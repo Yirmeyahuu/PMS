@@ -1,0 +1,45 @@
+# ===============================
+# Global
+# ===============================
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Secrets
+*.pem
+*.key
+
+# OS / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node & Python caches
+node_modules/
+__pycache__/
+*.py[cod]
+
+# Build outputs
+dist/
+build/
+
+# Coverage & testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.bak
