@@ -2,12 +2,170 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/src/assets/MESRELICON.svg" />
+    <link rel="apple-touch-icon" href="/src/assets/MESRELICON.svg" />
+    
+    <!-- Viewport and Mobile Optimization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    
+    <!-- Primary Meta Tags -->
+    <title>MES - Malasakit EMR Solutions | Patient Management System</title>
+    <meta name="title" content="MES - Malasakit EMR Solutions | Patient Management System" />
+    <meta name="description" content="Cloud-based patient management system for physiotherapy and allied health clinics in the Philippines. Streamline appointments, records, billing, and PhilHealth integration." />
+    <meta name="keywords" content="patient management system, EMR, physiotherapy, allied health, clinic management, PhilHealth, HMO, healthcare Philippines" />
+    <meta name="author" content="Malasakit EMR Solutions" />
+    <meta name="theme-color" content="#0ea5e9" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mes-pms.com/" />
+    <meta property="og:title" content="MES - Malasakit EMR Solutions | Patient Management System" />
+    <meta property="og:description" content="Cloud-based patient management system for physiotherapy and allied health clinics in the Philippines. Streamline appointments, records, billing, and PhilHealth integration." />
+    <meta property="og:image" content="/src/assets/MESLogo.svg" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://mes-pms.com/" />
+    <meta property="twitter:title" content="MES - Malasakit EMR Solutions | Patient Management System" />
+    <meta property="twitter:description" content="Cloud-based patient management system for physiotherapy and allied health clinics in the Philippines. Streamline appointments, records, billing, and PhilHealth integration." />
+    <meta property="twitter:image" content="/src/assets/MESLogo.svg" />
+    
+    <!-- Security Headers -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+    
+    <!-- Performance Optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MES - Malasakit EMR Solutions",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "PHP"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "150"
+      },
+      "description": "Cloud-based patient management system for physiotherapy and allied health clinics in the Philippines."
+    }
+    </script>
+    
+    <!-- Loading Styles -->
+    <style>
+      /* Loading Screen */
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease-out;
+      }
+      
+      #loading-screen.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loader {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+        margin-top: 24px;
+        letter-spacing: 0.5px;
+      }
+      
+      /* Prevent flash of unstyled content */
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
   <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+      <div class="loader"></div>
+      <div class="loading-text">Loading MES...</div>
+    </div>
+    
+    <!-- Main Application Root -->
     <div id="root"></div>
+    
+    <!-- Main Application Script -->
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Remove Loading Screen on Load -->
+    <script>
+      window.addEventListener('load', function() {
+        const loadingScreen = document.getElementById('loading-screen');
+        setTimeout(function() {
+          loadingScreen.classList.add('fade-out');
+          setTimeout(function() {
+            loadingScreen.style.display = 'none';
+          }, 300);
+        }, 500);
+      });
+      
+      // Fallback: Remove loading screen after 5 seconds regardless
+      setTimeout(function() {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.style.display = 'none';
+        }
+      }, 5000);
+    </script>
+    
+    <!-- No JavaScript Fallback -->
+    <noscript>
+      <style>
+        #loading-screen { display: none; }
+      </style>
+      <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>MES - Malasakit EMR Solutions requires JavaScript to be enabled. Please enable JavaScript in your browser settings to continue.</p>
+      </div>
+    </noscript>
   </body>
 </html>

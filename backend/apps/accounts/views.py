@@ -3,66 +3,251 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import authenticate
+from django.db import transaction
+from django.utils import timezone
 from .models import User, Role, Permission
 from .serializers import (
-    UserSerializer, UserRegistrationSerializer,
-    RoleSerializer, PermissionSerializer
+    UserSerializer, AdminRegistrationSerializer, UserRegistrationSerializer,
+    RoleSerializer, PermissionSerializer, PasswordChangeSerializer
 )
+from .services.password_service import PasswordService
+from .services.email_service import EmailService
+from apps.clinics.models import Clinic
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AuthViewSet(viewsets.GenericViewSet):
-    """Authentication endpoints"""
+    """Authentication endpoints with enhanced security"""
     
     permission_classes = [AllowAny]
     
-    @action(detail=False, methods=['post'])
-    def register(self, request):
-        """Register a new user"""
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'user': UserSerializer(user).data,
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_permissions(self):
+        """Set permissions based on action"""
+        if self.action in ['register_admin', 'register', 'login', 'verify_token']:
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], url_path='register-admin', permission_classes=[AllowAny])
+    def register_admin(self, request):
+        """
+        Register admin - Auto-generates password and emails credentials.
+        Security: No tokens returned, user must login manually.
+        """
+        serializer = AdminRegistrationSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                temp_password = PasswordService.generate_temporary_password()
+                
+                clinic = Clinic.objects.create(
+                    name=serializer.validated_data['company_name'],
+                    phone=serializer.validated_data.get('phone', ''),
+                    is_active=True
+                )
+                
+                user = User.objects.create_user(
+                    email=serializer.validated_data['email'],
+                    password=temp_password,
+                    first_name=serializer.validated_data['first_name'],
+                    last_name=serializer.validated_data['last_name'],
+                    phone=serializer.validated_data.get('phone', ''),
+                    role='ADMIN',
+                    clinic=clinic,
+                    password_changed=False
+                )
+                
+                email_sent = EmailService.send_welcome_email(
+                    user_email=user.email,
+                    user_name=user.get_full_name(),
+                    password=temp_password,
+                    company_name=clinic.name
+                )
+                
+                if not email_sent:
+                    logger.warning(f"Email failed to send for {user.email}")
+                
+                logger.info(f"Admin account created: {user.email}")
+                
+                return Response({
+                    'message': 'Account created successfully! Check your email for login credentials.',
+                    'email_sent': email_sent,
+                    'clinic': {
+                        'id': clinic.id,
+                        'name': clinic.name
+                    }
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            logger.error(f"Admin registration failed: {str(e)}")
+            return Response(
+                {'detail': 'Registration failed. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """User login"""
+        """
+        User login with enhanced security.
+        Security: 
+        - Updates last_login timestamp
+        - Logs authentication attempts
+        - Returns user data with tokens
+        """
         email = request.data.get('email')
         password = request.data.get('password')
         
-        user = authenticate(email=email, password=password)
-        if user:
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'user': UserSerializer(user).data,
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
-            })
-        return Response(
-            {'detail': 'Invalid credentials'},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
+        if not email or not password:
+            return Response(
+                {'detail': 'Email and password are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Authenticate user
+        user = authenticate(request=request, email=email, password=password)
+        
+        if not user:
+            logger.warning(f"Failed login attempt for: {email}")
+            return Response(
+                {'detail': 'Invalid email or password'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        if not user.is_active:
+            logger.warning(f"Inactive account login attempt: {email}")
+            return Response(
+                {'detail': 'Account is inactive. Please contact support.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        
+        # Update last login
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+        
+        logger.info(f"Successful login: {email}")
+        
+        return Response({
+            'user': UserSerializer(user).data,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
+            'needs_password_change': user.needs_password_change
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def logout(self, request):
-        """User logout - blacklist refresh token"""
+        """
+        User logout - Blacklists refresh token.
+        Security: Ensures token cannot be reused.
+        """
         try:
             refresh_token = request.data.get('refresh_token')
+            
+            if not refresh_token:
+                return Response(
+                    {'detail': 'Refresh token is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Blacklist the refresh token
             token = RefreshToken(refresh_token)
             token.blacklist()
-            return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            
+            logger.info(f"User logged out: {request.user.email}")
+            
+            return Response(
+                {'detail': 'Successfully logged out'},
+                status=status.HTTP_200_OK
+            )
+            
+        except TokenError as e:
+            logger.error(f"Token blacklist error: {str(e)}")
+            return Response(
+                {'detail': 'Invalid or expired token'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Logout failed: {str(e)}")
+            return Response(
+                {'detail': 'Logout failed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def verify_token(self, request):
+        """
+        Verify if access token is valid.
+        Security: Used for route protection on frontend.
+        """
+        token = request.data.get('token')
+        
+        if not token:
+            return Response(
+                {'valid': False, 'detail': 'Token is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Try to decode the token
+            from rest_framework_simplejwt.tokens import AccessToken
+            AccessToken(token)
+            
+            return Response({
+                'valid': True,
+                'detail': 'Token is valid'
+            }, status=status.HTTP_200_OK)
+            
+        except TokenError:
+            return Response({
+                'valid': False,
+                'detail': 'Token is invalid or expired'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        """
+        Get current authenticated user.
+        Security: Only returns data for authenticated users.
+        """
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def change_password(self, request):
+        """
+        Change user password.
+        Security: Requires old password verification.
+        """
+        serializer = PasswordChangeSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            user = request.user
+            user.set_password(serializer.validated_data['new_password'])
+            user.password_changed = True
+            user.save()
+            
+            logger.info(f"Password changed for user: {user.email}")
+            
+            return Response({
+                'detail': 'Password changed successfully. Please login again.'
+            }, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserViewSet(viewsets.ModelViewSet):

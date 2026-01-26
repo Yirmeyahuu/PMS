@@ -11,7 +11,8 @@ class UserManager(BaseUserManager):
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
         user.save(using=self._db)
         return user
 
@@ -32,13 +33,16 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     ]
     
     username = None  # Remove username field
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, db_index=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STAFF')
     phone = models.CharField(max_length=15, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     
-    # Clinic association (will be linked after clinic model is created)
+    # New field for password change tracking
+    password_changed = models.BooleanField(default=False)
+    
+    # Clinic association
     clinic = models.ForeignKey(
         'clinics.Clinic',
         on_delete=models.SET_NULL,
@@ -55,6 +59,10 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     class Meta:
         db_table = 'users'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['role']),
+        ]
     
     def __str__(self):
         return f"{self.get_full_name()} ({self.email})"
@@ -70,6 +78,11 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     @property
     def is_staff_member(self):
         return self.role == 'STAFF'
+    
+    @property
+    def needs_password_change(self):
+        """Check if user needs to change password"""
+        return not self.password_changed
 
 
 class Permission(TimeStampedModel):

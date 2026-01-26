@@ -1,0 +1,160 @@
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+import logging
+import ssl
+import certifi
+
+logger = logging.getLogger(__name__)
+
+
+class EmailService:
+    """Service for sending emails"""
+    
+    @staticmethod
+    def send_welcome_email(user_email: str, user_name: str, password: str, company_name: str) -> bool:
+        """
+        Send welcome email with auto-generated credentials.
+        """
+        try:
+            subject = f'Welcome to MES PMS - Your Account Credentials'
+            
+            # HTML content
+            html_message = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); 
+                              color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                    .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }}
+                    .credentials {{ background: white; padding: 20px; border-radius: 8px; 
+                                   margin: 20px 0; border-left: 4px solid #0ea5e9; }}
+                    .password {{ font-size: 24px; font-weight: bold; color: #0ea5e9; 
+                               letter-spacing: 2px; margin: 10px 0; }}
+                    .button {{ display: inline-block; padding: 12px 30px; background: #0ea5e9; 
+                             color: white; text-decoration: none; border-radius: 6px; 
+                             margin: 20px 0; font-weight: bold; }}
+                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; 
+                              padding: 15px; margin: 20px 0; border-radius: 4px; }}
+                    .footer {{ text-align: center; color: #6c757d; font-size: 12px; 
+                             margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🎉 Welcome to MES PMS!</h1>
+                        <p>Your Practice Management System</p>
+                    </div>
+                    
+                    <div class="content">
+                        <h2>Hello {user_name},</h2>
+                        
+                        <p>Your admin account for <strong>{company_name}</strong> has been successfully created!</p>
+                        
+                        <div class="credentials">
+                            <h3>Your Login Credentials:</h3>
+                            <p><strong>Email:</strong> {user_email}</p>
+                            <p><strong>Temporary Password:</strong></p>
+                            <div class="password">{password}</div>
+                        </div>
+                        
+                        <div class="warning">
+                            <strong>⚠️ Important Security Notice:</strong>
+                            <ul>
+                                <li>This is a temporary password</li>
+                                <li>Please change it immediately after your first login</li>
+                                <li>Never share your password with anyone</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <a href="{settings.FRONTEND_URL}/login" class="button">
+                                Login to Your Account
+                            </a>
+                        </div>
+                        
+                        <p>Best regards,<br>
+                        <strong>The MES PMS Team</strong></p>
+                    </div>
+                    
+                    <div class="footer">
+                        <p>© 2026 MES PMS. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Plain text fallback
+            plain_message = f"""
+            Welcome to MES PMS!
+            
+            Hello {user_name},
+            
+            Your admin account for {company_name} has been created!
+            
+            Email: {user_email}
+            Temporary Password: {password}
+            
+            Login: {settings.FRONTEND_URL}/login
+            
+            Best regards,
+            MES PMS Team
+            """
+            
+            # Create email with explicit encoding
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user_email]
+            )
+            email.attach_alternative(html_message, "text/html")
+            
+            # Send with fail_silently=False to catch errors
+            email.send(fail_silently=False)
+            
+            logger.info(f"✅ Welcome email sent to {user_email}")
+            return True
+            
+        except ssl.SSLError as e:
+            logger.error(f"❌ SSL Error: {str(e)}")
+            logger.error("Fix: Run '/Applications/Python 3.*/Install Certificates.command'")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Email error: {str(e)}")
+            return False
+    
+    @staticmethod
+    def send_password_reset_email(user_email: str, reset_token: str) -> bool:
+        """Send password reset email"""
+        try:
+            subject = 'MES PMS - Password Reset'
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/{reset_token}"
+            
+            plain_message = f"""
+            Password Reset Request
+            
+            Click here to reset: {reset_url}
+            
+            This link expires in 1 hour.
+            """
+            
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user_email]
+            )
+            email.send(fail_silently=False)
+            
+            logger.info(f"✅ Reset email sent to {user_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Reset email error: {str(e)}")
+            return False

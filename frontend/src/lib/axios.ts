@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -12,12 +12,16 @@ export const axiosInstance = axios.create({
 
 // Request interceptor - Add auth token
 axiosInstance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config: any) => {
     const tokens = localStorage.getItem('auth_tokens');
     if (tokens) {
-      const { access } = JSON.parse(tokens);
-      if (access && config.headers) {
-        config.headers.Authorization = `Bearer ${access}`;
+      try {
+        const { access } = JSON.parse(tokens);
+        if (access && config.headers) {
+          config.headers.Authorization = `Bearer ${access}`;
+        }
+      } catch (error) {
+        console.error('Error parsing auth tokens:', error);
       }
     }
     return config;
@@ -31,7 +35,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as any;
 
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -59,7 +63,7 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, clear auth and redirect to login
         localStorage.removeItem('auth_tokens');
-        localStorage.removeItem('user');
+        localStorage.removeItem('auth-storage');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }

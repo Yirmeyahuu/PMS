@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 
 # Import all viewsets
 from apps.accounts.views import AuthViewSet, UserViewSet, RoleViewSet, PermissionViewSet
@@ -65,6 +66,8 @@ router.register(r'hmo-claims', HMOClaimViewSet, basename='hmo-claims')
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    # Add token refresh endpoint
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 
 if settings.DEBUG:

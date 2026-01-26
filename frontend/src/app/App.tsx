@@ -1,53 +1,157 @@
-import { useState } from 'react'
-import reactLogo from '../assets/react.svg'
-import viteLogo from '/logo.svg'
-import '../App.css'
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from '@/store/auth.store';
+import { ProtectedRoute, PublicRoute, RoleBasedRoute } from './router'; // Changed this line
+
+// Public Pages
+import { LandingPage } from '@/features/landing/LandingPage';
+import { Login } from '@/features/auth/Login';
+import { AdminRegister } from '@/features/auth/AdminRegister';
+import { RegisterSuccess } from '@/features/auth/RegisterSuccess';
+
+// Protected Pages
+import { Dashboard } from '@/features/dashboard/Dashboard';
+
+// Placeholder components
+const Appointments = () => <div className="p-8"><h1 className="text-2xl font-bold">Appointments</h1></div>;
+const Patients = () => <div className="p-8"><h1 className="text-2xl font-bold">Patients</h1></div>;
+const Contacts = () => <div className="p-8"><h1 className="text-2xl font-bold">Contacts</h1></div>;
+const Reports = () => <div className="p-8"><h1 className="text-2xl font-bold">Reports</h1></div>;
+const Manage = () => <div className="p-8"><h1 className="text-2xl font-bold">Manage</h1></div>;
+const Setup = () => <div className="p-8"><h1 className="text-2xl font-bold">Setup</h1></div>;
+const Profile = () => <div className="p-8"><h1 className="text-2xl font-bold">Profile</h1></div>;
+
+const Unauthorized = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-bold text-red-600">403</h1>
+      <p className="text-gray-600 mt-2">You don't have permission to access this page</p>
+    </div>
+  </div>
+);
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { verifyAuth, isLoading } = useAuthStore();
+
+  // Verify authentication on app load
+  useEffect(() => {
+    verifyAuth();
+  }, [verifyAuth]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-sky-600"></div>
+      </div>
+    );
+  }
 
   return (
-    // Main container: centers content and sets full height
-    <div className="flex flex-col items-center justify-center min-h-screen py-10 text-center">
+    <BrowserRouter>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            padding: '16px',
+            borderRadius: '12px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       
-      {/* Logos section */}
-      <div className="flex justify-center gap-8 mb-8">
-        <a href="https://vite.dev" target="_blank">
-          <img 
-            src={viteLogo} 
-            className="h-24 w-24 object-contain transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa]" 
-            alt="Vite logo" 
-          />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img 
-            src={reactLogo} 
-            className="h-24 w-24 object-contain transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] animate-spin-slow" 
-            alt="React logo" 
-          />
-        </a>
-      </div>
+      <Routes>
+        {/* Public Routes - Redirect to dashboard if authenticated */}
+        <Route path="/" element={
+          <PublicRoute>
+            <LandingPage />
+          </PublicRoute>
+        } />
+        <Route path="/login" element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        } />
+        <Route path="/register" element={
+          <PublicRoute>
+            <AdminRegister />
+          </PublicRoute>
+        } />
+        <Route path="/register/success" element={
+          <PublicRoute>
+            <RegisterSuccess />
+          </PublicRoute>
+        } />
+        
+        {/* Unauthorized page */}
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
-      <h1 className="text-5xl font-bold mb-8">Vite + React</h1>
+        {/* Protected Routes - Require authentication */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/appointments" element={
+          <ProtectedRoute>
+            <Appointments />
+          </ProtectedRoute>
+        } />
+        <Route path="/patients" element={
+          <ProtectedRoute>
+            <Patients />
+          </ProtectedRoute>
+        } />
+        <Route path="/contacts" element={
+          <ProtectedRoute>
+            <Contacts />
+          </ProtectedRoute>
+        } />
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            <Reports />
+          </ProtectedRoute>
+        } />
+        
+        {/* Admin-only routes */}
+        <Route path="/manage" element={
+          <RoleBasedRoute allowedRoles={['ADMIN']}>
+            <Manage />
+          </RoleBasedRoute>
+        } />
+        <Route path="/setup" element={
+          <RoleBasedRoute allowedRoles={['ADMIN']}>
+            <Setup />
+          </RoleBasedRoute>
+        } />
+        
+        {/* Profile - All authenticated users */}
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } />
 
-      {/* Card section */}
-      <div className="p-8">
-        <button 
-          className="px-6 py-2 rounded-lg border border-transparent bg-slate-100 text-slate-900 font-medium cursor-pointer transition-colors hover:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/50 dark:bg-slate-800 dark:text-white"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          count is {count}
-        </button>
-        <p className="mt-6 text-slate-600 dark:text-slate-400">
-          Edit <code className="font-mono bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-sm">src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-
-      <p className="text-slate-500 text-sm">
-        Click on the Vite and React logos to learn more
-      </p>
-    </div>
-  )
+        {/* 404 - Redirect based on auth status */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
