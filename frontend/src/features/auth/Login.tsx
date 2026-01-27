@@ -50,8 +50,13 @@ export const Login: React.FC = () => {
       
       // Check if password change is needed
       if (response.needs_password_change) {
-        toast.info('Please change your temporary password', {
+        toast('Please change your temporary password', {
+          icon: '🔐',
           duration: 5000,
+          style: {
+            background: '#FEF3C7',
+            color: '#92400E',
+          },
         });
         navigate('/change-password');
       } else {

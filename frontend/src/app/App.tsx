@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
-import { ProtectedRoute, PublicRoute, RoleBasedRoute } from './router'; // Changed this line
+import { ProtectedRoute, PublicRoute, RoleBasedRoute } from './router';
 
 // Public Pages
 import { LandingPage } from '@/features/landing/LandingPage';
@@ -31,20 +31,33 @@ const Unauthorized = () => (
   </div>
 );
 
+const LoadingScreen = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-50">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-sky-600 mx-auto mb-4"></div>
+      <p className="text-gray-600 text-lg font-medium">Loading...</p>
+    </div>
+  </div>
+);
+
 function App() {
-  const { verifyAuth, isLoading } = useAuthStore();
+  const { verifyAuth } = useAuthStore();
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Verify authentication on app load
   useEffect(() => {
-    verifyAuth();
+    const initAuth = async () => {
+      console.log('🚀 App initializing...');
+      await verifyAuth();
+      setIsInitializing(false);
+      console.log('✅ App initialized');
+    };
+
+    initAuth();
   }, [verifyAuth]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-sky-600"></div>
-      </div>
-    );
+  if (isInitializing) {
+    return <LoadingScreen />;
   }
 
   return (

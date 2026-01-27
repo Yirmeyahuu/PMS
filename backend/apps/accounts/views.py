@@ -185,7 +185,7 @@ class AuthViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['post'], url_path='verify-token', permission_classes=[AllowAny])
     def verify_token(self, request):
         """
         Verify if access token is valid.
