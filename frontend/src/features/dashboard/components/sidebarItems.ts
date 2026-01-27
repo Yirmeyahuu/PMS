@@ -4,60 +4,62 @@ import {
   Users, 
   Contact, 
   BarChart3, 
-  FolderKanban, 
-  Settings 
+  FolderCog, 
+  Settings
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
 export interface SidebarItem {
   id: string;
   label: string;
-  icon: LucideIcon;
   path: string;
-  badge?: string;
+  icon: any;
+  badge?: number;
+  adminOnly?: boolean;
 }
 
 export const sidebarItems: SidebarItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
+    path: '/dashboard',
     icon: LayoutDashboard,
-    path: '/dashboard'
   },
   {
     id: 'diary',
     label: 'Diary',
+    path: '/diary',
     icon: Calendar,
-    path: '/appointments'
   },
   {
     id: 'clients',
     label: 'Clients',
+    path: '/clients',
     icon: Users,
-    path: '/patients'
   },
   {
     id: 'contacts',
     label: 'Contacts',
+    path: '/contacts',
     icon: Contact,
-    path: '/contacts'
   },
   {
     id: 'reports',
     label: 'Reports',
+    path: '/reports',
     icon: BarChart3,
-    path: '/reports'
   },
   {
     id: 'manage',
     label: 'Manage',
-    icon: FolderKanban,
-    path: '/manage'
+    path: '/manage',
+    icon: FolderCog,
+    adminOnly: true,
   },
   {
     id: 'setup',
     label: 'Setup',
+    path: '/setup',
     icon: Settings,
-    path: '/setup'
-  }
+    adminOnly: true,
+  },
 ];

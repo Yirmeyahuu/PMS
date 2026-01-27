@@ -1,25 +1,33 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Sidebar } from './Sidebar';
+import { MobileHeader } from './MobileHeader';
+import { useSidebar } from '@/hooks/useSidebar';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const [sidebarWidth, setSidebarWidth] = useState(80); // Default collapsed width
+  const { sidebarWidth, isMobile } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      {/* Mobile Header */}
+      {isMobile && <MobileHeader />}
+      
+      {/* Sidebar */}
       <Sidebar />
       
-      {/* Main Content Area */}
+      {/* Main Content Area - Full height, no scroll */}
       <main 
-        className="transition-all duration-300 ease-in-out"
-        style={{ marginLeft: `${sidebarWidth}px` }}
+        className="transition-all duration-300 ease-in-out h-screen overflow-hidden"
+        style={{ 
+          marginLeft: isMobile ? '0' : `${sidebarWidth}px`,
+          marginTop: isMobile ? '64px' : '0',
+          height: isMobile ? 'calc(100vh - 64px)' : '100vh',
+        }}
       >
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          {children}
-        </div>
+        {children}
       </main>
     </div>
   );
