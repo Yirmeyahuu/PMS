@@ -66,11 +66,12 @@ export const DashboardContent: React.FC = () => {
         </div>
       </div>
 
-      {/* Bento Grid Layout - Scrollable content */}
+      {/* Bento Grid Layout - Scrollable content with bottom padding */}
       <div
         className="flex-1 overflow-y-auto"
         style={{
           padding: isMobile ? '1rem' : isExpanded ? '2rem' : '1.5rem',
+          paddingBottom: isMobile ? '2rem' : '2.5rem', // ✅ Added extra bottom padding
         }}
       >
         {isMobile ? (

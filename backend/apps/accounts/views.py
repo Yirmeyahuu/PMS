@@ -264,6 +264,110 @@ class UserViewSet(viewsets.ModelViewSet):
             return self.queryset
         return self.queryset.filter(clinic=user.clinic)
     
+    def create(self, request, *args, **kwargs):
+        """
+        Create new staff/practitioner account.
+        Auto-generates password and sends via email.
+        Only admins can create users.
+        """
+        # Check if user is admin
+        if not request.user.is_admin:
+            return Response(
+                {'detail': 'Only administrators can create staff accounts.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                # Generate temporary password
+                temp_password = PasswordService.generate_temporary_password()
+                
+                # Create user with validated data
+                user = User.objects.create_user(
+                    email=serializer.validated_data['email'],
+                    password=temp_password,
+                    first_name=serializer.validated_data['first_name'],
+                    last_name=serializer.validated_data['last_name'],
+                    phone=serializer.validated_data.get('phone', ''),
+                    role=serializer.validated_data.get('role', 'STAFF'),
+                    clinic=request.user.clinic,
+                    password_changed=False
+                )
+                
+                # Send welcome email with credentials
+                company_name = request.user.clinic.name if request.user.clinic else 'Your Organization'
+                email_sent = EmailService.send_welcome_email(
+                    user_email=user.email,
+                    user_name=user.get_full_name(),
+                    password=temp_password,
+                    company_name=company_name
+                )
+                
+                if not email_sent:
+                    logger.warning(f"Email failed to send for {user.email}")
+                
+                logger.info(f"Staff account created: {user.email} by {request.user.email}")
+                
+                # Return created user data
+                response_serializer = self.get_serializer(user)
+                headers = self.get_success_headers(response_serializer.data)
+                
+                return Response({
+                    **response_serializer.data,
+                    'message': 'Staff account created successfully! Login credentials sent to email.',
+                    'email_sent': email_sent
+                }, status=status.HTTP_201_CREATED, headers=headers)
+                
+        except Exception as e:
+            logger.error(f"Staff creation failed: {str(e)}")
+            return Response(
+                {'detail': f'Failed to create staff account: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def update(self, request, *args, **kwargs):
+        """Update user - prevents password changes through this endpoint"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Remove password from data if present
+        data = request.data.copy()
+        if 'password' in data:
+            data.pop('password')
+        
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Soft delete user"""
+        instance = self.get_object()
+        
+        # Prevent deleting yourself
+        if instance.id == request.user.id:
+            return Response(
+                {'detail': 'You cannot delete your own account.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Soft delete
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save()
+        
+        logger.info(f"User soft deleted: {instance.email} by {request.user.email}")
+        
+        return Response(
+            {'detail': 'Staff member removed successfully.'},
+            status=status.HTTP_204_NO_CONTENT
+        )
+    
     @action(detail=False, methods=['get'])
     def me(self, request):
         """Get current user profile"""
@@ -280,4 +384,4 @@ class RoleViewSet(viewsets.ModelViewSet):
 class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated] 
