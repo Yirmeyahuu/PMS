@@ -15,6 +15,7 @@ from apps.billing.views import InvoiceViewSet, InvoiceItemViewSet, PaymentViewSe
 from apps.reports.views import ReportViewSet
 from apps.notifications.views import NotificationViewSet, EmailLogViewSet, SMSLogViewSet
 from apps.integrations.views import PhilHealthClaimViewSet, HMOClaimViewSet
+from apps.contacts.views import ContactViewSet
 
 # Create router
 router = DefaultRouter()
@@ -33,6 +34,9 @@ router.register(r'locations', LocationViewSet, basename='locations')
 # Patients routes
 router.register(r'patients', PatientViewSet, basename='patients')
 router.register(r'intake-forms', IntakeFormViewSet, basename='intake-forms')
+
+
+router.register(r'contacts', ContactViewSet, basename='contacts')
 
 # Appointments routes
 router.register(r'appointments', AppointmentViewSet, basename='appointments')

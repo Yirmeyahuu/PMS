@@ -15,7 +15,7 @@ import { RegisterSuccess } from '@/features/auth/RegisterSuccess';
 import { Dashboard } from '@/features/dashboard/Dashboard';
 import { Diary } from '@/features/appointments/Diary';
 import { Clients } from '@/features/patients/Clients';
-import { Contacts } from '@/features/patients/Contacts';
+import { Contacts } from '@/features/contacts/Contacts';
 import { Reports } from '@/features/reports/Reports';
 import { Manage } from '@/features/manage/Manage';
 import { Setup } from '@/features/setup/Setup';

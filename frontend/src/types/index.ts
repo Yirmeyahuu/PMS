@@ -2,6 +2,7 @@
 export * from './auth';
 export * from './patient';
 export * from './appointment';
+export * from './contact';
 
 // Common types
 export interface PaginatedResponse<T> {

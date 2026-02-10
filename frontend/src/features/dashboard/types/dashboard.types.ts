@@ -16,7 +16,7 @@ export interface BookingByCase {
 }
 
 export interface UncompletedNote {
-  id: string;
+  id: number;
   patientName: string;
   appointmentDate: string;
   appointmentTime: string;

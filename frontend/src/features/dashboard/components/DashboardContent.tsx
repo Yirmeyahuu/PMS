@@ -4,11 +4,11 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import { DashboardStats } from './DashboardStats';
 import { BookingsChart } from './BookingsChart';
 import { UncompletedNotesTable } from './UncompletedNotesTable';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
   const { isMobile, isExpanded } = useSidebar();
-  const { data, isLoading, error } = useDashboardData();
+  const { data, isLoading, error, refresh } = useDashboardData();
 
   if (error) {
     return (
@@ -18,7 +18,14 @@ export const DashboardContent: React.FC = () => {
             <AlertCircle className="w-6 h-6 text-red-600" />
             <h3 className="text-lg font-bold text-red-900">Error Loading Dashboard</h3>
           </div>
-          <p className="text-red-700">{error}</p>
+          <p className="text-red-700 mb-4">{error}</p>
+          <button
+            onClick={refresh}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -27,50 +34,62 @@ export const DashboardContent: React.FC = () => {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header - Fixed */}
-      <div 
+      <div
         className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm"
         style={{
-          padding: isMobile ? '1rem' : (isExpanded ? '1.5rem 2rem' : '1.5rem'),
+          padding: isMobile ? '1rem' : isExpanded ? '1.5rem 2rem' : '1.5rem',
         }}
       >
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-          Dashboard Overview
-        </h1>
-        <p className="text-sm text-gray-600">
-          {new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+              Dashboard Overview
+            </h1>
+            <p className="text-sm text-gray-600">
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </p>
+          </div>
+          {!isLoading && (
+            <button
+              onClick={refresh}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Bento Grid Layout - Scrollable content */}
-      <div 
+      <div
         className="flex-1 overflow-y-auto"
         style={{
-          padding: isMobile ? '1rem' : (isExpanded ? '2rem' : '1.5rem'),
+          padding: isMobile ? '1rem' : isExpanded ? '2rem' : '1.5rem',
         }}
       >
         {isMobile ? (
           // Mobile: Stack vertically
           <div className="space-y-4">
-            <DashboardStats 
-              stats={data?.stats || {
-                todayOccupancy: { current: 0, total: 0, percentage: 0 },
-                todayBookings: 0,
-                todayNewClients: 0,
-                todayCancellations: 0
-              }} 
+            <DashboardStats
+              stats={
+                data?.stats || {
+                  todayOccupancy: { current: 0, total: 0, percentage: 0 },
+                  todayBookings: 0,
+                  todayNewClients: 0,
+                  todayCancellations: 0,
+                }
+              }
               isLoading={isLoading}
             />
-            <BookingsChart 
-              data={data?.bookingsByCase || []} 
-              isLoading={isLoading}
-            />
-            <UncompletedNotesTable 
-              notes={data?.uncompletedNotes || []} 
+            <BookingsChart data={data?.bookingsByCase || []} isLoading={isLoading} />
+            <UncompletedNotesTable
+              notes={data?.uncompletedNotes || []}
               isLoading={isLoading}
             />
           </div>
@@ -79,13 +98,15 @@ export const DashboardContent: React.FC = () => {
           <div className="grid grid-cols-12 gap-6 h-full">
             {/* Left Column: Stats Cards */}
             <div className="col-span-12 lg:col-span-4 xl:col-span-3 flex flex-col gap-6">
-              <DashboardStats 
-                stats={data?.stats || {
-                  todayOccupancy: { current: 0, total: 0, percentage: 0 },
-                  todayBookings: 0,
-                  todayNewClients: 0,
-                  todayCancellations: 0
-                }} 
+              <DashboardStats
+                stats={
+                  data?.stats || {
+                    todayOccupancy: { current: 0, total: 0, percentage: 0 },
+                    todayBookings: 0,
+                    todayNewClients: 0,
+                    todayCancellations: 0,
+                  }
+                }
                 isLoading={isLoading}
                 layout="vertical"
               />
@@ -95,16 +116,16 @@ export const DashboardContent: React.FC = () => {
             <div className="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-6 h-full">
               {/* Bar Chart */}
               <div className="flex-shrink-0">
-                <BookingsChart 
-                  data={data?.bookingsByCase || []} 
+                <BookingsChart
+                  data={data?.bookingsByCase || []}
                   isLoading={isLoading}
                 />
               </div>
 
               {/* Uncompleted Notes Table - Takes remaining space */}
               <div className="flex-1 min-h-0">
-                <UncompletedNotesTable 
-                  notes={data?.uncompletedNotes || []} 
+                <UncompletedNotesTable
+                  notes={data?.uncompletedNotes || []}
                   isLoading={isLoading}
                 />
               </div>

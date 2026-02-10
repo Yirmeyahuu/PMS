@@ -13,16 +13,10 @@ export const axiosInstance = axios.create({
 // Request interceptor - Add auth token
 axiosInstance.interceptors.request.use(
   (config: any) => {
-    const tokens = localStorage.getItem('auth_tokens');
-    if (tokens) {
-      try {
-        const { access } = JSON.parse(tokens);
-        if (access && config.headers) {
-          config.headers.Authorization = `Bearer ${access}`;
-        }
-      } catch (error) {
-        console.error('Error parsing auth tokens:', error);
-      }
+    // FIX: Use access_token instead of auth_tokens
+    const token = localStorage.getItem('access_token');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -42,27 +36,27 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const tokens = localStorage.getItem('auth_tokens');
-        if (tokens) {
-          const { refresh } = JSON.parse(tokens);
-          
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
           // Attempt to refresh token
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
-            refresh,
+          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+            refresh: refreshToken,
           });
 
-          const newTokens = response.data;
-          localStorage.setItem('auth_tokens', JSON.stringify(newTokens));
+          const newAccessToken = response.data.access;
+          localStorage.setItem('access_token', newAccessToken);
 
           // Retry original request with new token
           if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           }
           return axiosInstance(originalRequest);
         }
       } catch (refreshError) {
         // Refresh failed, clear auth and redirect to login
-        localStorage.removeItem('auth_tokens');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';
         return Promise.reject(refreshError);

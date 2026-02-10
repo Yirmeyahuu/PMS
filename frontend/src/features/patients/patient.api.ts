@@ -1,73 +1,67 @@
-export interface Patient {
-  id: number;
-  clinic: number;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  full_name: string;
-  date_of_birth: string;
-  age: number;
-  gender: 'M' | 'F' | 'O';
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  province: string;
-  postal_code: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relationship: string;
-  philhealth_number: string;
-  hmo_provider: string;
-  hmo_number: string;
-  medical_conditions: string;
-  allergies: string;
-  medications: string;
-  patient_number: string;
-  avatar: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+import axiosInstance from '@/lib/axios';
+import type { Patient, CreatePatientData, PaginatedResponse } from '@/types';
+
+export interface PatientFilters {
+  search?: string;
+  gender?: 'M' | 'F' | 'O' | '';
+  is_active?: boolean;
+  page?: number;
+  page_size?: number;
 }
 
-export interface IntakeForm {
-  id: number;
-  patient: number;
-  patient_name: string;
-  completed_by: number | null;
-  completed_by_name: string;
-  chief_complaint: string;
-  complaint_onset: string;
-  past_medical_history: string;
-  surgical_history: string;
-  family_history: string;
-  social_history: string;
-  system_review: Record<string, any>;
-  consent_given: boolean;
-  consent_date: string | null;
-  created_at: string;
-}
+/**
+ * Get all patients with filters
+ */
+export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResponse<Patient>> => {
+  const params = new URLSearchParams();
+  
+  if (filters?.search) params.append('search', filters.search);
+  if (filters?.gender) params.append('gender', filters.gender);
+  if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active));
+  if (filters?.page) params.append('page', String(filters.page));
+  if (filters?.page_size) params.append('page_size', String(filters.page_size));
 
-export interface CreatePatientData {
-  clinic: number;
-  first_name: string;
-  middle_name?: string;
-  last_name: string;
-  date_of_birth: string;
-  gender: 'M' | 'F' | 'O';
-  email?: string;
-  phone: string;
-  address: string;
-  city: string;
-  province: string;
-  postal_code?: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relationship: string;
-  philhealth_number?: string;
-  hmo_provider?: string;
-  hmo_number?: string;
-  medical_conditions?: string;
-  allergies?: string;
-  medications?: string;
-}
+  const response = await axiosInstance.get<PaginatedResponse<Patient>>(
+    `/patients/?${params.toString()}`
+  );
+  return response.data;
+};
+
+/**
+ * Get single patient by ID
+ */
+export const getPatient = async (id: number): Promise<Patient> => {
+  const response = await axiosInstance.get<Patient>(`/patients/${id}/`);
+  return response.data;
+};
+
+/**
+ * Create new patient
+ */
+export const createPatient = async (data: CreatePatientData): Promise<Patient> => {
+  const response = await axiosInstance.post<Patient>('/patients/', data);
+  return response.data;
+};
+
+/**
+ * Update patient
+ */
+export const updatePatient = async (id: number, data: Partial<CreatePatientData>): Promise<Patient> => {
+  const response = await axiosInstance.patch<Patient>(`/patients/${id}/`, data);
+  return response.data;
+};
+
+/**
+ * Delete patient (soft delete)
+ */
+export const deletePatient = async (id: number): Promise<void> => {
+  await axiosInstance.delete(`/patients/${id}/`);
+};
+
+/**
+ * Get patient intake forms
+ */
+export const getPatientIntakeForms = async (patientId: number) => {
+  const response = await axiosInstance.get(`/patients/${patientId}/intake_forms/`);
+  return response.data;
+};

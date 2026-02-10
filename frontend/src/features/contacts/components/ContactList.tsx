@@ -1,47 +1,36 @@
 import React from 'react';
-import { Eye, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Patient } from '@/types';
+import { Eye, Edit, ChevronLeft, ChevronRight, Star, StarOff } from 'lucide-react';
+import type { Contact } from '@/types';
 
-interface PatientListProps {
-  patients: Patient[];
+interface ContactListProps {
+  contacts: Contact[];
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  onView: (patient: Patient) => void;
-  onEdit: (patient: Patient) => void;
+  onView: (contact: Contact) => void;
+  onEdit: (contact: Contact) => void;
+  onTogglePreferred?: (contact: Contact) => void;
 }
 
-export const PatientList: React.FC<PatientListProps> = ({ 
-  patients, 
+export const ContactList: React.FC<ContactListProps> = ({
+  contacts,
   currentPage,
   totalPages,
   onPageChange,
   onView,
-  onEdit
+  onEdit,
+  onTogglePreferred,
 }) => {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      onPageChange(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      onPageChange(currentPage + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => {
-    onPageChange(page);
+  const getContactTypeColor = (type: string) => {
+    const colors = {
+      DOCTOR: 'bg-blue-100 text-blue-700',
+      PRACTITIONER: 'bg-green-100 text-green-700',
+      CLINIC: 'bg-purple-100 text-purple-700',
+      LABORATORY: 'bg-yellow-100 text-yellow-700',
+      PHARMACY: 'bg-pink-100 text-pink-700',
+      OTHER: 'bg-gray-100 text-gray-700',
+    };
+    return colors[type as keyof typeof colors] || colors.OTHER;
   };
 
   const getPageNumbers = () => {
@@ -65,14 +54,14 @@ export const PatientList: React.FC<PatientListProps> = ({
     return pages;
   };
 
-  if (patients.length === 0) {
+  if (contacts.length === 0) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
             <Eye className="w-10 h-10 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No clients found</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No contacts found</h3>
           <p className="text-gray-600">Try adjusting your search or filters</p>
         </div>
       </div>
@@ -89,16 +78,19 @@ export const PatientList: React.FC<PatientListProps> = ({
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                    Client ID
+                    Company ID
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                     Full Name
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                    Type
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                     Email
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                    Birthday
+                    Phone
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Actions
@@ -106,48 +98,84 @@ export const PatientList: React.FC<PatientListProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {patients.map((patient) => (
+                {contacts.map((contact) => (
                   <tr
-                    key={patient.id}
+                    key={contact.id}
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {patient.patient_number}
+                      {contact.contact_number}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-semibold">
-                          {patient.first_name.charAt(0)}
-                          {patient.last_name.charAt(0)}
+                        <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold relative">
+                          {contact.first_name.charAt(0)}
+                          {contact.last_name.charAt(0)}
+                          {contact.is_preferred && (
+                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 absolute -top-1 -right-1" />
+                          )}
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {patient.full_name}
+                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                            {contact.full_name}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {patient.phone}
-                          </div>
+                          {contact.organization_name && (
+                            <div className="text-xs text-gray-500">
+                              {contact.organization_name}
+                            </div>
+                          )}
+                          {contact.specialty && (
+                            <div className="text-xs text-gray-500">
+                              {contact.specialty}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {patient.email || '-'}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getContactTypeColor(
+                          contact.contact_type
+                        )}`}
+                      >
+                        {contact.contact_type_display}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {formatDate(patient.date_of_birth)}
+                      {contact.email || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {contact.phone}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        {onTogglePreferred && (
+                          <button
+                            onClick={() => onTogglePreferred(contact)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              contact.is_preferred
+                                ? 'text-yellow-600 hover:bg-yellow-50'
+                                : 'text-gray-400 hover:bg-gray-50'
+                            }`}
+                            title={contact.is_preferred ? 'Remove from preferred' : 'Mark as preferred'}
+                          >
+                            {contact.is_preferred ? (
+                              <Star className="w-4 h-4 fill-yellow-600" />
+                            ) : (
+                              <StarOff className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
                         <button
-                          onClick={() => onView(patient)}
+                          onClick={() => onView(contact)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           View
                         </button>
                         <button
-                          onClick={() => onEdit(patient)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                          onClick={() => onEdit(contact)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                           Edit
@@ -167,10 +195,9 @@ export const PatientList: React.FC<PatientListProps> = ({
         <div className="flex-shrink-0 bg-white border-t border-gray-200 px-6 py-4">
           <div className="flex items-center justify-center gap-2">
             <button
-              onClick={handlePrevPage}
+              onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Previous page"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -178,24 +205,21 @@ export const PatientList: React.FC<PatientListProps> = ({
             {getPageNumbers().map((page) => (
               <button
                 key={page}
-                onClick={() => handlePageClick(page)}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-colors
-                  ${currentPage === page
-                    ? 'bg-green-500 text-white'
+                onClick={() => onPageChange(page)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  currentPage === page
+                    ? 'bg-purple-500 text-white'
                     : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }
-                `}
+                }`}
               >
                 {page}
               </button>
             ))}
 
             <button
-              onClick={handleNextPage}
+              onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Next page"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
