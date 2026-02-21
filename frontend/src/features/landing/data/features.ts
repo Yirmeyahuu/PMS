@@ -36,7 +36,7 @@ export const features: Feature[] = [
   {
     id: 'security',
     icon: Shield,
-    title: 'HIPAA Compliant',
+    title: 'OWASP Compliant',
     description: 'Bank-level encryption and compliance with healthcare data protection standards.'
   },
   {

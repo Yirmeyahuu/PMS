@@ -14,7 +14,7 @@ from .serializers import (
 )
 from .services.password_service import PasswordService
 from .services.email_service import EmailService
-from apps.clinics.models import Clinic
+from apps.clinics.models import Clinic, Practitioner
 import logging
 
 logger = logging.getLogger(__name__)
@@ -269,8 +269,9 @@ class UserViewSet(viewsets.ModelViewSet):
         Create new staff/practitioner account.
         Auto-generates password and sends via email.
         Only admins can create users.
+        
+        ✅ FIX: Automatically creates Practitioner profile if role is PRACTITIONER
         """
-        # Check if user is admin
         if not request.user.is_admin:
             return Response(
                 {'detail': 'Only administrators can create staff accounts.'},
@@ -283,22 +284,36 @@ class UserViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
-                # Generate temporary password
                 temp_password = PasswordService.generate_temporary_password()
+                role = serializer.validated_data.get('role', 'STAFF')
                 
-                # Create user with validated data
                 user = User.objects.create_user(
                     email=serializer.validated_data['email'],
                     password=temp_password,
                     first_name=serializer.validated_data['first_name'],
                     last_name=serializer.validated_data['last_name'],
                     phone=serializer.validated_data.get('phone', ''),
-                    role=serializer.validated_data.get('role', 'STAFF'),
+                    role=role,
                     clinic=request.user.clinic,
                     password_changed=False
                 )
                 
-                # Send welcome email with credentials
+                # ✅ FIX: Create Practitioner profile without is_active
+                practitioner_created = False
+                if role == 'PRACTITIONER':
+                    if not Practitioner.objects.filter(user=user).exists():
+                        Practitioner.objects.create(
+                            user=user,
+                            clinic=request.user.clinic,
+                            license_number='',
+                            specialization='',
+                            consultation_fee=0,
+                            is_accepting_patients=True
+                            # ✅ REMOVED: is_active=True
+                        )
+                        practitioner_created = True
+                        logger.info(f"✅ Practitioner profile created for: {user.email}")
+                
                 company_name = request.user.clinic.name if request.user.clinic else 'Your Organization'
                 email_sent = EmailService.send_welcome_email(
                     user_email=user.email,
@@ -310,16 +325,16 @@ class UserViewSet(viewsets.ModelViewSet):
                 if not email_sent:
                     logger.warning(f"Email failed to send for {user.email}")
                 
-                logger.info(f"Staff account created: {user.email} by {request.user.email}")
+                logger.info(f"Staff account created: {user.email} (Role: {role}) by {request.user.email}")
                 
-                # Return created user data
                 response_serializer = self.get_serializer(user)
                 headers = self.get_success_headers(response_serializer.data)
                 
                 return Response({
                     **response_serializer.data,
-                    'message': 'Staff account created successfully! Login credentials sent to email.',
-                    'email_sent': email_sent
+                    'message': f'{"Practitioner" if role == "PRACTITIONER" else "Staff"} account created successfully! Login credentials sent to email.',
+                    'email_sent': email_sent,
+                    'practitioner_profile_created': practitioner_created
                 }, status=status.HTTP_201_CREATED, headers=headers)
                 
         except Exception as e:
@@ -329,37 +344,23 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def update(self, request, *args, **kwargs):
-        """Update user - prevents password changes through this endpoint"""
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        
-        # Remove password from data if present
-        data = request.data.copy()
-        if 'password' in data:
-            data.pop('password')
-        
-        serializer = self.get_serializer(instance, data=data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        
-        return Response(serializer.data)
-    
     def destroy(self, request, *args, **kwargs):
         """Soft delete user"""
         instance = self.get_object()
         
-        # Prevent deleting yourself
         if instance.id == request.user.id:
             return Response(
                 {'detail': 'You cannot delete your own account.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Soft delete
         instance.is_deleted = True
         instance.is_active = False
         instance.save()
+        
+        # ✅ FIX: Deactivate via User, not Practitioner
+        # Practitioner doesn't have is_active, but we can soft-delete the User
+        # which will filter it out in queries
         
         logger.info(f"User soft deleted: {instance.email} by {request.user.email}")
         
@@ -384,4 +385,4 @@ class RoleViewSet(viewsets.ModelViewSet):
 class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]

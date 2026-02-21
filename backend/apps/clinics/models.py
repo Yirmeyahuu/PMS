@@ -1,11 +1,23 @@
 from django.db import models
+from django.db.models import Q
 from apps.common.models import TimeStampedModel, SoftDeleteModel
 
 
 class Clinic(TimeStampedModel, SoftDeleteModel):
-    """Clinic/practice information"""
+    """Main clinic/practice with support for multiple branches"""
+    
+    # Parent clinic for branch support
+    parent_clinic = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='branches',
+        help_text='Parent clinic if this is a branch'
+    )
     
     name = models.CharField(max_length=200)
+    branch_code = models.CharField(max_length=50, unique=True, help_text='Unique branch identifier', blank=True, null=True)
     email = models.EmailField()
     phone = models.CharField(max_length=15)
     address = models.TextField()
@@ -22,8 +34,11 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
     website = models.URLField(blank=True)
     timezone = models.CharField(max_length=50, default='Asia/Manila')
     
-    # Subscription
+    # Branch specific
+    is_main_branch = models.BooleanField(default=True, help_text='Is this the main clinic?')
     is_active = models.BooleanField(default=True)
+    
+    # Subscription (only for main clinic)
     subscription_plan = models.CharField(
         max_length=20,
         choices=[
@@ -39,9 +54,35 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
     class Meta:
         db_table = 'clinics'
         ordering = ['name']
+        indexes = [
+            models.Index(fields=['parent_clinic', 'is_active']),
+            models.Index(fields=['branch_code']),
+        ]
     
     def __str__(self):
+        if self.parent_clinic:
+            return f"{self.parent_clinic.name} - {self.name}"
         return self.name
+    
+    @property
+    def is_branch(self):
+        """Check if this is a branch clinic"""
+        return self.parent_clinic is not None
+    
+    @property
+    def main_clinic(self):
+        """Get the main clinic (top-level parent)"""
+        if self.parent_clinic:
+            return self.parent_clinic.main_clinic if self.parent_clinic.parent_clinic else self.parent_clinic
+        return self
+    
+    def get_all_branches(self):
+        """Get all branches including self"""
+        if self.is_branch:
+            return self.parent_clinic.get_all_branches()
+        return Clinic.objects.filter(
+            models.Q(id=self.id) | models.Q(parent_clinic=self)
+        ).filter(is_deleted=False, is_active=True)
 
 
 class Practitioner(TimeStampedModel, SoftDeleteModel):

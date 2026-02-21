@@ -24,7 +24,7 @@ export const Hero: React.FC = () => {
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-5 sm:gap-6">
               <div className="flex items-center space-x-3">
                 <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
-                <span className="text-base sm:text-md text-gray-600 font-medium">HIPAA Compliant</span>
+                <span className="text-base sm:text-md text-gray-600 font-medium">OWASP Top 10</span>
               </div>
               <div className="flex items-center space-x-3">
                 <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />

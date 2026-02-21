@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
     legal: [
       { label: 'Privacy Policy', href: '#' },
       { label: 'Terms of Service', href: '#' },
-      { label: 'HIPAA Compliance', href: '#' },
+      { label: 'OWASP Compliance', href: '#' },
       { label: 'Cookie Policy', href: '#' }
     ]
   };
@@ -53,11 +53,11 @@ export const Footer: React.FC = () => {
               </a>
               <a href="tel:+1234567890" className="flex items-center text-base hover:text-white transition-colors">
                 <Phone className="w-5 h-5 mr-3" />
-                +1 (234) 567-890
+                +63 9457 123 456
               </a>
               <div className="flex items-start text-base">
                 <MapPin className="w-5 h-5 mr-3 mt-0.5 shrink-0" />
-                <span>123 Healthcare Ave, Medical District, CA 90210</span>
+                <span>Lacson Street, Bacolod City, Philippines</span>
               </div>
             </div>
           </div>

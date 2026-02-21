@@ -1,8 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, endOfWeek, isSameMonth, isSameDay } from 'date-fns';
 import { useAppointmentModal } from './hooks/useAppointmentModal';
 import { useDragSelection } from './hooks/useDragSelection';
+import { useAppointments } from './hooks/useAppointments';
 import { AppointmentModal } from './components/AppointmentModal';
+import { AppointmentView } from './components/AppointmentView';
+import { APPOINTMENT_STATUS_COLORS } from '@/types';
+import type { Appointment } from '@/types';
 
 type CalendarView = 'day' | 'week' | 'month';
 
@@ -10,10 +14,42 @@ interface CalendarProps {
   view: CalendarView;
   currentDate: Date;
   onDateChange: (date: Date) => void;
+  selectedPractitionerId: number | null;
+  selectedClinicBranchId: number | null;
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateChange }) => {
+export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateChange, selectedPractitionerId, selectedClinicBranchId }) => {
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  
+  // ✅ Calculate date range based on view
+  const getDateRange = () => {
+    if (view === 'day') {
+      return { startDate: currentDate, endDate: currentDate };
+    } else if (view === 'week') {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      return { startDate: weekStart, endDate: weekEnd };
+    } else {
+      // Month view - get full calendar range including days from previous/next month
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      return { startDate, endDate };
+    }
+  };
+
+  const { startDate, endDate } = getDateRange();
+
+  const { appointments, loading, refetch } = useAppointments({
+    startDate,
+    endDate,
+    practitionerId: selectedPractitionerId,
+    clinicBranchId: selectedClinicBranchId, // ✅ Pass clinic branch filter
+  });
+
   const {
     selection,
     startSelection,
@@ -25,7 +61,6 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
     getSelectionStartTime,
   } = useDragSelection();
 
-  // Track if user is dragging or just clicking
   const isDraggingRef = useRef(false);
   const dragStartTimeRef = useRef<number>(0);
 
@@ -52,17 +87,55 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
 
   const timeSlots = generateTimeSlots();
 
-  // Handle mouse down - start selection
+  // Get appointments for a specific time slot
+  const getAppointmentsForSlot = (date: Date, hour: number, minutes: number): Appointment[] => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    return appointments.filter(apt => {
+      if (apt.date !== dateStr) return false;
+      
+      const slotTime = hour * 60 + minutes;
+      const [startHour, startMin] = apt.start_time.split(':').map(Number);
+      const [endHour, endMin] = apt.end_time.split(':').map(Number);
+      const aptStart = startHour * 60 + startMin;
+      const aptEnd = endHour * 60 + endMin;
+      
+      return slotTime >= aptStart && slotTime < aptEnd;
+    });
+  };
+
+  // Get appointments for a specific day (for month view)
+  const getAppointmentsForDay = (date: Date): Appointment[] => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return appointments.filter(apt => apt.date === dateStr);
+  };
+
+  // Calculate appointment position and height
+  const getAppointmentStyle = (appointment: Appointment) => {
+    const [startHour, startMin] = appointment.start_time.split(':').map(Number);
+    const startSlotIndex = ((startHour - 6) * 4) + Math.floor(startMin / 15);
+    const heightSlots = appointment.duration_minutes / 15;
+    
+    return {
+      top: `${startSlotIndex * 1.25}rem`,
+      height: `${heightSlots * 1.25}rem`,
+    };
+  };
+
+  // Handle appointment click
+  const handleAppointmentClick = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setIsViewOpen(true);
+  };
+
   const handleMouseDown = (date: Date, slot: any) => {
     isDraggingRef.current = false;
     dragStartTimeRef.current = Date.now();
     startSelection(slot);
   };
 
-  // Handle mouse enter - update selection
   const handleMouseEnter = (slot: any) => {
     if (selection.isSelecting) {
-      // If mouse moved to a different slot, mark as dragging
       const currentSlotIndex = slot.hour * 4 + slot.quarter;
       const startSlotIndex = selection.startSlot 
         ? selection.startSlot.hour * 4 + selection.startSlot.quarter 
@@ -76,17 +149,12 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
     }
   };
 
-  // Handle mouse up - open modal
   const handleMouseUp = (date: Date) => {
     if (selection.startSlot) {
       const duration = getSelectionDuration();
       const startTime = getSelectionStartTime();
 
-      // Only open modal if:
-      // 1. User dragged (selected multiple cells), OR
-      // 2. Will be handled by double-click for single cell
       if (isDraggingRef.current && duration > 15) {
-        // Drag selection - open immediately
         if (startTime) {
           openModal({
             date,
@@ -97,7 +165,6 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
           });
         }
       }
-      // If single cell (15 min), do nothing - wait for double-click
     }
     
     endSelection();
@@ -105,9 +172,7 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
     isDraggingRef.current = false;
   };
 
-  // Handle double-click for single cell selection
   const handleDoubleClick = (date: Date, slot: any) => {
-    // Open modal with 15-minute duration
     openModal({
       date,
       time: slot.time,
@@ -117,13 +182,22 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
     });
   };
 
-  // Generate week days starting from Monday
+  // Handle modal close and refresh
+  const handleModalClose = () => {
+    closeModal();
+    refetch();
+  };
+
+  const handleViewClose = () => {
+    setIsViewOpen(false);
+    setSelectedAppointment(null);
+  };
+
   const getWeekDays = (date: Date) => {
     const start = startOfWeek(date, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   };
 
-  // Generate month calendar grid
   const getMonthDays = (date: Date) => {
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
@@ -146,7 +220,7 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
     return rows;
   };
 
-  // Day View with Drag Selection
+  // Day View with Appointments
   if (view === 'day') {
     return (
       <>
@@ -179,10 +253,11 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
                 ))}
               </div>
 
-              {/* Day Column with Drag Selection */}
-              <div onMouseUp={() => handleMouseUp(currentDate)}>
+              {/* Day Column with Appointments */}
+              <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
                 {timeSlots.map((slot, index) => {
                   const isSelected = isSlotSelected(slot);
+                  const slotsAppointments = getAppointmentsForSlot(currentDate, slot.hour, slot.minutes);
                   
                   return (
                     <div
@@ -195,18 +270,52 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
                         ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
                         ${isSelected 
                           ? 'bg-sky-200 hover:bg-sky-300' 
-                          : 'hover:bg-sky-50'
+                          : slotsAppointments.length > 0
+                            ? 'bg-gray-50'
+                            : 'hover:bg-sky-50'
                         }
                       `}
                       title={`Double-click for 15-min appointment, or click & drag to select duration`}
                     >
-                      {/* Selection indicator */}
                       {isSelected && (
                         <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
                       )}
                     </div>
                   );
                 })}
+
+                {/* Render Appointments */}
+                {appointments
+                  .filter(apt => format(new Date(apt.date), 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd'))
+                  .map((appointment) => {
+                    const style = getAppointmentStyle(appointment);
+                    const colors = APPOINTMENT_STATUS_COLORS[appointment.status];
+                    
+                    return (
+                      <div
+                        key={appointment.id}
+                        className={`
+                          absolute left-1 right-1 ${colors.bg} ${colors.border} border rounded-lg p-2
+                          cursor-pointer hover:shadow-lg transition-shadow z-10
+                          overflow-hidden
+                        `}
+                        style={style}
+                        onClick={() => handleAppointmentClick(appointment)}
+                      >
+                        <div className={`text-xs font-semibold ${colors.text} truncate`}>
+                          {appointment.patient_name}
+                        </div>
+                        <div className="text-xs text-gray-600 truncate">
+                          {appointment.start_time} - {appointment.end_time}
+                        </div>
+                        {appointment.chief_complaint && (
+                          <div className="text-xs text-gray-500 truncate mt-1">
+                            {appointment.chief_complaint}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </div>
@@ -215,8 +324,21 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
         {/* Appointment Modal */}
         <AppointmentModal
           isOpen={isOpen}
-          onClose={closeModal}
+          onClose={handleModalClose}
           selectedSlot={selectedSlot}
+        />
+
+        {/* Appointment View Modal */}
+        <AppointmentView
+          isOpen={isViewOpen}
+          onClose={handleViewClose}
+          appointment={selectedAppointment}
+          onEdit={(apt) => {
+            console.log('Edit appointment:', apt);
+          }}
+          onDelete={(apt) => {
+            console.log('Delete appointment:', apt);
+          }}
         />
       </>
     );
@@ -270,7 +392,7 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
               {weekDays.map((day) => (
                 <div 
                   key={day.toISOString()} 
-                  className="border-l border-gray-200"
+                  className="border-l border-gray-200 relative"
                   onMouseUp={() => handleMouseUp(day)}
                 >
                   {timeSlots.map((slot, index) => {
@@ -292,13 +414,40 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
                         `}
                         title={`Double-click for 15-min appointment, or click & drag to select duration`}
                       >
-                        {/* Selection indicator */}
                         {isSelected && (
                           <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
                         )}
                       </div>
                     );
                   })}
+
+                  {/* Render Appointments for Week View */}
+                  {appointments
+                    .filter(apt => format(new Date(apt.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
+                    .map((appointment) => {
+                      const style = getAppointmentStyle(appointment);
+                      const colors = APPOINTMENT_STATUS_COLORS[appointment.status];
+                      
+                      return (
+                        <div
+                          key={appointment.id}
+                          className={`
+                            absolute left-1 right-1 ${colors.bg} ${colors.border} border rounded-lg p-1
+                            cursor-pointer hover:shadow-lg transition-shadow z-10
+                            overflow-hidden
+                          `}
+                          style={style}
+                          onClick={() => handleAppointmentClick(appointment)}
+                        >
+                          <div className={`text-xs font-semibold ${colors.text} truncate`}>
+                            {appointment.patient_name}
+                          </div>
+                          <div className="text-xs text-gray-600 truncate">
+                            {appointment.start_time}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               ))}
             </div>
@@ -308,14 +457,21 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
         {/* Appointment Modal */}
         <AppointmentModal
           isOpen={isOpen}
-          onClose={closeModal}
+          onClose={handleModalClose}
           selectedSlot={selectedSlot}
+        />
+
+        {/* Appointment View Modal */}
+        <AppointmentView
+          isOpen={isViewOpen}
+          onClose={handleViewClose}
+          appointment={selectedAppointment}
         />
       </>
     );
   }
 
-  // Month View (unchanged)
+  // Month View with Appointments
   if (view === 'month') {
     const monthDays = getMonthDays(currentDate);
     const weekDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -336,30 +492,85 @@ export const Calendar: React.FC<CalendarProps> = ({ view, currentDate, onDateCha
         <div className="flex-1 overflow-auto">
           {monthDays.map((week, weekIndex) => (
             <div key={weekIndex} className="grid grid-cols-7 border-b border-gray-200 last:border-b-0">
-              {week.map((day) => (
-                <div
-                  key={day.toISOString()}
-                  className={`
-                    min-h-[120px] p-3 border-r border-gray-200 last:border-r-0
-                    hover:bg-sky-50 transition-colors cursor-pointer
-                    ${!isSameMonth(day, currentDate) ? 'bg-gray-50' : ''}
-                    ${isSameDay(day, new Date()) ? 'bg-sky-100' : ''}
-                  `}
-                >
+              {week.map((day) => {
+                const dayAppointments = getAppointmentsForDay(day);
+                const hasAppointments = dayAppointments.length > 0;
+                
+                return (
                   <div
+                    key={day.toISOString()}
+                    onClick={() => onDateChange(day)}
                     className={`
-                      text-sm font-medium mb-2
-                      ${!isSameMonth(day, currentDate) ? 'text-gray-400' : 'text-gray-700'}
-                      ${isSameDay(day, new Date()) ? 'text-sky-600 font-bold' : ''}
+                      min-h-[120px] p-2 border-r border-gray-200 last:border-r-0
+                      hover:bg-sky-50 transition-colors cursor-pointer
+                      ${!isSameMonth(day, currentDate) ? 'bg-gray-50' : ''}
+                      ${isSameDay(day, new Date()) ? 'bg-sky-50' : ''}
                     `}
                   >
-                    {format(day, 'd')}
+                    {/* Date Number */}
+                    <div className="flex items-center justify-between mb-1">
+                      <div
+                        className={`
+                          text-sm font-medium
+                          ${!isSameMonth(day, currentDate) ? 'text-gray-400' : 'text-gray-700'}
+                          ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold' : ''}
+                        `}
+                      >
+                        {format(day, 'd')}
+                      </div>
+                      
+                      {/* Appointment Count Badge */}
+                      {hasAppointments && (
+                        <div className="bg-sky-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                          {dayAppointments.length}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Appointments List */}
+                    <div className="space-y-1 mt-2">
+                      {dayAppointments.slice(0, 3).map((appointment) => {
+                        const colors = APPOINTMENT_STATUS_COLORS[appointment.status];
+                        
+                        return (
+                          <div
+                            key={appointment.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAppointmentClick(appointment);
+                            }}
+                            className={`
+                              ${colors.bg} ${colors.border} border rounded px-2 py-1
+                              hover:shadow-md transition-shadow
+                            `}
+                          >
+                            <div className={`text-xs font-semibold ${colors.text} truncate`}>
+                              {appointment.start_time} - {appointment.patient_name}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Show "+X more" if there are more than 3 appointments */}
+                      {dayAppointments.length > 3 && (
+                        <div className="text-xs text-gray-500 font-medium px-2">
+                          +{dayAppointments.length - 3} more
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
+
+        {/* Appointment View Modal */}
+        <AppointmentView
+          isOpen={isViewOpen}
+          onClose={handleViewClose}
+          appointment={selectedAppointment}
+        />
       </div>
     );
   }

@@ -26,17 +26,21 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
     clinic = models.ForeignKey(
         'clinics.Clinic',
         on_delete=models.CASCADE,
-        related_name='appointments'
+        related_name='appointments',
+        help_text='Specific clinic branch for this appointment'
     )
     patient = models.ForeignKey(
         'patients.Patient',
         on_delete=models.CASCADE,
         related_name='appointments'
     )
+    # ✅ FIX: Make practitioner optional (can be assigned later)
     practitioner = models.ForeignKey(
         'clinics.Practitioner',
         on_delete=models.CASCADE,
-        related_name='appointments'
+        related_name='appointments',
+        null=True,  # ✅ ADDED
+        blank=True  # ✅ ADDED
     )
     location = models.ForeignKey(
         'clinics.Location',
@@ -64,6 +68,22 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
     # Reminder tracking
     reminder_sent = models.BooleanField(default=False)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    
+    # Audit tracking
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appointments_created'
+    )
+    updated_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appointments_updated'
+    )
     
     # Cancellation
     cancelled_by = models.ForeignKey(
@@ -93,7 +113,7 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValidationError('End time must be after start time')
         
-        # Check for overlapping appointments
+        # ✅ FIX: Only check for overlapping if practitioner is assigned
         if self.practitioner and self.date and self.start_time and self.end_time:
             overlapping = Appointment.objects.filter(
                 practitioner=self.practitioner,

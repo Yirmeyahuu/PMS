@@ -5,6 +5,7 @@ interface AppointmentSlot {
   time: string;
   hour: number;
   minutes: number;
+  duration: number; // ✅ ADDED: duration field
 }
 
 export const useAppointmentModal = () => {
