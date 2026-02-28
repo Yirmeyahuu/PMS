@@ -23,9 +23,11 @@ export interface StaffMember {
   avatar: string | null;
   is_active: boolean;
   clinic: number;
+  clinic_branch?: number | null;
+  clinic_branch_name?: string | null;
   created_at: string;
   password_changed: boolean;
-  
+
   // Additional staff fields
   position?: string;
   discipline?: DisciplineType;
@@ -48,6 +50,7 @@ export interface CreateStaffData {
   date_of_birth?: string;
   gender?: GenderType;
   address?: string;
+  clinic_branch?: number | null;
 }
 
 export interface StaffFormErrors {
@@ -59,6 +62,7 @@ export interface StaffFormErrors {
   email?: string;
   phone?: string;
   date_of_birth?: string;
+  clinic_branch?: string;
   general?: string;
 }
 

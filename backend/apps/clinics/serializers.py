@@ -2,7 +2,6 @@ from rest_framework import serializers
 from .models import Clinic, Practitioner, Location
 
 
-
 class ClinicBranchSerializer(serializers.ModelSerializer):
     """Lightweight serializer for clinic branches"""
     
@@ -13,9 +12,11 @@ class ClinicBranchSerializer(serializers.ModelSerializer):
         model = Clinic
         fields = [
             'id', 'name', 'branch_code', 'is_main_branch', 'is_branch',
-            'parent_clinic', 'parent_name', 'is_active', 'city', 'province'
+            'parent_clinic', 'parent_name', 'is_active', 'city', 'province',
+            'email', 'phone', 'address', 'postal_code', 'website', 'tin',
         ]
-        read_only_fields = ['id', 'is_branch', 'parent_name']
+        # branch_code is read_only — always auto-generated
+        read_only_fields = ['id', 'branch_code', 'is_branch', 'parent_name']
 
 
 class ClinicSerializer(serializers.ModelSerializer):
@@ -26,7 +27,10 @@ class ClinicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Clinic
         fields = '__all__'
-        read_only_fields = ['id', 'created_at', 'updated_at', 'is_branch', 'main_clinic_name']
+        read_only_fields = [
+            'id', 'branch_code', 'created_at', 'updated_at',
+            'is_branch', 'main_clinic_name'
+        ]
 
 
 class PractitionerSerializer(serializers.ModelSerializer):

@@ -71,6 +71,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     
+    path('api/clinical-templates/', include('apps.clinical_templates.urls')),
+    
     # Add explicit auth endpoints
     path('api/auth/verify-token/', AuthViewSet.as_view({'post': 'verify_token'}), name='verify-token'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

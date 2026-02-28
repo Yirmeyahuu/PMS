@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { ClinicBranch, ClinicBranchesResponse } from '@/types/clinic';
+import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/types/clinic';
 
 export interface Practitioner {
   id: number;
@@ -8,37 +8,52 @@ export interface Practitioner {
   specialization: string | null;
   clinic_id: number;
   clinic_name: string | null;
+  clinic_branch_id: number | null;
+  clinic_branch_name: string | null;
 }
 
 export interface PractitionersResponse {
   practitioners: Practitioner[];
 }
 
-/**
- * Fetch all active practitioners for the current user's clinic
- * Optionally filter by clinic branch
- */
 export const getPractitioners = async (clinicBranchId?: number | null): Promise<PractitionersResponse> => {
-  const params = clinicBranchId ? { clinic_branch: clinicBranchId } : {};
-  // ✅ FIXED: Removed /api prefix (already in baseURL)
+  const params: Record<string, any> = {};
+  if (clinicBranchId) params.clinic_branch = clinicBranchId;
   const response = await api.get<PractitionersResponse>('/appointments/practitioners/', { params });
   return response.data;
 };
 
-/**
- * Fetch all clinic branches for the current user's clinic
- */
 export const getClinicBranches = async (): Promise<ClinicBranchesResponse> => {
-  // ✅ FIXED: Removed /api prefix (already in baseURL)
   const response = await api.get<ClinicBranchesResponse>('/clinics/branches/');
   return response.data;
 };
 
-/**
- * Fetch a single practitioner by ID
- */
 export const getPractitioner = async (id: number): Promise<Practitioner> => {
-  // ✅ FIXED: Removed /api prefix (already in baseURL)
   const response = await api.get<Practitioner>(`/practitioners/${id}/`);
+  return response.data;
+};
+
+/**
+ * Create a new branch under the given main clinic
+ */
+export const createClinicBranch = async (
+  mainClinicId: number,
+  data: CreateBranchData
+): Promise<ClinicBranch> => {
+  const response = await api.post<ClinicBranch>(
+    `/clinics/${mainClinicId}/create_branch/`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * Update an existing clinic branch
+ */
+export const updateClinicBranch = async (
+  id: number,
+  data: Partial<CreateBranchData>
+): Promise<ClinicBranch> => {
+  const response = await api.patch<ClinicBranch>(`/clinics/${id}/`, data);
   return response.data;
 };

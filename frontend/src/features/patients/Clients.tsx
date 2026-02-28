@@ -16,15 +16,15 @@ interface FilterOptions {
 }
 
 export const Clients: React.FC = () => {
-  const { 
-    patients, 
-    isLoading, 
-    error, 
-    totalCount, 
+  const {
+    patients,
+    isLoading,
+    error,
+    totalCount,
     filters,
-    updateFilters, 
+    updateFilters,
     setPage,
-    refresh 
+    refresh,
   } = usePatients();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +43,6 @@ export const Clients: React.FC = () => {
     const timer = setTimeout(() => {
       updateFilters({ search: searchQuery || undefined });
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -72,7 +71,6 @@ export const Clients: React.FC = () => {
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setCurrentFilters(newFilters);
-    
     updateFilters({
       gender: newFilters.gender || undefined,
       is_active: newFilters.is_active !== null ? newFilters.is_active : undefined,
@@ -82,98 +80,92 @@ export const Clients: React.FC = () => {
   const handleSavePatient = async (data: CreatePatientData) => {
     try {
       if (isEditModalOpen && selectedPatient) {
-        // Update existing patient
         await updatePatient(selectedPatient.id, data);
         toast.success('Client updated successfully');
       } else {
-        // Create new patient
         await createPatient(data);
         toast.success('Client added successfully');
       }
-      
-      // Refresh the patient list
       refresh();
-      
-      // Close modal
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
       setSelectedPatient(null);
     } catch (error: any) {
       const message = error.response?.data?.detail || 'Failed to save client';
       toast.error(message);
-      throw error; // Re-throw to let modal handle it
+      throw error;
     }
   };
 
   return (
     <DashboardLayout>
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Page Header */}
-        <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Clients</h1>
-                <p className="text-sm text-gray-600">
-                  Manage your client database and records ({totalCount} total)
-                </p>
-              </div>
+
+        {/* ── Page Header ── */}
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Clients</h1>
+              <p className="text-xs text-gray-500">
+                Manage your client database and records
+                <span className="ml-1 font-medium text-gray-700">({totalCount} total)</span>
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Search & Actions Bar */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 p-4">
+        {/* ── Search & Actions Bar ── */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Search Bar */}
+            {/* Search */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search Client by name, id, or phone..."
+                placeholder="Search client by name, ID, or phone..."
                 value={searchQuery}
                 onChange={handleSearch}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
               />
               {isLoading && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
               )}
             </div>
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="flex gap-2">
               <button
                 onClick={handleFilterClients}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Filter className="w-5 h-5" />
-                <span className="hidden sm:inline">Filter Clients</span>
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">Filter</span>
               </button>
               <button
                 onClick={handleAddClient}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-colors font-medium"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Add Client</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Error State */}
+        {/* ── Error State ── */}
         {error && (
-          <div className="flex-shrink-0 bg-red-50 border-l-4 border-red-500 p-4 m-4">
+          <div className="flex-shrink-0 bg-red-50 border-l-4 border-red-500 p-4 m-4 rounded-r-lg">
             <div className="flex items-center gap-3">
               <div className="text-red-700">
-                <p className="font-medium">Error loading patients</p>
-                <p className="text-sm">{error}</p>
+                <p className="text-sm font-semibold">Error loading patients</p>
+                <p className="text-xs mt-0.5">{error}</p>
               </div>
               <button
                 onClick={refresh}
-                className="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="ml-auto px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Retry
               </button>
@@ -181,18 +173,17 @@ export const Clients: React.FC = () => {
           </div>
         )}
 
-        {/* Loading State */}
+        {/* ── Loading State ── */}
         {isLoading && patients.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <Loader2 className="w-12 h-12 text-green-500 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading patients...</p>
+              <Loader2 className="w-10 h-10 text-sky-500 animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Loading patients...</p>
             </div>
           </div>
         ) : (
-          /* Patient List */
           <div className="flex-1 overflow-hidden">
-            <PatientList 
+            <PatientList
               patients={patients}
               currentPage={filters.page || 1}
               totalPages={Math.ceil(totalCount / (filters.page_size || 10))}
@@ -203,7 +194,7 @@ export const Clients: React.FC = () => {
           </div>
         )}
 
-        {/* Filter Modal */}
+        {/* ── Filter Modal ── */}
         <PatientFilters
           isOpen={isFilterModalOpen}
           onClose={() => setIsFilterModalOpen(false)}
@@ -211,7 +202,7 @@ export const Clients: React.FC = () => {
           currentFilters={currentFilters}
         />
 
-        {/* Add Patient Modal */}
+        {/* ── Add Patient Modal ── */}
         <PatientModal
           isOpen={isAddModalOpen}
           onClose={() => {
@@ -222,7 +213,7 @@ export const Clients: React.FC = () => {
           mode="create"
         />
 
-        {/* Edit Patient Modal */}
+        {/* ── Edit Patient Modal ── */}
         <PatientModal
           isOpen={isEditModalOpen}
           onClose={() => {
@@ -234,7 +225,7 @@ export const Clients: React.FC = () => {
           mode="edit"
         />
 
-        {/* View Patient Details Modal */}
+        {/* ── View Patient Details Modal ── */}
         <PatientDetailsModal
           isOpen={isViewModalOpen}
           onClose={() => {
@@ -247,6 +238,7 @@ export const Clients: React.FC = () => {
             setIsEditModalOpen(true);
           }}
         />
+
       </div>
     </DashboardLayout>
   );

@@ -5,6 +5,7 @@ export * from './appointment';
 export * from './contact';
 export * from './clinic';
 
+
 // Common types
 export interface PaginatedResponse<T> {
   count: number;
@@ -39,3 +40,15 @@ export {
   APPOINTMENT_STATUS_COLORS,
   APPOINTMENT_TYPE_LABELS,
 } from './appointment';
+
+// ✅ ADD: Explicit clinical template exports
+export type {
+  FieldType,
+  FieldOption,
+  TemplateField,
+  TemplateSection,
+  TemplateStructure,
+  ClinicalTemplate,
+  ClinicalNote,
+  CreateClinicalNoteData,
+} from './clinicalTemplate';

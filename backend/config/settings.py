@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.contacts',
     'apps.notifications',
     'apps.integrations',
+    'apps.clinical_templates',
 ]
 
 MIDDLEWARE = [
@@ -110,6 +111,19 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
+
+# ✅ ADD: Field-Level Encryption Key (after EMAIL settings)
+FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY')
+
+if not FIELD_ENCRYPTION_KEY:
+    # Generate a temporary key for development ONLY
+    # In production, this MUST be set via environment variable
+    if DEBUG:
+        from cryptography.fernet import Fernet
+        FIELD_ENCRYPTION_KEY = Fernet.generate_key()
+        print('⚠️  WARNING: Using auto-generated encryption key. Set FIELD_ENCRYPTION_KEY in production!')
+    else:
+        raise ValueError('FIELD_ENCRYPTION_KEY must be set in production environment')
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

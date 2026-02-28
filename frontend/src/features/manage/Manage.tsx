@@ -17,7 +17,6 @@ import { DataMenu1 } from './pages/data/DataMenu1';
 import { DataMenu2 } from './pages/data/DataMenu2';
 import { DataMenu3 } from './pages/data/DataMenu3';
 
-// ...existing MANAGE_CATEGORIES...
 const MANAGE_CATEGORIES: ManageCategory[] = [
   {
     id: 'administration',
@@ -33,7 +32,7 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     label: 'Clinical',
     items: [
       { id: 'clinical1', label: 'Clinical Menu 1', path: 'clinical1', component: ClinicalMenu1 },
-      { id: 'clinical2', label: 'Clinical Menu 2', path: 'clinical2', component: ClinicalMenu2 },
+      { id: 'clinical2', label: 'Clinical Templates', path: 'clinical2', component: ClinicalMenu2 },
       { id: 'clinical3', label: 'Clinical Menu 3', path: 'clinical3', component: ClinicalMenu3 },
     ],
   },

@@ -20,6 +20,10 @@ import { Reports } from '@/features/reports/Reports';
 import { Manage } from '@/features/manage/Manage';
 import { Setup } from '@/features/setup/Setup';
 import { Profile } from '@/features/profile/Profile';
+import {PatientProfile} from "@/features/patients/PatientProfile";
+
+// ✅ NEW: Clinical Template Pages
+import { NoteEditor } from '@/features/clinical-template/pages/NoteEditor';
 
 const Unauthorized = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -61,7 +65,7 @@ function App() {
   return (
     <SidebarProvider>
       <BrowserRouter>
-        <Toaster 
+        <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
@@ -86,14 +90,14 @@ function App() {
             },
           }}
         />
-        
+
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><AdminRegister /></PublicRoute>} />
           <Route path="/register/success" element={<PublicRoute><RegisterSuccess /></PublicRoute>} />
-          
+
           {/* Unauthorized */}
           <Route path="/unauthorized" element={<Unauthorized />} />
 
@@ -103,11 +107,45 @@ function App() {
           <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
           <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          
-          {/* Admin-only routes */}
-          <Route path="/manage" element={<RoleBasedRoute allowedRoles={['ADMIN']}><Manage /></RoleBasedRoute>} />
-          <Route path="/setup" element={<RoleBasedRoute allowedRoles={['ADMIN']}><Setup /></RoleBasedRoute>} />
-          
+          <Route path="/patients/:patientId" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
+          <Route path="/clients/:id" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
+
+          {/* ✅ NEW: Clinical Note Routes */}
+          <Route
+            path="/clinical-notes"
+            element={
+              <ProtectedRoute>
+                <NoteEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clinical-notes/:noteId"
+            element={
+              <ProtectedRoute>
+                <NoteEditor />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin-only Routes */}
+          <Route
+            path="/manage"
+            element={
+              <RoleBasedRoute allowedRoles={['ADMIN']}>
+                <Manage />
+              </RoleBasedRoute>
+            }
+          />
+          <Route
+            path="/setup"
+            element={
+              <RoleBasedRoute allowedRoles={['ADMIN']}>
+                <Setup />
+              </RoleBasedRoute>
+            }
+          />
+
           {/* Profile - All authenticated users */}
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 

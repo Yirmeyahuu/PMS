@@ -23,4 +23,4 @@ export const Permissions: React.FC = () => {
       </div>
     </div>
   );
-};
+}; 
