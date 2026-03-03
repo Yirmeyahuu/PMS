@@ -21,12 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class AuthViewSet(viewsets.GenericViewSet):
-    """Authentication endpoints with enhanced security"""
+    """Authentication endpoints"""
     
     permission_classes = [AllowAny]
     
     def get_permissions(self):
-        """Set permissions based on action"""
         if self.action in ['register_admin', 'register', 'login', 'verify_token']:
             permission_classes = [AllowAny]
         else:
@@ -35,25 +34,23 @@ class AuthViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['post'], url_path='register-admin', permission_classes=[AllowAny])
     def register_admin(self, request):
-        """
-        Register admin - Auto-generates password and emails credentials.
-        Security: No tokens returned, user must login manually.
-        """
+        """Register admin — auto-generates password, emails credentials,
+        and creates a PortalLink for the new clinic."""
         serializer = AdminRegistrationSerializer(data=request.data)
-        
+
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             with transaction.atomic():
                 temp_password = PasswordService.generate_temporary_password()
-                
+
                 clinic = Clinic.objects.create(
                     name=serializer.validated_data['company_name'],
                     phone=serializer.validated_data.get('phone', ''),
                     is_active=True
                 )
-                
+
                 user = User.objects.create_user(
                     email=serializer.validated_data['email'],
                     password=temp_password,
@@ -64,28 +61,32 @@ class AuthViewSet(viewsets.GenericViewSet):
                     clinic=clinic,
                     password_changed=False
                 )
-                
+
+                # ── Auto-create portal link for the new clinic ───────────────
+                from apps.patients.models import PortalLink
+                portal_link, _ = PortalLink.get_or_create_for_clinic(clinic)
+                logger.info(
+                    f"Portal link auto-created for new clinic: {clinic.name} "
+                    f"(token: {portal_link.token})"
+                )
+
                 email_sent = EmailService.send_welcome_email(
                     user_email=user.email,
                     user_name=user.get_full_name(),
                     password=temp_password,
                     company_name=clinic.name
                 )
-                
+
                 if not email_sent:
                     logger.warning(f"Email failed to send for {user.email}")
-                
-                logger.info(f"Admin account created: {user.email}")
-                
+
                 return Response({
                     'message': 'Account created successfully! Check your email for login credentials.',
                     'email_sent': email_sent,
-                    'clinic': {
-                        'id': clinic.id,
-                        'name': clinic.name
-                    }
+                    'clinic': {'id': clinic.id, 'name': clinic.name},
+                    'portal_token': portal_link.token,   # handy for debugging
                 }, status=status.HTTP_201_CREATED)
-                
+
         except Exception as e:
             logger.error(f"Admin registration failed: {str(e)}")
             return Response(
@@ -95,14 +96,8 @@ class AuthViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """
-        User login with enhanced security.
-        Security: 
-        - Updates last_login timestamp
-        - Logs authentication attempts
-        - Returns user data with tokens
-        """
-        email = request.data.get('email')
+        """User login."""
+        email    = request.data.get('email')
         password = request.data.get('password')
         
         if not email or not password:
@@ -111,7 +106,6 @@ class AuthViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Authenticate user
         user = authenticate(request=request, email=email, password=password)
         
         if not user:
@@ -122,20 +116,14 @@ class AuthViewSet(viewsets.GenericViewSet):
             )
         
         if not user.is_active:
-            logger.warning(f"Inactive account login attempt: {email}")
             return Response(
                 {'detail': 'Account is inactive. Please contact support.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Generate tokens
         refresh = RefreshToken.for_user(user)
-        
-        # Update last login
         user.last_login = timezone.now()
         user.save(update_fields=['last_login'])
-        
-        logger.info(f"Successful login: {email}")
         
         return Response({
             'user': UserSerializer(user).data,
@@ -148,129 +136,106 @@ class AuthViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def logout(self, request):
-        """
-        User logout - Blacklists refresh token.
-        Security: Ensures token cannot be reused.
-        """
+        """Blacklist refresh token."""
         try:
             refresh_token = request.data.get('refresh_token')
-            
             if not refresh_token:
-                return Response(
-                    {'detail': 'Refresh token is required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Blacklist the refresh token
+                return Response({'detail': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
             token = RefreshToken(refresh_token)
             token.blacklist()
-            
-            logger.info(f"User logged out: {request.user.email}")
-            
-            return Response(
-                {'detail': 'Successfully logged out'},
-                status=status.HTTP_200_OK
-            )
-            
+            return Response({'detail': 'Successfully logged out'}, status=status.HTTP_200_OK)
         except TokenError as e:
-            logger.error(f"Token blacklist error: {str(e)}")
-            return Response(
-                {'detail': 'Invalid or expired token'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'detail': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Logout failed: {str(e)}")
-            return Response(
-                {'detail': 'Logout failed'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'detail': 'Logout failed'}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['post'], url_path='verify-token', permission_classes=[AllowAny])
     def verify_token(self, request):
-        """
-        Verify if access token is valid.
-        Security: Used for route protection on frontend.
-        """
+        """Verify access token."""
         token = request.data.get('token')
-        
         if not token:
-            return Response(
-                {'valid': False, 'detail': 'Token is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+            return Response({'valid': False, 'detail': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            # Try to decode the token
             from rest_framework_simplejwt.tokens import AccessToken
             AccessToken(token)
-            
-            return Response({
-                'valid': True,
-                'detail': 'Token is valid'
-            }, status=status.HTTP_200_OK)
-            
+            return Response({'valid': True, 'detail': 'Token is valid'}, status=status.HTTP_200_OK)
         except TokenError:
-            return Response({
-                'valid': False,
-                'detail': 'Token is invalid or expired'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'valid': False, 'detail': 'Token is invalid or expired'}, status=status.HTTP_401_UNAUTHORIZED)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        """
-        Get current authenticated user.
-        Security: Only returns data for authenticated users.
-        """
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def change_password(self, request):
-        """
-        Change user password.
-        Security: Requires old password verification.
-        """
-        serializer = PasswordChangeSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             user = request.user
             user.set_password(serializer.validated_data['new_password'])
             user.password_changed = True
             user.save()
-            
-            logger.info(f"Password changed for user: {user.email}")
-            
-            return Response({
-                'detail': 'Password changed successfully. Please login again.'
-            }, status=status.HTTP_200_OK)
-        
+            return Response({'detail': 'Password changed successfully. Please login again.'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """CRUD operations for users"""
+    """CRUD operations for users / staff management"""
     
-    queryset = User.objects.filter(is_deleted=False)
+    queryset = User.objects.filter(is_deleted=False).select_related('clinic', 'clinic_branch')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Filter users by clinic for non-admin users"""
         user = self.request.user
+        qs   = self.queryset
+
         if user.is_admin:
-            return self.queryset
-        return self.queryset.filter(clinic=user.clinic)
-    
+            # Admin sees all users in their clinic family
+            base_qs = qs.filter(clinic=user.clinic)
+        else:
+            base_qs = qs.filter(clinic=user.clinic) if user.clinic else qs.none()
+
+        # ✅ Optional filter: ?clinic_branch=<id>
+        branch_id = self.request.query_params.get('clinic_branch')
+        if branch_id:
+            base_qs = base_qs.filter(clinic_branch_id=branch_id)
+
+        # ✅ Optional filter: ?role=STAFF or ?role=PRACTITIONER
+        role = self.request.query_params.get('role')
+        if role:
+            base_qs = base_qs.filter(role=role)
+
+        return base_qs
+
+    def _validate_branch(self, request, branch_id):
+        """
+        Helper: verify the branch belongs to the requesting admin's clinic family.
+        Returns the Clinic branch instance or raises a validation error dict.
+        """
+        if not branch_id:
+            return None
+
+        main_clinic = request.user.clinic.main_clinic if request.user.clinic else None
+        if not main_clinic:
+            return None
+
+        try:
+            branch = Clinic.objects.get(pk=branch_id, is_deleted=False)
+        except Clinic.DoesNotExist:
+            return {'error': 'Selected branch does not exist.'}
+
+        # Must be main clinic or a direct branch of it
+        if branch.id != main_clinic.id and branch.parent_clinic_id != main_clinic.id:
+            return {'error': 'The selected branch does not belong to your clinic.'}
+
+        return branch
+
     def create(self, request, *args, **kwargs):
         """
-        Create new staff/practitioner account.
+        Create new staff / practitioner account.
+        ✅ Now accepts clinic_branch in the request body.
         Auto-generates password and sends via email.
         Only admins can create users.
-        
-        ✅ FIX: Automatically creates Practitioner profile if role is PRACTITIONER
         """
         if not request.user.is_admin:
             return Response(
@@ -278,14 +243,24 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        serializer = self.get_serializer(data=request.data)
+        # ── Validate branch before touching the serializer ──────────────────
+        branch_id    = request.data.get('clinic_branch')
+        branch_result = self._validate_branch(request, branch_id)
+
+        if isinstance(branch_result, dict) and 'error' in branch_result:
+            return Response({'clinic_branch': branch_result['error']}, status=status.HTTP_400_BAD_REQUEST)
+
+        branch = branch_result  # Clinic instance or None
+
+        # ── Validate remaining fields ────────────────────────────────────────
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             with transaction.atomic():
                 temp_password = PasswordService.generate_temporary_password()
-                role = serializer.validated_data.get('role', 'STAFF')
+                role          = serializer.validated_data.get('role', 'STAFF')
                 
                 user = User.objects.create_user(
                     email=serializer.validated_data['email'],
@@ -295,10 +270,11 @@ class UserViewSet(viewsets.ModelViewSet):
                     phone=serializer.validated_data.get('phone', ''),
                     role=role,
                     clinic=request.user.clinic,
+                    clinic_branch=branch,          # ✅ assign branch
                     password_changed=False
                 )
                 
-                # ✅ FIX: Create Practitioner profile without is_active
+                # ── Create Practitioner profile if needed ────────────────────
                 practitioner_created = False
                 if role == 'PRACTITIONER':
                     if not Practitioner.objects.filter(user=user).exists():
@@ -309,13 +285,12 @@ class UserViewSet(viewsets.ModelViewSet):
                             specialization='',
                             consultation_fee=0,
                             is_accepting_patients=True
-                            # ✅ REMOVED: is_active=True
                         )
                         practitioner_created = True
-                        logger.info(f"✅ Practitioner profile created for: {user.email}")
+                        logger.info(f"Practitioner profile created for: {user.email}")
                 
                 company_name = request.user.clinic.name if request.user.clinic else 'Your Organization'
-                email_sent = EmailService.send_welcome_email(
+                email_sent   = EmailService.send_welcome_email(
                     user_email=user.email,
                     user_name=user.get_full_name(),
                     password=temp_password,
@@ -325,17 +300,22 @@ class UserViewSet(viewsets.ModelViewSet):
                 if not email_sent:
                     logger.warning(f"Email failed to send for {user.email}")
                 
-                logger.info(f"Staff account created: {user.email} (Role: {role}) by {request.user.email}")
+                logger.info(
+                    f"Staff account created: {user.email} "
+                    f"(Role: {role}, Branch: {branch.name if branch else 'All'}) "
+                    f"by {request.user.email}"
+                )
                 
-                response_serializer = self.get_serializer(user)
-                headers = self.get_success_headers(response_serializer.data)
-                
+                response_data = self.get_serializer(user).data
                 return Response({
-                    **response_serializer.data,
-                    'message': f'{"Practitioner" if role == "PRACTITIONER" else "Staff"} account created successfully! Login credentials sent to email.',
+                    **response_data,
+                    'message': (
+                        f'{"Practitioner" if role == "PRACTITIONER" else "Staff"} account created successfully! '
+                        f'Login credentials sent to email.'
+                    ),
                     'email_sent': email_sent,
-                    'practitioner_profile_created': practitioner_created
-                }, status=status.HTTP_201_CREATED, headers=headers)
+                    'practitioner_profile_created': practitioner_created,
+                }, status=status.HTTP_201_CREATED, headers=self.get_success_headers(response_data))
                 
         except Exception as e:
             logger.error(f"Staff creation failed: {str(e)}")
@@ -343,9 +323,41 @@ class UserViewSet(viewsets.ModelViewSet):
                 {'detail': f'Failed to create staff account: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+
+    def update(self, request, *args, **kwargs):
+        """
+        Update staff / practitioner.
+        ✅ Validates clinic_branch belongs to the same clinic family on update too.
+        """
+        if not request.user.is_admin:
+            return Response(
+                {'detail': 'Only administrators can update staff accounts.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        partial     = kwargs.pop('partial', False)
+        instance    = self.get_object()
+        branch_id   = request.data.get('clinic_branch')
+
+        # Only validate branch when it is explicitly included in payload
+        if 'clinic_branch' in request.data:
+            branch_result = self._validate_branch(request, branch_id)
+            if isinstance(branch_result, dict) and 'error' in branch_result:
+                return Response({'clinic_branch': branch_result['error']}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial, context={'request': request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_update(serializer)
+
+        logger.info(
+            f"Staff account updated: {instance.email} by {request.user.email}"
+        )
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
-        """Soft delete user"""
+        """Soft delete user."""
         instance = self.get_object()
         
         if instance.id == request.user.id:
@@ -355,12 +367,8 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         
         instance.is_deleted = True
-        instance.is_active = False
+        instance.is_active  = False
         instance.save()
-        
-        # ✅ FIX: Deactivate via User, not Practitioner
-        # Practitioner doesn't have is_active, but we can soft-delete the User
-        # which will filter it out in queries
         
         logger.info(f"User soft deleted: {instance.email} by {request.user.email}")
         
@@ -371,9 +379,7 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def me(self, request):
-        """Get current user profile"""
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        return Response(self.get_serializer(request.user).data)
 
 
 class RoleViewSet(viewsets.ModelViewSet):

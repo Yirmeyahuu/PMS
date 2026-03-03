@@ -32,7 +32,7 @@ const SETUP_CARDS: SetupCard[] = [
     color: 'bg-blue-500',
     bgColor: 'bg-blue-50',
     options: [
-      { id: 'option1', label: 'Option 1', component: PracticeOption1 },
+      { id: 'option1', label: 'Locations', component: PracticeOption1 },
       { id: 'option2', label: 'Option 2', component: PracticeOption2 },
       { id: 'option3', label: 'Option 3', component: PracticeOption3 },
     ],

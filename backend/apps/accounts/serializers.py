@@ -8,16 +8,43 @@ class UserSerializer(serializers.ModelSerializer):
     
     password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
     needs_password_change = serializers.BooleanField(read_only=True)
-    
+
+    # ✅ NEW: expose the branch name as a read-only convenience field
+    clinic_branch_name = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'role', 'phone',
-            'avatar', 'is_active', 'clinic', 'created_at', 'password',
-            'password_changed', 'needs_password_change'
+            'avatar', 'is_active', 'clinic', 'clinic_branch', 'clinic_branch_name',
+            'created_at', 'password', 'password_changed', 'needs_password_change',
         ]
         read_only_fields = ['id', 'created_at', 'password_changed']
-    
+
+    def get_clinic_branch_name(self, obj) -> str | None:
+        """Return the branch name for display purposes."""
+        if obj.clinic_branch:
+            return obj.clinic_branch.name
+        return None
+
+    def validate_clinic_branch(self, value):
+        """
+        Ensure the branch belongs to the same main clinic as the user's clinic.
+        Only validated on create/update when a branch is supplied.
+        """
+        if value is None:
+            return value
+
+        request = self.context.get('request')
+        if request and request.user and request.user.clinic:
+            main_clinic = request.user.clinic.main_clinic
+            # The branch must be either the main clinic itself or one of its branches
+            if value.id != main_clinic.id and value.parent_clinic_id != main_clinic.id:
+                raise serializers.ValidationError(
+                    "The selected branch does not belong to your clinic."
+                )
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         user = User.objects.create(**validated_data)
@@ -58,9 +85,7 @@ class AdminRegistrationSerializer(serializers.Serializer):
     def validate_phone(self, value):
         """Validate Philippine phone number format"""
         if value:
-            # Remove spaces and dashes
             cleaned = value.replace(' ', '').replace('-', '')
-            # Check if it's a valid PH number (09xxxxxxxxx or +639xxxxxxxxx)
             if not (cleaned.startswith('09') and len(cleaned) == 11) and \
                not (cleaned.startswith('+639') and len(cleaned) == 13):
                 raise serializers.ValidationError(
@@ -89,7 +114,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User.objects.create(**validated_data)
         user.set_password(password)
-        user.password_changed = True  # User set their own password
+        user.password_changed = True
         user.save()
         return user
 

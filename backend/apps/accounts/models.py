@@ -39,16 +39,27 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     
-    # New field for password change tracking
+    # Password change tracking
     password_changed = models.BooleanField(default=False)
     
-    # Clinic association
+    # Clinic association (main clinic)
     clinic = models.ForeignKey(
         'clinics.Clinic',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='users'
+    )
+
+    # ✅ NEW: Specific branch assignment (optional — null means "all branches")
+    clinic_branch = models.ForeignKey(
+        'clinics.Clinic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='branch_users',
+        help_text='Specific branch this staff/practitioner is assigned to. '
+                  'Null means they work across all branches.'
     )
     
     USERNAME_FIELD = 'email'
@@ -62,6 +73,7 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
         indexes = [
             models.Index(fields=['email']),
             models.Index(fields=['role']),
+            models.Index(fields=['clinic_branch']),   # ✅ NEW index
         ]
     
     def __str__(self):
@@ -110,4 +122,4 @@ class Role(TimeStampedModel):
         db_table = 'roles'
     
     def __str__(self):
-        return self.name  
+        return self.name

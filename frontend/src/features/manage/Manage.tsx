@@ -31,7 +31,7 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     id: 'clinical',
     label: 'Clinical',
     items: [
-      { id: 'clinical1', label: 'Clinical Menu 1', path: 'clinical1', component: ClinicalMenu1 },
+      { id: 'clinical1', label: 'Clinic Link Portal', path: 'clinical1', component: ClinicalMenu1 },
       { id: 'clinical2', label: 'Clinical Templates', path: 'clinical2', component: ClinicalMenu2 },
       { id: 'clinical3', label: 'Clinical Menu 3', path: 'clinical3', component: ClinicalMenu3 },
     ],
