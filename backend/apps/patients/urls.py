@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    PatientViewSet, IntakeFormViewSet,
+    PatientViewSet, IntakeFormViewSet, PortalBookingDiaryView,
     ServiceCategoryViewSet, PortalServiceViewSet,    # ✅ PortalServiceViewSet
     PortalLinkViewSet, PortalBookingAdminViewSet,
     PublicPortalView, PublicPortalBookView, PublicAvailableSlotsView,
@@ -33,4 +33,5 @@ urlpatterns = [
         PublicAvailableSlotsView.as_view(),
         name='public-portal-slots',
     ),
+    path('portal-bookings/diary/', PortalBookingDiaryView.as_view(), name='portal-bookings-diary'),
 ]

@@ -14,6 +14,7 @@ from apps.reports.views import ReportViewSet
 from apps.notifications.views import NotificationViewSet, EmailLogViewSet, SMSLogViewSet
 from apps.integrations.views import PhilHealthClaimViewSet, HMOClaimViewSet
 from apps.contacts.views import ContactViewSet
+from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet  # ✅ NEW
 
 router = DefaultRouter()
 
@@ -27,6 +28,7 @@ router.register(r'permissions', PermissionViewSet, basename='permissions')
 router.register(r'clinics',       ClinicViewSet,       basename='clinics')
 router.register(r'practitioners', PractitionerViewSet, basename='practitioners')
 router.register(r'locations',     LocationViewSet,     basename='locations')
+router.register(r'clinic-services', ClinicServiceViewSet, basename='clinic-services')  # ✅ NEW
 
 # Contacts
 router.register(r'contacts', ContactViewSet, basename='contacts')
@@ -64,10 +66,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
 
-    # ✅ Patients app — patients, intake-forms, portal-services, portal-links,
-    #                   portal-bookings, service-categories + public portal endpoints
     path('api/', include('apps.patients.urls')),
-
     path('api/clinical-templates/', include('apps.clinical_templates.urls')),
 
     path('api/auth/verify-token/', AuthViewSet.as_view({'post': 'verify_token'}), name='verify-token'),

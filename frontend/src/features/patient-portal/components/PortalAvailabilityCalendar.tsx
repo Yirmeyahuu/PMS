@@ -1,0 +1,236 @@
+import React, { useState, useEffect } from 'react';
+import {
+  format, addMonths, subMonths,
+  startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek,
+  addDays, isSameMonth, isSameDay,
+} from 'date-fns';
+import { ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
+import { fetchAvailableSlots } from '../portal.api';
+import type { PortalService, PortalPractitioner } from '@/types/portal';
+
+interface PortalAvailabilityCalendarProps {
+  token:        string;
+  service:      PortalService;
+  practitioner: PortalPractitioner | null;
+  onConfirm:    (date: string, slot: string) => void;
+  onClose:      () => void;
+}
+
+const fmt12 = (slot: string) => {
+  const [h, m] = slot.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m);
+  return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProps> = ({
+  token,
+  service,
+  practitioner,
+  onConfirm,
+  onClose,
+}) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const [calMonth,       setCalMonth]       = useState(new Date());
+  const [selectedDate,   setSelectedDate]   = useState<string>('');
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [selectedSlot,   setSelectedSlot]   = useState<string>('');
+  const [loadingSlots,   setLoadingSlots]   = useState(false);
+
+  // ── Fetch available slots whenever date changes ──────────────────────────
+  useEffect(() => {
+    if (!selectedDate) return;
+    setAvailableSlots([]);
+    setSelectedSlot('');
+    setLoadingSlots(true);
+
+    fetchAvailableSlots(token, service.id, selectedDate, practitioner?.id ?? null)
+      .then((r) => setAvailableSlots(r.slots ?? []))
+      .catch(() => setAvailableSlots([]))
+      .finally(() => setLoadingSlots(false));
+  }, [selectedDate, token, service.id, practitioner?.id]);
+
+  // ── Calendar grid ────────────────────────────────────────────────────────
+  const gridStart = startOfWeek(startOfMonth(calMonth), { weekStartsOn: 1 });
+  const gridEnd   = endOfWeek(endOfMonth(calMonth),     { weekStartsOn: 1 });
+  const weeks: Date[][] = [];
+  let cur = gridStart;
+  while (cur <= gridEnd) {
+    const week: Date[] = [];
+    for (let i = 0; i < 7; i++) { week.push(cur); cur = addDays(cur, 1); }
+    weeks.push(week);
+  }
+
+  const handleDateClick = (date: Date) => {
+    const str = format(date, 'yyyy-MM-dd');
+    if (str < todayStr || !isSameMonth(date, calMonth)) return;
+    setSelectedDate(str);
+  };
+
+  const weekDayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden w-full">
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">
+            Pick Date &amp; Time
+          </p>
+          <p className="text-xs font-bold text-gray-800 truncate">{service.name}</p>
+          {practitioner?.id != null && (
+            <p className="text-[10px] text-gray-500 truncate">with {practitioner.full_name}</p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="ml-2 p-1 rounded-md hover:bg-teal-100 text-gray-400 transition-colors flex-shrink-0"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="p-4 space-y-3">
+
+        {/* ── Month navigation ── */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setCalMonth(subMonths(calMonth, 1))}
+            className="p-1 rounded-md hover:bg-gray-100 text-gray-500 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-semibold text-gray-700">
+            {format(calMonth, 'MMMM yyyy')}
+          </span>
+          <button
+            onClick={() => setCalMonth(addMonths(calMonth, 1))}
+            className="p-1 rounded-md hover:bg-gray-100 text-gray-500 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* ── Weekday labels ── */}
+        <div className="grid grid-cols-7">
+          {weekDayLabels.map((d) => (
+            <div
+              key={d}
+              className="text-center text-[10px] font-semibold text-gray-400 pb-1"
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Days grid ── */}
+        <div className="space-y-1">
+          {weeks.map((week, wi) => (
+            <div key={wi} className="grid grid-cols-7 gap-1">
+              {week.map((date, di) => {
+                const dateStr    = format(date, 'yyyy-MM-dd');
+                const isPast     = dateStr < todayStr;
+                const isOther    = !isSameMonth(date, calMonth);
+                const isToday    = isSameDay(date, new Date());
+                const isSelected = dateStr === selectedDate;
+                const disabled   = isPast || isOther;
+
+                return (
+                  <button
+                    key={di}
+                    onClick={() => handleDateClick(date)}
+                    disabled={disabled}
+                    className={`
+                      h-8 w-full flex items-center justify-center
+                      text-xs font-medium rounded-md transition-all
+                      ${disabled
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : isSelected
+                          ? 'bg-gray-800 text-white shadow-sm'
+                          : isToday
+                            ? 'bg-teal-100 text-teal-700 font-bold hover:bg-teal-200'
+                            : 'text-gray-700 hover:bg-gray-100'
+                      }
+                    `}
+                  >
+                    {format(date, 'd')}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Available time slots ── */}
+        {selectedDate && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+
+            {/* Label */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3 text-gray-400" />
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  Available Times — {format(new Date(selectedDate + 'T00:00:00'), 'EEE, MMM d')}
+                </p>
+              </div>
+              <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                {service.duration_minutes} min
+              </span>
+            </div>
+
+            {/* Loading */}
+            {loadingSlots && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-600" />
+              </div>
+            )}
+
+            {/* No slots */}
+            {!loadingSlots && availableSlots.length === 0 && (
+              <p className="text-[11px] text-gray-400 text-center py-4 bg-gray-50 rounded-md">
+                No available slots for this date. Try another day.
+              </p>
+            )}
+
+            {/* Slot pills — matches wireframe layout */}
+            {!loadingSlots && availableSlots.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {availableSlots.map((slot) => (
+                  <button
+                    key={slot}
+                    onClick={() => setSelectedSlot(slot)}
+                    className={`
+                      px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
+                      ${selectedSlot === slot
+                        ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                      }
+                    `}
+                  >
+                    {fmt12(slot)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Confirm button ── */}
+        {selectedDate && selectedSlot && (
+          <div className="pt-2 border-t border-gray-100">
+            <button
+              onClick={() => onConfirm(selectedDate, selectedSlot)}
+              className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-md transition-colors shadow-sm"
+            >
+              Confirm — {format(new Date(selectedDate + 'T00:00:00'), 'MMM d')} at {fmt12(selectedSlot)}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

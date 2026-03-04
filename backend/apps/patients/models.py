@@ -233,11 +233,12 @@ class PortalBooking(TimeStampedModel):
         related_name='bookings',
     )
     service = models.ForeignKey(
-        PortalService,                              # ✅ points to renamed model
+        'clinic_services.Service',   # ✅ points to ClinicService
         on_delete=models.SET_NULL,
         null=True,
-        related_name='bookings',
+        related_name='portal_bookings',
     )
+    
     practitioner = models.ForeignKey(
         'clinics.Practitioner',
         on_delete=models.SET_NULL,

@@ -17,6 +17,23 @@ export interface AppointmentFilters {
   page_size?: number;
 }
 
+// ✅ NEW: Portal booking shape for the Diary
+export interface PortalBookingDiaryItem {
+  id:               number;
+  reference_number: string;
+  status:           'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  patient_name:     string;
+  patient_phone:    string;
+  patient_email:    string;
+  service_name:     string;
+  practitioner_name: string | null;
+  date:             string;   // yyyy-MM-dd
+  start_time:       string;   // HH:MM
+  end_time:         string;   // HH:MM  (derived: start + duration)
+  duration_minutes: number;
+  notes:            string;
+}
+
 /**
  * Get all appointments with filters
  */
@@ -93,6 +110,31 @@ export const getAppointmentClinicalNotes = async (appointmentId: number) => {
 export const getAppointmentInvoice = async (appointmentId: number) => {
   const response = await axiosInstance.get(
     `/invoices/?appointment=${appointmentId}`
+  );
+  return response.data;
+}; 
+
+export const getPortalBookingsForDiary = async (params: {
+  date_from: string;
+  date_to:   string;
+}): Promise<PortalBookingDiaryItem[]> => {
+  const response = await axiosInstance.get<PortalBookingDiaryItem[]>(
+    `/appointments/portal_bookings/`,  // ✅ FIX: was /portal-bookings/diary/
+    { params: { start_date: params.date_from, end_date: params.date_to } }  // ✅ FIX: match backend param names
+  );
+  return response.data;
+};
+
+/**
+ * Update portal booking status (CONFIRMED / CANCELLED)
+ */
+export const updatePortalBookingStatus = async (
+  id: number,
+  status: 'CONFIRMED' | 'CANCELLED'
+): Promise<PortalBookingDiaryItem> => {
+  const response = await axiosInstance.patch<PortalBookingDiaryItem>(
+    `/portal-bookings/${id}/update_status/`,
+    { status }
   );
   return response.data;
 };

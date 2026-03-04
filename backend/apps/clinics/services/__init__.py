@@ -1,0 +1,1 @@
+# This file is intentionally left blank.default_app_config = 'apps.clinics.services.apps.ClinicServicesConfig'

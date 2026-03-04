@@ -2,21 +2,29 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
-import { fetchPortal, fetchAvailableSlots, submitBooking } from '../portal.api';
+import { fetchPortal, submitBooking } from '../portal.api';
 import { PortalSidebar }       from '../components/PortalSidebar';
+import { PractitionerStep }    from '../components/PractitionerStep';
 import { ServiceList }         from '../components/ServiceList';
-import { DateTimeStep }        from '../components/DateTimeStep';
 import { PatientDetailsForm }  from '../components/PatientDetailsForm';
 import { PortalFooterActions } from '../components/PortalFooterActions';
 
 import type {
   PortalData,
+  PortalPractitioner,
   PortalService,
   BookingPayload,
 } from '@/types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
 
-type Step = 'services' | 'datetime' | 'details';
+type Step = 'practitioner' | 'services' | 'datetime' | 'details';
+
+const STEP_NUMBER: Record<Step, number> = {
+  practitioner: 1,
+  services:     2,
+  datetime:     3,
+  details:      4,
+};
 
 const EMPTY_FORM: PatientFormData = {
   first_name: '',
@@ -30,55 +38,65 @@ export const PortalHome: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const navigate  = useNavigate();
 
-  // Portal data
+  // ── Portal data ──────────────────────────────────────────────────────────
   const [portal,  setPortal]  = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
-  // Service selection
-  const [search,          setSearch]          = useState('');
-  const [activeTab,       setActiveTab]        = useState<'Appointments' | 'Classes'>('Appointments');
-  const [selectedService, setSelectedService]  = useState<PortalService | null>(null);
+  // ── Selections ───────────────────────────────────────────────────────────
+  const [step,                 setStep]                 = useState<Step>('practitioner');
+  const [selectedPractitioner, setSelectedPractitioner] = useState<PortalPractitioner | null>(null);
+  const [selectedService,      setSelectedService]      = useState<PortalService | null>(null);
+  const [search,               setSearch]               = useState('');
 
-  // Date / time
+  // ── Date / time ──────────────────────────────────────────────────────────
   const [selectedDate,   setSelectedDate]   = useState('');
   const [selectedSlot,   setSelectedSlot]   = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [slotsLoading,   setSlotsLoading]   = useState(false);
 
-  // Patient form
-  const [step,       setStep]       = useState<Step>('services');
+  // ── Patient form ─────────────────────────────────────────────────────────
   const [formData,   setFormData]   = useState<PatientFormData>(EMPTY_FORM);
   const [formError,  setFormError]  = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Load portal ──────────────────────────────────────────────────────────
+  // ── Load portal on mount ─────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
-    setLoading(true);
     fetchPortal(token)
       .then(setPortal)
       .catch(() => setError('This booking page is unavailable or the link has expired.'))
       .finally(() => setLoading(false));
   }, [token]);
 
-  // ── Fetch slots ──────────────────────────────────────────────────────────
+  // ── Fetch slots when service + date are set (datetime step only) ─────────
   useEffect(() => {
+    if (step !== 'datetime') return;
     if (!token || !selectedService || !selectedDate) return;
     setSlotsLoading(true);
-    fetchAvailableSlots(token, selectedService.id, selectedDate)
-      .then((r) => setAvailableSlots(r.slots))
-      .catch(() => setAvailableSlots([]))
-      .finally(() => setSlotsLoading(false));
-  }, [token, selectedService, selectedDate]);
+    import('../portal.api').then(({ fetchAvailableSlots }) =>
+      fetchAvailableSlots(
+        token,
+        selectedService.id,
+        selectedDate,
+        selectedPractitioner?.id ?? null,
+      )
+        .then((r) => setAvailableSlots(r.slots))
+        .catch(() => setAvailableSlots([]))
+        .finally(() => setSlotsLoading(false))
+    );
+  }, [step, token, selectedService, selectedDate, selectedPractitioner]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ── Navigation handlers ──────────────────────────────────────────────────
+  const handleSelectPractitioner = (p: PortalPractitioner) => {
+    setSelectedPractitioner(p);
+  };
+
   const handleSelectService = (svc: PortalService) => {
     setSelectedService(svc);
     setSelectedDate('');
     setSelectedSlot('');
     setAvailableSlots([]);
-    setStep('datetime');
   };
 
   const handleDateChange = (date: string) => {
@@ -86,20 +104,31 @@ export const PortalHome: React.FC = () => {
     setSelectedSlot('');
   };
 
-  const handleBack = () => {
-    if (step === 'details') { setStep('datetime'); return; }
-    if (step === 'datetime') {
-      setSelectedService(null);
-      setSelectedDate('');
-      setSelectedSlot('');
-      setStep('services');
-    }
+  /**
+   * Called when the user picks a date + slot directly from the inline
+   * PortalAvailabilityCalendar inside ServiceCard.
+   * We store the picked values and jump straight to 'details', skipping
+   * the separate 'datetime' step entirely.
+   */
+  const handleInlineDateTimeConfirm = (date: string, slot: string) => {
+    setSelectedDate(date);
+    setSelectedSlot(slot);
+    setStep('details');
   };
 
   const handleContinue = () => {
-    if (selectedDate && selectedSlot) setStep('details');
+    if (step === 'practitioner' && selectedPractitioner) setStep('services');
+    if (step === 'services'     && selectedService)      setStep('datetime');
+    if (step === 'datetime'     && selectedDate && selectedSlot) setStep('details');
   };
 
+  const handleBack = () => {
+    if (step === 'details')  { setStep('datetime');     return; }
+    if (step === 'datetime') { setStep('services');     return; }
+    if (step === 'services') { setStep('practitioner'); return; }
+  };
+
+  // ── Submit booking ───────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!token || !selectedService || !selectedDate || !selectedSlot) return;
     setFormError(null);
@@ -116,6 +145,7 @@ export const PortalHome: React.FC = () => {
 
     const payload: BookingPayload = {
       service:            selectedService.id,
+      practitioner:       selectedPractitioner?.id ?? null,
       patient_first_name: formData.first_name,
       patient_last_name:  formData.last_name,
       patient_email:      formData.email,
@@ -131,12 +161,22 @@ export const PortalHome: React.FC = () => {
       navigate(`/portal/${token}/success`, { state: { confirmation } });
     } catch (err: any) {
       setFormError(
-        err.response?.data?.detail || 'Failed to submit booking. Please try again.',
+        err.response?.data?.detail ?? 'Failed to submit booking. Please try again.',
       );
     } finally {
       setSubmitting(false);
     }
   };
+
+  // ── canContinue per step ─────────────────────────────────────────────────
+  // On 'services' step, the user can either:
+  //   a) select a service and click Continue (goes to datetime step), or
+  //   b) use the inline calendar to jump directly to details.
+  // So Continue is enabled as soon as a service is selected.
+  const canContinue =
+    (step === 'practitioner' && !!selectedPractitioner) ||
+    (step === 'services'     && !!selectedService)       ||
+    (step === 'datetime'     && !!(selectedDate && selectedSlot));
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -159,7 +199,7 @@ export const PortalHome: React.FC = () => {
     );
   }
 
-  // ── Filter services by search query ──────────────────────────────────────
+  // ── Filter services for search ───────────────────────────────────────────
   const filteredCategories = portal.categories
     .map((cat) => ({
       ...cat,
@@ -173,63 +213,67 @@ export const PortalHome: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar */}
       <PortalSidebar
         portal={portal}
+        selectedPractitioner={selectedPractitioner}
         selectedService={selectedService}
         selectedDate={selectedDate}
         selectedSlot={selectedSlot}
+        currentStep={STEP_NUMBER[step]}
       />
 
-      {/* Main */}
-      <main className="flex-1 p-6 flex flex-col">
+      {/* Main content */}
+      <main className="flex-1 flex flex-col min-h-screen">
 
-        {/* Heading */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {portal.heading || portal.clinic_name}
-          </h1>
-          {portal.description && (
-            <p className="text-gray-500 mt-1">{portal.description}</p>
+        {/* Top bar */}
+        <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center gap-4">
+          <div className="flex-1">
+            <h1 className="text-xl font-bold text-gray-900">
+              {portal.heading || portal.clinic_name}
+            </h1>
+            {portal.description && (
+              <p className="text-sm text-gray-500">{portal.description}</p>
+            )}
+          </div>
+
+          {/* Search bar — only on services step */}
+          {step === 'services' && (
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search services..."
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
           )}
         </div>
 
-        {/* Search + tab bar */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="w-full pl-9 pr-4 py-2.5 bg-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-          {(['Appointments', 'Classes'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? 'bg-gray-700 text-white'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
         {/* Step content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-8">
+
+          {step === 'practitioner' && (
+            <PractitionerStep
+              practitioners={portal.practitioners}
+              selectedPractitioner={selectedPractitioner}
+              onSelect={handleSelectPractitioner}
+            />
+          )}
+
           {step === 'services' && (
             <ServiceList
               categories={filteredCategories}
               selectedService={selectedService}
               onSelectService={handleSelectService}
+              // ── inline calendar props ──
+              token={token}
+              selectedPractitioner={selectedPractitioner}
+              onDateTimeConfirm={handleInlineDateTimeConfirm}
             />
           )}
 
@@ -255,15 +299,17 @@ export const PortalHome: React.FC = () => {
           )}
         </div>
 
-        {/* Footer */}
-        <PortalFooterActions
-          step={step}
-          canContinue={!!(selectedDate && selectedSlot)}
-          submitting={submitting}
-          onBack={handleBack}
-          onContinue={handleContinue}
-          onSubmit={handleSubmit}
-        />
+        {/* Footer actions */}
+        <div className="px-8 pb-6">
+          <PortalFooterActions
+            step={step}
+            canContinue={canContinue}
+            submitting={submitting}
+            onBack={handleBack}
+            onContinue={handleContinue}
+            onSubmit={handleSubmit}
+          />
+        </div>
       </main>
     </div>
   );

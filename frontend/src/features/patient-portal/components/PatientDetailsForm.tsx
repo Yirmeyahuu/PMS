@@ -1,17 +1,19 @@
 import React from 'react';
+import { User, Mail, Phone, FileText, Calendar } from 'lucide-react';
 
 export interface PatientFormData {
-  first_name: string;
-  last_name:  string;
-  email:      string;
-  phone:      string;
-  notes:      string;
+  first_name:    string;
+  last_name:     string;
+  email:         string;
+  phone:         string;
+  date_of_birth: string;
+  notes:         string;
 }
 
 interface PatientDetailsFormProps {
-  formData:   PatientFormData;
-  formError:  string | null;
-  onChange:   (data: PatientFormData) => void;
+  formData:  PatientFormData;
+  formError: string | null;
+  onChange:  (data: PatientFormData) => void;
 }
 
 export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
@@ -24,83 +26,131 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
       onChange({ ...formData, [field]: e.target.value });
 
   return (
-    <div className="bg-white rounded-xl p-6 space-y-4 max-w-lg">
-      <h3 className="font-semibold text-gray-800">Your Details</h3>
+    <div className="space-y-4 w-full">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Your Booking Details</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Please fill in your contact information to complete the booking.
+        </p>
+      </div>
 
       {formError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {formError}
         </div>
       )}
 
-      {/* Name row */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            First Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.first_name}
-            onChange={set('first_name')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            placeholder="Juan"
-          />
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
+
+        {/* Row 1 — First Name / Last Name */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={set('first_name')}
+                className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                placeholder="Enter First Name"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={set('last_name')}
+                className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                placeholder="Enter Last Name"
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Last Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.last_name}
-            onChange={set('last_name')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            placeholder="dela Cruz"
-          />
+
+        {/* Row 2 — Phone / Email */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Mobile Phone <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={set('phone')}
+                className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                placeholder="Enter Mobile Number"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Email Address <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="email"
+                value={formData.email}
+                onChange={set('email')}
+                className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                placeholder="Enter Email"
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Email */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Email <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="email"
-          value={formData.email}
-          onChange={set('email')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          placeholder="juan@example.com"
-        />
-      </div>
+        {/* Row 3 — Date of Birth (half width) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Date of Birth <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={formData.date_of_birth}
+                onChange={set('date_of_birth')}
+                max={new Date().toISOString().split('T')[0]}
+                className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+              />
+            </div>
+          </div>
+          {/* intentionally empty — keeps DOB at half width */}
+          <div />
+        </div>
 
-      {/* Phone */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Phone <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="tel"
-          value={formData.phone}
-          onChange={set('phone')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          placeholder="09XXXXXXXXX"
-        />
-      </div>
+        {/* Divider */}
+        <div className="border-t border-gray-100" />
 
-      {/* Notes */}
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Notes <span className="text-gray-400">(optional)</span>
-        </label>
-        <textarea
-          rows={3}
-          value={formData.notes}
-          onChange={set('notes')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          placeholder="Any additional information..."
-        />
+        {/* Notes — full width */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            Notes{' '}
+            <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <div className="relative">
+            <FileText className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
+            <textarea
+              rows={4}
+              value={formData.notes}
+              onChange={set('notes')}
+              className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50 resize-none"
+              placeholder="Any additional information for the practitioner..."
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

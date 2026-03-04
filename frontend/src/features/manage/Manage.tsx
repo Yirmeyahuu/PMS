@@ -9,7 +9,7 @@ import { AdminMenu2 } from './pages/administration/AdminMenu2';
 import { AdminMenu3 } from './pages/administration/AdminMenu3';
 import { ClinicalMenu1 } from './pages/clinical/ClinicalMenu1';
 import { ClinicalMenu2 } from './pages/clinical/ClinicalMenu2';
-import { ClinicalMenu3 } from './pages/clinical/ClinicalMenu3';
+import { ClinicServices } from './pages/clinical/ClinicServices';
 import { CommMenu1 } from './pages/communications/CommMenu1';
 import { CommMenu2 } from './pages/communications/CommMenu2';
 import { CommMenu3 } from './pages/communications/CommMenu3';
@@ -33,7 +33,7 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     items: [
       { id: 'clinical1', label: 'Clinic Link Portal', path: 'clinical1', component: ClinicalMenu1 },
       { id: 'clinical2', label: 'Clinical Templates', path: 'clinical2', component: ClinicalMenu2 },
-      { id: 'clinical3', label: 'Clinical Menu 3', path: 'clinical3', component: ClinicalMenu3 },
+      { id: 'clinical3', label: 'Clinic Services', path: 'clinical3', component: ClinicServices },
     ],
   },
   {

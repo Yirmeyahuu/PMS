@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
+from apps.clinics.services.models import Service as ClinicService
 from .models import (
     Patient, IntakeForm,
     ServiceCategory, PortalService,
@@ -242,11 +243,6 @@ class PublicPortalBookView(APIView):
 
 
 class PublicAvailableSlotsView(APIView):
-    """
-    GET /api/public/portal/<token>/slots/?service=<id>&date=<YYYY-MM-DD>&practitioner=<id>
-    Returns available time slots for a given service + date.
-    """
-
     permission_classes = [AllowAny]
 
     def get(self, request, token: str):
@@ -263,13 +259,17 @@ class PublicAvailableSlotsView(APIView):
             )
 
         service = get_object_or_404(
-            PortalService,                              # ✅ PortalService
+            ClinicService,
             pk=service_id,
             clinic=portal_link.clinic,
             is_active=True,
+            show_in_portal=True,
         )
 
         from datetime import time, date as date_type, timedelta, datetime
+        from apps.appointments.models import Appointment  # ✅ cross-check Diary appointments
+        from apps.appointments.models import PractitionerSchedule  # ✅ respect practitioner schedule
+
         try:
             target_date = date_type.fromisoformat(date_str)
         except ValueError:
@@ -278,30 +278,154 @@ class PublicAvailableSlotsView(APIView):
         if target_date < date_type.today():
             return Response({'detail': 'Cannot book a past date.'}, status=400)
 
-        duration   = service.duration_minutes
-        all_slots  = []
-        current    = datetime.combine(target_date, time(9, 0))
-        end_of_day = datetime.combine(target_date, time(17, 0))
+        duration = service.duration_minutes
 
-        while current + timedelta(minutes=duration) <= end_of_day:
-            all_slots.append(current.time())
-            current += timedelta(minutes=duration)
+        CLINIC_START = 6 * 60    # 6:00 AM
+        CLINIC_END   = 21 * 60   # 9:00 PM
 
-        booked_qs = PortalBooking.objects.filter(
+        def time_to_minutes(t):
+            return t.hour * 60 + t.minute
+
+        def minutes_to_time(m):
+            return time(m // 60, m % 60)
+
+        # ── 1. Build candidate 15-min slots (respect practitioner schedule if set) ──
+        weekday = target_date.weekday()
+        candidate_slots: list = []
+
+        if practitioner_id:
+            schedules = PractitionerSchedule.objects.filter(
+                practitioner_id=practitioner_id,
+                weekday=weekday,
+                is_available=True,
+            )
+            if schedules.exists():
+                for sched in schedules:
+                    start_min = max(time_to_minutes(sched.start_time), CLINIC_START)
+                    end_min   = min(time_to_minutes(sched.end_time),   CLINIC_END)
+                    m = start_min
+                    while m + 15 <= end_min:
+                        candidate_slots.append(minutes_to_time(m))
+                        m += 15
+            else:
+                # No schedule set — use clinic hours
+                m = CLINIC_START
+                while m + 15 <= CLINIC_END:
+                    candidate_slots.append(minutes_to_time(m))
+                    m += 15
+        else:
+            m = CLINIC_START
+            while m + 15 <= CLINIC_END:
+                candidate_slots.append(minutes_to_time(m))
+                m += 15
+
+        # ── 2. Collect booked ranges from BOTH sources ────────────────────────────
+        booked_ranges: list[tuple] = []
+
+        # Source A: Diary/Calendar appointments (Appointment table)
+        diary_qs = Appointment.objects.filter(
+            date=target_date,
+            clinic=portal_link.clinic,
+            status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
+            is_deleted=False,
+        )
+        if practitioner_id:
+            diary_qs = diary_qs.filter(practitioner_id=practitioner_id)
+
+        for appt in diary_qs:
+            booked_ranges.append((
+                time_to_minutes(appt.start_time),
+                time_to_minutes(appt.end_time),
+            ))
+
+        # Source B: Portal bookings (PortalBooking table)
+        portal_qs = PortalBooking.objects.filter(
             portal_link=portal_link,
-            service=service,
             appointment_date=target_date,
             status__in=['PENDING', 'CONFIRMED'],
         )
         if practitioner_id:
-            booked_qs = booked_qs.filter(practitioner_id=practitioner_id)
+            portal_qs = portal_qs.filter(practitioner_id=practitioner_id)
 
-        booked_times = set(booked_qs.values_list('appointment_time', flat=True))
+        for booking in portal_qs:
+            # Portal bookings store only start time — derive end from service duration
+            booking_start = time_to_minutes(booking.appointment_time)
+            booking_service_duration = (
+                booking.service.duration_minutes if booking.service else duration
+            )
+            booking_end = booking_start + booking_service_duration
+            booked_ranges.append((booking_start, booking_end))
 
-        available = [
-            t.strftime('%H:%M')
-            for t in all_slots
-            if t not in booked_times
-        ]
+        # ── 3. Filter candidate slots against all booked ranges ───────────────────
+        available: list[str] = []
+        for slot_time in candidate_slots:
+            slot_start = time_to_minutes(slot_time)
+            slot_end   = slot_start + duration
 
-        return Response({'date': date_str, 'slots': available}) 
+            if slot_end > CLINIC_END:
+                continue
+
+            overlaps = any(
+                slot_start < booked_end and slot_end > booked_start
+                for booked_start, booked_end in booked_ranges
+            )
+            if not overlaps:
+                available.append(f"{slot_time.hour:02d}:{slot_time.minute:02d}")
+
+        return Response({'date': date_str, 'slots': available})
+
+
+class PortalBookingDiaryView(APIView):
+    """
+    GET /api/portal-bookings/diary/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    Returns PENDING + CONFIRMED portal bookings shaped for the Diary calendar.
+    Requires authentication (staff/admin only).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        date_from = request.query_params.get('date_from')
+        date_to   = request.query_params.get('date_to')
+
+        if not date_from or not date_to:
+            return Response(
+                {'detail': 'date_from and date_to are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        bookings = PortalBooking.objects.filter(
+            portal_link__clinic=request.user.clinic,
+            appointment_date__gte=date_from,
+            appointment_date__lte=date_to,
+            status__in=['PENDING', 'CONFIRMED'],
+        ).select_related('service', 'practitioner__user')
+
+        from datetime import datetime, timedelta
+
+        data = []
+        for b in bookings:
+            duration = b.service.duration_minutes if b.service else 60
+            start_dt = datetime.combine(b.appointment_date, b.appointment_time)
+            end_dt   = start_dt + timedelta(minutes=duration)
+
+            practitioner_name = (
+                b.practitioner.user.get_full_name() if b.practitioner else 'Any Available'
+            )
+
+            data.append({
+                'id':               b.id,
+                'reference_number': b.reference_number,
+                'status':           b.status,
+                'patient_name':     f"{b.patient_first_name} {b.patient_last_name}",
+                'patient_phone':    b.patient_phone,
+                'patient_email':    b.patient_email,
+                'service_name':     b.service.name if b.service else '—',
+                'practitioner_name': practitioner_name,
+                'date':             b.appointment_date.strftime('%Y-%m-%d'),
+                'start_time':       b.appointment_time.strftime('%H:%M'),
+                'end_time':         end_dt.strftime('%H:%M'),
+                'duration_minutes': duration,
+                'notes':            b.notes,
+            })
+
+        return Response(data)

@@ -1,7 +1,8 @@
 from rest_framework import serializers
+from apps.clinics.services.models import Service as ClinicService   # ✅ top-level import
 from .models import (
     Patient, IntakeForm,
-    ServiceCategory, PortalService, 
+    ServiceCategory, PortalService,
     PortalLink, PortalBooking,
 )
 
@@ -9,12 +10,12 @@ from .models import (
 class PatientSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='get_full_name', read_only=True)
     age = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Patient
         fields = '__all__'
         read_only_fields = ['id', 'patient_number', 'created_at', 'updated_at']
-    
+
     def get_age(self, obj):
         from datetime import date
         today = date.today()
@@ -26,7 +27,7 @@ class PatientSerializer(serializers.ModelSerializer):
 class IntakeFormSerializer(serializers.ModelSerializer):
     patient_name      = serializers.CharField(source='patient.get_full_name', read_only=True)
     completed_by_name = serializers.CharField(source='completed_by.get_full_name', read_only=True)
-    
+
     class Meta:
         model = IntakeForm
         fields = '__all__'
@@ -41,12 +42,12 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description', 'sort_order', 'is_active']
 
 
-class PortalServiceSerializer(serializers.ModelSerializer):      # ✅ renamed class
+class PortalServiceSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     image_url     = serializers.SerializerMethodField()
 
     class Meta:
-        model  = PortalService                                   # ✅ PortalService
+        model  = PortalService
         fields = [
             'id', 'name', 'description', 'duration_minutes',
             'price', 'image_url', 'is_active', 'sort_order',
@@ -60,18 +61,71 @@ class PortalServiceSerializer(serializers.ModelSerializer):      # ✅ renamed c
         return None
 
 
+class PortalPractitionerSerializer(serializers.Serializer):
+    """
+    Lightweight practitioner card for the public portal.
+    Sourced from clinics.Practitioner — no auth required.
+    """
+    id             = serializers.IntegerField(source='pk')
+    full_name      = serializers.SerializerMethodField()
+    specialization = serializers.CharField()
+    bio            = serializers.CharField()
+    avatar_url     = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj) -> str:
+        return obj.user.get_full_name()
+
+    def get_avatar_url(self, obj) -> str | None:
+        request = self.context.get('request')
+        if obj.user.avatar and request:
+            return request.build_absolute_uri(obj.user.avatar.url)
+        return None
+
+
+
+class PortalClinicServiceSerializer(serializers.ModelSerializer):
+    """Serializes ClinicService for the public portal (matches PortalService shape)."""
+    image_url     = serializers.SerializerMethodField()
+    category      = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ClinicService    # ✅ reference the top-level import, NOT inside Meta
+        fields = [
+            'id', 'name', 'description', 'duration_minutes',
+            'price', 'image_url', 'is_active', 'sort_order',
+            'category', 'category_name', 'color_hex',
+        ]
+
+    def get_image_url(self, obj) -> str | None:
+        request = self.context.get('request')
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    def get_category(self, obj):
+        return None
+
+    def get_category_name(self, obj):
+        return None
+
+
 class PortalLinkPublicSerializer(serializers.ModelSerializer):
-    clinic_name    = serializers.CharField(source='clinic.name', read_only=True)
+    clinic_name    = serializers.CharField(source='clinic.name',    read_only=True)
     clinic_logo    = serializers.SerializerMethodField()
     clinic_address = serializers.SerializerMethodField()
+    clinic_phone   = serializers.CharField(source='clinic.phone',   read_only=True)
+    clinic_email   = serializers.EmailField(source='clinic.email',  read_only=True)
     categories     = serializers.SerializerMethodField()
+    practitioners  = serializers.SerializerMethodField()
 
     class Meta:
         model  = PortalLink
         fields = [
             'token', 'heading', 'description',
             'clinic_name', 'clinic_logo', 'clinic_address',
-            'categories',
+            'clinic_phone', 'clinic_email',
+            'categories', 'practitioners',
         ]
 
     def get_clinic_logo(self, obj) -> str | None:
@@ -81,49 +135,55 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
         return None
 
     def get_clinic_address(self, obj) -> str:
-        c = obj.clinic
+        c     = obj.clinic
         parts = [c.address, c.city, c.province, c.postal_code]
         return ', '.join(p for p in parts if p)
 
     def get_categories(self, obj):
-        categories = ServiceCategory.objects.filter(
+        services = ClinicService.objects.filter(    # ✅ now resolves correctly
             clinic=obj.clinic,
             is_active=True,
-            is_deleted=False,
-        ).prefetch_related('portal_services').order_by('sort_order', 'name')  # ✅ updated related_name
-
-        result = []
-        for cat in categories:
-            services = cat.portal_services.filter(             # ✅ updated related_name
-                is_active=True, is_deleted=False
-            ).order_by('sort_order', 'name')
-            result.append({
-                'id':          cat.id,
-                'name':        cat.name,
-                'description': cat.description,
-                'services':    PortalServiceSerializer(         # ✅ updated serializer
-                    services, many=True, context=self.context
-                ).data,
-            })
-
-        uncategorized = PortalService.objects.filter(          # ✅ PortalService
-            clinic=obj.clinic,
-            category__isnull=True,
-            is_active=True,
+            show_in_portal=True,
             is_deleted=False,
         ).order_by('sort_order', 'name')
 
-        if uncategorized.exists():
-            result.append({
-                'id':          None,
-                'name':        'Other Services',
-                'description': '',
-                'services':    PortalServiceSerializer(         # ✅ updated serializer
-                    uncategorized, many=True, context=self.context
-                ).data,
-            })
+        if not services.exists():
+            return []
 
-        return result
+        serialized = PortalClinicServiceSerializer(
+            services, many=True, context=self.context
+        ).data
+
+        return [
+            {
+                'id':          None,
+                'name':        'Our Services',
+                'description': '',
+                'services':    serialized,
+            }
+        ]
+
+    def get_practitioners(self, obj):
+        from apps.clinics.models import Practitioner
+        practitioners = Practitioner.objects.filter(
+            clinic=obj.clinic,
+            is_accepting_patients=True,
+            is_deleted=False,
+            user__is_active=True,
+        ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+        serialized = PortalPractitionerSerializer(
+            practitioners, many=True, context=self.context
+        ).data
+
+        any_available = {
+            'id':             None,
+            'full_name':      'Any Available',
+            'specialization': '',
+            'bio':            '',
+            'avatar_url':     None,
+        }
+        return [any_available] + list(serialized)
 
 
 class PortalLinkAdminSerializer(serializers.ModelSerializer):
@@ -136,7 +196,7 @@ class PortalLinkAdminSerializer(serializers.ModelSerializer):
             'description', 'is_active', 'portal_url',
             'created_at',
         ]
-        read_only_fields = ['id', 'clinic', 'token', 'created_at']  # clinic + token are read-only
+        read_only_fields = ['id', 'clinic', 'token', 'created_at']
 
     def get_portal_url(self, obj) -> str:
         request = self.context.get('request')
@@ -144,8 +204,6 @@ class PortalLinkAdminSerializer(serializers.ModelSerializer):
             base = f"{request.scheme}://{request.get_host()}"
             return f"{base}/portal/{obj.token}/"
         return f"/portal/{obj.token}/"
-    
-    
 
 
 class PortalBookingCreateSerializer(serializers.ModelSerializer):
