@@ -32,12 +32,12 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
         help_text='Auto-generated unique branch identifier',
         blank=True, null=True
     )
-    email = models.EmailField()
-    phone = models.CharField(max_length=15)
-    address = models.TextField()
-    city = models.CharField(max_length=100)
-    province = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=10)
+    email = models.EmailField(blank=True)           # ✅ blank=True
+    phone = models.CharField(max_length=15, blank=True)  # ✅ blank=True
+    address = models.TextField(blank=True)          # ✅ blank=True
+    city = models.CharField(max_length=100, blank=True)  # ✅ blank=True
+    province = models.CharField(max_length=100, blank=True)  # ✅ blank=True
+    postal_code = models.CharField(max_length=10, blank=True)  # ✅ blank=True
     
     tin = models.CharField(max_length=50, blank=True, verbose_name='TIN')
     philhealth_accreditation = models.CharField(max_length=100, blank=True)
@@ -75,33 +75,36 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Auto-generate branch_code if not set.
-        
-        Always uses the ROOT (main) clinic name as prefix so that
-        all branches share the same prefix, differentiated only by sequence.
-        
-        Main branch:  ClinicTest-0001
-        Branch 2:     ClinicTest-0002
-        Branch 3:     ClinicTest-0003
-        """
         if not self.branch_code:
-            # Always derive prefix from the root/main clinic name
-            root_clinic = self.parent_clinic if self.parent_clinic else self
-            root_name   = root_clinic.name
+            if self.parent_clinic:
+                # ── This is a branch being created ──────────────────────────
+                root_clinic = self.parent_clinic
+                root_name   = root_clinic.name
 
-            # Count all existing clinics in this family (root + all its branches)
-            existing_count = Clinic.objects.filter(
-                Q(id=root_clinic.id) | Q(parent_clinic=root_clinic)
-            ).count()
+                existing_count = Clinic.objects.filter(
+                    Q(id=root_clinic.id) | Q(parent_clinic=root_clinic)
+                ).count()
 
-            # Next sequence = existing count + 1
-            sequence = existing_count + 1
-
-            # Collision-safe generation
-            code = generate_branch_code(root_name, sequence)
-            while Clinic.objects.filter(branch_code=code).exists():
-                sequence += 1
+                sequence = existing_count + 1
                 code = generate_branch_code(root_name, sequence)
+                while Clinic.objects.filter(branch_code=code).exists():
+                    sequence += 1
+                    code = generate_branch_code(root_name, sequence)
+
+            else:
+                # ── This is a brand-new ROOT clinic (not yet saved) ──────────
+                # Cannot query by self.id — use name + total clinic count
+                root_name = self.name
+
+                existing_count = Clinic.objects.filter(
+                    branch_code__startswith=re.sub(r"\s+", "", re.sub(r"[^A-Za-z0-9\s]", "", root_name))
+                ).count()
+
+                sequence = existing_count + 1
+                code = generate_branch_code(root_name, sequence)
+                while Clinic.objects.filter(branch_code=code).exists():
+                    sequence += 1
+                    code = generate_branch_code(root_name, sequence)
 
             self.branch_code = code
 

@@ -45,10 +45,17 @@ class AuthViewSet(viewsets.GenericViewSet):
             with transaction.atomic():
                 temp_password = PasswordService.generate_temporary_password()
 
+                # ✅ FIX: Provide all required non-nullable fields with safe defaults
                 clinic = Clinic.objects.create(
                     name=serializer.validated_data['company_name'],
                     phone=serializer.validated_data.get('phone', ''),
-                    is_active=True
+                    email=serializer.validated_data['email'],  # ✅ use admin email as clinic email
+                    address='',        # ✅ blank default — admin fills this in setup
+                    city='',           # ✅ blank default
+                    province='',       # ✅ blank default
+                    postal_code='',    # ✅ blank default
+                    is_active=True,
+                    is_main_branch=True,
                 )
 
                 user = User.objects.create_user(
@@ -84,13 +91,15 @@ class AuthViewSet(viewsets.GenericViewSet):
                     'message': 'Account created successfully! Check your email for login credentials.',
                     'email_sent': email_sent,
                     'clinic': {'id': clinic.id, 'name': clinic.name},
-                    'portal_token': portal_link.token,   # handy for debugging
+                    'portal_token': portal_link.token,
                 }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            logger.error(f"Admin registration failed: {str(e)}")
+            logger.error(f"Admin registration failed: {str(e)}", exc_info=True)
+            import traceback
+            traceback.print_exc()
             return Response(
-                {'detail': 'Registration failed. Please try again later.'},
+                {'detail': f'Registration failed: {str(e)}'},  # ✅ expose actual error in dev
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
