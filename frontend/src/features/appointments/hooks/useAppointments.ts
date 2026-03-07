@@ -1,3 +1,4 @@
+// filepath: useAppointments.ts
 import { useState, useEffect, useCallback } from 'react';
 import { getAppointments, getPortalBookingsForDiary } from '../appointment.api';
 import { format } from 'date-fns';
@@ -31,22 +32,32 @@ export const useAppointments = ({
     setError(null);
 
     try {
-      const params: any = {
+      // Backend get_queryset reads 'start_date' and 'end_date'
+      const apptParams: Record<string, any> = {
         start_date: startDateStr,
         end_date:   endDateStr,
         page_size:  1000,
       };
 
-      if (practitionerId !== null) params.practitioner  = practitionerId;
-      if (clinicBranchId  !== null) params.clinic_branch = clinicBranchId;
+      // Always send clinic_branch when selected — this is what scopes to a branch
+      if (clinicBranchId !== null) apptParams.clinic_branch = clinicBranchId;
+      // Only add practitioner if one is selected
+      if (practitionerId !== null) apptParams.practitioner = practitionerId;
+
+      const portalParams: Record<string, any> = {
+        start_date: startDateStr,
+        end_date:   endDateStr,
+      };
+      if (clinicBranchId !== null) portalParams.clinic_branch = clinicBranchId;
+      if (practitionerId !== null) portalParams.practitioner  = practitionerId;
 
       const [apptResponse, portalResponse] = await Promise.all([
-        getAppointments(params),
-        getPortalBookingsForDiary({ date_from: startDateStr, date_to: endDateStr }),
+        getAppointments(apptParams),
+        getPortalBookingsForDiary(portalParams),
       ]);
 
       setAppointments(apptResponse.results);
-      setPortalBookings(portalResponse);
+      setPortalBookings(portalResponse.filter((b: PortalBookingDiaryItem) => b.status === 'PENDING'));
     } catch (err: any) {
       console.error('Failed to fetch appointments:', err);
       const msg = err.response?.data?.detail || 'Failed to load appointments';
@@ -61,5 +72,9 @@ export const useAppointments = ({
     fetchAppointments();
   }, [fetchAppointments]);
 
-  return { appointments, portalBookings, loading, error, refetch: fetchAppointments };
+  const removePortalBooking = useCallback((bookingId: number) => {
+    setPortalBookings(prev => prev.filter(b => b.id !== bookingId));
+  }, []);
+
+  return { appointments, portalBookings, loading, error, refetch: fetchAppointments, removePortalBooking };
 };

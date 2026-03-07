@@ -233,18 +233,26 @@ class PortalBooking(TimeStampedModel):
         related_name='bookings',
     )
     service = models.ForeignKey(
-        'clinic_services.Service',   # ✅ points to ClinicService
+        'clinic_services.Service',
         on_delete=models.SET_NULL,
         null=True,
         related_name='portal_bookings',
     )
-    
     practitioner = models.ForeignKey(
         'clinics.Practitioner',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='portal_bookings',
+    )
+
+    # ── NEW: link back to the Appointment created on confirmation ──────────
+    appointment = models.OneToOneField(
+        'appointments.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='portal_booking',
     )
 
     patient_first_name = models.CharField(max_length=100)

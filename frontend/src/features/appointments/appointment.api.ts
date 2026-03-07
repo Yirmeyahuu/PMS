@@ -11,13 +11,16 @@ export interface AppointmentFilters {
   appointment_type?: string;
   patient?: number;
   practitioner?: number;
+  clinic_branch?: number;
   date_from?: string;
   date_to?: string;
+  // Backend also accepts start_date/end_date (used by diary)
+  start_date?: string;
+  end_date?: string;
   page?: number;
   page_size?: number;
 }
 
-// ✅ NEW: Portal booking shape for the Diary
 export interface PortalBookingDiaryItem {
   id:               number;
   reference_number: string;
@@ -29,7 +32,7 @@ export interface PortalBookingDiaryItem {
   practitioner_name: string | null;
   date:             string;   // yyyy-MM-dd
   start_time:       string;   // HH:MM
-  end_time:         string;   // HH:MM  (derived: start + duration)
+  end_time:         string;   // HH:MM
   duration_minutes: number;
   notes:            string;
 }
@@ -42,15 +45,19 @@ export const getAppointments = async (
 ): Promise<PaginatedResponse<Appointment>> => {
   const params = new URLSearchParams();
 
-  if (filters?.search) params.append('search', filters.search);
-  if (filters?.status) params.append('status', filters.status);
-  if (filters?.appointment_type) params.append('appointment_type', filters.appointment_type);
-  if (filters?.patient) params.append('patient', String(filters.patient));
-  if (filters?.practitioner) params.append('practitioner', String(filters.practitioner));
-  if (filters?.date_from) params.append('date_from', filters.date_from);
-  if (filters?.date_to) params.append('date_to', filters.date_to);
-  if (filters?.page) params.append('page', String(filters.page));
-  if (filters?.page_size) params.append('page_size', String(filters.page_size));
+  if (filters?.search)            params.append('search',           filters.search);
+  if (filters?.status)            params.append('status',           filters.status);
+  if (filters?.appointment_type)  params.append('appointment_type', filters.appointment_type);
+  if (filters?.patient)           params.append('patient',          String(filters.patient));
+  if (filters?.practitioner)      params.append('practitioner',     String(filters.practitioner));
+  if (filters?.clinic_branch)     params.append('clinic_branch',    String(filters.clinic_branch));
+  if (filters?.date_from)         params.append('date_from',        filters.date_from);
+  if (filters?.date_to)           params.append('date_to',          filters.date_to);
+  // Diary uses start_date/end_date — backend get_queryset reads these
+  if (filters?.start_date)        params.append('start_date',       filters.start_date);
+  if (filters?.end_date)          params.append('end_date',         filters.end_date);
+  if (filters?.page)              params.append('page',             String(filters.page));
+  if (filters?.page_size)         params.append('page_size',        String(filters.page_size));
 
   const response = await axiosInstance.get<PaginatedResponse<Appointment>>(
     `/appointments/?${params.toString()}`
@@ -112,15 +119,17 @@ export const getAppointmentInvoice = async (appointmentId: number) => {
     `/invoices/?appointment=${appointmentId}`
   );
   return response.data;
-}; 
+};
 
 export const getPortalBookingsForDiary = async (params: {
-  date_from: string;
-  date_to:   string;
+  start_date:     string;
+  end_date:       string;
+  practitioner?:  number;
+  clinic_branch?: number;
 }): Promise<PortalBookingDiaryItem[]> => {
   const response = await axiosInstance.get<PortalBookingDiaryItem[]>(
-    `/appointments/portal_bookings/`,  // ✅ FIX: was /portal-bookings/diary/
-    { params: { start_date: params.date_from, end_date: params.date_to } }  // ✅ FIX: match backend param names
+    `/appointments/portal_bookings/`,
+    { params }
   );
   return response.data;
 };
@@ -130,11 +139,19 @@ export const getPortalBookingsForDiary = async (params: {
  */
 export const updatePortalBookingStatus = async (
   id: number,
-  status: 'CONFIRMED' | 'CANCELLED'
-): Promise<PortalBookingDiaryItem> => {
-  const response = await axiosInstance.patch<PortalBookingDiaryItem>(
+  newStatus: 'CONFIRMED' | 'CANCELLED'
+): Promise<{
+  id: number;
+  status: string;
+  patient_id?: number;
+  patient_number?: string;
+  patient_name?: string;
+  appointment_id?: number;
+  warning?: string;
+}> => {
+  const response = await axiosInstance.patch(
     `/portal-bookings/${id}/update_status/`,
-    { status }
+    { status: newStatus }
   );
   return response.data;
 };

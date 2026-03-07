@@ -8,7 +8,7 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from .models import Appointment, PractitionerSchedule, AppointmentReminder
 from .serializers import (
-    AppointmentSerializer, PractitionerScheduleSerializer, 
+    AppointmentSerializer, PractitionerScheduleSerializer,
     AppointmentReminderSerializer
 )
 from apps.patients.models import PortalBooking
@@ -16,39 +16,63 @@ from apps.patients.models import PortalBooking
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     """CRUD operations for appointments"""
-    
+
     queryset = Appointment.objects.filter(is_deleted=False).select_related(
         'patient', 'practitioner__user', 'location', 'clinic', 'created_by', 'updated_by'
     )
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['clinic', 'patient', 'practitioner', 'status', 'date', 'appointment_type']
+    # ✅ Remove 'clinic' from filterset_fields — we handle scoping manually in get_queryset
+    filterset_fields = ['patient', 'practitioner', 'status', 'date', 'appointment_type']
     search_fields = ['patient__first_name', 'patient__last_name', 'chief_complaint']
     ordering_fields = ['date', 'start_time', 'created_at']
-    
+
     def get_queryset(self):
-        # ...existing code ... (keep all existing logic unchanged)
         user = self.request.user
         queryset = self.queryset
 
-        if not user.is_admin:
-            queryset = queryset.filter(clinic=user.clinic)
-        else:
-            if user.clinic:
-                main_clinic = user.clinic.main_clinic
-                branch_ids = list(
-                    main_clinic.get_all_branches().values_list('id', flat=True)
-                )
-                queryset = queryset.filter(clinic_id__in=branch_ids)
+        # ── 1. Scope to the user's clinic family ──────────────────────────
+        if not user.clinic:
+            return queryset.none()
 
-        clinic_id = self.request.query_params.get('clinic_branch')
-        if clinic_id:
-            queryset = queryset.filter(clinic_id=clinic_id)
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+        queryset = queryset.filter(clinic_id__in=all_branch_ids)
 
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
+        # ── 2. Filter by specific clinic branch if provided ───────────────
+        clinic_branch_param = self.request.query_params.get('clinic_branch')
+        if clinic_branch_param:
+            try:
+                branch_id = int(clinic_branch_param)
+                # Only allow branches that belong to this clinic family
+                if branch_id in all_branch_ids:
+                    queryset = queryset.filter(clinic_id=branch_id)
+                else:
+                    return queryset.none()
+            except (ValueError, TypeError):
+                pass
 
+        # ── 3. Filter by practitioner if provided ─────────────────────────
+        practitioner_param = self.request.query_params.get('practitioner')
+        if practitioner_param:
+            try:
+                queryset = queryset.filter(practitioner_id=int(practitioner_param))
+            except (ValueError, TypeError):
+                pass
+
+        # ── 4. Filter by date range ───────────────────────────────────────
+        # Accept both start_date/end_date (diary) and date_from/date_to (list view)
+        start_date = (
+            self.request.query_params.get('start_date') or
+            self.request.query_params.get('date_from')
+        )
+        end_date = (
+            self.request.query_params.get('end_date') or
+            self.request.query_params.get('date_to')
+        )
         if start_date:
             queryset = queryset.filter(date__gte=start_date)
         if end_date:
@@ -56,25 +80,24 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    # ✅ NEW: endpoint to fetch portal bookings for the diary
     @action(detail=False, methods=['get'])
     def portal_bookings(self, request):
-        """
-        Returns PENDING portal bookings for the diary calendar.
-        These are shown as orange 'pending' blocks until confirmed.
-        GET /api/appointments/portal_bookings/?start_date=...&end_date=...
-        """
         user = request.user
-        main_clinic = user.clinic.main_clinic if user.clinic else None
 
-        if not main_clinic:
+        if not user.clinic:
             return Response([])
 
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
         qs = PortalBooking.objects.filter(
-            portal_link__clinic=main_clinic,
-            status__in=['PENDING', 'CONFIRMED'],
+            portal_link__clinic_id__in=all_branch_ids,
+            status='PENDING',
         ).select_related('service', 'practitioner__user', 'portal_link__clinic')
 
+        # ── Date range ────────────────────────────────────────────────────
         start_date = request.query_params.get('start_date')
         end_date   = request.query_params.get('end_date')
         if start_date:
@@ -82,15 +105,26 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if end_date:
             qs = qs.filter(appointment_date__lte=end_date)
 
-        clinic_id = request.query_params.get('clinic_branch')
-        if clinic_id:
-            qs = qs.filter(portal_link__clinic_id=clinic_id)
+        # ── Clinic branch filter ──────────────────────────────────────────
+        clinic_branch_param = request.query_params.get('clinic_branch')
+        if clinic_branch_param:
+            try:
+                branch_id = int(clinic_branch_param)
+                if branch_id in all_branch_ids:
+                    qs = qs.filter(portal_link__clinic_id=branch_id)
+                else:
+                    return Response([])
+            except (ValueError, TypeError):
+                pass
 
+        # ── Practitioner filter ───────────────────────────────────────────
         practitioner_id = request.query_params.get('practitioner')
         if practitioner_id:
-            qs = qs.filter(practitioner_id=practitioner_id)
+            try:
+                qs = qs.filter(practitioner_id=int(practitioner_id))
+            except (ValueError, TypeError):
+                pass
 
-        from datetime import datetime, timedelta
         data = []
         for booking in qs:
             duration = booking.service.duration_minutes if booking.service else 60
@@ -98,36 +132,36 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             end_dt   = start_dt + timedelta(minutes=duration)
 
             data.append({
-                'id':             booking.id,
-                'type':           'portal_booking',          # ✅ flag for frontend
+                'id':               booking.id,
+                'type':             'portal_booking',
                 'reference_number': booking.reference_number,
-                'patient_name':   f"{booking.patient_first_name} {booking.patient_last_name}",
-                'patient_email':  booking.patient_email,
-                'patient_phone':  booking.patient_phone,
-                'service_name':   booking.service.name if booking.service else '',
-                'service_id':     booking.service_id,
-                'practitioner_id': booking.practitioner_id,
+                'patient_name':     f"{booking.patient_first_name} {booking.patient_last_name}",
+                'patient_email':    booking.patient_email,
+                'patient_phone':    booking.patient_phone,
+                'service_name':     booking.service.name if booking.service else '',
+                'service_id':       booking.service_id,
+                'practitioner_id':  booking.practitioner_id,
                 'practitioner_name': (
                     booking.practitioner.user.get_full_name()
                     if booking.practitioner else 'Any Available'
                 ),
-                'date':           booking.appointment_date.isoformat(),
-                'start_time':     booking.appointment_time.strftime('%H:%M'),
-                'end_time':       end_dt.time().strftime('%H:%M'),
+                'date':             booking.appointment_date.isoformat(),
+                'start_time':       booking.appointment_time.strftime('%H:%M'),
+                'end_time':         end_dt.time().strftime('%H:%M'),
                 'duration_minutes': duration,
-                'status':         booking.status,   # PENDING | CONFIRMED
-                'notes':          booking.notes,
+                'status':           booking.status,
+                'notes':            booking.notes,
             })
 
         return Response(data)
 
-    # ✅ NEW: confirm or cancel a portal booking
     @action(detail=False, methods=['patch'], url_path='portal_bookings/(?P<booking_id>[^/.]+)/update')
     def update_portal_booking(self, request, booking_id=None):
         """
         PATCH /api/appointments/portal_bookings/{id}/update/
         body: { "status": "CONFIRMED" | "CANCELLED" }
         """
+        from django.shortcuts import get_object_or_404
         booking = get_object_or_404(PortalBooking, pk=booking_id)
         new_status = request.data.get('status')
 
@@ -141,50 +175,43 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         booking.status = new_status
         booking.save(update_fields=['status'])
         return Response({'id': booking.id, 'status': booking.status})
-    
+
     def perform_create(self, serializer):
-        """Auto-populate created_by"""
         serializer.save(created_by=self.request.user, updated_by=self.request.user)
-    
+
     def perform_update(self, serializer):
-        """Auto-populate updated_by"""
         serializer.save(updated_by=self.request.user)
-    
+
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
-        """Confirm an appointment"""
         appointment = self.get_object()
         appointment.status = 'CONFIRMED'
         appointment.save()
         return Response({'status': 'appointment confirmed'})
-    
+
     @action(detail=True, methods=['post'])
     def check_in(self, request, pk=None):
-        """Check in a patient for appointment"""
         appointment = self.get_object()
         appointment.status = 'CHECKED_IN'
         appointment.save()
         return Response({'status': 'patient checked in'})
-    
+
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
-        """Start an appointment"""
         appointment = self.get_object()
         appointment.status = 'IN_PROGRESS'
         appointment.save()
         return Response({'status': 'appointment started'})
-    
+
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
-        """Complete an appointment"""
         appointment = self.get_object()
         appointment.status = 'COMPLETED'
         appointment.save()
         return Response({'status': 'appointment completed'})
-    
+
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancel an appointment"""
         appointment = self.get_object()
         appointment.status = 'CANCELLED'
         appointment.cancelled_by = request.user
@@ -192,15 +219,15 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment.cancelled_at = timezone.now()
         appointment.save()
         return Response({'status': 'appointment cancelled'})
-    
+
     @action(detail=False, methods=['get'])
     def available_slots(self, request):
         """Get available 15-min time slots for a practitioner on a specific date"""
         from datetime import date as date_type, time, timedelta
         from apps.clinics.models import Practitioner
 
-        CLINIC_START = 6 * 60   # 6:00 AM in minutes
-        CLINIC_END   = 21 * 60  # 9:00 PM in minutes
+        CLINIC_START = 6 * 60
+        CLINIC_END   = 21 * 60
 
         practitioner_id = request.query_params.get('practitioner')
         date_str        = request.query_params.get('date')
@@ -217,16 +244,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
 
-        weekday = target_date.weekday()  # 0=Monday … 6=Sunday
+        weekday = target_date.weekday()
 
-        # ── 1. Determine working hours ────────────────────────────────────
         def time_to_minutes(t):
             return t.hour * 60 + t.minute
 
         def minutes_to_time(m):
             return time(m // 60, m % 60)
 
-        # ── 2. Build candidate 15-min slots ──────────────────────────────
         candidate_slots: list = []
 
         if practitioner_id:
@@ -243,7 +268,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
             if schedules.exists():
                 for sched in schedules:
-                    # Clamp schedule to clinic hours
                     start_min = max(time_to_minutes(sched.start_time), CLINIC_START)
                     end_min   = min(time_to_minutes(sched.end_time),   CLINIC_END)
                     m = start_min
@@ -251,20 +275,17 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                         candidate_slots.append(minutes_to_time(m))
                         m += 15
             else:
-                # Practitioner exists but no schedule set → use clinic hours
                 m = CLINIC_START
                 while m + 15 <= CLINIC_END:
                     candidate_slots.append(minutes_to_time(m))
                     m += 15
         else:
-            # No practitioner filter → use clinic hours only
             m = CLINIC_START
             while m + 15 <= CLINIC_END:
                 candidate_slots.append(minutes_to_time(m))
                 m += 15
 
-        # ── 3. Get service duration (default 60 min) ──────────────────────
-        duration = 15  # ✅ FIX: Default to 15-min slots, not 60
+        duration = 15
         if service_id:
             try:
                 from apps.clinics.models import ClinicService
@@ -273,7 +294,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
-        # ── 4. Find booked appointments on this date ──────────────────────
         booked_qs = Appointment.objects.filter(
             date=target_date,
             status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
@@ -284,13 +304,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         booked_ranges = [(a.start_time, a.end_time) for a in booked_qs]
 
-        # ── 5. Filter out overlapping slots ──────────────────────────────
         available: list[str] = []
         for slot_time in candidate_slots:
             slot_start = time_to_minutes(slot_time)
             slot_end   = slot_start + duration
 
-            # Also ensure the slot END doesn't exceed clinic closing time
             if slot_end > CLINIC_END:
                 continue
 
@@ -302,75 +320,69 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 available.append(f"{slot_time.hour:02d}:{slot_time.minute:02d}")
 
         return Response({'slots': available})
-    
-    # ✅ NEW: Get list of practitioners for filtering
+
     @action(detail=False, methods=['get'])
     def practitioners(self, request):
-        """Get list of active practitioners for the clinic"""
+        """
+        GET /api/appointments/practitioners/?clinic_branch=<id>
+        """
         from apps.clinics.models import Practitioner
-        
+
         user = request.user
-        
-        # ✅ NEW: Filter by clinic branch if provided
-        clinic_id = request.query_params.get('clinic_branch')
-        
-        if user.is_admin:
-            if clinic_id:
-                # Filter by specific branch
-                practitioners = Practitioner.objects.filter(
-                    clinic_id=clinic_id,
-                    user__is_active=True,
-                    user__is_deleted=False
-                ).select_related('user')
-            else:
-                # Get practitioners from all branches
-                main_clinic = user.clinic.main_clinic if user.clinic else None
-                if main_clinic:
-                    branch_ids = list(
-                        main_clinic.get_all_branches().values_list('id', flat=True)
-                    )
-                    practitioners = Practitioner.objects.filter(
-                        clinic_id__in=branch_ids,
-                        user__is_active=True,
-                        user__is_deleted=False
-                    ).select_related('user', 'clinic')
-                else:
-                    practitioners = Practitioner.objects.filter(
-                        user__is_active=True,
-                        user__is_deleted=False
-                    ).select_related('user', 'clinic')
-        else:
-            practitioners = Practitioner.objects.filter(
-                clinic=user.clinic,
-                user__is_active=True,
-                user__is_deleted=False
-            ).select_related('user')
-        
-        # Format response
+
+        if not user.clinic:
+            return Response({'practitioners': []})
+
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
+        base_qs = Practitioner.objects.filter(
+            clinic_id__in=all_branch_ids,
+            user__is_active=True,
+            user__is_deleted=False,
+        ).select_related('user', 'clinic', 'user__clinic_branch')
+
+        clinic_branch_param = request.query_params.get('clinic_branch')
+
+        if clinic_branch_param:
+            try:
+                branch_id = int(clinic_branch_param)
+            except ValueError:
+                return Response({'practitioners': []})
+
+            base_qs = base_qs.filter(
+                Q(user__clinic_branch_id=branch_id) |
+                Q(clinic_id=branch_id, user__clinic_branch__isnull=True)
+            )
+
         practitioners_data = [
             {
-                'id': p.id,
-                'name': p.user.get_full_name(),
-                'email': p.user.email,
-                'specialization': p.specialization if p.specialization else None,
-                'clinic_id': p.clinic_id,
-                'clinic_name': p.clinic.name if p.clinic else None
+                'id':                 p.id,
+                'name':               p.user.get_full_name(),
+                'email':              p.user.email,
+                'specialization':     p.specialization or None,
+                'clinic_id':          p.clinic_id,
+                'clinic_name':        p.clinic.name if p.clinic else None,
+                'clinic_branch_id':   p.user.clinic_branch_id,
+                'clinic_branch_name': p.user.clinic_branch.name if p.user.clinic_branch else None,
             }
-            for p in practitioners
+            for p in base_qs
         ]
-        
+
         return Response({'practitioners': practitioners_data})
 
 
 class PractitionerScheduleViewSet(viewsets.ModelViewSet):
     """CRUD operations for practitioner schedules"""
-    
+
     queryset = PractitionerSchedule.objects.all().select_related('practitioner__user', 'location')
     serializer_class = PractitionerScheduleSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['practitioner', 'location', 'weekday', 'is_available']
-    
+
     def get_queryset(self):
         user = self.request.user
         if user.is_admin:
@@ -380,13 +392,13 @@ class PractitionerScheduleViewSet(viewsets.ModelViewSet):
 
 class AppointmentReminderViewSet(viewsets.ReadOnlyModelViewSet):
     """View appointment reminders"""
-    
+
     queryset = AppointmentReminder.objects.all().select_related('appointment')
     serializer_class = AppointmentReminderSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['appointment', 'reminder_type', 'is_successful']
-    
+
     def get_queryset(self):
         user = self.request.user
         if user.is_admin:

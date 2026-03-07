@@ -1,7 +1,7 @@
 import React from 'react';
 import { Package } from 'lucide-react';
 
-export const ItemsOption1: React.FC = () => {
+export const Inventory: React.FC = () => {
   return (
     <div className="p-6">
       <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">

@@ -33,10 +33,10 @@ export const Calendar: React.FC<CalendarProps> = ({
 }) => {
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
 
-  const [selectedAppointment,  setSelectedAppointment]  = useState<Appointment | null>(null);
-  const [isViewOpen,           setIsViewOpen]           = useState(false);
-  const [selectedPortalBooking, setSelectedPortalBooking] = useState<PortalBookingDiaryItem | null>(null);
-  const [isConfirmModalOpen,   setIsConfirmModalOpen]   = useState(false);
+  const [selectedAppointment,   setSelectedAppointment]   = useState<Appointment | null>(null);
+  const [isViewOpen,             setIsViewOpen]             = useState(false);
+  const [selectedPortalBooking,  setSelectedPortalBooking]  = useState<PortalBookingDiaryItem | null>(null);
+  const [isConfirmModalOpen,     setIsConfirmModalOpen]     = useState(false);
 
   // ── Date range ──────────────────────────────────────────────────────────────
   const getDateRange = () => {
@@ -57,7 +57,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const { startDate, endDate } = getDateRange();
 
-  const { appointments, portalBookings, loading, refetch } = useAppointments({
+  const { appointments, portalBookings, loading, refetch, removePortalBooking } = useAppointments({
     startDate,
     endDate,
     practitionerId: selectedPractitionerId,
@@ -117,6 +117,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     return appointments.filter(apt => apt.date === dateStr);
   };
 
+  // ✅ portalBookings now only contains PENDING ones from the API
   const getPortalBookingsForDay = (date: Date): PortalBookingDiaryItem[] => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return portalBookings.filter(b => b.date === dateStr);
@@ -146,6 +147,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     setIsViewOpen(true);
   };
 
+  // ✅ Only PENDING bookings reach here — confirmed ones show as Appointments
   const handlePortalBookingClick = (booking: PortalBookingDiaryItem) => {
     setSelectedPortalBooking(booking);
     setIsConfirmModalOpen(true);
@@ -191,9 +193,22 @@ export const Calendar: React.FC<CalendarProps> = ({
     openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
   };
 
-  const handleModalClose = () => { closeModal(); refetch(); };
-  const handleViewClose  = () => { setIsViewOpen(false); setSelectedAppointment(null); };
-  const handleConfirmClose = () => { setIsConfirmModalOpen(false); setSelectedPortalBooking(null); };
+  const handleModalClose = () => {
+    closeModal();
+    // small delay ensures backend write is committed before refetch
+    setTimeout(() => refetch(), 300);
+  };
+
+  const handleViewClose = () => {
+    setIsViewOpen(false);
+    setSelectedAppointment(null);
+  };
+
+  const handleConfirmClose = () => {
+    setIsConfirmModalOpen(false);
+    setSelectedPortalBooking(null);
+    // refetch is called by the modal itself via onUpdated
+  };
 
   const getWeekDays = (date: Date) => {
     const start = startOfWeek(date, { weekStartsOn: 1 });
@@ -201,8 +216,8 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const getMonthDays = (date: Date) => {
-    const monthStart = startOfMonth(date);
-    const monthEnd   = endOfMonth(date);
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd   = endOfMonth(currentDate);
     const start      = startOfWeek(monthStart, { weekStartsOn: 1 });
     const end        = endOfWeek(monthEnd,     { weekStartsOn: 1 });
     const rows: Date[][] = [];
@@ -216,49 +231,41 @@ export const Calendar: React.FC<CalendarProps> = ({
     return rows;
   };
 
-  // ── Shared portal booking block renderer (day + week) ─────────────────────
-  const renderPortalBlock = (booking: PortalBookingDiaryItem) => {
-    const isPending = booking.status === 'PENDING';
-    return (
-      <div
-        key={`portal-${booking.id}`}
-        style={getPortalBookingStyle(booking)}
-        onClick={() => handlePortalBookingClick(booking)}
-        className={`
-          absolute left-1 right-1 border rounded-lg p-1.5
-          cursor-pointer hover:shadow-lg transition-shadow z-10 overflow-hidden
-          ${isPending
-            ? 'bg-orange-50 border-orange-300 hover:bg-orange-100'
-            : 'bg-sky-50 border-sky-300 hover:bg-sky-100'
-          }
-        `}
-      >
-        {/* Animated pending dot */}
-        {isPending && (
-          <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
-          </span>
-        )}
-        <div className={`text-xs font-semibold truncate pr-4 ${isPending ? 'text-orange-700' : 'text-sky-700'}`}>
-          {booking.patient_name}
-        </div>
-        <div className={`text-xs truncate ${isPending ? 'text-orange-500' : 'text-sky-500'}`}>
-          {booking.start_time} · {booking.service_name}
-        </div>
-        <div className={`text-xs font-medium mt-0.5 ${isPending ? 'text-orange-400' : 'text-sky-400'}`}>
-          {isPending ? '● Portal — Pending' : '● Portal — Confirmed'}
-        </div>
+  // ── Portal pending block (day + week views) ────────────────────────────────
+  // ✅ Always orange/pending — confirmed ones are rendered as real Appointments
+  const renderPortalPendingBlock = (booking: PortalBookingDiaryItem) => (
+    <div
+      key={`portal-${booking.id}`}
+      style={getPortalBookingStyle(booking)}
+      onClick={() => handlePortalBookingClick(booking)}
+      className="
+        absolute left-1 right-1 border rounded-lg p-1.5
+        cursor-pointer hover:shadow-lg transition-shadow z-10 overflow-hidden
+        bg-orange-50 border-orange-300 hover:bg-orange-100
+      "
+    >
+      {/* Animated pending dot */}
+      <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+      </span>
+      <div className="text-xs font-semibold truncate pr-4 text-orange-700">
+        {booking.patient_name}
       </div>
-    );
-  };
+      <div className="text-xs truncate text-orange-500">
+        {booking.start_time} · {booking.service_name}
+      </div>
+      <div className="text-xs font-medium mt-0.5 text-orange-400">
+        ● Pending Review
+      </div>
+    </div>
+  );
 
   // ── DAY VIEW ───────────────────────────────────────────────────────────────
   if (view === 'day') {
     return (
       <>
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Header */}
           <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -267,7 +274,6 @@ export const Calendar: React.FC<CalendarProps> = ({
             </div>
           </div>
 
-          {/* Time Grid */}
           <div className="flex-1 overflow-auto">
             <div className="grid grid-cols-[80px_1fr]">
 
@@ -290,8 +296,8 @@ export const Calendar: React.FC<CalendarProps> = ({
               {/* Day column */}
               <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
                 {timeSlots.map((slot, i) => {
-                  const isSelected       = isSlotSelected(slot);
-                  const slotsAppointments = getAppointmentsForSlot(currentDate, slot.hour, slot.minutes);
+                  const isSelected        = isSlotSelected(slot);
+                  const slotAppointments  = getAppointmentsForSlot(currentDate, slot.hour, slot.minutes);
                   return (
                     <div
                       key={i}
@@ -303,12 +309,12 @@ export const Calendar: React.FC<CalendarProps> = ({
                         ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
                         ${isSelected
                           ? 'bg-sky-200 hover:bg-sky-300'
-                          : slotsAppointments.length > 0
+                          : slotAppointments.length > 0
                             ? 'bg-gray-50'
                             : 'hover:bg-sky-50'
                         }
                       `}
-                      title="Double-click for 15-min appointment, or click & drag to select duration"
+                      title="Double-click for 15-min appointment, or drag to select duration"
                     >
                       {isSelected && (
                         <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
@@ -317,7 +323,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                   );
                 })}
 
-                {/* Diary appointments */}
+                {/* ✅ Confirmed/regular appointments */}
                 {appointments
                   .filter(apt => apt.date === format(currentDate, 'yyyy-MM-dd'))
                   .map(apt => {
@@ -337,7 +343,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                           {apt.patient_name}
                         </div>
                         <div className="text-xs text-gray-600 truncate">
-                          {apt.start_time} - {apt.end_time}
+                          {apt.start_time} – {apt.end_time}
                         </div>
                         {apt.chief_complaint && (
                           <div className="text-xs text-gray-500 truncate mt-1">
@@ -348,8 +354,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                     );
                   })}
 
-                {/* Portal bookings */}
-                {getPortalBookingsForDay(currentDate).map(renderPortalBlock)}
+                {/* ✅ Only PENDING portal bookings */}
+                {getPortalBookingsForDay(currentDate).map(renderPortalPendingBlock)}
               </div>
             </div>
           </div>
@@ -368,6 +374,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           booking={selectedPortalBooking}
           onClose={handleConfirmClose}
           onUpdated={refetch}
+          onRemove={removePortalBooking}
         />
       </>
     );
@@ -381,7 +388,6 @@ export const Calendar: React.FC<CalendarProps> = ({
       <>
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
 
-          {/* Header */}
           <div className="flex-shrink-0 grid grid-cols-[80px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
             <div className="p-4" />
             {weekDays.map(day => (
@@ -402,7 +408,6 @@ export const Calendar: React.FC<CalendarProps> = ({
             ))}
           </div>
 
-          {/* Grid */}
           <div className="flex-1 overflow-auto">
             <div className="grid grid-cols-[80px_repeat(7,1fr)]">
 
@@ -442,7 +447,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                           ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
                           ${isSelected ? 'bg-sky-200 hover:bg-sky-300' : 'hover:bg-sky-50'}
                         `}
-                        title="Double-click for 15-min appointment, or click & drag to select duration"
+                        title="Double-click for 15-min appointment, or drag to select duration"
                       >
                         {isSelected && (
                           <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
@@ -451,7 +456,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     );
                   })}
 
-                  {/* Diary appointments */}
+                  {/* ✅ Confirmed/regular appointments */}
                   {appointments
                     .filter(apt => apt.date === format(day, 'yyyy-MM-dd'))
                     .map(apt => {
@@ -475,8 +480,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                       );
                     })}
 
-                  {/* Portal bookings */}
-                  {getPortalBookingsForDay(day).map(renderPortalBlock)}
+                  {/* ✅ Only PENDING portal bookings */}
+                  {getPortalBookingsForDay(day).map(renderPortalPendingBlock)}
                 </div>
               ))}
             </div>
@@ -490,6 +495,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           booking={selectedPortalBooking}
           onClose={handleConfirmClose}
           onUpdated={refetch}
+          onRemove={removePortalBooking}
         />
       </>
     );
@@ -504,7 +510,6 @@ export const Calendar: React.FC<CalendarProps> = ({
       <>
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
 
-          {/* Header row */}
           <div className="flex-shrink-0 grid grid-cols-7 border-b border-gray-200 bg-gray-50">
             {weekDayNames.map(d => (
               <div key={d} className="p-4 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0">
@@ -517,10 +522,11 @@ export const Calendar: React.FC<CalendarProps> = ({
             {monthDays.map((week, wi) => (
               <div key={wi} className="grid grid-cols-7 border-b border-gray-200 last:border-b-0">
                 {week.map(day => {
-                  const dayAppts   = getAppointmentsForDay(day);
-                  const dayPortal  = getPortalBookingsForDay(day);
-                  const totalCount = dayAppts.length + dayPortal.length;
-                  const pendingCount = dayPortal.filter(b => b.status === 'PENDING').length;
+                  const dayAppts      = getAppointmentsForDay(day);
+                  const dayPending    = getPortalBookingsForDay(day); // ✅ only PENDING
+                  const confirmedCount = dayAppts.length;
+                  const pendingCount   = dayPending.length;
+                  const totalCount     = confirmedCount + pendingCount;
 
                   return (
                     <div
@@ -533,7 +539,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                         ${isSameDay(day, new Date()) ? 'bg-sky-50' : ''}
                       `}
                     >
-                      {/* Date + badges row */}
+                      {/* Date + badge row */}
                       <div className="flex items-center justify-between mb-1">
                         <div className={`
                           text-sm font-medium
@@ -545,25 +551,26 @@ export const Calendar: React.FC<CalendarProps> = ({
                         `}>
                           {format(day, 'd')}
                         </div>
+
                         <div className="flex items-center gap-1">
-                          {/* Pending portal badge (orange) */}
+                          {/* ✅ Orange badge — PENDING portal bookings only */}
                           {pendingCount > 0 && (
                             <div className="bg-orange-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                               {pendingCount}
                             </div>
                           )}
-                          {/* Total count badge (sky) */}
-                          {totalCount > 0 && (
-                            <div className="bg-sky-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
-                              {totalCount}
+                          {/* ✅ Green badge — confirmed appointments */}
+                          {confirmedCount > 0 && (
+                            <div className="bg-green-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                              {confirmedCount}
                             </div>
                           )}
                         </div>
                       </div>
 
                       <div className="space-y-1 mt-2">
-                        {/* Diary appointments (up to 2) */}
+                        {/* ✅ Regular appointments (up to 2) — green/status colored */}
                         {dayAppts.slice(0, 2).map(apt => {
                           const colors = APPOINTMENT_STATUS_COLORS[apt.status];
                           return (
@@ -573,41 +580,28 @@ export const Calendar: React.FC<CalendarProps> = ({
                               className={`${colors.bg} ${colors.border} border rounded px-2 py-1 hover:shadow-md transition-shadow`}
                             >
                               <div className={`text-xs font-semibold ${colors.text} truncate`}>
-                                {apt.start_time} - {apt.patient_name}
+                                {apt.start_time} · {apt.patient_name}
                               </div>
                             </div>
                           );
                         })}
 
-                        {/* Portal bookings (up to 1) */}
-                        {dayPortal.slice(0, 1).map(booking => {
-                          const isPending = booking.status === 'PENDING';
-                          return (
-                            <div
-                              key={`portal-${booking.id}`}
-                              onClick={e => { e.stopPropagation(); handlePortalBookingClick(booking); }}
-                              className={`
-                                border rounded px-2 py-1 hover:shadow-md transition-shadow
-                                ${isPending
-                                  ? 'bg-orange-50 border-orange-300'
-                                  : 'bg-sky-50 border-sky-300'
-                                }
-                              `}
-                            >
-                              <div className={`text-xs font-semibold truncate flex items-center gap-1 ${
-                                isPending ? 'text-orange-700' : 'text-sky-700'
-                              }`}>
-                                {isPending && (
-                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
-                                )}
-                                {booking.start_time} - {booking.patient_name}
-                              </div>
-                              <div className={`text-xs truncate ${isPending ? 'text-orange-400' : 'text-sky-400'}`}>
-                                {booking.service_name}
-                              </div>
+                        {/* ✅ Pending portal bookings (up to 1) — always orange */}
+                        {dayPending.slice(0, 1).map(booking => (
+                          <div
+                            key={`portal-${booking.id}`}
+                            onClick={e => { e.stopPropagation(); handlePortalBookingClick(booking); }}
+                            className="bg-orange-50 border border-orange-300 rounded px-2 py-1 hover:shadow-md transition-shadow"
+                          >
+                            <div className="text-xs font-semibold text-orange-700 truncate flex items-center gap-1">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
+                              {booking.start_time} · {booking.patient_name}
                             </div>
-                          );
-                        })}
+                            <div className="text-xs text-orange-400 truncate">
+                              Pending · {booking.service_name}
+                            </div>
+                          </div>
+                        ))}
 
                         {/* +X more */}
                         {totalCount > 3 && (
@@ -630,6 +624,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           booking={selectedPortalBooking}
           onClose={handleConfirmClose}
           onUpdated={refetch}
+          onRemove={removePortalBooking}
         />
       </>
     );

@@ -1,14 +1,15 @@
 import api from '@/lib/axios';
 import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/types/clinic';
+import { axiosInstance } from '../../lib/axios';
 
 export interface Practitioner {
-  id: number;
-  name: string;
-  email: string;
-  specialization: string | null;
-  clinic_id: number;
-  clinic_name: string | null;
-  clinic_branch_id: number | null;
+  id:                 number;
+  name:               string;
+  email:              string;
+  specialization:     string | null;
+  clinic_id:          number;
+  clinic_name:        string | null;
+  clinic_branch_id:   number | null;
   clinic_branch_name: string | null;
 }
 
@@ -16,10 +17,13 @@ export interface PractitionersResponse {
   practitioners: Practitioner[];
 }
 
-export const getPractitioners = async (clinicBranchId?: number | null): Promise<PractitionersResponse> => {
-  const params: Record<string, any> = {};
-  if (clinicBranchId) params.clinic_branch = clinicBranchId;
-  const response = await api.get<PractitionersResponse>('/appointments/practitioners/', { params });
+export const getPractitioners = async (
+  clinicBranchId?: number | null
+): Promise<{ practitioners: Practitioner[] }> => {
+  const params: any = {};
+  if (clinicBranchId != null) params.clinic_branch = clinicBranchId;
+
+  const response = await axiosInstance.get('/appointments/practitioners/', { params });
   return response.data;
 };
 

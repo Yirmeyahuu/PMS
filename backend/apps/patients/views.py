@@ -22,6 +22,107 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ─── Helper ───────────────────────────────────────────────────────────────────
+
+def _confirm_portal_booking(booking, confirmed_by_user):
+    """
+    When a PortalBooking is CONFIRMED:
+      1. Find or create a Patient record from the booking's contact details.
+      2. Find or create a proper Appointment in the diary.
+      3. Link the appointment back to the booking via booking.appointment.
+    Returns (patient, appointment).
+    """
+    from datetime import datetime, timedelta
+    from apps.appointments.models import Appointment
+
+    clinic = booking.portal_link.clinic
+
+    # ── 1. Find or create Patient ─────────────────────────────────────────
+    patient = None
+
+    if booking.patient_email:
+        patient = Patient.objects.filter(
+            clinic=clinic,
+            email__iexact=booking.patient_email,
+            is_deleted=False,
+        ).first()
+
+    if patient is None:
+        patient = Patient.objects.filter(
+            clinic=clinic,
+            first_name__iexact=booking.patient_first_name,
+            last_name__iexact=booking.patient_last_name,
+            phone=booking.patient_phone,
+            is_deleted=False,
+        ).first()
+
+    if patient is None:
+        patient = Patient.objects.create(
+            clinic=clinic,
+            first_name=booking.patient_first_name,
+            last_name=booking.patient_last_name,
+            date_of_birth='2000-01-01',   # placeholder — staff updates via profile
+            gender='O',
+            email=booking.patient_email or '',
+            phone=booking.patient_phone,
+            address='',
+            city=clinic.city or '',
+            province=clinic.province or '',
+            emergency_contact_name='',
+            emergency_contact_phone='',
+            emergency_contact_relationship='',
+            is_active=True,
+        )
+        logger.info(
+            f"Patient created from portal booking #{booking.reference_number}: "
+            f"{patient.get_full_name()} ({patient.patient_number})"
+        )
+
+    # ── 2. Find or create Appointment ─────────────────────────────────────
+    # If booking already has a linked appointment, reuse it
+    if booking.appointment_id:
+        return patient, booking.appointment
+
+    appointment = Appointment.objects.filter(
+        clinic=clinic,
+        patient=patient,
+        date=booking.appointment_date,
+        start_time=booking.appointment_time,
+        is_deleted=False,
+    ).first()
+
+    if appointment is None:
+        duration = booking.service.duration_minutes if booking.service else 60
+        start_dt = datetime.combine(booking.appointment_date, booking.appointment_time)
+        end_dt   = start_dt + timedelta(minutes=duration)
+
+        appointment = Appointment.objects.create(
+            clinic=clinic,
+            patient=patient,
+            practitioner=booking.practitioner,
+            appointment_type='INITIAL',
+            status='CONFIRMED',
+            date=booking.appointment_date,
+            start_time=booking.appointment_time,
+            end_time=end_dt.time(),
+            duration_minutes=duration,
+            chief_complaint=booking.notes or '',
+            notes=f'Created from portal booking #{booking.reference_number}',
+            created_by=confirmed_by_user,
+            updated_by=confirmed_by_user,
+        )
+        logger.info(
+            f"Appointment #{appointment.id} created from portal booking "
+            f"#{booking.reference_number} for {patient.get_full_name()}"
+        )
+
+    # ── 3. Link appointment back to booking ───────────────────────────────
+    booking.appointment = appointment
+    booking.save(update_fields=['appointment'])
+
+    return patient, appointment 
+
+
 # ─── Existing ViewSets ────────────────────────────────────────────────────────
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -64,8 +165,6 @@ class IntakeFormViewSet(viewsets.ModelViewSet):
 # ─── Portal Service Management (admin) ───────────────────────────────────────
 
 class ServiceCategoryViewSet(viewsets.ModelViewSet):
-    """Admin CRUD for portal service categories."""
-
     queryset           = ServiceCategory.objects.filter(is_deleted=False)
     serializer_class   = ServiceCategorySerializer
     permission_classes = [IsAuthenticated]
@@ -80,13 +179,11 @@ class ServiceCategoryViewSet(viewsets.ModelViewSet):
         serializer.save(clinic=self.request.user.clinic)
 
 
-class PortalServiceViewSet(viewsets.ModelViewSet):          # ✅ renamed class
-    """Admin CRUD for portal services."""
-
-    queryset           = PortalService.objects.filter(      # ✅ PortalService
+class PortalServiceViewSet(viewsets.ModelViewSet):
+    queryset           = PortalService.objects.filter(
         is_deleted=False
     ).select_related('category', 'clinic')
-    serializer_class   = PortalServiceSerializer            # ✅ PortalServiceSerializer
+    serializer_class   = PortalServiceSerializer
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields   = ['is_active', 'category']
@@ -102,37 +199,21 @@ class PortalServiceViewSet(viewsets.ModelViewSet):          # ✅ renamed class
 # ─── Portal Link management (admin) ──────────────────────────────────────────
 
 class PortalLinkViewSet(viewsets.ModelViewSet):
-    """
-    Admin endpoint to view the portal link.
-    The link is always tied to the MAIN clinic — shared across all branches.
-
-    GET   /api/portal-links/       → returns the clinic's portal link (auto-creates if missing)
-    PATCH /api/portal-links/{id}/  → update heading / description / is_active
-    """
-
     queryset           = PortalLink.objects.select_related('clinic')
     serializer_class   = PortalLinkAdminSerializer
     permission_classes = [IsAuthenticated]
-    # Disable POST (create) — link is auto-created; disable DELETE
     http_method_names  = ['get', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        # Always resolve to the main clinic
         main_clinic = self.request.user.clinic.main_clinic
         return self.queryset.filter(clinic=main_clinic)
 
     def list(self, request, *args, **kwargs):
-        """
-        Auto-create the portal link if it doesn't exist yet,
-        then return it as a single-item list (keeps frontend interface unchanged).
-        """
         main_clinic = request.user.clinic.main_clinic
         portal_link, created = PortalLink.get_or_create_for_clinic(main_clinic)
         if created:
             logger.info(f"Portal link auto-created for clinic: {main_clinic.name}")
-        serializer = self.get_serializer(
-            portal_link, context={'request': request}
-        )
+        serializer = self.get_serializer(portal_link, context={'request': request})
         return Response([serializer.data])
 
     def retrieve(self, request, *args, **kwargs):
@@ -141,7 +222,6 @@ class PortalLinkViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
-        """PATCH — allow updating heading, description, is_active only."""
         instance   = self.get_object()
         serializer = self.get_serializer(
             instance, data=request.data, partial=True, context={'request': request}
@@ -158,12 +238,6 @@ class PortalLinkViewSet(viewsets.ModelViewSet):
 # ─── Portal Booking management (admin) ───────────────────────────────────────
 
 class PortalBookingAdminViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Admin read-only view of incoming portal bookings.
-    GET   /api/portal-bookings/
-    PATCH /api/portal-bookings/{id}/update_status/  → update status
-    """
-
     queryset = PortalBooking.objects.select_related(
         'portal_link__clinic', 'service', 'practitioner__user'
     )
@@ -174,7 +248,15 @@ class PortalBookingAdminViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields    = ['appointment_date', 'created_at']
 
     def get_queryset(self):
-        return self.queryset.filter(portal_link__clinic=self.request.user.clinic)
+        user = self.request.user
+        if not user.clinic:
+            return self.queryset.none()
+        # ✅ Use main_clinic so all branches are included
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+        return self.queryset.filter(portal_link__clinic_id__in=all_branch_ids)
 
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
@@ -188,20 +270,35 @@ class PortalBookingAdminViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # ── Save the new status first ─────────────────────────────────────
         booking.status = new_status
-        booking.save(update_fields=['status'])
-        return Response(self.get_serializer(booking).data)
+        booking.save(update_fields=['status', 'updated_at'])
+
+        result = {'id': booking.id, 'status': booking.status}
+
+        # ── Auto-create Patient + Appointment when CONFIRMED ──────────────
+        if new_status == 'CONFIRMED':
+            try:
+                patient, appointment = _confirm_portal_booking(booking, request.user)
+                result['patient_id']     = patient.id
+                result['patient_number'] = patient.patient_number
+                result['patient_name']   = patient.get_full_name()
+                result['appointment_id'] = appointment.id if appointment else None
+                logger.info(
+                    f"Portal booking #{booking.reference_number} confirmed. "
+                    f"Patient: {patient.patient_number}, "
+                    f"Appointment: {appointment.id if appointment else 'N/A'}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to create patient/appointment from portal booking: {e}")
+                result['warning'] = 'Booking confirmed but failed to auto-create patient record.'
+
+        return Response(result)
 
 
 # ─── Public Portal endpoints (no auth) ───────────────────────────────────────
 
 class PublicPortalView(APIView):
-    """
-    GET /api/public/portal/<token>/
-    Returns clinic branding + services for the booking page.
-    No authentication required.
-    """
-
     permission_classes = [AllowAny]
 
     def get(self, request, token: str):
@@ -211,11 +308,6 @@ class PublicPortalView(APIView):
 
 
 class PublicPortalBookView(APIView):
-    """
-    POST /api/public/portal/<token>/book/
-    Creates a PortalBooking. No authentication required.
-    """
-
     permission_classes = [AllowAny]
 
     def post(self, request, token: str):
@@ -376,11 +468,6 @@ class PublicAvailableSlotsView(APIView):
 
 
 class PortalBookingDiaryView(APIView):
-    """
-    GET /api/portal-bookings/diary/?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-    Returns PENDING + CONFIRMED portal bookings shaped for the Diary calendar.
-    Requires authentication (staff/admin only).
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -397,20 +484,23 @@ class PortalBookingDiaryView(APIView):
             portal_link__clinic=request.user.clinic,
             appointment_date__gte=date_from,
             appointment_date__lte=date_to,
-            status__in=['PENDING', 'CONFIRMED'],
+            status='PENDING',  # ✅ strictly PENDING only
         ).select_related('service', 'practitioner__user')
 
-        from datetime import datetime, timedelta
+        practitioner_id = request.query_params.get('practitioner')
+        if practitioner_id:
+            bookings = bookings.filter(practitioner_id=practitioner_id)
 
+        clinic_branch = request.query_params.get('clinic_branch')
+        if clinic_branch:
+            bookings = bookings.filter(portal_link__clinic_id=clinic_branch)
+
+        from datetime import datetime, timedelta
         data = []
         for b in bookings:
             duration = b.service.duration_minutes if b.service else 60
             start_dt = datetime.combine(b.appointment_date, b.appointment_time)
             end_dt   = start_dt + timedelta(minutes=duration)
-
-            practitioner_name = (
-                b.practitioner.user.get_full_name() if b.practitioner else 'Any Available'
-            )
 
             data.append({
                 'id':               b.id,
@@ -420,7 +510,10 @@ class PortalBookingDiaryView(APIView):
                 'patient_phone':    b.patient_phone,
                 'patient_email':    b.patient_email,
                 'service_name':     b.service.name if b.service else '—',
-                'practitioner_name': practitioner_name,
+                'practitioner_id':  b.practitioner_id,
+                'practitioner_name': (
+                    b.practitioner.user.get_full_name() if b.practitioner else 'Any Available'
+                ),
                 'date':             b.appointment_date.strftime('%Y-%m-%d'),
                 'start_time':       b.appointment_time.strftime('%H:%M'),
                 'end_time':         end_dt.strftime('%H:%M'),
@@ -429,3 +522,4 @@ class PortalBookingDiaryView(APIView):
             })
 
         return Response(data)
+ 

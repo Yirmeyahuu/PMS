@@ -1,7 +1,7 @@
 import React from 'react';
 import { CreditCard } from 'lucide-react';
 
-export const AccountOption1: React.FC = () => {
+export const Subscription: React.FC = () => {
   return (
     <div className="p-6">
       <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">
