@@ -28,6 +28,10 @@ export interface Patient {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  is_archived:      boolean;
+  archived_at?:     string | null;
+  archived_by?:     number | null;
+  archived_by_name?: string | null;
 }
 
 export interface IntakeForm {

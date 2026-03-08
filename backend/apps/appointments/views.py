@@ -42,12 +42,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         )
         queryset = queryset.filter(clinic_id__in=all_branch_ids)
 
-        # ── 2. Filter by specific clinic branch if provided ───────────────
+        # ── 2. ✅ Exclude appointments for archived patients ───────────────
+        queryset = queryset.filter(patient__is_archived=False)
+
+        # ── 3. Filter by specific clinic branch if provided ───────────────
         clinic_branch_param = self.request.query_params.get('clinic_branch')
         if clinic_branch_param:
             try:
                 branch_id = int(clinic_branch_param)
-                # Only allow branches that belong to this clinic family
                 if branch_id in all_branch_ids:
                     queryset = queryset.filter(clinic_id=branch_id)
                 else:
@@ -55,7 +57,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
-        # ── 3. Filter by practitioner if provided ─────────────────────────
+        # ── 4. Filter by practitioner if provided ─────────────────────────
         practitioner_param = self.request.query_params.get('practitioner')
         if practitioner_param:
             try:
@@ -63,8 +65,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
-        # ── 4. Filter by date range ───────────────────────────────────────
-        # Accept both start_date/end_date (diary) and date_from/date_to (list view)
+        # ── 5. Filter by date range ───────────────────────────────────────
         start_date = (
             self.request.query_params.get('start_date') or
             self.request.query_params.get('date_from')

@@ -10,50 +10,93 @@ export const axiosInstance = axios.create({
   },
 });
 
-// Request interceptor - Add auth token
+// ─── Helper: get token from any known storage location ────────────────────────
+const getStoredToken = (): string | null => {
+  // 1. Direct key (authService.ts stores here)
+  const direct = localStorage.getItem('access_token');
+  if (direct) return direct;
+
+  // 2. Zustand persisted store (auth.store.ts may persist here)
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      const token =
+        parsed?.state?.tokens?.access ||
+        parsed?.tokens?.access ||
+        null;
+      if (token) return token;
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  return null;
+};
+
+// ─── Request interceptor — attach token ───────────────────────────────────────
 axiosInstance.interceptors.request.use(
   (config: any) => {
-    // FIX: Use access_token instead of auth_tokens
-    const token = localStorage.getItem('access_token');
+    const token = getStoredToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
+  (error: AxiosError) => Promise.reject(error)
 );
 
-// Response interceptor - Handle token refresh and errors
+// ─── Response interceptor — token refresh + 401 handling ─────────────────────
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as any;
 
-    // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const refreshToken =
+          localStorage.getItem('refresh_token') ||
+          (() => {
+            try {
+              const s = localStorage.getItem('auth-storage');
+              if (s) {
+                const p = JSON.parse(s);
+                return p?.state?.tokens?.refresh || p?.tokens?.refresh || null;
+              }
+            } catch { return null; }
+          })();
+
         if (refreshToken) {
-          // Attempt to refresh token
           const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
             refresh: refreshToken,
           });
 
           const newAccessToken = response.data.access;
+
+          // Persist the new token in both locations
           localStorage.setItem('access_token', newAccessToken);
 
-          // Retry original request with new token
+          // Also update Zustand persisted storage if present
+          try {
+            const authStorage = localStorage.getItem('auth-storage');
+            if (authStorage) {
+              const parsed = JSON.parse(authStorage);
+              if (parsed?.state?.tokens) {
+                parsed.state.tokens.access = newAccessToken;
+                localStorage.setItem('auth-storage', JSON.stringify(parsed));
+              }
+            }
+          } catch { /* ignore */ }
+
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           }
           return axiosInstance(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed, clear auth and redirect to login
+        // Refresh failed — clear everything and redirect
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
@@ -67,4 +110,4 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-export default axiosInstance; 
+export default axiosInstance;

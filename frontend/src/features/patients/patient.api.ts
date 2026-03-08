@@ -5,8 +5,19 @@ export interface PatientFilters {
   search?: string;
   gender?: 'M' | 'F' | 'O' | '';
   is_active?: boolean;
+  // ── Archive filters ──────────────────────────────────────────────────────
+  archived?: boolean;          // ?archived=true  → only archived patients
+  include_archived?: boolean;  // ?include_archived=true → all patients
   page?: number;
   page_size?: number;
+}
+
+export interface ArchiveResponse {
+  detail: string;
+  patient_id: number;
+  is_archived: boolean;
+  archived_at?: string;
+  archived_by?: string;
 }
 
 /**
@@ -14,12 +25,14 @@ export interface PatientFilters {
  */
 export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResponse<Patient>> => {
   const params = new URLSearchParams();
-  
-  if (filters?.search) params.append('search', filters.search);
-  if (filters?.gender) params.append('gender', filters.gender);
-  if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active));
-  if (filters?.page) params.append('page', String(filters.page));
-  if (filters?.page_size) params.append('page_size', String(filters.page_size));
+
+  if (filters?.search)                          params.append('search',           filters.search);
+  if (filters?.gender)                          params.append('gender',           filters.gender);
+  if (filters?.is_active !== undefined)         params.append('is_active',        String(filters.is_active));
+  if (filters?.archived === true)               params.append('archived',         'true');
+  if (filters?.include_archived === true)       params.append('include_archived', 'true');
+  if (filters?.page)                            params.append('page',             String(filters.page));
+  if (filters?.page_size)                       params.append('page_size',        String(filters.page_size));
 
   const response = await axiosInstance.get<PaginatedResponse<Patient>>(
     `/patients/?${params.toString()}`
@@ -56,6 +69,24 @@ export const updatePatient = async (id: number, data: Partial<CreatePatientData>
  */
 export const deletePatient = async (id: number): Promise<void> => {
   await axiosInstance.delete(`/patients/${id}/`);
+};
+
+/**
+ * Archive a patient — hides them and their appointments from the diary.
+ * POST /patients/{id}/archive/
+ */
+export const archivePatient = async (id: number): Promise<ArchiveResponse> => {
+  const response = await axiosInstance.post<ArchiveResponse>(`/patients/${id}/archive/`);
+  return response.data;
+};
+
+/**
+ * Restore an archived patient — makes them and their appointments visible again.
+ * POST /patients/{id}/restore/
+ */
+export const restorePatient = async (id: number): Promise<ArchiveResponse> => {
+  const response = await axiosInstance.post<ArchiveResponse>(`/patients/${id}/restore/`);
+  return response.data;
 };
 
 /**

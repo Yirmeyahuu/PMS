@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from apps.clinics.services.models import Service as ClinicService
 from .models import (
     Patient, IntakeForm,
@@ -27,10 +28,9 @@ logger = logging.getLogger(__name__)
 def _confirm_portal_booking(booking, confirmed_by_user):
     """
     When a PortalBooking is CONFIRMED:
-      1. Find or create a Patient record from the booking's contact details.
+      1. Find or create a Patient record.
       2. Find or create a proper Appointment in the diary.
-      3. Link the appointment back to the booking via booking.appointment.
-    Returns (patient, appointment).
+      3. Link the appointment back to the booking.
     """
     from datetime import datetime, timedelta
     from apps.appointments.models import Appointment
@@ -61,7 +61,7 @@ def _confirm_portal_booking(booking, confirmed_by_user):
             clinic=clinic,
             first_name=booking.patient_first_name,
             last_name=booking.patient_last_name,
-            date_of_birth='2000-01-01',   # placeholder — staff updates via profile
+            date_of_birth='2000-01-01',
             gender='O',
             email=booking.patient_email or '',
             phone=booking.patient_phone,
@@ -79,7 +79,6 @@ def _confirm_portal_booking(booking, confirmed_by_user):
         )
 
     # ── 2. Find or create Appointment ─────────────────────────────────────
-    # If booking already has a linked appointment, reuse it
     if booking.appointment_id:
         return patient, booking.appointment
 
@@ -120,25 +119,45 @@ def _confirm_portal_booking(booking, confirmed_by_user):
     booking.appointment = appointment
     booking.save(update_fields=['appointment'])
 
-    return patient, appointment 
+    return patient, appointment
 
 
-# ─── Existing ViewSets ────────────────────────────────────────────────────────
+# ─── Patient ViewSet ──────────────────────────────────────────────────────────
 
 class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.filter(is_deleted=False).select_related('clinic')
-    serializer_class = PatientSerializer
+    queryset = Patient.objects.filter(is_deleted=False).select_related(
+        'clinic', 'archived_by'
+    )
+    serializer_class   = PatientSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['clinic', 'gender', 'is_active']
-    search_fields = ['first_name', 'last_name', 'patient_number', 'phone', 'email']
-    ordering_fields = ['last_name', 'created_at']
+    filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields   = ['clinic', 'gender', 'is_active', 'is_archived']
+    search_fields      = ['first_name', 'last_name', 'patient_number', 'phone', 'email']
+    ordering_fields    = ['last_name', 'created_at']
 
     def get_queryset(self):
         user = self.request.user
+        qs   = self.queryset
+
+        # Scope to clinic
         if user.is_admin:
-            return self.queryset
-        return self.queryset.filter(clinic=user.clinic)
+            base_qs = qs.filter(clinic=user.clinic)
+        else:
+            base_qs = qs.filter(clinic=user.clinic) if user.clinic else qs.none()
+
+        # ── Default: exclude archived patients unless explicitly requested ──
+        # Pass ?include_archived=true  → return ALL (active + archived)
+        # Pass ?archived=true          → return ONLY archived
+        # Default (no param)           → return ONLY active (not archived)
+        include_archived = self.request.query_params.get('include_archived', 'false').lower()
+        only_archived    = self.request.query_params.get('archived', 'false').lower()
+
+        if only_archived == 'true':
+            base_qs = base_qs.filter(is_archived=True)
+        elif include_archived != 'true':
+            base_qs = base_qs.filter(is_archived=False)
+
+        return base_qs
 
     @action(detail=True, methods=['get'])
     def intake_forms(self, request, pk=None):
@@ -147,13 +166,86 @@ class PatientViewSet(viewsets.ModelViewSet):
         serializer = IntakeFormSerializer(forms, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='archive')
+    def archive(self, request, pk=None):
+        """
+        POST /api/patients/{id}/archive/
+        Archives a patient — hides them and their appointments from the diary.
+        Any authenticated user can archive.
+        """
+        patient = self.get_object()
+
+        if patient.is_archived:
+            return Response(
+                {'detail': 'Patient is already archived.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        patient.archive(archived_by_user=request.user)
+
+        logger.info(
+            f"Patient #{patient.patient_number} ({patient.get_full_name()}) "
+            f"archived by {request.user.email}"
+        )
+
+        return Response(
+            {
+                'detail':      f'{patient.get_full_name()} has been archived.',
+                'patient_id':  patient.id,
+                'is_archived': True,
+                'archived_at': patient.archived_at,
+                'archived_by': request.user.get_full_name(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        """
+        POST /api/patients/{id}/restore/
+        Restores an archived patient — makes them and their appointments visible again.
+        Any authenticated user can restore.
+        """
+        # get_object() by default uses get_queryset() which excludes archived —
+        # we need to fetch directly so archived patients are reachable.
+        patient = get_object_or_404(
+            Patient,
+            pk=pk,
+            clinic=request.user.clinic,
+            is_deleted=False,
+        )
+
+        if not patient.is_archived:
+            return Response(
+                {'detail': 'Patient is not archived.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        patient.restore()
+
+        logger.info(
+            f"Patient #{patient.patient_number} ({patient.get_full_name()}) "
+            f"restored by {request.user.email}"
+        )
+
+        return Response(
+            {
+                'detail':      f'{patient.get_full_name()} has been restored.',
+                'patient_id':  patient.id,
+                'is_archived': False,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─── Intake Form ViewSet ──────────────────────────────────────────────────────
 
 class IntakeFormViewSet(viewsets.ModelViewSet):
-    queryset = IntakeForm.objects.all().select_related('patient', 'completed_by')
-    serializer_class = IntakeFormSerializer
+    queryset           = IntakeForm.objects.all().select_related('patient', 'completed_by')
+    serializer_class   = IntakeFormSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['patient', 'completed_by']
+    filter_backends    = [DjangoFilterBackend]
+    filterset_fields   = ['patient', 'completed_by']
 
     def get_queryset(self):
         user = self.request.user
@@ -180,9 +272,7 @@ class ServiceCategoryViewSet(viewsets.ModelViewSet):
 
 
 class PortalServiceViewSet(viewsets.ModelViewSet):
-    queryset           = PortalService.objects.filter(
-        is_deleted=False
-    ).select_related('category', 'clinic')
+    queryset           = PortalService.objects.filter(is_deleted=False).select_related('category', 'clinic')
     serializer_class   = PortalServiceSerializer
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter]
@@ -251,8 +341,7 @@ class PortalBookingAdminViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
         if not user.clinic:
             return self.queryset.none()
-        # ✅ Use main_clinic so all branches are included
-        main_clinic = user.clinic.main_clinic
+        main_clinic    = user.clinic.main_clinic
         all_branch_ids = list(
             main_clinic.get_all_branches().values_list('id', flat=True)
         )
@@ -270,13 +359,11 @@ class PortalBookingAdminViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Save the new status first ─────────────────────────────────────
         booking.status = new_status
         booking.save(update_fields=['status', 'updated_at'])
 
         result = {'id': booking.id, 'status': booking.status}
 
-        # ── Auto-create Patient + Appointment when CONFIRMED ──────────────
         if new_status == 'CONFIRMED':
             try:
                 patient, appointment = _confirm_portal_booking(booking, request.user)
@@ -359,8 +446,8 @@ class PublicAvailableSlotsView(APIView):
         )
 
         from datetime import time, date as date_type, timedelta, datetime
-        from apps.appointments.models import Appointment  # ✅ cross-check Diary appointments
-        from apps.appointments.models import PractitionerSchedule  # ✅ respect practitioner schedule
+        from apps.appointments.models import Appointment
+        from apps.appointments.models import PractitionerSchedule
 
         try:
             target_date = date_type.fromisoformat(date_str)
@@ -370,10 +457,9 @@ class PublicAvailableSlotsView(APIView):
         if target_date < date_type.today():
             return Response({'detail': 'Cannot book a past date.'}, status=400)
 
-        duration = service.duration_minutes
-
-        CLINIC_START = 6 * 60    # 6:00 AM
-        CLINIC_END   = 21 * 60   # 9:00 PM
+        duration     = service.duration_minutes
+        CLINIC_START = 6 * 60
+        CLINIC_END   = 21 * 60
 
         def time_to_minutes(t):
             return t.hour * 60 + t.minute
@@ -381,9 +467,8 @@ class PublicAvailableSlotsView(APIView):
         def minutes_to_time(m):
             return time(m // 60, m % 60)
 
-        # ── 1. Build candidate 15-min slots (respect practitioner schedule if set) ──
-        weekday = target_date.weekday()
-        candidate_slots: list = []
+        weekday         = target_date.weekday()
+        candidate_slots = []
 
         if practitioner_id:
             schedules = PractitionerSchedule.objects.filter(
@@ -400,7 +485,6 @@ class PublicAvailableSlotsView(APIView):
                         candidate_slots.append(minutes_to_time(m))
                         m += 15
             else:
-                # No schedule set — use clinic hours
                 m = CLINIC_START
                 while m + 15 <= CLINIC_END:
                     candidate_slots.append(minutes_to_time(m))
@@ -411,15 +495,15 @@ class PublicAvailableSlotsView(APIView):
                 candidate_slots.append(minutes_to_time(m))
                 m += 15
 
-        # ── 2. Collect booked ranges from BOTH sources ────────────────────────────
-        booked_ranges: list[tuple] = []
+        booked_ranges = []
 
-        # Source A: Diary/Calendar appointments (Appointment table)
         diary_qs = Appointment.objects.filter(
             date=target_date,
             clinic=portal_link.clinic,
             status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
             is_deleted=False,
+            # ✅ Exclude archived patients' appointments from slot-availability too
+            patient__is_archived=False,
         )
         if practitioner_id:
             diary_qs = diary_qs.filter(practitioner_id=practitioner_id)
@@ -430,7 +514,6 @@ class PublicAvailableSlotsView(APIView):
                 time_to_minutes(appt.end_time),
             ))
 
-        # Source B: Portal bookings (PortalBooking table)
         portal_qs = PortalBooking.objects.filter(
             portal_link=portal_link,
             appointment_date=target_date,
@@ -440,16 +523,14 @@ class PublicAvailableSlotsView(APIView):
             portal_qs = portal_qs.filter(practitioner_id=practitioner_id)
 
         for booking in portal_qs:
-            # Portal bookings store only start time — derive end from service duration
-            booking_start = time_to_minutes(booking.appointment_time)
+            booking_start            = time_to_minutes(booking.appointment_time)
             booking_service_duration = (
                 booking.service.duration_minutes if booking.service else duration
             )
             booking_end = booking_start + booking_service_duration
             booked_ranges.append((booking_start, booking_end))
 
-        # ── 3. Filter candidate slots against all booked ranges ───────────────────
-        available: list[str] = []
+        available = []
         for slot_time in candidate_slots:
             slot_start = time_to_minutes(slot_time)
             slot_end   = slot_start + duration
@@ -484,7 +565,7 @@ class PortalBookingDiaryView(APIView):
             portal_link__clinic=request.user.clinic,
             appointment_date__gte=date_from,
             appointment_date__lte=date_to,
-            status='PENDING',  # ✅ strictly PENDING only
+            status='PENDING',
         ).select_related('service', 'practitioner__user')
 
         practitioner_id = request.query_params.get('practitioner')
@@ -522,4 +603,3 @@ class PortalBookingDiaryView(APIView):
             })
 
         return Response(data)
- 

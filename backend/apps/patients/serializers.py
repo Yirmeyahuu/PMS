@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.clinics.services.models import Service as ClinicService   # ✅ top-level import
+from apps.clinics.services.models import Service as ClinicService
 from .models import (
     Patient, IntakeForm,
     ServiceCategory, PortalService,
@@ -8,13 +8,18 @@ from .models import (
 
 
 class PatientSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
-    age = serializers.SerializerMethodField()
+    full_name       = serializers.CharField(source='get_full_name', read_only=True)
+    age             = serializers.SerializerMethodField()
+    archived_by_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Patient
+        model  = Patient
         fields = '__all__'
-        read_only_fields = ['id', 'patient_number', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'patient_number', 'created_at', 'updated_at',
+            # Archive fields are set server-side via the archive/restore actions
+            'is_archived', 'archived_at', 'archived_by',
+        ]
 
     def get_age(self, obj):
         from datetime import date
@@ -23,13 +28,18 @@ class PatientSerializer(serializers.ModelSerializer):
             (today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day)
         )
 
+    def get_archived_by_name(self, obj) -> str | None:
+        if obj.archived_by:
+            return obj.archived_by.get_full_name()
+        return None
+
 
 class IntakeFormSerializer(serializers.ModelSerializer):
     patient_name      = serializers.CharField(source='patient.get_full_name', read_only=True)
     completed_by_name = serializers.CharField(source='completed_by.get_full_name', read_only=True)
 
     class Meta:
-        model = IntakeForm
+        model  = IntakeForm
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -62,10 +72,6 @@ class PortalServiceSerializer(serializers.ModelSerializer):
 
 
 class PortalPractitionerSerializer(serializers.Serializer):
-    """
-    Lightweight practitioner card for the public portal.
-    Sourced from clinics.Practitioner — no auth required.
-    """
     id             = serializers.IntegerField(source='pk')
     full_name      = serializers.SerializerMethodField()
     specialization = serializers.CharField()
@@ -82,15 +88,13 @@ class PortalPractitionerSerializer(serializers.Serializer):
         return None
 
 
-
 class PortalClinicServiceSerializer(serializers.ModelSerializer):
-    """Serializes ClinicService for the public portal (matches PortalService shape)."""
     image_url     = serializers.SerializerMethodField()
     category      = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
 
     class Meta:
-        model  = ClinicService    # ✅ reference the top-level import, NOT inside Meta
+        model  = ClinicService
         fields = [
             'id', 'name', 'description', 'duration_minutes',
             'price', 'image_url', 'is_active', 'sort_order',
@@ -111,11 +115,11 @@ class PortalClinicServiceSerializer(serializers.ModelSerializer):
 
 
 class PortalLinkPublicSerializer(serializers.ModelSerializer):
-    clinic_name    = serializers.CharField(source='clinic.name',    read_only=True)
+    clinic_name    = serializers.CharField(source='clinic.name',   read_only=True)
     clinic_logo    = serializers.SerializerMethodField()
     clinic_address = serializers.SerializerMethodField()
-    clinic_phone   = serializers.CharField(source='clinic.phone',   read_only=True)
-    clinic_email   = serializers.EmailField(source='clinic.email',  read_only=True)
+    clinic_phone   = serializers.CharField(source='clinic.phone',  read_only=True)
+    clinic_email   = serializers.EmailField(source='clinic.email', read_only=True)
     categories     = serializers.SerializerMethodField()
     practitioners  = serializers.SerializerMethodField()
 
@@ -140,7 +144,7 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
         return ', '.join(p for p in parts if p)
 
     def get_categories(self, obj):
-        services = ClinicService.objects.filter(    # ✅ now resolves correctly
+        services = ClinicService.objects.filter(
             clinic=obj.clinic,
             is_active=True,
             show_in_portal=True,
@@ -232,14 +236,14 @@ class PortalBookingCreateSerializer(serializers.ModelSerializer):
 
 
 class PortalBookingResponseSerializer(serializers.ModelSerializer):
-    service_name     = serializers.CharField(source='service.name',               read_only=True)
-    service_duration = serializers.IntegerField(source='service.duration_minutes', read_only=True)
-    service_price    = serializers.DecimalField(
+    service_name                = serializers.CharField(source='service.name',               read_only=True)
+    service_duration            = serializers.IntegerField(source='service.duration_minutes', read_only=True)
+    service_price               = serializers.DecimalField(
         source='service.price', max_digits=10, decimal_places=2, read_only=True
     )
     practitioner_name           = serializers.SerializerMethodField()
     practitioner_specialization = serializers.SerializerMethodField()
-    clinic_name = serializers.CharField(source='portal_link.clinic.name', read_only=True)
+    clinic_name                 = serializers.CharField(source='portal_link.clinic.name', read_only=True)
 
     class Meta:
         model  = PortalBooking

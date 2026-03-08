@@ -4,27 +4,22 @@ import { ManageNavbar } from './components/ManageNavbar';
 import type { ManageCategory } from './types/manage.types';
 
 
-import { AdminMenu1 } from './pages/administration/AdminMenu1';
-import { AdminMenu2 } from './pages/administration/AdminMenu2';
-import { AdminMenu3 } from './pages/administration/AdminMenu3';
+import { AdminMenu1 } from './pages/administration/PrintAppointments';
+import { AdminMenu2 } from './pages/administration/BulkInvoicing';
 import { ClinicalMenu1 } from './pages/clinical/ClinicalMenu1';
 import { ClinicalMenu2 } from './pages/clinical/ClinicalMenu2';
 import { ClinicServices } from './pages/clinical/ClinicServices';
-import { CommMenu1 } from './pages/communications/CommMenu1';
-import { CommMenu2 } from './pages/communications/CommMenu2';
-import { CommMenu3 } from './pages/communications/CommMenu3';
-import { DataMenu1 } from './pages/data/DataMenu1';
-import { DataMenu2 } from './pages/data/DataMenu2';
-import { DataMenu3 } from './pages/data/DataMenu3';
+import { EmailReminder } from './pages/communications/EmailReminder';
+import { Records } from './pages/communications/Records';
+import { Notifications } from './pages/communications/Notifications';
 
 const MANAGE_CATEGORIES: ManageCategory[] = [
   {
     id: 'administration',
     label: 'Administration',
     items: [
-      { id: 'admin1', label: 'Administration Menu 1', path: 'admin1', component: AdminMenu1 },
-      { id: 'admin2', label: 'Administration Menu 2', path: 'admin2', component: AdminMenu2 },
-      { id: 'admin3', label: 'Administration Menu 3', path: 'admin3', component: AdminMenu3 },
+      { id: 'admin1', label: 'Print Appointments', path: 'admin1', component: AdminMenu1 },
+      { id: 'admin2', label: 'Bulk Invoicing', path: 'admin2', component: AdminMenu2 },
     ],
   },
   {
@@ -40,18 +35,9 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     id: 'communications',
     label: 'Communications',
     items: [
-      { id: 'comm1', label: 'Communications Menu 1', path: 'comm1', component: CommMenu1 },
-      { id: 'comm2', label: 'Communications Menu 2', path: 'comm2', component: CommMenu2 },
-      { id: 'comm3', label: 'Communications Menu 3', path: 'comm3', component: CommMenu3 },
-    ],
-  },
-  {
-    id: 'data',
-    label: 'Data',
-    items: [
-      { id: 'data1', label: 'Data Menu 1', path: 'data1', component: DataMenu1 },
-      { id: 'data2', label: 'Data Menu 2', path: 'data2', component: DataMenu2 },
-      { id: 'data3', label: 'Data Menu 3', path: 'data3', component: DataMenu3 },
+      { id: 'comm1', label: 'Email Reminder', path: 'comm1', component: EmailReminder },
+      { id: 'comm2', label: 'Records', path: 'comm2', component: Records },
+      { id: 'comm3', label: 'Notifications', path: 'comm3', component: Notifications },
     ],
   },
 ];

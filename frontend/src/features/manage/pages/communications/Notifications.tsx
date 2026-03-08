@@ -1,7 +1,7 @@
 import React from 'react';
 import { MessageSquare } from 'lucide-react';
 
-export const CommMenu3: React.FC = () => {
+export const Notifications: React.FC = () => {
   return (
     <div className="p-6">
       <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">
@@ -10,13 +10,13 @@ export const CommMenu3: React.FC = () => {
             <MessageSquare className="w-8 h-8 text-pink-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Communications Menu 3</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
             <p className="text-gray-600">Patient portal and messaging</p>
           </div>
         </div>
         <div className="prose max-w-none">
           <p className="text-gray-700">
-            This is <strong>Communications subpage 3</strong>. Patient portal configuration, 
+            This is <strong>Notifications</strong>. Patient portal configuration, 
             secure messaging, and communication preferences.
           </p>
         </div>

@@ -10,13 +10,13 @@ export const AdminMenu1: React.FC = () => {
             <Settings className="w-8 h-8 text-blue-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Administration Menu 1</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Print Appointments</h2>
             <p className="text-gray-600">System administration and user management</p>
           </div>
         </div>
         <div className="prose max-w-none">
           <p className="text-gray-700">
-            This is <strong>Administration subpage 1</strong>. Content for user management, 
+            This is <strong>Print Appointments</strong>. Content for user management, 
             system settings, and administrative controls will be displayed here.
           </p>
         </div>
