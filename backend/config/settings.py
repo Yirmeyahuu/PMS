@@ -18,7 +18,7 @@ TIME_ZONE = 'Asia/Manila'
 USE_TZ = True
 
 # Frontend URL
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Allowed Hosts
 if os.getenv("RENDER"):
@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     
     # Third-party apps
     'rest_framework',
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     'django_filters',
     'cloudinary',
     'cloudinary_storage',
+    'django_crontab',
     
     # Your apps
     'apps.common',
@@ -82,6 +84,12 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'config.urls'
+
+CRONJOBS = [
+    # Every day at 8:00 AM Asia/Manila — send reminders for tomorrow's appointments
+    ('0 8 * * *', 'config.cron.send_reminders_cron'),
+]
+
 
 TEMPLATES = [
     {
@@ -195,6 +203,12 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'MES PMS <noreply@mespms.com>')
+
+# ── Twilio SMS Settings ───────────────────────────────────────────────────────
+TWILIO_ACCOUNT_SID      = os.getenv('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN       = os.getenv('TWILIO_AUTH_TOKEN', '')
+TWILIO_FROM_NUMBER      = os.getenv('TWILIO_FROM_NUMBER', '')
+SMS_REMINDERS_ENABLED   = os.getenv('SMS_REMINDERS_ENABLED', 'False') == 'True'
 
 # Cloudinary Settings
 CLOUDINARY_URL = os.getenv('CLOUDINARY_URL')

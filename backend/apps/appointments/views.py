@@ -12,6 +12,9 @@ from .serializers import (
     AppointmentReminderSerializer
 )
 from apps.patients.models import PortalBooking
+from apps.appointments.email_service import send_appointment_reminder_email, send_bulk_reminders
+from apps.appointments.sms_service import send_appointment_reminder_sms
+from apps.appointments.reminder_service import send_all_reminders, send_bulk_all_reminders
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -373,6 +376,112 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         ]
 
         return Response({'practitioners': practitioners_data})
+    
+    @action(detail=True, methods=['post'], url_path='send_reminder')
+    def send_reminder(self, request, pk=None):
+        """
+        POST /api/appointments/{id}/send_reminder/
+        body: { "channel": "email" | "sms" | "both" }  — defaults to "both"
+        """
+        appointment = self.get_object()
+
+        if appointment.status not in ['SCHEDULED', 'CONFIRMED']:
+            return Response(
+                {'detail': 'Reminders can only be sent for Scheduled or Confirmed appointments.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        channel = request.data.get('channel', 'both').lower()
+        if channel not in ['email', 'sms', 'both']:
+            return Response(
+                {'detail': "channel must be 'email', 'sms', or 'both'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reset reminder_sent so email_service doesn't skip resend
+        appointment.reminder_sent = False
+        appointment.save(update_fields=['reminder_sent'])
+
+        result = {}
+
+        if channel in ['email', 'both']:
+            if not getattr(appointment.patient, 'email', None):
+                result['email'] = {'success': False, 'message': 'Patient has no email address on file.'}
+            else:
+                ok, msg = send_appointment_reminder_email(appointment)
+                result['email'] = {'success': ok, 'message': msg or 'Sent successfully.'}
+
+        if channel in ['sms', 'both']:
+            ok, msg = send_appointment_reminder_sms(appointment)
+            result['sms'] = {'success': ok, 'message': msg or 'Sent successfully.'}
+
+        any_success = any(v.get('success') for v in result.values())
+        return Response(
+            result,
+            status=status.HTTP_200_OK if any_success else status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    @action(detail=False, methods=['post'], url_path='send_bulk_reminders')
+    def send_bulk_reminders_action(self, request):
+        """
+        POST /api/appointments/send_bulk_reminders/
+        body: { "date": "YYYY-MM-DD", "channel": "email" | "sms" | "both" }
+        Restricted to admin users.
+        """
+        if not request.user.is_admin:
+            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        date_str = request.data.get('date')
+        channel  = request.data.get('channel', 'both').lower()
+
+        if channel not in ['email', 'sms', 'both']:
+            return Response(
+                {'detail': "channel must be 'email', 'sms', or 'both'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if date_str:
+            try:
+                from datetime import datetime
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'detail': 'Invalid date format. Use YYYY-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            from datetime import timedelta
+            target_date = timezone.now().date() + timedelta(days=1)
+
+        user   = request.user
+        clinic = user.clinic
+        if not clinic:
+            return Response({'detail': 'User has no clinic.'}, status=400)
+
+        main_clinic    = clinic.main_clinic
+        all_branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+
+        qs = Appointment.objects.filter(
+            clinic_id__in=all_branch_ids,
+            date=target_date,
+            status__in=['SCHEDULED', 'CONFIRMED'],
+            reminder_sent=False,
+            is_deleted=False,
+        ).select_related('patient', 'practitioner__user', 'clinic', 'location')
+
+        if channel == 'both':
+            summary = send_bulk_all_reminders(qs)
+        elif channel == 'email':
+            from apps.appointments.email_service import send_bulk_reminders
+            raw = send_bulk_reminders(qs)
+            summary = {'email': raw}
+        else:  # sms
+            from apps.appointments.sms_service import send_bulk_sms_reminders
+            raw = send_bulk_sms_reminders(qs)
+            summary = {'sms': raw}
+
+        return Response({'target_date': str(target_date), 'channel': channel, **summary})
+
 
 
 class PractitionerScheduleViewSet(viewsets.ModelViewSet):

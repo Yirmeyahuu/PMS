@@ -1,0 +1,32 @@
+{{ clinic_name }} — Appointment Reminder
+========================================
+
+Hi {{ patient_first_name }},
+
+This is a friendly reminder that you have an appointment scheduled TOMORROW.
+
+APPOINTMENT DETAILS
+-------------------
+Date         : {{ appointment_date }}
+Time         : {{ appointment_time }}
+Type         : {{ appointment_type }}
+Practitioner : {{ practitioner_name }}
+Location     : {{ location_name }}
+{% if clinic_address %}Address      : {{ clinic_address }}{% endif %}
+
+{% if notes_for_patient %}
+NOTES FOR YOU
+-------------
+{{ notes_for_patient }}
+
+{% endif %}
+If you need to reschedule or cancel, please contact us as soon as possible:
+{% if clinic_phone %}Phone : {{ clinic_phone }}{% endif %}
+{% if clinic_email %}Email : {{ clinic_email }}{% endif %}
+
+We look forward to seeing you!
+
+— {{ clinic_name }} Team
+
+---
+This is an automated reminder. Please do not reply to this email.
