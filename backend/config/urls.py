@@ -9,12 +9,16 @@ from apps.accounts.views import AuthViewSet, UserViewSet, RoleViewSet, Permissio
 from apps.clinics.views import ClinicViewSet, PractitionerViewSet, LocationViewSet
 from apps.appointments.views import AppointmentViewSet, PractitionerScheduleViewSet, AppointmentReminderViewSet
 from apps.records.views import ClinicalNoteViewSet, NoteTemplateViewSet, OutcomeMeasureViewSet, AttachmentViewSet
-from apps.billing.views import InvoiceViewSet, InvoiceItemViewSet, PaymentViewSet, ServiceViewSet  # billing Service only
+from apps.billing.views import (
+    InvoiceViewSet, InvoiceItemViewSet, PaymentViewSet,
+    ServiceViewSet, InvoiceBatchViewSet, AppointmentPrintViewSet,
+)
 from apps.reports.views import ReportViewSet
 from apps.notifications.views import NotificationViewSet, EmailLogViewSet, SMSLogViewSet
 from apps.integrations.views import PhilHealthClaimViewSet, HMOClaimViewSet
 from apps.contacts.views import ContactViewSet
-from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet  # ✅ NEW
+from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet
+
 
 router = DefaultRouter()
 
@@ -25,18 +29,18 @@ router.register(r'roles',       RoleViewSet,       basename='roles')
 router.register(r'permissions', PermissionViewSet, basename='permissions')
 
 # Clinics
-router.register(r'clinics',       ClinicViewSet,       basename='clinics')
-router.register(r'practitioners', PractitionerViewSet, basename='practitioners')
-router.register(r'locations',     LocationViewSet,     basename='locations')
-router.register(r'clinic-services', ClinicServiceViewSet, basename='clinic-services')  # ✅ NEW
+router.register(r'clinics',         ClinicViewSet,         basename='clinics')
+router.register(r'practitioners',   PractitionerViewSet,   basename='practitioners')
+router.register(r'locations',       LocationViewSet,       basename='locations')
+router.register(r'clinic-services', ClinicServiceViewSet,  basename='clinic-services')
 
 # Contacts
 router.register(r'contacts', ContactViewSet, basename='contacts')
 
 # Appointments
-router.register(r'appointments',            AppointmentViewSet,           basename='appointments')
-router.register(r'practitioner-schedules',  PractitionerScheduleViewSet,  basename='practitioner-schedules')
-router.register(r'appointment-reminders',   AppointmentReminderViewSet,   basename='appointment-reminders')
+router.register(r'appointments',           AppointmentViewSet,          basename='appointments')
+router.register(r'practitioner-schedules', PractitionerScheduleViewSet, basename='practitioner-schedules')
+router.register(r'appointment-reminders',  AppointmentReminderViewSet,  basename='appointment-reminders')
 
 # Records
 router.register(r'clinical-notes',   ClinicalNoteViewSet,   basename='clinical-notes')
@@ -44,11 +48,13 @@ router.register(r'note-templates',   NoteTemplateViewSet,   basename='note-templ
 router.register(r'outcome-measures', OutcomeMeasureViewSet, basename='outcome-measures')
 router.register(r'attachments',      AttachmentViewSet,     basename='attachments')
 
-# Billing — billing.Service stays on /api/services/
-router.register(r'invoices',      InvoiceViewSet,     basename='invoices')
-router.register(r'invoice-items', InvoiceItemViewSet, basename='invoice-items')
-router.register(r'payments',      PaymentViewSet,     basename='payments')
-router.register(r'services',      ServiceViewSet,     basename='services')
+# Billing
+router.register(r'invoices',             InvoiceViewSet,          basename='invoice')
+router.register(r'invoice-items',        InvoiceItemViewSet,      basename='invoice-item')
+router.register(r'payments',             PaymentViewSet,          basename='payment')
+router.register(r'services',             ServiceViewSet,          basename='service')
+router.register(r'invoice-batches',      InvoiceBatchViewSet,     basename='invoice-batch')
+router.register(r'appointments-print',   AppointmentPrintViewSet, basename='appointments-print')
 
 # Reports
 router.register(r'reports', ReportViewSet, basename='reports')
@@ -61,6 +67,7 @@ router.register(r'sms-logs',      SMSLogViewSet,       basename='sms-logs')
 # Integrations
 router.register(r'philhealth-claims', PhilHealthClaimViewSet, basename='philhealth-claims')
 router.register(r'hmo-claims',        HMOClaimViewSet,        basename='hmo-claims')
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),

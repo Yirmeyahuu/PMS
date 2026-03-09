@@ -9,12 +9,15 @@ from datetime import datetime, timedelta
 from .models import Appointment, PractitionerSchedule, AppointmentReminder
 from .serializers import (
     AppointmentSerializer, PractitionerScheduleSerializer,
-    AppointmentReminderSerializer
+    AppointmentReminderSerializer, AppointmentPrintSerializer
 )
 from apps.patients.models import PortalBooking
 from apps.appointments.email_service import send_appointment_reminder_email, send_bulk_reminders
 from apps.appointments.sms_service import send_appointment_reminder_sms
 from apps.appointments.reminder_service import send_all_reminders, send_bulk_all_reminders
+
+from apps.appointments.filters import AppointmentFilter
+
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -514,3 +517,65 @@ class AppointmentReminderViewSet(viewsets.ReadOnlyModelViewSet):
         if user.is_admin:
             return self.queryset
         return self.queryset.filter(appointment__clinic=user.clinic)
+
+class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only viewset dedicated to the Print Appointments feature.
+    Supports filtering by clinic branch, practitioner, date range, and status.
+    Returns a structured list suitable for printing/PDF generation.
+    """
+    serializer_class   = AppointmentPrintSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends    = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_class    = AppointmentFilter
+    ordering_fields    = ['date', 'start_time', 'patient__last_name', 'status']
+    ordering           = ['date', 'start_time']
+    search_fields      = ['patient__first_name', 'patient__last_name', 'patient__patient_number']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.clinic:
+            return Appointment.objects.none()
+
+        main_clinic    = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
+        return (
+            Appointment.objects
+            .filter(
+                clinic_id__in=all_branch_ids,
+                is_deleted=False,
+                patient__is_archived=False,
+            )
+            .select_related(
+                'patient',
+                'practitioner__user',
+                'clinic',
+                'location',
+            )
+        )
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """
+        GET /api/appointments/print/summary/
+        Returns aggregate counts grouped by status for the filtered queryset.
+        Useful for the print header.
+        """
+        qs = self.filter_queryset(self.get_queryset())
+
+        from django.db.models import Count
+        counts = (
+            qs.values('status')
+            .annotate(count=Count('id'))
+            .order_by('status')
+        )
+
+        total = qs.count()
+
+        return Response({
+            'total':    total,
+            'by_status': {row['status']: row['count'] for row in counts},
+        })
