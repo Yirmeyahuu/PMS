@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.integrations',
     'apps.clinical_templates',
+    'apps.inventory',
 
 ]
 

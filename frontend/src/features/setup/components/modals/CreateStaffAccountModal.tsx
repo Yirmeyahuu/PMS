@@ -1,39 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, AlertCircle, Building2 } from 'lucide-react';
+import { X, UserPlus, AlertCircle, Building2, RefreshCw } from 'lucide-react';
 import type { CreateStaffData, StaffFormErrors, StaffMember } from '../../types/staff.types';
 import { TITLE_OPTIONS, DISCIPLINE_OPTIONS, GENDER_OPTIONS } from '../../types/staff.types';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 
 interface CreateStaffAccountModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: CreateStaffData) => Promise<void>;
-  /** Pass a StaffMember to switch the modal into edit mode */
+  isOpen:        boolean;
+  onClose:       () => void;
+  onSubmit:      (data: CreateStaffData) => Promise<void>;
   editingStaff?: StaffMember | null;
 }
 
 const EMPTY_FORM: CreateStaffData = {
-  first_name: '',
-  last_name: '',
-  middle_name: '',
-  nickname: '',
-  title: 'Mr',
-  position: '',
-  discipline: 'OCCUPATIONAL_THERAPY',
-  email: '',
-  phone: '',
-  address: '',
+  first_name:    '',
+  last_name:     '',
+  middle_name:   '',
+  nickname:      '',
+  title:         'Mr',
+  position:      '',
+  discipline:    'OCCUPATIONAL_THERAPY',
+  email:         '',
+  phone:         '',
+  address:       '',
   date_of_birth: '',
-  gender: 'Male',
-  role: 'STAFF',
+  gender:        'Male',
+  role:          'STAFF',
   clinic_branch: null,
 };
 
+/* ── Reusable field helpers ─────────────────────────────── */
+const inputCls = (hasError?: boolean) =>
+  `w-full border ${hasError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'}
+   rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2
+   focus:ring-cyan-400 focus:border-transparent transition`;
+
+const selectCls =
+  'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition';
+
+const Label: React.FC<{ children: React.ReactNode; required?: boolean }> = ({ children, required }) => (
+  <label className="block text-xs font-semibold text-gray-600 mb-1">
+    {children} {required && <span className="text-red-400">*</span>}
+  </label>
+);
+
+const FieldError: React.FC<{ msg?: string }> = ({ msg }) =>
+  msg ? <p className="mt-0.5 text-[11px] text-red-500">{msg}</p> : null;
+
+const SectionTitle: React.FC<{ color?: string; children: React.ReactNode }> = ({
+  color = 'text-cyan-600', children,
+}) => (
+  <p className={`text-[11px] font-bold ${color} uppercase tracking-widest mb-3`}>
+    {children}
+  </p>
+);
+
 export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = ({
-  isOpen,
-  onClose,
-  onSubmit,
-  editingStaff = null,
+  isOpen, onClose, onSubmit, editingStaff = null,
 }) => {
   const isEditMode = !!editingStaff;
 
@@ -41,27 +63,25 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
   const [errors, setErrors]     = useState<StaffFormErrors>({});
   const [loading, setLoading]   = useState(false);
 
-  // Fetch clinic branches for the dropdown
   const { branches, loading: loadingBranches } = useClinicBranches();
 
-  // Populate form when editing
   useEffect(() => {
     if (editingStaff) {
       setFormData({
         first_name:    editingStaff.first_name,
         last_name:     editingStaff.last_name,
-        middle_name:   editingStaff.middle_name  ?? '',
-        nickname:      editingStaff.nickname      ?? '',
-        title:         editingStaff.title         ?? 'Mr',
-        position:      editingStaff.position      ?? '',
-        discipline:    editingStaff.discipline    ?? 'OCCUPATIONAL_THERAPY',
+        middle_name:   editingStaff.middle_name   ?? '',
+        nickname:      editingStaff.nickname       ?? '',
+        title:         editingStaff.title          ?? 'Mr',
+        position:      editingStaff.position       ?? '',
+        discipline:    editingStaff.discipline     ?? 'OCCUPATIONAL_THERAPY',
         email:         editingStaff.email,
         phone:         editingStaff.phone,
-        address:       editingStaff.address       ?? '',
-        date_of_birth: editingStaff.date_of_birth ?? '',
-        gender:        editingStaff.gender        ?? 'Male',
+        address:       editingStaff.address        ?? '',
+        date_of_birth: editingStaff.date_of_birth  ?? '',
+        gender:        editingStaff.gender         ?? 'Male',
         role:          editingStaff.role,
-        clinic_branch: editingStaff.clinic_branch ?? null,
+        clinic_branch: editingStaff.clinic_branch  ?? null,
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -70,52 +90,38 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
   }, [editingStaff, isOpen]);
 
   const validateForm = (): boolean => {
-    const newErrors: StaffFormErrors = {};
-
-    if (!formData.first_name.trim()) newErrors.first_name = 'First name is required';
-    if (!formData.last_name.trim())  newErrors.last_name  = 'Last name is required';
-    if (!formData.position?.trim())  newErrors.position   = 'Position is required';
-
+    const e: StaffFormErrors = {};
+    if (!formData.first_name.trim()) e.first_name = 'First name is required';
+    if (!formData.last_name.trim())  e.last_name  = 'Last name is required';
+    if (!formData.position?.trim())  e.position   = 'Position is required';
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      e.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
+      e.email = 'Invalid email format';
     }
-
     if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
+      e.phone = 'Phone number is required';
     } else {
-      const cleaned = formData.phone.replace(/[\s-]/g, '');
-      if (
-        !(cleaned.startsWith('09')   && cleaned.length === 11) &&
-        !(cleaned.startsWith('+639') && cleaned.length === 13)
-      ) {
-        newErrors.phone = 'Invalid phone format. Use 09XXXXXXXXX or +639XXXXXXXXX';
-      }
+      const c = formData.phone.replace(/[\s-]/g, '');
+      if (!(c.startsWith('09') && c.length === 11) && !(c.startsWith('+639') && c.length === 13))
+        e.phone = 'Use 09XXXXXXXXX or +639XXXXXXXXX';
     }
-
-    if (formData.date_of_birth) {
-      const birthDate = new Date(formData.date_of_birth);
-      if (birthDate > new Date()) {
-        newErrors.date_of_birth = 'Date of birth cannot be in the future';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (formData.date_of_birth && new Date(formData.date_of_birth) > new Date())
+      e.date_of_birth = 'Date of birth cannot be in the future';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
     setLoading(true);
     setErrors({});
     try {
       await onSubmit(formData);
       handleClose();
-    } catch (error: any) {
-      setErrors({ general: error.message || 'Failed to save staff account. Please try again.' });
+    } catch (err: any) {
+      setErrors({ general: err.message || 'Failed to save. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -127,87 +133,105 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
     onClose();
   };
 
+  const set = <K extends keyof CreateStaffData>(field: K, value: CreateStaffData[K]) =>
+    setFormData(prev => ({ ...prev, [field]: value }));
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={handleClose} />
+      <div
+        className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+        onClick={handleClose}
+      />
 
-      {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+        <div
+          className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* ── Top accent bar ── */}
+          <div className="h-1.5 w-full bg-cyan-500 rounded-t-2xl" />
 
-          {/* Header */}
-          <div className="bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <UserPlus className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">
-                    {isEditMode ? 'Edit Staff Account' : 'Create Staff Account'}
-                  </h2>
-                  <p className="text-sm text-white/80">
-                    {isEditMode
-                      ? `Editing ${editingStaff?.first_name} ${editingStaff?.last_name}`
-                      : 'Add a new staff member to your practice'
-                    }
-                  </p>
-                </div>
+          {/* ── Header ── */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-600 flex items-center justify-center shadow-sm">
+                <UserPlus className="w-5 h-5 text-white" />
               </div>
-              <button onClick={handleClose} className="text-white/80 hover:text-white transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-
-            {/* Error Alert */}
-            {errors.general && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-semibold text-red-900 mb-1">Error</h3>
-                  <p className="text-sm text-red-700">{errors.general}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Info Alert — only on create */}
-            {!isEditMode && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-700">
-                  A temporary password will be automatically generated and sent to the staff
-                  member's email address. They will be required to change it upon first login.
+              <div>
+                <h2 className="text-base font-bold text-gray-900">
+                  {isEditMode ? 'Edit Staff Account' : 'New Staff Member'}
+                </h2>
+                <p className="text-xs text-gray-400">
+                  {isEditMode
+                    ? `Editing ${editingStaff?.first_name} ${editingStaff?.last_name}`
+                    : 'Add a new staff member to your practice'}
                 </p>
               </div>
-            )}
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-            <div className="space-y-6">
+          {/* ── Scrollable body ── */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="px-6 py-5 space-y-6">
 
-              {/* ── Personal Information ── */}
+              {/* General error */}
+              {errors.general && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {errors.general}
+                </div>
+              )}
+
+              {/* Info notice — create mode only */}
+              {!isEditMode && (
+                <div className="flex items-start gap-2 bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 text-sm text-cyan-700">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    A temporary password will be auto-generated and sent to the staff member's
+                    email. They must change it on first login.
+                  </span>
+                </div>
+              )}
+
+              {/* ════════════════════════════════════════
+                  SECTION 1 — Personal Information
+              ════════════════════════════════════════ */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
-                  Personal Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SectionTitle color="text-cyan-600">Personal Information</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
 
                   {/* Title */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Title <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>Title</Label>
                     <select
                       value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value as any })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      onChange={e => set('title', e.target.value as any)}
+                      className={selectCls}
                     >
-                      {TITLE_OPTIONS.map((o) => (
+                      {TITLE_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <Label>Gender</Label>
+                    <select
+                      value={formData.gender}
+                      onChange={e => set('gender', e.target.value as any)}
+                      className={selectCls}
+                    >
+                      {GENDER_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
@@ -215,278 +239,239 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
 
                   {/* First Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>First Name</Label>
                     <input
                       type="text"
                       value={formData.first_name}
-                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
+                      onChange={e => set('first_name', e.target.value)}
                       placeholder="John"
+                      className={inputCls(!!errors.first_name)}
                     />
-                    {errors.first_name && <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>}
-                  </div>
-
-                  {/* Middle Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                    <input
-                      type="text"
-                      value={formData.middle_name}
-                      onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Optional"
-                    />
+                    <FieldError msg={errors.first_name} />
                   </div>
 
                   {/* Last Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>Last Name</Label>
                     <input
                       type="text"
                       value={formData.last_name}
-                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
+                      onChange={e => set('last_name', e.target.value)}
                       placeholder="Doe"
+                      className={inputCls(!!errors.last_name)}
                     />
-                    {errors.last_name && <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>}
+                    <FieldError msg={errors.last_name} />
+                  </div>
+
+                  {/* Middle Name */}
+                  <div>
+                    <Label>Middle Name</Label>
+                    <input
+                      type="text"
+                      value={formData.middle_name}
+                      onChange={e => set('middle_name', e.target.value)}
+                      placeholder="Optional"
+                      className={inputCls()}
+                    />
                   </div>
 
                   {/* Nickname */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nickname</label>
+                    <Label>Nickname</Label>
                     <input
                       type="text"
                       value={formData.nickname}
-                      onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      onChange={e => set('nickname', e.target.value)}
                       placeholder="Optional"
+                      className={inputCls()}
                     />
                   </div>
 
                   {/* Date of Birth */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                    <Label>Date of Birth</Label>
                     <input
                       type="date"
                       value={formData.date_of_birth}
-                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.date_of_birth ? 'border-red-500' : 'border-gray-300'}`}
+                      onChange={e => set('date_of_birth', e.target.value)}
+                      className={inputCls(!!errors.date_of_birth)}
                     />
-                    {errors.date_of_birth && <p className="mt-1 text-sm text-red-600">{errors.date_of_birth}</p>}
+                    <FieldError msg={errors.date_of_birth} />
                   </div>
 
-                  {/* Gender */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                    <select
-                      value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      {GENDER_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               </div>
 
-              {/* ── Professional Information ── */}
+              {/* ════════════════════════════════════════
+                  SECTION 2 — Professional Information
+              ════════════════════════════════════════ */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
-                  Professional Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SectionTitle color="text-slate-500">Professional Information</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
 
                   {/* Position */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Position <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>Position</Label>
                     <input
                       type="text"
                       value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.position ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="e.g., Clinic Desk, Office Manager"
+                      onChange={e => set('position', e.target.value)}
+                      placeholder="e.g. Clinic Desk, Office Manager"
+                      className={inputCls(!!errors.position)}
                     />
-                    {errors.position && <p className="mt-1 text-sm text-red-600">{errors.position}</p>}
+                    <FieldError msg={errors.position} />
                   </div>
 
                   {/* Discipline */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discipline <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>Discipline</Label>
                     <select
                       value={formData.discipline}
-                      onChange={(e) => setFormData({ ...formData, discipline: e.target.value as any })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      onChange={e => set('discipline', e.target.value as any)}
+                      className={selectCls}
                     >
-                      {DISCIPLINE_OPTIONS.map((o) => (
+                      {DISCIPLINE_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Role */}
+                  {/* Role — toggle buttons */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio" name="role" value="STAFF"
-                          checked={formData.role === 'STAFF'}
-                          onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                          className="w-4 h-4 text-teal-600 focus:ring-teal-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Staff</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio" name="role" value="PRACTITIONER"
-                          checked={formData.role === 'PRACTITIONER'}
-                          onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                          className="w-4 h-4 text-teal-600 focus:ring-teal-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Practitioner</span>
-                      </label>
+                    <Label required>Role</Label>
+                    <div className="flex gap-3">
+                      {[
+                        { value: 'STAFF',        label: 'Staff',        ring: 'ring-cyan-400',   bg: 'bg-cyan-50   text-cyan-700   border-cyan-200'   },
+                        { value: 'PRACTITIONER', label: 'Practitioner', ring: 'ring-purple-400', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => set('role', opt.value as any)}
+                          className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            formData.role === opt.value
+                              ? `${opt.bg} ring-2 ${opt.ring}`
+                              : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* ── Clinic Branch Assignment ── */}
+                  {/* Clinic Branch */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <span className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-teal-500" />
+                    <Label>
+                      <span className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-cyan-500" />
                         Assign to Clinic Branch
                       </span>
-                    </label>
+                    </Label>
                     {loadingBranches ? (
-                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-400">
-                        Loading branches...
-                      </div>
+                      <div className={`${selectCls} text-gray-400`}>Loading branches…</div>
                     ) : branches.length === 0 ? (
-                      <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-400">
-                        No branches available
-                      </div>
+                      <div className={`${selectCls} text-gray-400`}>No branches available</div>
                     ) : (
                       <select
                         value={formData.clinic_branch ?? ''}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            clinic_branch: e.target.value ? Number(e.target.value) : null,
-                          })
+                        onChange={e =>
+                          set('clinic_branch', e.target.value ? Number(e.target.value) : null)
                         }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        className={selectCls}
                       >
                         <option value="">— No specific branch (all branches) —</option>
-                        {branches.map((branch) => (
-                          <option key={branch.id} value={branch.id}>
-                            {branch.name}
-                            {branch.is_main_branch ? ' (Main)' : ''}
-                            {branch.city ? ` · ${branch.city}` : ''}
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                            {b.is_main_branch ? ' (Main)' : ''}
+                            {b.city ? ` · ${b.city}` : ''}
                           </option>
                         ))}
                       </select>
                     )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Assigning a branch will allow filtering staff/practitioners per location in the diary.
+                    <p className="mt-0.5 text-[10px] text-gray-400">
+                      Allows filtering staff per location in the diary.
                     </p>
                   </div>
 
                 </div>
               </div>
 
-              {/* ── Contact Information ── */}
+              {/* ════════════════════════════════════════
+                  SECTION 3 — Contact Information
+              ════════════════════════════════════════ */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">
-                  Contact Information
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
+                <SectionTitle color="text-slate-500">Contact Information</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
 
                   {/* Email */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
+                  <div className="md:col-span-2">
+                    <Label required>Email Address</Label>
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      disabled={isEditMode} // email shouldn't change on edit
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'} ${isEditMode ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                      onChange={e => set('email', e.target.value)}
+                      disabled={isEditMode}
                       placeholder="john.doe@example.com"
+                      className={`${inputCls(!!errors.email)} ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
                     {isEditMode && (
-                      <p className="mt-1 text-xs text-gray-400">Email cannot be changed after account creation.</p>
+                      <p className="mt-0.5 text-[10px] text-gray-400">
+                        Email cannot be changed after account creation.
+                      </p>
                     )}
-                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                    <FieldError msg={errors.email} />
                   </div>
 
                   {/* Phone */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
+                    <Label required>Phone Number</Label>
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                      placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                      onChange={e => set('phone', e.target.value)}
+                      placeholder="09XXXXXXXXX"
+                      className={inputCls(!!errors.phone)}
                     />
-                    {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
+                    <FieldError msg={errors.phone} />
                   </div>
 
                   {/* Address */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <Label>Address</Label>
                     <textarea
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Street, City, Province, ZIP Code"
+                      value={formData.address}
+                      onChange={e => set('address', e.target.value)}
+                      placeholder="Street, City, Province, ZIP"
+                      className={`${inputCls()} resize-none`}
                     />
                   </div>
+
                 </div>
               </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t">
+            {/* ── Footer ── */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/80">
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={loading}
-                className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="flex items-center gap-2 px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-semibold"
               >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {isEditMode ? 'Saving...' : 'Creating...'}
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    {isEditMode ? 'Save Changes' : 'Create Staff Account'}
-                  </>
-                )}
+                {loading
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" />{isEditMode ? 'Saving…' : 'Creating…'}</>
+                  : <><UserPlus  className="w-4 h-4" />{isEditMode ? 'Save Changes' : 'Create Staff Member'}</>
+                }
               </button>
             </div>
           </form>

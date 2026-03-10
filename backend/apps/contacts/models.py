@@ -4,16 +4,14 @@ from apps.clinics.models import Clinic
 
 
 class Contact(TimeStampedModel):
-    """
-    Professional contacts for clinics (doctors, practitioners, other clinics, etc.)
-    """
     CONTACT_TYPE_CHOICES = [
-        ('DOCTOR', 'Doctor'),
+        ('DOCTOR',       'Doctor'),
         ('PRACTITIONER', 'Practitioner'),
-        ('CLINIC', 'Clinic'),
-        ('LABORATORY', 'Laboratory'),
-        ('PHARMACY', 'Pharmacy'),
-        ('OTHER', 'Other'),
+        ('CLINIC',       'Clinic'),
+        ('LABORATORY',   'Laboratory'),
+        ('PHARMACY',     'Pharmacy'),
+        ('SUPPLIER',     'Supplier'),   # ← added
+        ('OTHER',        'Other'),
     ]
 
     clinic = models.ForeignKey(
