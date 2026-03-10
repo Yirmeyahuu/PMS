@@ -45,40 +45,49 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       updateUser: (user) => {
+        // 1. Update standalone 'user' key
         localStorage.setItem('user', JSON.stringify(user));
+
+        // 2. CRITICAL: Also patch the zustand persisted 'auth-storage' key
+        //    so that on page refresh, rehydration uses the updated user
+        try {
+          const raw = localStorage.getItem('auth-storage');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            parsed.state = { ...parsed.state, user };
+            localStorage.setItem('auth-storage', JSON.stringify(parsed));
+          }
+        } catch (e) {
+          console.error('Failed to patch auth-storage:', e);
+        }
+
+        // 3. Update zustand in-memory state
         set({ user });
       },
 
       setLoading: (isLoading) => {
         set({ isLoading });
       },
-      /**
-       * Verify authentication status
-       * Called on app initialization
-       */
+
       verifyAuth: async () => {
         console.log('🔐 Verifying authentication...');
-        
-        const token = localStorage.getItem('access_token');
+
+        const token       = localStorage.getItem('access_token');
         const refreshToken = localStorage.getItem('refresh_token');
-        const userStr = localStorage.getItem('user');
-        
+        const userStr     = localStorage.getItem('user');
+
         if (!token || !userStr) {
           console.log('❌ No token or user found');
           set({ isAuthenticated: false, isLoading: false, user: null, tokens: null });
           return false;
         }
-      
+
         try {
-          // Parse user data
           const user = JSON.parse(userStr);
-          
-          // Verify token with backend
           const response = await authService.verifyToken(token);
-          
+
           if (response.valid && refreshToken) {
             console.log('✅ Token valid, restoring session');
-            
             set({
               user,
               tokens: { access: token, refresh: refreshToken },
@@ -91,11 +100,8 @@ export const useAuthStore = create<AuthStore>()(
             get().logout();
             return false;
           }
-          
         } catch (error: any) {
           console.error('❌ Auth verification failed:', error);
-          
-          // Log detailed error for debugging
           if (error.response) {
             console.error('Response error:', error.response.status, error.response.data);
           } else if (error.request) {
@@ -103,7 +109,6 @@ export const useAuthStore = create<AuthStore>()(
           } else {
             console.error('Error:', error.message);
           }
-          
           get().logout();
           return false;
         }

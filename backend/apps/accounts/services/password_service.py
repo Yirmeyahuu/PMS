@@ -44,3 +44,18 @@ class PasswordService:
         """
         user.set_password(password)
         user.save(update_fields=['password'])
+
+    
+    @staticmethod
+    def reset_password(user) -> str:
+        """
+        Generate a new temporary password, set it on the user,
+        mark password_changed=False so they are prompted to change it,
+        and blacklist all existing refresh tokens.
+        Returns the new plain-text password.
+        """
+        new_password = PasswordService.generate_temporary_password()
+        user.set_password(new_password)
+        user.password_changed = False
+        user.save(update_fields=['password', 'password_changed'])
+        return new_password

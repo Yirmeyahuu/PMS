@@ -175,16 +175,73 @@ class AuthViewSet(viewsets.GenericViewSet):
     def me(self, request):
         return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
-    def change_password(self, request):
-        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            user = request.user
-            user.set_password(serializer.validated_data['new_password'])
-            user.password_changed = True
-            user.save()
-            return Response({'detail': 'Password changed successfully. Please login again.'}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='reset-password',
+        permission_classes=[IsAuthenticated],
+    )
+    def reset_password(self, request):
+        """
+        Self-service password reset:
+        1. Generates a new temporary password.
+        2. Emails it to the authenticated user's email.
+        3. Blacklists the current refresh token → forces re-login.
+        4. Sets password_changed=False → prompts change on next login.
+        """
+        user = request.user
+
+        try:
+            with transaction.atomic():
+                # 1. Generate + set new password
+                new_password = PasswordService.reset_password(user)
+
+                # 2. Blacklist the supplied refresh token (logout current session)
+                refresh_token = request.data.get('refresh_token')
+                if refresh_token:
+                    try:
+                        token = RefreshToken(refresh_token)
+                        token.blacklist()
+                    except TokenError:
+                        pass  # already invalid — that's fine
+
+                # 3. Send email with new credentials
+                email_sent = EmailService.send_password_reset_email(
+                    user_email=user.email,
+                    user_name=user.get_full_name(),
+                    new_password=new_password,
+                )
+
+                if not email_sent:
+                    logger.warning(f"Reset email failed for {user.email}")
+                    # Still succeed — password was changed, but warn
+                    return Response(
+                        {
+                            'detail': 'Password reset but email delivery failed. '
+                                      'Please contact your administrator.',
+                            'email_sent': False,
+                        },
+                        status=status.HTTP_200_OK,
+                    )
+
+                logger.info(f"Password reset successful for {user.email}")
+                return Response(
+                    {
+                        'detail': 'Password reset successfully. '
+                                  'Check your email for the new temporary password. '
+                                  'You will be logged out now.',
+                        'email_sent': True,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        except Exception as e:
+            logger.error(f"Password reset failed for {user.email}: {str(e)}")
+            return Response(
+                {'detail': f'Password reset failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -386,9 +443,65 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT
         )
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get', 'patch'])
     def me(self, request):
-        return Response(self.get_serializer(request.user).data)
+        """Get or update the currently authenticated user's own profile."""
+        if request.method == 'GET':
+            return Response(self.get_serializer(request.user).data)
+
+        content_type = request.content_type or ''
+
+        # ── Avatar removal via JSON: { "remove_avatar": true } ──────────
+        if 'application/json' in content_type:
+            if request.data.get('remove_avatar') is True:
+                # Delete the file from storage if it exists
+                if request.user.avatar:
+                    try:
+                        request.user.avatar.delete(save=False)
+                    except Exception:
+                        pass
+                request.user.avatar = None
+                request.user.save(update_fields=['avatar'])
+                return Response(self.get_serializer(request.user).data)
+
+            # Regular JSON profile update (name, phone)
+            ALLOWED = {'first_name', 'last_name', 'phone'}
+            data = {k: v for k, v in request.data.items() if k in ALLOWED}
+            if not data:
+                return Response(self.get_serializer(request.user).data)
+
+            serializer = self.get_serializer(
+                request.user, data=data, partial=True,
+                context={'request': request}
+            )
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(self.get_serializer(request.user).data)
+
+        # ── Avatar upload via multipart/form-data ───────────────────────
+        if 'multipart/form-data' in content_type or 'avatar' in request.FILES:
+            avatar_file = request.FILES.get('avatar')
+            if not avatar_file:
+                return Response(
+                    {'detail': 'No image file provided.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Delete old avatar file from storage
+            if request.user.avatar:
+                try:
+                    request.user.avatar.delete(save=False)
+                except Exception:
+                    pass
+
+            request.user.avatar = avatar_file
+            request.user.save(update_fields=['avatar'])
+            return Response(self.get_serializer(request.user).data)
+
+        return Response(
+            {'detail': 'Unsupported content type.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class RoleViewSet(viewsets.ModelViewSet):
@@ -400,4 +513,4 @@ class RoleViewSet(viewsets.ModelViewSet):
 class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated] 

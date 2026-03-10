@@ -1,65 +1,125 @@
 import React from 'react';
-import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
-import { User } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { DashboardLayout }      from '@/features/dashboard/components/DashboardLayout';
+import { ProfileHeader }        from './components/ProfileHeader';
+import { ProfileAvatarUpload }  from './components/ProfileAvatarUpload';
+import { ProfileInfoCard }      from './components/ProfileInfoCard';
+import { ResetPasswordCard }    from './components/ResetPasswordCard';
+import { useProfile }           from './hooks/useProfile';
+import { useAuth }              from '@/hooks/useAuth';
+import { Loader2 }              from 'lucide-react';
 
 export const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+
+  const {
+    user,
+    isSaving,
+    isUploadingAvatar,
+    isRemovingAvatar,
+    isResettingPw,
+    saveProfile,
+    saveAvatar,
+    deleteAvatar,
+    doResetPassword,
+  } = useProfile(authUser ?? null);
+
+  if (!user) {
+    return (
+      <DashboardLayout>
+        <div className="h-full flex items-center justify-center">
+          <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const initials =
+    `${user.first_name?.[0] ?? ''}${user.last_name?.[0] ?? ''}`.toUpperCase() || '?';
 
   return (
     <DashboardLayout>
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Page Header */}
-        <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-sky-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <User className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Profile</h1>
-              <p className="text-sm text-gray-600">Manage your account settings and preferences</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">
-              {/* User Info Card */}
-              <div className="flex items-center gap-4 mb-8 pb-8 border-b border-gray-200">
-                <div className="w-20 h-20 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold text-2xl">
-                    {user?.first_name?.[0]}{user?.last_name?.[0]}
-                  </span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {user?.first_name} {user?.last_name}
-                  </h2>
-                  <p className="text-gray-600">{user?.email}</p>
-                  <div className="mt-2 inline-flex items-center px-3 py-1 bg-sky-100 text-sky-700 rounded-full text-sm font-medium">
-                    {user?.role}
+        {/* ── Page Header ── */}
+        <ProfileHeader user={user} />
+
+        {/* ── Content ── */}
+        <div className="flex-1 overflow-y-auto bg-gray-50/50">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col xl:flex-row gap-6">
+
+              {/* ── Left: Avatar card ── */}
+              <div className="xl:w-72 flex-shrink-0">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7
+                                flex flex-col items-center gap-5 sticky top-6">
+                  <ProfileAvatarUpload
+                    avatarUrl={user.avatar}
+                    initials={initials}
+                    isUploading={isUploadingAvatar}
+                    isRemoving={isRemovingAvatar}
+                    onFileSelect={saveAvatar}
+                    onRemove={deleteAvatar}
+                  />
+
+                  {/* Identity summary */}
+                  <div className="text-center w-full pt-4 border-t border-gray-100">
+                    <p className="text-base font-bold text-gray-900 truncate">
+                      {user.first_name} {user.last_name}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate mt-1">{user.email}</p>
+                  </div>
+
+                  {/* Info rows */}
+                  <div className="w-full space-y-3 pt-1">
+                    {[
+                      { label: 'Role',   value: user.role },
+                      { label: 'Status', value: user.is_active ? 'Active' : 'Inactive' },
+                      {
+                        label: 'Joined',
+                        value: new Date(user.created_at).toLocaleDateString('en-PH', {
+                          year: 'numeric', month: 'short', day: 'numeric',
+                        }),
+                      },
+                    ].map(row => (
+                      <div
+                        key={row.label}
+                        className="flex items-center justify-between
+                                   bg-gray-50 rounded-xl px-4 py-2.5"
+                      >
+                        <span className="text-xs text-gray-400 font-medium">{row.label}</span>
+                        <span className={`text-xs font-bold truncate ml-2 max-w-[130px] text-right
+                          ${row.label === 'Status'
+                            ? user.is_active
+                              ? 'text-emerald-600'
+                              : 'text-red-500'
+                            : 'text-gray-700'
+                          }`}>
+                          {row.label === 'Status' && (
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 mb-0.5
+                              ${user.is_active ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                          )}
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Coming Soon */}
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <User className="w-8 h-8 text-sky-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Profile Settings Coming Soon
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Update your personal information, change password, and manage preferences.
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-sky-50 rounded-lg text-sm text-sky-700">
-                  <span className="w-2 h-2 bg-sky-500 rounded-full animate-pulse"></span>
-                  Coming Soon
-                </div>
+              {/* ── Right: Info + Reset Password ── */}
+              <div className="flex-1 min-w-0 space-y-6">
+                <ProfileInfoCard
+                  user={user}
+                  isSaving={isSaving}
+                  onSave={saveProfile}
+                />
+                <ResetPasswordCard
+                  userEmail={user.email}
+                  isResetting={isResettingPw}
+                  onReset={doResetPassword}
+                />
               </div>
+
             </div>
           </div>
         </div>

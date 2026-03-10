@@ -130,31 +130,114 @@ class EmailService:
             return False
     
     @staticmethod
-    def send_password_reset_email(user_email: str, reset_token: str) -> bool:
-        """Send password reset email"""
+    def send_password_reset_email(user_email: str, user_name: str, new_password: str) -> bool:
+        """Send a new auto-generated password to the user's email."""
         try:
-            subject = 'MES PMS - Password Reset'
-            reset_url = f"{settings.FRONTEND_URL}/reset-password/{reset_token}"
-            
-            plain_message = f"""
-            Password Reset Request
-            
-            Click here to reset: {reset_url}
-            
-            This link expires in 1 hour.
+            subject = 'MES PMS — Your Password Has Been Reset'
+
+            html_message = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+                               color: white; padding: 30px; text-align: center;
+                               border-radius: 10px 10px 0 0; }}
+                    .content {{ background: #f8f9fa; padding: 30px;
+                                border-radius: 0 0 10px 10px; }}
+                    .credentials {{ background: white; padding: 20px; border-radius: 8px;
+                                    margin: 20px 0; border-left: 4px solid #0891b2; }}
+                    .password {{ font-size: 26px; font-weight: bold; color: #0891b2;
+                                 letter-spacing: 3px; margin: 10px 0; }}
+                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107;
+                                padding: 15px; margin: 20px 0; border-radius: 4px; }}
+                    .button {{ display: inline-block; padding: 12px 30px;
+                               background: #0891b2; color: white; text-decoration: none;
+                               border-radius: 6px; margin: 20px 0; font-weight: bold; }}
+                    .footer {{ text-align: center; color: #6c757d; font-size: 12px;
+                               margin-top: 30px; padding-top: 20px;
+                               border-top: 1px solid #dee2e6; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🔐 Password Reset</h1>
+                        <p>MES Practice Management System</p>
+                    </div>
+                    <div class="content">
+                        <h2>Hello {user_name},</h2>
+                        <p>Your password has been <strong>reset successfully</strong>.
+                           Use the temporary password below to log in.</p>
+
+                        <div class="credentials">
+                            <h3>Your New Temporary Password:</h3>
+                            <p><strong>Email:</strong> {user_email}</p>
+                            <p><strong>New Password:</strong></p>
+                            <div class="password">{new_password}</div>
+                        </div>
+
+                        <div class="warning">
+                            <strong>⚠️ Important:</strong>
+                            <ul>
+                                <li>You have been logged out of all active sessions.</li>
+                                <li>Log in with this temporary password.</li>
+                                <li>You will be prompted to set a new password on next login.</li>
+                                <li>Never share your password with anyone.</li>
+                            </ul>
+                        </div>
+
+                        <div style="text-align:center;">
+                            <a href="{settings.FRONTEND_URL}/login" class="button">
+                                Login Now
+                            </a>
+                        </div>
+
+                        <p>If you did not request this reset, contact your administrator
+                           immediately.</p>
+
+                        <p>Best regards,<br><strong>The MES PMS Team</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2026 MES PMS. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
             """
-            
+
+            plain_message = f"""
+            MES PMS — Password Reset
+
+            Hello {user_name},
+
+            Your password has been reset.
+
+            Email:        {user_email}
+            New Password: {new_password}
+
+            Login: {settings.FRONTEND_URL}/login
+
+            You will be prompted to change this password after login.
+
+            Best regards,
+            MES PMS Team
+            """
+
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=plain_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[user_email]
+                to=[user_email],
             )
+            email.attach_alternative(html_message, 'text/html')
             email.send(fail_silently=False)
-            
-            logger.info(f"✅ Reset email sent to {user_email}")
+
+            logger.info(f"✅ Password reset email sent to {user_email}")
             return True
-            
+
         except Exception as e:
-            logger.error(f"❌ Reset email error: {str(e)}")
+            logger.error(f"❌ Password reset email error: {str(e)}")
             return False
