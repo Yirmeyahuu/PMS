@@ -3,13 +3,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Pin, PinOff, LogOut, X } from 'lucide-react';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 import { sidebarItems } from './sidebarItems';
 import MESLogo from '@/assets/MESLogo.svg';
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user }  = useAuth();
+  const { open: openLogoutConfirm } = useLogoutConfirm();
   const {
     isExpanded,
     isPinned,
@@ -22,11 +24,8 @@ export const Sidebar: React.FC = () => {
     togglePin,
   } = useSidebar();
 
-  // Filter menu items based on user role
   const visibleMenuItems = sidebarItems.filter(item => {
-    if (item.adminOnly) {
-      return user?.role === 'ADMIN';
-    }
+    if (item.adminOnly) return user?.role === 'ADMIN';
     return true;
   });
 
@@ -40,13 +39,13 @@ export const Sidebar: React.FC = () => {
     if (isMobile) closeMobileSidebar();
   };
 
+  // ✅ Open confirmation modal instead of direct logout
   const handleLogout = (e: React.MouseEvent) => {
     e.stopPropagation();
-    logout();
     if (isMobile) closeMobileSidebar();
+    openLogoutConfirm();
   };
 
-  // Mobile Overlay
   const MobileOverlay = isMobile && isMobileOpen && (
     <div
       className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
@@ -91,11 +90,10 @@ export const Sidebar: React.FC = () => {
                   className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-colors animate-fadeIn"
                   title={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
                 >
-                  {isPinned ? (
-                    <PinOff className="w-4 h-4 text-white" />
-                  ) : (
-                    <Pin className="w-4 h-4 text-white/70 hover:text-white" />
-                  )}
+                  {isPinned
+                    ? <PinOff className="w-4 h-4 text-white" />
+                    : <Pin    className="w-4 h-4 text-white/70 hover:text-white" />
+                  }
                 </button>
               )}
 
@@ -116,7 +114,7 @@ export const Sidebar: React.FC = () => {
           <nav className="flex-1 overflow-y-auto overflow-x-hidden py-6 px-3">
             <div className="space-y-1">
               {visibleMenuItems.map((item) => {
-                const Icon = item.icon;
+                const Icon     = item.icon;
                 const isActive = location.pathname === item.path;
 
                 return (
@@ -135,10 +133,7 @@ export const Sidebar: React.FC = () => {
                     <Icon
                       className={`
                         w-5 h-5 flex-shrink-0 transition-colors
-                        ${isActive
-                          ? 'text-sky-600'
-                          : 'text-white group-hover:text-sky-600'
-                        }
+                        ${isActive ? 'text-sky-600' : 'text-white group-hover:text-sky-600'}
                       `}
                     />
 
@@ -154,7 +149,7 @@ export const Sidebar: React.FC = () => {
                       </span>
                     )}
 
-                    {/* Tooltip for collapsed state (Desktop only) */}
+                    {/* Tooltip for collapsed state */}
                     {!isExpanded && !isMobile && (
                       <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
                         {item.label}
@@ -169,32 +164,32 @@ export const Sidebar: React.FC = () => {
 
           {/* ── User Section ── */}
           <div className="flex-shrink-0 border-t border-sky-500 bg-sky-700">
-            <button
-              onClick={handleProfileClick}
+            <div
               className={`
-                w-full p-4 flex items-center gap-3 min-w-0
-                transition-all duration-200 hover:bg-white/10 group
+                flex items-center gap-3 p-4 min-w-0 relative group
                 ${isProfileActive ? 'bg-white/20' : ''}
               `}
-              title="View Profile"
             >
-              {/* Avatar */}
-              <div className={`
-                w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
-                transition-all duration-200 bg-white
-                ${isProfileActive
-                  ? 'ring-2 ring-white'
-                  : 'group-hover:ring-2 group-hover:ring-white/60'
-                }
-              `}>
-                <span className="text-sky-600 font-bold text-sm">
-                  {user?.first_name?.[0]}{user?.last_name?.[0]}
-                </span>
-              </div>
+              {/* Profile Button */}
+              <button
+                onClick={handleProfileClick}
+                className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                title="View Profile"
+              >
+                <div className={`
+                  w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
+                  transition-all duration-200 bg-white
+                  ${isProfileActive
+                    ? 'ring-2 ring-white'
+                    : 'group-hover:ring-2 group-hover:ring-white/60'
+                  }
+                `}>
+                  <span className="text-sky-600 font-bold text-sm">
+                    {user?.first_name?.[0]}{user?.last_name?.[0]}
+                  </span>
+                </div>
 
-              {/* User Info — only when expanded */}
-              {(isExpanded || isMobile) && (
-                <>
+                {(isExpanded || isMobile) && (
                   <div className="flex-1 min-w-0 animate-fadeIn text-left">
                     <p className={`
                       font-medium text-sm truncate transition-colors
@@ -202,30 +197,30 @@ export const Sidebar: React.FC = () => {
                     `}>
                       {user?.first_name} {user?.last_name}
                     </p>
-                    <p className="text-sky-200 text-xs truncate">
-                      {user?.role}
-                    </p>
+                    <p className="text-sky-200 text-xs truncate">{user?.role}</p>
                   </div>
+                )}
+              </button>
 
-                  {/* Logout Button */}
-                  <button
-                    onClick={handleLogout}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0 group/logout animate-fadeIn"
-                    title="Logout"
-                  >
-                    <LogOut className="w-4 h-4 text-white/70 group-hover/logout:text-white" />
-                  </button>
-                </>
+              {/* Logout Button — sibling, NOT nested inside profile button */}
+              {(isExpanded || isMobile) && (
+                <button
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0 group/logout animate-fadeIn"
+                  title="Sign out"
+                >
+                  <LogOut className="w-4 h-4 text-white/70 group-hover/logout:text-white" />
+                </button>
               )}
 
-              {/* Tooltip for collapsed state (Desktop only) */}
+              {/* Tooltip for collapsed state */}
               {!isExpanded && !isMobile && (
                 <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
                   View Profile
                   <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-gray-900" />
                 </div>
               )}
-            </button>
+            </div>
           </div>
 
         </div>

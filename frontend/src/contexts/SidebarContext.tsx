@@ -17,7 +17,7 @@ const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 const SIDEBAR_WIDTH = {
   COLLAPSED: 80,
-  EXPANDED: 280,
+  EXPANDED: 240,
   MOBILE: 280,
 };
 

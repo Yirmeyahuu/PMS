@@ -29,6 +29,7 @@ export const Login: React.FC = () => {
     setError('');
   };
 
+  // Remove the 'from' line entirely — always go to dashboard
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -46,23 +47,10 @@ export const Login: React.FC = () => {
       // Store auth state
       setAuth(response.user, response.tokens);
       
-      toast.success(`Welcome back, ${response.user.first_name}!`);
+      toast.success(`Hello there, ${response.user.first_name}!`);
       
-      // Check if password change is needed
-      if (response.needs_password_change) {
-        toast('Please change your temporary password', {
-          icon: '🔐',
-          duration: 5000,
-          style: {
-            background: '#FEF3C7',
-            color: '#92400E',
-          },
-        });
-        navigate('/change-password');
-      } else {
-        // Redirect to the page they were trying to access, or dashboard
-        navigate(from, { replace: true });
-      }
+      // Always redirect to dashboard on login
+      navigate('/dashboard', { replace: true });
       
     } catch (error: any) {
       console.error('Login error:', error);
@@ -79,6 +67,7 @@ export const Login: React.FC = () => {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">

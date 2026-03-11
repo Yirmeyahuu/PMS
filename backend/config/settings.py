@@ -33,10 +33,10 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
 
-    
-    # Third-party apps
+    # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'cloudinary',
     'cloudinary_storage',
     'django_crontab',
-    
+    'channels',         # ← already present
+
     # Your apps
     'apps.common',
     'apps.accounts',
@@ -61,12 +62,10 @@ INSTALLED_APPS = [
     'apps.integrations',
     'apps.clinical_templates',
     'apps.inventory',
-    'channels',
     'apps.messages',
-
 ]
 
-# ── Django Channels ──────────────────────────────────────────────────────────
+# ── Django Channels ───────────────────────────────────────────────────────────
 ASGI_APPLICATION = 'config.asgi.application'
 
 if DEBUG:

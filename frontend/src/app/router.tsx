@@ -8,7 +8,6 @@ import { useAuthStore } from '@/store/auth.store';
  */
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
-  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -19,8 +18,8 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   if (!isAuthenticated) {
-    // Redirect to login but save the attempted location
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redirect to login — do NOT save location.state to prevent redirect abuse
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
@@ -28,11 +27,10 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 
 /**
  * PublicRoute - Only for non-authenticated users
- * Redirects to dashboard if already authenticated
+ * Always redirects to /dashboard if already authenticated
  */
 export const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuthStore();
-  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -43,9 +41,8 @@ export const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   if (isAuthenticated && user) {
-    // Get the page they tried to access before login, or default to dashboard
-    const from = (location.state as any)?.from?.pathname || '/dashboard';
-    return <Navigate to={from} replace />;
+    // Always go to dashboard — never follow location.state.from
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -60,12 +57,11 @@ interface RoleBasedRouteProps {
   allowedRoles: string[];
 }
 
-export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ 
-  children, 
-  allowedRoles 
+export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
+  children,
+  allowedRoles,
 }) => {
   const { isAuthenticated, isLoading, user } = useAuthStore();
-  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -76,7 +72,8 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redirect to login — no location.state saved
+    return <Navigate to="/login" replace />;
   }
 
   if (user && !allowedRoles.includes(user.role)) {

@@ -1,0 +1,31 @@
+export type NotificationType = 'NEW_BOOKING' | 'DAILY_SUMMARY';
+
+export interface Notification {
+  id: number;
+  notification_type: NotificationType;
+  notification_type_display: string;
+  title: string;
+  message: string;
+  link_url: string;
+  appointment_id: number | null;
+  clinic_branch_id: number | null;
+  clinic_branch_name: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Notification[];
+}
+
+export interface UnreadCountResponse {
+  unread_count: number;
+}
+
+export interface MarkAllReadResponse {
+  marked_read: number;
+}

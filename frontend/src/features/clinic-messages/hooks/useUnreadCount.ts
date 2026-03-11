@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getUnreadCount } from '../services/message.api';
 
-const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8001';
+const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8000';
 
 const getToken = (): string | null => {
   const direct = localStorage.getItem('access_token');

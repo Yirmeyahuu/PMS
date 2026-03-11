@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WSIncomingEvent, MessageItem } from '../types/messages.types';
 
-const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8001';
+const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8000';
 
 const MAX_RETRIES   = 5;
 const BASE_DELAY_MS = 3000;

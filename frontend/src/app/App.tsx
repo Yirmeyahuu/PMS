@@ -1,35 +1,78 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { SidebarProvider } from '@/contexts/SidebarContext';
 import { ProtectedRoute, PublicRoute, RoleBasedRoute } from './router';
+import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
+import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 
 // Public Pages
-import { LandingPage } from '@/features/landing/LandingPage';
-import { Login } from '@/features/auth/Login';
-import { AdminRegister } from '@/features/auth/AdminRegister';
-import { RegisterSuccess } from '@/features/auth/RegisterSuccess';
-import { PortalHome }               from '@/features/patient-portal/pages/PortalHome';
-import { BookAppointmentSuccess }   from '@/features/patient-portal/pages/BookAppointmentSuccess';
+import { LandingPage }            from '@/features/landing/LandingPage';
+import { Login }                  from '@/features/auth/Login';
+import { AdminRegister }          from '@/features/auth/AdminRegister';
+import { RegisterSuccess }        from '@/features/auth/RegisterSuccess';
+import { PortalHome }             from '@/features/patient-portal/pages/PortalHome';
+import { BookAppointmentSuccess } from '@/features/patient-portal/pages/BookAppointmentSuccess';
 
 // Protected Pages
-import { Dashboard } from '@/features/dashboard/Dashboard';
-import { Diary } from '@/features/appointments/Diary';
-import { Clients } from '@/features/patients/Clients';
-import { Contacts } from '@/features/contacts/Contacts';
-import { Reports } from '@/features/reports/Reports';
-import { Manage } from '@/features/manage/Manage';
-import { Setup } from '@/features/setup/Setup';
-import { Profile } from '@/features/profile/Profile';
-import {PatientProfile} from "@/features/patients/PatientProfile";
-
+import { Dashboard }      from '@/features/dashboard/Dashboard';
+import { Diary }          from '@/features/appointments/Diary';
+import { Clients }        from '@/features/patients/Clients';
+import { Contacts }       from '@/features/contacts/Contacts';
+import { Reports }        from '@/features/reports/Reports';
+import { Manage }         from '@/features/manage/Manage';
+import { Setup }          from '@/features/setup/Setup';
+import { Profile }        from '@/features/profile/Profile';
+import { PatientProfile } from '@/features/patients/PatientProfile';
 import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
+import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
 
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 
-// ✅ NEW: Clinical Template Pages
-import { NoteEditor } from '@/features/clinical-template/pages/NoteEditor';
+// ─── Routes where ClinicMessages should NOT appear ───────────────────────────
+const PORTAL_PATHS = ['/portal'];
 
+const ClinicMessagesGuard = () => {
+  const location = useLocation();
+  const isPortal = PORTAL_PATHS.some(path => location.pathname.startsWith(path));
+  if (isPortal) return null;
+  return <ClinicMessages />;
+};
+
+// ── NEW: Only show bell for authenticated users, not on portal/login ──────────
+const NotificationBellGuard = () => {
+  const { isAuthenticated } = useAuthStore();
+  const location = useLocation();
+
+  const isPublicPage = ['/login', '/register', '/portal'].some(p =>
+    location.pathname.startsWith(p)
+  );
+
+  if (!isAuthenticated || isPublicPage) return null;
+  return <NotificationBell />;
+};
+
+// ─── Global Logout Confirmation Modal ────────────────────────────────────────
+const GlobalLogoutModal = () => {
+  const { isOpen, close } = useLogoutConfirm();
+  const { logout }        = useAuthStore();
+
+  const handleConfirm = () => {
+    close();
+    logout();
+  };
+
+  return (
+    <LogoutConfirmModal
+      isOpen={isOpen}
+      onConfirm={handleConfirm}
+      onCancel={close}
+    />
+  );
+};
+
+// ─── Static pages ─────────────────────────────────────────────────────────────
 const Unauthorized = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="text-center">
@@ -48,8 +91,9 @@ const LoadingScreen = () => (
   </div>
 );
 
+// ─── App ──────────────────────────────────────────────────────────────────────
 function App() {
-  const { verifyAuth } = useAuthStore();
+  const { verifyAuth }      = useAuthStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
@@ -59,13 +103,10 @@ function App() {
       setIsInitializing(false);
       console.log('✅ App initialized');
     };
-
     initAuth();
   }, [verifyAuth]);
 
-  if (isInitializing) {
-    return <LoadingScreen />;
-  }
+  if (isInitializing) return <LoadingScreen />;
 
   return (
     <SidebarProvider>
@@ -81,91 +122,57 @@ function App() {
               borderRadius: '12px',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
             },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
+            success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+            error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
           }}
         />
-        
 
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><AdminRegister /></PublicRoute>} />
+          {/* ── Public ──────────────────────────────────────────────── */}
+          <Route path="/"                 element={<PublicRoute><LandingPage /></PublicRoute>} />
+          <Route path="/login"            element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register"         element={<PublicRoute><AdminRegister /></PublicRoute>} />
           <Route path="/register/success" element={<PublicRoute><RegisterSuccess /></PublicRoute>} />
 
-          {/* ✅ NEW: Patient Portal — fully public, no auth wrapper */}
+          {/* ── Patient Portal — no auth, no clinic messages ─────────── */}
           <Route path="/portal/:token"         element={<PortalHome />} />
           <Route path="/portal/:token/success" element={<BookAppointmentSuccess />} />
 
-          {/* Unauthorized */}
+          {/* ── Misc ──────────────────────────────────────────────────── */}
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* Unauthorized */}
-          <Route path="/unauthorized" element={<Unauthorized />} />
-
-          {/* Protected Routes */}
+          {/* ── Protected ───────────────────────────────────────────── */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/diary" element={<ProtectedRoute><Diary /></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
-          <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/diary"     element={<ProtectedRoute><Diary /></ProtectedRoute>} />
+          <Route path="/clients"   element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+          <Route path="/contacts"  element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+          <Route path="/reports"   element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/profile"   element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
           <Route path="/patients/:patientId" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
-          <Route path="/clients/:id" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
+          <Route path="/clients/:id"         element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
 
-          {/* ✅ NEW: Clinical Note Routes */}
-          <Route
-            path="/clinical-notes"
-            element={
-              <ProtectedRoute>
-                <NoteEditor />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clinical-notes/:noteId"
-            element={
-              <ProtectedRoute>
-                <NoteEditor />
-              </ProtectedRoute>
-            }
-          />
+          {/* ── Clinical Notes ───────────────────────────────────────── */}
+          <Route path="/clinical-notes"         element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
+          <Route path="/clinical-notes/:noteId" element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
 
-          {/* Admin-only Routes */}
-          <Route
-            path="/manage"
-            element={
-              <RoleBasedRoute allowedRoles={['ADMIN']}>
-                <Manage />
-              </RoleBasedRoute>
-            }
-          />
-          <Route
-            path="/setup"
-            element={
-              <RoleBasedRoute allowedRoles={['ADMIN']}>
-                <Setup />
-              </RoleBasedRoute>
-            }
-          />
+          {/* ── Admin only ───────────────────────────────────────────── */}
+          <Route path="/manage" element={<RoleBasedRoute allowedRoles={['ADMIN']}><Manage /></RoleBasedRoute>} />
+          <Route path="/setup"  element={<RoleBasedRoute allowedRoles={['ADMIN']}><Setup /></RoleBasedRoute>} />
 
-          {/* Profile - All authenticated users */}
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-
-          {/* 404 */}
+          {/* ── 404 ─────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <ClinicMessages />
+
+        {/* Must be inside <BrowserRouter> to use useLocation() */}
+        <ClinicMessagesGuard />
+
+        {/* ── Notification Bell — shown for authenticated users only ── */}
+        <NotificationBellGuard />
+
+        {/* Global logout modal — rendered once, accessible from anywhere */}
+        <GlobalLogoutModal />
+
       </BrowserRouter>
     </SidebarProvider>
   );

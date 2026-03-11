@@ -14,7 +14,6 @@ from apps.billing.views import (
     ServiceViewSet, InvoiceBatchViewSet, AppointmentPrintViewSet,
 )
 from apps.reports.views import ReportViewSet
-from apps.notifications.views import NotificationViewSet, EmailLogViewSet, SMSLogViewSet
 from apps.integrations.views import PhilHealthClaimViewSet, HMOClaimViewSet
 from apps.contacts.views import ContactViewSet
 from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet
@@ -59,11 +58,6 @@ router.register(r'appointments-print',   AppointmentPrintViewSet, basename='appo
 # Reports
 router.register(r'reports', ReportViewSet, basename='reports')
 
-# Notifications
-router.register(r'notifications', NotificationViewSet, basename='notifications')
-router.register(r'email-logs',    EmailLogViewSet,     basename='email-logs')
-router.register(r'sms-logs',      SMSLogViewSet,       basename='sms-logs')
-
 # Integrations
 router.register(r'philhealth-claims', PhilHealthClaimViewSet, basename='philhealth-claims')
 router.register(r'hmo-claims',        HMOClaimViewSet,        basename='hmo-claims')
@@ -78,6 +72,7 @@ urlpatterns = [
     path('api/', include('apps.inventory.urls')),
     path('api/', include('apps.contacts.urls')),
     path('api/', include('apps.messages.urls')),
+    path('api/', include('apps.notifications.urls')),  # ← notifications routes here only
 
     path('api/auth/verify-token/', AuthViewSet.as_view({'post': 'verify_token'}), name='verify-token'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
