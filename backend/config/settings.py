@@ -61,8 +61,29 @@ INSTALLED_APPS = [
     'apps.integrations',
     'apps.clinical_templates',
     'apps.inventory',
+    'channels',
+    'apps.messages',
 
 ]
+
+# ── Django Channels ──────────────────────────────────────────────────────────
+ASGI_APPLICATION = 'config.asgi.application'
+
+if DEBUG:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379')],
+            },
+        },
+    }
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -83,6 +104,16 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+
+
+# Add production frontend URL dynamically
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        os.getenv('FRONTEND_URL', 'https://mespms.com'),
+        'https://www.mespms.com',
+    ]
+
 CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'config.urls'

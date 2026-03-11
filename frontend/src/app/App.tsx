@@ -24,6 +24,9 @@ import { Setup } from '@/features/setup/Setup';
 import { Profile } from '@/features/profile/Profile';
 import {PatientProfile} from "@/features/patients/PatientProfile";
 
+import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
+
+
 // ✅ NEW: Clinical Template Pages
 import { NoteEditor } from '@/features/clinical-template/pages/NoteEditor';
 
@@ -92,6 +95,7 @@ function App() {
             },
           }}
         />
+        
 
         <Routes>
           {/* Public Routes */}
@@ -161,6 +165,7 @@ function App() {
           {/* 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <ClinicMessages />
       </BrowserRouter>
     </SidebarProvider>
   );
