@@ -28,8 +28,8 @@ export const ResetPasswordCard: React.FC<ResetPasswordCardProps> = ({
 
       {/* ── Card header ── */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-        <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center">
-          <ShieldCheck className="w-5 h-5 text-cyan-600" />
+        <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center">
+          <ShieldCheck className="w-5 h-5 text-sky-600" />
         </div>
         <div>
           <h3 className="text-base font-bold text-gray-800">Password &amp; Security</h3>
@@ -41,11 +41,11 @@ export const ResetPasswordCard: React.FC<ResetPasswordCardProps> = ({
       <div className="px-6 py-6 space-y-5">
 
         {/* Info block */}
-        <div className="flex gap-4 p-4 bg-cyan-50 border border-cyan-100 rounded-2xl">
-          <Mail className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
+        <div className="flex gap-4 p-4 bg-sky-50 border border-sky-100 rounded-2xl">
+          <Mail className="w-5 h-5 text-sky-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-bold text-cyan-800 mb-1">How password reset works</p>
-            <p className="text-sm text-cyan-700 leading-relaxed">
+            <p className="text-sm font-bold text-sky-800 mb-1">How password reset works</p>
+            <p className="text-sm text-sky-700 leading-relaxed">
               A new temporary password will be generated and sent to{' '}
               <span className="font-bold">{userEmail}</span>.
               Your current session will be terminated immediately and you
@@ -111,7 +111,7 @@ export const ResetPasswordCard: React.FC<ResetPasswordCardProps> = ({
                           disabled:opacity-50 disabled:cursor-not-allowed
                           ${confirmed
                             ? 'flex-1 bg-red-500 hover:bg-red-600 text-white'
-                            : 'w-full bg-cyan-600 hover:bg-cyan-700 text-white'
+                            : 'w-full bg-sky-600 hover:bg-sky-700 text-white'
                           }`}
             >
               {isResetting ? (

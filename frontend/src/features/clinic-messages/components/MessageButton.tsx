@@ -11,14 +11,14 @@ export const MessageButton = ({ unreadCount, onClick }: Props) => (
     className="
       fixed bottom-6 right-6 z-40
       flex items-center gap-2 px-5 py-3
-      bg-white text-gray-700 font-medium
-      rounded-2xl shadow-xl border border-gray-200
-      hover:shadow-2xl hover:bg-gray-50
-      transition-all duration-200
+      bg-sky-500 text-white font-medium
+      rounded-2xl shadow-xl border border-sky-500
+      hover:shadow-2xl hover:bg-sky-600
+      transition-all duration-200 cursor-pointer
     "
   >
     <div className="relative">
-      <MessageSquare className="w-5 h-5 text-gray-500" />
+      <MessageSquare className="w-5 h-5 text-white" />
       {unreadCount > 0 && (
         <span className="
           absolute -top-2 -right-2

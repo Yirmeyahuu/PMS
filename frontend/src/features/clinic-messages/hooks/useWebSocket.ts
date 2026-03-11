@@ -1,7 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WSIncomingEvent, MessageItem } from '../types/messages.types';
 
-const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8000';
+const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://127.0.0.1:8001';
+
+const MAX_RETRIES   = 5;
+const BASE_DELAY_MS = 3000;
 
 const getToken = (): string | null => {
   const direct = localStorage.getItem('access_token');
@@ -30,6 +33,7 @@ export const useWebSocket = ({
   const wsRef        = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef   = useRef(true);
+  const retriesRef   = useRef(0);
   const onMessageRef = useRef(onMessage);
   const onTypingRef  = useRef(onTyping);
   const [isConnected, setIsConnected] = useState(false);
@@ -38,15 +42,44 @@ export const useWebSocket = ({
   useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
   useEffect(() => { onTypingRef.current  = onTyping;  }, [onTyping]);
 
-  const connect = useCallback(() => {
-    if (!conversationId) return;
-    const token = getToken();
-    if (!token) return;
-
-    // Close existing connection first
+  const cleanup = useCallback(() => {
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
     if (wsRef.current) {
-      wsRef.current.onclose = null;
+      wsRef.current.onopen    = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onerror   = null;
+      wsRef.current.onclose   = null;
       wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
+
+  const connect = useCallback(() => {
+    if (!mountedRef.current || !conversationId) return;
+
+    // Don't open a second connection if one is already open/connecting
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN ||
+       wsRef.current.readyState === WebSocket.CONNECTING)
+    ) return;
+
+    const token = getToken();
+    if (!token) {
+      // Token not ready yet — retry after short delay
+      reconnectRef.current = setTimeout(() => {
+        if (mountedRef.current) connect();
+      }, 1000);
+      return;
+    }
+
+    // Stop retrying after MAX_RETRIES
+    if (retriesRef.current >= MAX_RETRIES) {
+      console.warn('[Chat WS] Max retries reached. Giving up.');
+      return;
     }
 
     const url = `${WS_BASE}/ws/messages/${conversationId}/?token=${token}`;
@@ -54,7 +87,9 @@ export const useWebSocket = ({
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (mountedRef.current) setIsConnected(true);
+      if (!mountedRef.current) return;
+      retriesRef.current = 0; // Reset on successful connection
+      setIsConnected(true);
     };
 
     ws.onmessage = (event) => {
@@ -67,33 +102,47 @@ export const useWebSocket = ({
           onTypingRef.current(data.user_id, data.name, data.is_typing);
         }
       } catch {
-        console.error('WS parse error');
+        console.error('[Chat WS] parse error');
       }
+    };
+
+    ws.onerror = () => {
+      // Let onclose handle reconnect
+      ws.close();
     };
 
     ws.onclose = () => {
       if (!mountedRef.current) return;
+      wsRef.current = null;
       setIsConnected(false);
+
+      retriesRef.current += 1;
+
+      // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+      const delay = Math.min(BASE_DELAY_MS * 2 ** (retriesRef.current - 1), 48000);
+
       reconnectRef.current = setTimeout(() => {
         if (mountedRef.current) connect();
-      }, 3000);
+      }, delay);
     };
-
-    ws.onerror = () => ws.close();
   }, [conversationId]);
 
   useEffect(() => {
     mountedRef.current = true;
-    connect();
+    retriesRef.current = 0;
+
+    if (conversationId) {
+      // Small delay to ensure token is ready
+      reconnectRef.current = setTimeout(() => {
+        if (mountedRef.current) connect();
+      }, 300);
+    }
+
     return () => {
       mountedRef.current = false;
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
-      }
+      cleanup();
     };
-  }, [connect]);
+  }, [conversationId, connect, cleanup]);
 
   const sendMessage = useCallback((body: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

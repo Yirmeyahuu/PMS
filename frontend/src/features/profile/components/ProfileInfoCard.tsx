@@ -51,7 +51,7 @@ const Field: React.FC<{
           className={`w-full border-2 ${
             error
               ? 'border-red-400 bg-red-50 focus:ring-red-300'
-              : 'border-gray-200 bg-gray-50 focus:ring-cyan-300'
+              : 'border-gray-200 bg-gray-50 focus:ring-sky-300'
           } rounded-xl px-4 py-3 text-sm focus:bg-white focus:outline-none
             focus:ring-2 focus:border-transparent transition`}
         />
@@ -136,8 +136,8 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
       {/* Card header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center">
-            <User className="w-5 h-5 text-cyan-600" />
+          <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center">
+            <User className="w-5 h-5 text-sky-600" />
           </div>
           <div>
             <h3 className="text-base font-bold text-gray-800">Personal Information</h3>
@@ -149,8 +149,8 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
           <button
             onClick={() => setEditing(true)}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold
-                       text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-xl
-                       border border-cyan-200 transition-colors"
+                       text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl
+                       border border-sky-200 transition-colors"
           >
             <Edit2 className="w-4 h-4" />
             Edit Profile
@@ -171,7 +171,7 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
               onClick={handleSave}
               disabled={isSaving}
               className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold
-                         text-white bg-cyan-600 hover:bg-cyan-700 rounded-xl
+                         text-white bg-sky-600 hover:bg-sky-700 rounded-xl
                          disabled:opacity-50 transition-colors shadow-sm"
             >
               {isSaving

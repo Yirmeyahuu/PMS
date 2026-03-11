@@ -25,7 +25,7 @@ export const ContactList: React.FC<ContactListProps> = ({
     const colors = {
       DOCTOR: 'bg-blue-100 text-blue-700',
       PRACTITIONER: 'bg-green-100 text-green-700',
-      CLINIC: 'bg-cyan-100 text-cyan-700',
+      CLINIC: 'bg-sky-100 text-sky-700',
       LABORATORY: 'bg-yellow-100 text-yellow-700',
       PHARMACY: 'bg-pink-100 text-pink-700',
       OTHER: 'bg-gray-100 text-gray-700',
@@ -108,7 +108,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-semibold relative">
+                        <div className="w-10 h-10 bg-gradient-to-r from-sky-500 to-sky-600 rounded-full flex items-center justify-center text-white font-semibold relative">
                           {contact.first_name.charAt(0)}
                           {contact.last_name.charAt(0)}
                           {contact.is_preferred && (
@@ -175,7 +175,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                         </button>
                         <button
                           onClick={() => onEdit(contact)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-cyan-700 bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                           Edit
@@ -208,7 +208,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                 onClick={() => onPageChange(page)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   currentPage === page
-                    ? 'bg-cyan-500 text-white'
+                    ? 'bg-sky-500 text-white'
                     : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}
               >

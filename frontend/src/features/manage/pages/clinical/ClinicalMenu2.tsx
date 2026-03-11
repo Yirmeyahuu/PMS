@@ -62,8 +62,8 @@ export const ClinicalMenu2: React.FC = () => {
       {/* Page Header */}
       <div className="flex-shrink-0 flex items-center justify-between p-6 pb-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center">
-            <FileText className="w-6 h-6 text-cyan-600" />
+          <div className="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center">
+            <FileText className="w-6 h-6 text-sky-600" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900">Clinical Note Templates</h2>

@@ -3,7 +3,7 @@ import { UserCircle, BadgeCheck } from 'lucide-react';
 import type { User } from '@/types/auth';
 
 const ROLE_META: Record<string, { label: string; color: string }> = {
-  ADMIN:        { label: 'Administrator',  color: 'bg-cyan-100    text-cyan-700'   },
+  ADMIN:        { label: 'Administrator',  color: 'bg-sky-100    text-sky-700'   },
   PRACTITIONER: { label: 'Practitioner',   color: 'bg-violet-100  text-violet-700' },
   STAFF:        { label: 'Staff',          color: 'bg-slate-100   text-slate-600'  },
 };
@@ -20,7 +20,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user }) => {
       <div className="max-w-7xl mx-auto flex items-center gap-4">
 
         {/* Icon */}
-        <div className="w-13 h-13 rounded-2xl bg-cyan-600 flex items-center
+        <div className="w-13 h-13 rounded-2xl bg-sky-600 flex items-center
                         justify-center shadow-md flex-shrink-0 p-2.5">
           <UserCircle className="w-7 h-7 text-white" />
         </div>

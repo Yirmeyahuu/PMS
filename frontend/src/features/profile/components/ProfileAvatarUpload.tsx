@@ -55,8 +55,8 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
 
       {/* ── Avatar circle ── */}
       <div className="relative group">
-        <div className="w-36 h-36 rounded-full ring-4 ring-cyan-100 overflow-hidden
-                        bg-gradient-to-br from-cyan-500 to-cyan-700
+        <div className="w-36 h-36 rounded-full ring-4 ring-sky-100 overflow-hidden
+                        bg-gradient-to-br from-sky-500 to-sky-700
                         flex items-center justify-center shadow-lg">
           {src ? (
             <img src={src} alt="Avatar" className="w-full h-full object-cover" />
@@ -103,7 +103,7 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="absolute bottom-1 right-1 w-10 h-10 bg-cyan-600 hover:bg-cyan-700
+            className="absolute bottom-1 right-1 w-10 h-10 bg-sky-600 hover:bg-sky-700
                        rounded-full flex items-center justify-center shadow-lg
                        ring-2 ring-white transition-colors"
             title="Upload photo"

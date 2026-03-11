@@ -32,10 +32,10 @@ const EMPTY_FORM: CreateStaffData = {
 const inputCls = (hasError?: boolean) =>
   `w-full border ${hasError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'}
    rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2
-   focus:ring-cyan-400 focus:border-transparent transition`;
+   focus:ring-sky-400 focus:border-transparent transition`;
 
 const selectCls =
-  'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition';
+  'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition';
 
 const Label: React.FC<{ children: React.ReactNode; required?: boolean }> = ({ children, required }) => (
   <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -47,7 +47,7 @@ const FieldError: React.FC<{ msg?: string }> = ({ msg }) =>
   msg ? <p className="mt-0.5 text-[11px] text-red-500">{msg}</p> : null;
 
 const SectionTitle: React.FC<{ color?: string; children: React.ReactNode }> = ({
-  color = 'text-cyan-600', children,
+  color = 'text-sky-600', children,
 }) => (
   <p className={`text-[11px] font-bold ${color} uppercase tracking-widest mb-3`}>
     {children}
@@ -152,12 +152,12 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
           onClick={e => e.stopPropagation()}
         >
           {/* ── Top accent bar ── */}
-          <div className="h-1.5 w-full bg-cyan-500 rounded-t-2xl" />
+          <div className="h-1.5 w-full bg-sky-500 rounded-t-2xl" />
 
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-600 flex items-center justify-center shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
                 <UserPlus className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -193,7 +193,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
 
               {/* Info notice — create mode only */}
               {!isEditMode && (
-                <div className="flex items-start gap-2 bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 text-sm text-cyan-700">
+                <div className="flex items-start gap-2 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 text-sm text-sky-700">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>
                     A temporary password will be auto-generated and sent to the staff member's
@@ -206,7 +206,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                   SECTION 1 — Personal Information
               ════════════════════════════════════════ */}
               <div>
-                <SectionTitle color="text-cyan-600">Personal Information</SectionTitle>
+                <SectionTitle color="text-sky-600">Personal Information</SectionTitle>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
 
                   {/* Title */}
@@ -341,7 +341,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                     <Label required>Role</Label>
                     <div className="flex gap-3">
                       {[
-                        { value: 'STAFF',        label: 'Staff',        ring: 'ring-cyan-400',   bg: 'bg-cyan-50   text-cyan-700   border-cyan-200'   },
+                        { value: 'STAFF',        label: 'Staff',        ring: 'ring-sky-400',   bg: 'bg-sky-50   text-sky-700   border-sky-200'   },
                         { value: 'PRACTITIONER', label: 'Practitioner', ring: 'ring-purple-400', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
                       ].map(opt => (
                         <button
@@ -364,7 +364,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                   <div className="md:col-span-2">
                     <Label>
                       <span className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-cyan-500" />
+                        <Building2 className="w-3.5 h-3.5 text-sky-500" />
                         Assign to Clinic Branch
                       </span>
                     </Label>
@@ -466,7 +466,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-semibold"
+                className="flex items-center gap-2 px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-semibold"
               >
                 {loading
                   ? <><RefreshCw className="w-4 h-4 animate-spin" />{isEditMode ? 'Saving…' : 'Creating…'}</>

@@ -75,12 +75,12 @@ export const StockAdjustModal: React.FC<Props> = ({
           onClick={e => e.stopPropagation()}
         >
           {/* Top accent */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-teal-400 via-cyan-500 to-sky-500" />
+          <div className="h-1.5 w-full bg-gradient-to-r from-teal-400 via-sky-500 to-sky-500" />
 
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-sky-500 flex items-center justify-center shadow-sm">
                 <Activity className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -222,7 +222,7 @@ export const StockAdjustModal: React.FC<Props> = ({
               <button
                 type="submit"
                 disabled={isLoading || isNegative || !quantity}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg hover:from-teal-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm text-sm font-semibold"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-sky-500 text-white rounded-lg hover:from-teal-600 hover:to-sky-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm text-sm font-semibold"
               >
                 {isLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
                 Save Adjustment

@@ -96,8 +96,8 @@ export const Inventory: React.FC = () => {
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-cyan-50 border border-cyan-200 rounded-xl flex items-center justify-center">
-            <Package className="w-5 h-5 text-cyan-600" />
+          <div className="w-10 h-10 bg-sky-50 border border-sky-200 rounded-xl flex items-center justify-center">
+            <Package className="w-5 h-5 text-sky-600" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
@@ -106,7 +106,7 @@ export const Inventory: React.FC = () => {
         </div>
         <button
           onClick={() => setModal({ type: 'create' })}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 transition-colors text-sm font-semibold shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors text-sm font-semibold shadow-sm"
         >
           <Plus className="w-4 h-4" />
           New Product
@@ -139,7 +139,7 @@ export const Inventory: React.FC = () => {
             value={search}
             onChange={e => { setSearch(e.target.value); setFilters(f => ({ ...f, page: 1 })); }}
             placeholder="Search by name, SKU, barcode…"
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
           />
         </div>
 
@@ -170,7 +170,7 @@ export const Inventory: React.FC = () => {
         {/* Refresh */}
         <button
           onClick={() => refetch()}
-          className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 transition-colors"
+          className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
           title="Refresh"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />

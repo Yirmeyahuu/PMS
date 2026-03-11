@@ -6,7 +6,7 @@ import {
 import type { ProductListItem } from '@/types/inventory';
 
 const TYPE_BADGE: Record<string, string> = {
-  PRODUCT: 'bg-cyan-50   text-cyan-700   border-cyan-200',
+  PRODUCT: 'bg-sky-50   text-sky-700   border-sky-200',
   SERVICE: 'bg-purple-50 text-purple-700 border-purple-200',
   SUPPLY:  'bg-amber-50  text-amber-700  border-amber-200',
 };
@@ -22,8 +22,8 @@ interface Props {
 }
 
 const SortIcon: React.FC<{ field: string; current: string }> = ({ field, current }) => {
-  if (current === field)       return <ChevronUp   className="w-3 h-3 inline ml-0.5 text-cyan-500" />;
-  if (current === `-${field}`) return <ChevronDown className="w-3 h-3 inline ml-0.5 text-cyan-500" />;
+  if (current === field)       return <ChevronUp   className="w-3 h-3 inline ml-0.5 text-sky-500" />;
+  if (current === `-${field}`) return <ChevronDown className="w-3 h-3 inline ml-0.5 text-sky-500" />;
   return null;
 };
 
@@ -43,7 +43,7 @@ export const ProductTable: React.FC<Props> = ({
   const th = (label: string, field?: string) => (
     <th
       className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide select-none ${
-        field ? 'cursor-pointer hover:text-cyan-600' : ''
+        field ? 'cursor-pointer hover:text-sky-600' : ''
       }`}
       onClick={() => field && onOrder(field)}
     >
@@ -73,7 +73,7 @@ export const ProductTable: React.FC<Props> = ({
           {products.map(p => (
             <tr
               key={p.id}
-              className={`hover:bg-cyan-50/40 transition-colors ${p.is_archived ? 'opacity-50' : ''}`}
+              className={`hover:bg-sky-50/40 transition-colors ${p.is_archived ? 'opacity-50' : ''}`}
             >
               {/* Name */}
               <td className="px-4 py-3">
@@ -139,7 +139,7 @@ export const ProductTable: React.FC<Props> = ({
                     <>
                       <button
                         onClick={() => onAdjust(p)}
-                        className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
                         title="Adjust stock"
                       >
                         <TrendingUp className="w-4 h-4" />
@@ -163,7 +163,7 @@ export const ProductTable: React.FC<Props> = ({
                   {p.is_archived && (
                     <button
                       onClick={() => onRestore(p)}
-                      className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
                       title="Restore"
                     >
                       <RotateCcw className="w-4 h-4" />

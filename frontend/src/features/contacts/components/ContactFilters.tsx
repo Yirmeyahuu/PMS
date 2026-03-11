@@ -71,8 +71,8 @@ export const ContactFilters: React.FC<ContactFiltersProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center">
-                <Filter className="w-5 h-5 text-cyan-600" />
+              <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                <Filter className="w-5 h-5 text-sky-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-900">Filter Contacts</h2>
             </div>
@@ -96,7 +96,7 @@ export const ContactFilters: React.FC<ContactFiltersProps> = ({
                 onChange={(e) =>
                   setFilters({ ...filters, contact_type: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
                 {contactTypes.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -128,7 +128,7 @@ export const ContactFilters: React.FC<ContactFiltersProps> = ({
                         : e.target.value === 'active',
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
                 <option value="">All Status</option>
                 <option value="active">Active</option>
@@ -158,7 +158,7 @@ export const ContactFilters: React.FC<ContactFiltersProps> = ({
                         : e.target.value === 'preferred',
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
                 <option value="">All Contacts</option>
                 <option value="preferred">Preferred Only</option>
@@ -184,7 +184,7 @@ export const ContactFilters: React.FC<ContactFiltersProps> = ({
               </button>
               <button
                 onClick={handleApply}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-colors font-medium"
+                className="px-4 py-2 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg hover:from-sky-600 hover:to-sky-700 transition-colors font-medium"
               >
                 Apply Filters
               </button>

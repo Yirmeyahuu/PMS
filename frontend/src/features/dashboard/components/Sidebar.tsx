@@ -62,7 +62,7 @@ export const Sidebar: React.FC = () => {
 
       <aside
         className={`
-          fixed left-0 top-0 h-screen bg-cyan-600 border-r border-cyan-700 shadow-xl z-50
+          fixed left-0 top-0 h-screen bg-sky-600 border-r border-sky-700 shadow-xl z-50
           transition-all duration-300 ease-in-out overflow-hidden
           ${isMobile ? (isMobileOpen ? 'translate-x-0' : '-translate-x-full') : ''}
         `}
@@ -73,7 +73,7 @@ export const Sidebar: React.FC = () => {
         <div className="flex flex-col h-full overflow-hidden">
 
           {/* ── Logo Section ── */}
-          <div className="flex-shrink-0 p-4 border-b border-cyan-500">
+          <div className="flex-shrink-0 p-4 border-b border-sky-500">
             <div className="flex items-center justify-center gap-3 relative">
               <img
                 src={MESLogo}
@@ -127,8 +127,8 @@ export const Sidebar: React.FC = () => {
                       w-full flex items-center gap-3 px-4 py-3 rounded-xl
                       transition-all duration-200 group relative
                       ${isActive
-                        ? 'bg-white text-cyan-600 shadow-md'
-                        : 'text-white hover:bg-white hover:text-cyan-600'
+                        ? 'bg-white text-sky-600 shadow-md'
+                        : 'text-white hover:bg-white hover:text-sky-600'
                       }
                     `}
                   >
@@ -136,8 +136,8 @@ export const Sidebar: React.FC = () => {
                       className={`
                         w-5 h-5 flex-shrink-0 transition-colors
                         ${isActive
-                          ? 'text-cyan-600'
-                          : 'text-white group-hover:text-cyan-600'
+                          ? 'text-sky-600'
+                          : 'text-white group-hover:text-sky-600'
                         }
                       `}
                     />
@@ -168,7 +168,7 @@ export const Sidebar: React.FC = () => {
           </nav>
 
           {/* ── User Section ── */}
-          <div className="flex-shrink-0 border-t border-cyan-500 bg-cyan-700">
+          <div className="flex-shrink-0 border-t border-sky-500 bg-sky-700">
             <button
               onClick={handleProfileClick}
               className={`
@@ -187,7 +187,7 @@ export const Sidebar: React.FC = () => {
                   : 'group-hover:ring-2 group-hover:ring-white/60'
                 }
               `}>
-                <span className="text-cyan-600 font-bold text-sm">
+                <span className="text-sky-600 font-bold text-sm">
                   {user?.first_name?.[0]}{user?.last_name?.[0]}
                 </span>
               </div>
@@ -202,7 +202,7 @@ export const Sidebar: React.FC = () => {
                     `}>
                       {user?.first_name} {user?.last_name}
                     </p>
-                    <p className="text-cyan-200 text-xs truncate">
+                    <p className="text-sky-200 text-xs truncate">
                       {user?.role}
                     </p>
                   </div>

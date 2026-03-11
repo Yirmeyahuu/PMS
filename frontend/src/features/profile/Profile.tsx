@@ -27,7 +27,7 @@ export const Profile: React.FC = () => {
     return (
       <DashboardLayout>
         <div className="h-full flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+          <Loader2 className="w-10 h-10 text-sky-500 animate-spin" />
         </div>
       </DashboardLayout>
     );

@@ -105,7 +105,7 @@ export const Contacts: React.FC = () => {
         {/* Header */}
         <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-600 flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
               <Users className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -128,7 +128,7 @@ export const Contacts: React.FC = () => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm
-                           focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400
+                           focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400
                            focus:border-transparent transition"
               />
               {isLoading && (
@@ -146,7 +146,7 @@ export const Contacts: React.FC = () => {
               </button>
               <button
                 onClick={() => setIsAddOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white
+                className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white
                            rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -171,7 +171,7 @@ export const Contacts: React.FC = () => {
         {isLoading && contacts.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto mb-3" />
+              <Loader2 className="w-10 h-10 text-sky-400 animate-spin mx-auto mb-3" />
               <p className="text-sm text-gray-500">Loading contacts…</p>
             </div>
           </div>

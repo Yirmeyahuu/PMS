@@ -12,7 +12,7 @@ interface Props {
 
 const ROLE_BADGE: Record<string, string> = {
   PRACTITIONER: 'bg-purple-50 text-purple-700 border-purple-200',
-  STAFF:        'bg-cyan-50   text-cyan-700   border-cyan-200',
+  STAFF:        'bg-sky-50   text-sky-700   border-sky-200',
 };
 
 const DISCIPLINE_BADGE: Record<string, string> = {
@@ -28,12 +28,12 @@ export const StaffTableRow: React.FC<Props> = ({
   const initials = `${staff.first_name[0] ?? ''}${staff.last_name[0] ?? ''}`.toUpperCase();
 
   return (
-    <tr className="hover:bg-cyan-50/40 transition-colors">
+    <tr className="hover:bg-sky-50/40 transition-colors">
 
       {/* Name + Avatar */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-cyan-100 border border-cyan-200 flex items-center justify-center text-xs font-bold text-cyan-700 flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-sky-100 border border-sky-200 flex items-center justify-center text-xs font-bold text-sky-700 flex-shrink-0">
             {initials}
           </div>
           <div>
@@ -103,7 +103,7 @@ export const StaffTableRow: React.FC<Props> = ({
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => onEdit(staff)}
-            className="p-1.5 text-gray-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
+            className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
             title="Edit"
           >
             <Edit2 className="w-4 h-4" />

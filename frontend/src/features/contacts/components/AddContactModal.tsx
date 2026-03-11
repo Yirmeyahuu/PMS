@@ -58,10 +58,10 @@ const EMPTY_FORM: CreateContactData = {
 const inputCls = (hasError?: boolean) =>
   `w-full border ${hasError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'}
    rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2
-   focus:ring-cyan-400 focus:border-transparent transition`;
+   focus:ring-sky-400 focus:border-transparent transition`;
 
 const selectCls =
-  'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition';
+  'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition';
 
 const Label: React.FC<{ children: React.ReactNode; required?: boolean }> = ({ children, required }) => (
   <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -73,7 +73,7 @@ const FieldError: React.FC<{ msg?: string }> = ({ msg }) =>
   msg ? <p className="mt-0.5 text-[11px] text-red-500">{msg}</p> : null;
 
 const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode; color?: string }> = ({
-  icon, children, color = 'text-cyan-600',
+  icon, children, color = 'text-sky-600',
 }) => (
   <div className={`flex items-center gap-1.5 text-[11px] font-bold ${color} uppercase tracking-widest mb-3`}>
     {icon}
@@ -187,12 +187,12 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
           onClick={e => e.stopPropagation()}
         >
           {/* Top accent */}
-          <div className="h-1.5 w-full bg-cyan-500 rounded-t-2xl" />
+          <div className="h-1.5 w-full bg-sky-500 rounded-t-2xl" />
 
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-600 flex items-center justify-center shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
                 <UserPlus className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -293,7 +293,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
                   <div>
                     <Label>
                       <span className="flex items-center gap-1">
-                        <Building2 className="w-3 h-3 text-cyan-400" />
+                        <Building2 className="w-3 h-3 text-sky-400" />
                         Organization / Clinic Name
                       </span>
                     </Label>
@@ -311,7 +311,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
                     <Label required>Status</Label>
                     <div className="flex gap-3">
                       {[
-                        { value: true,  label: 'Active',   ring: 'ring-cyan-400', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+                        { value: true,  label: 'Active',   ring: 'ring-sky-400', bg: 'bg-sky-50 text-sky-700 border-sky-200' },
                         { value: false, label: 'Archived', ring: 'ring-gray-300',   bg: 'bg-gray-100  text-gray-500   border-gray-200'   },
                       ].map(opt => (
                         <button
@@ -411,7 +411,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
                   <div>
                     <Label required>
                       <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3 text-cyan-400" />
+                        <Phone className="w-3 h-3 text-sky-400" />
                         Phone Number
                       </span>
                     </Label>
@@ -441,7 +441,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
                   <div>
                     <Label>
                       <span className="flex items-center gap-1">
-                        <Mail className="w-3 h-3 text-cyan-400" />
+                        <Mail className="w-3 h-3 text-sky-400" />
                         Email Address
                       </span>
                     </Label>
@@ -538,7 +538,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-semibold"
+                className="flex items-center gap-2 px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-semibold"
               >
                 {loading
                   ? <><RefreshCw className="w-4 h-4 animate-spin" />{isEditMode ? 'Saving…' : 'Adding…'}</>

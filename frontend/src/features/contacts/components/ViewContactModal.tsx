@@ -17,7 +17,7 @@ interface ViewContactModalProps {
 const TYPE_COLORS: Record<string, string> = {
   DOCTOR:       'bg-blue-100   text-blue-700',
   PRACTITIONER: 'bg-green-100  text-green-700',
-  CLINIC:       'bg-cyan-100 text-cyan-700',
+  CLINIC:       'bg-sky-100 text-sky-700',
   LABORATORY:   'bg-yellow-100 text-yellow-700',
   PHARMACY:     'bg-pink-100   text-pink-700',
   SUPPLIER:     'bg-orange-100 text-orange-700',
@@ -30,7 +30,7 @@ const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string |
   if (!value) return null;
   return (
     <div className="flex items-start gap-2.5">
-      <span className="mt-0.5 flex-shrink-0 text-cyan-400">{icon}</span>
+      <span className="mt-0.5 flex-shrink-0 text-sky-400">{icon}</span>
       <div>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
         <p className="text-sm text-gray-800 font-medium">{value}</p>
@@ -57,14 +57,14 @@ export const ViewContactModal: React.FC<ViewContactModalProps> = ({
           onClick={e => e.stopPropagation()}
         >
           {/* Top accent */}
-          <div className="h-1.5 w-full bg-cyan-500 rounded-t-2xl" />
+          <div className="h-1.5 w-full bg-sky-500 rounded-t-2xl" />
 
           {/* Header */}
           <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
               {/* Avatar */}
               <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold text-lg">
+                <div className="w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center text-sky-700 font-bold text-lg">
                   {contact.first_name.charAt(0)}{contact.last_name.charAt(0)}
                 </div>
                 {contact.is_preferred && (
@@ -98,9 +98,9 @@ export const ViewContactModal: React.FC<ViewContactModalProps> = ({
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
             {/* Contact Number */}
-            <div className="flex items-center gap-2 bg-cyan-50 border border-cyan-100 rounded-xl px-3 py-2">
-              <Hash className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-              <span className="text-xs text-cyan-600 font-semibold tracking-widest">
+            <div className="flex items-center gap-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2">
+              <Hash className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+              <span className="text-xs text-sky-600 font-semibold tracking-widest">
                 {contact.contact_number}
               </span>
             </div>
@@ -190,7 +190,7 @@ export const ViewContactModal: React.FC<ViewContactModalProps> = ({
             <button
               type="button"
               onClick={() => onEdit(contact)}   // ← just calls onEdit; Contacts.tsx closes view & opens edit
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700
+              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700
                          text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4" />
