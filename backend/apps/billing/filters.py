@@ -13,7 +13,7 @@ class AppointmentPrintFilter(django_filters.FilterSet):
     clinic       = django_filters.NumberFilter(field_name='clinic__id')
     practitioner = django_filters.NumberFilter(field_name='practitioner__id')
     status       = django_filters.MultipleChoiceFilter(
-        choices=Appointment.STATUS_CHOICES
+        choices=Appointment.STATUS_CHOICES,
     )
     patient_name = django_filters.CharFilter(method='filter_patient_name')
 
@@ -40,6 +40,7 @@ class InvoiceFilter(django_filters.FilterSet):
     clinic         = django_filters.NumberFilter(field_name='clinic__id')
     patient_name   = django_filters.CharFilter(method='filter_patient_name')
     status         = django_filters.MultipleChoiceFilter(choices=Invoice.STATUS_CHOICES)
+    appointment    = django_filters.NumberFilter(field_name='appointment__id')
 
     def filter_patient_name(self, queryset, name, value):
         return queryset.filter(
@@ -49,7 +50,7 @@ class InvoiceFilter(django_filters.FilterSet):
 
     class Meta:
         model  = Invoice
-        fields = ['date_from', 'date_to', 'clinic', 'status', 'patient_name', 'bulk_batch']
+        fields = ['date_from', 'date_to', 'clinic', 'status', 'patient_name', 'bulk_batch', 'appointment']
 
 
 class InvoiceBatchFilter(django_filters.FilterSet):

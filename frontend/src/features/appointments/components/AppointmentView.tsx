@@ -1,24 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
   Receipt, Plus, Printer, CheckCircle, AlertCircle,
-  RefreshCw, ChevronRight,
+  RefreshCw, ChevronRight, Building2, Edit3, Trash2,
+  Save, XCircle, Search,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Appointment } from '@/types';
 import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_TYPE_LABELS } from '@/types';
-import { invoiceApi } from '@/features/manage/services/billing.api';
-import type { Invoice } from '@/types/billing';
+import { billingApi } from '@/features/billing/billing.api';
+import type { ClinicService } from '@/features/billing/billing.api';
+import type { Invoice, InvoiceItem } from '@/types/billing';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const INVOICE_STATUS_STYLES: Record<string, string> = {
-  DRAFT:           'bg-gray-100 text-gray-600 border-gray-200',
-  PENDING:         'bg-yellow-50 text-yellow-700 border-yellow-200',
-  PAID:            'bg-green-50 text-green-700 border-green-200',
-  PARTIALLY_PAID:  'bg-blue-50 text-blue-700 border-blue-200',
-  OVERDUE:         'bg-red-50 text-red-700 border-red-200',
-  CANCELLED:       'bg-gray-100 text-gray-400 border-gray-200',
+  DRAFT:          'bg-gray-100 text-gray-600 border-gray-200',
+  PENDING:        'bg-yellow-50 text-yellow-700 border-yellow-200',
+  PAID:           'bg-green-50 text-green-700 border-green-200',
+  PARTIALLY_PAID: 'bg-blue-50 text-blue-700 border-blue-200',
+  OVERDUE:        'bg-red-50 text-red-700 border-red-200',
+  CANCELLED:      'bg-gray-100 text-gray-400 border-gray-200',
 };
 
 type Tab = 'details' | 'invoice';
@@ -31,26 +33,174 @@ interface AppointmentViewProps {
   onDelete?:   (appointment: Appointment) => void;
 }
 
+// ── editable line-item shape ──────────────────────────────────────────────────
+interface EditableItem {
+  id?:          number;       // existing DB id — undefined for new items
+  description:  string;
+  quantity:     number;
+  unit_price:   number;
+  service_id?:  number;       // linked clinic service
+  _key:         string;       // local React key
+}
+
+const newBlankItem = (): EditableItem => ({
+  description: '',
+  quantity:    1,
+  unit_price:  0,
+  _key:        crypto.randomUUID(),
+});
+
+// ── Appointment Summary Card ──────────────────────────────────────────────────
+const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
+  const formattedDate = format(new Date(appointment.date), 'MMM d, yyyy');
+  const typeLabel     = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
+
+  return (
+    <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
+      <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide">
+        Appointment Summary
+      </p>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-sky-500 flex-shrink-0" />
+          <div>
+            <p className="text-xs text-gray-500">Patient</p>
+            <p className="font-semibold text-gray-800">{appointment.patient_name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-sky-500 flex-shrink-0" />
+          <div>
+            <p className="text-xs text-gray-500">Practitioner</p>
+            <p className="font-semibold text-gray-800">{appointment.practitioner_name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-sky-500 flex-shrink-0" />
+          <div>
+            <p className="text-xs text-gray-500">Date &amp; Time</p>
+            <p className="font-semibold text-gray-800">
+              {formattedDate} · {appointment.start_time} – {appointment.end_time}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Tag className="w-4 h-4 text-sky-500 flex-shrink-0" />
+          <div>
+            <p className="text-xs text-gray-500">Type</p>
+            <p className="font-semibold text-gray-800">{typeLabel}</p>
+          </div>
+        </div>
+        {appointment.location_name && (
+          <div className="flex items-center gap-2 col-span-2">
+            <Building2 className="w-4 h-4 text-sky-500 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-gray-500">Clinic / Location</p>
+              <p className="font-semibold text-gray-800">{appointment.location_name}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Service Picker Dropdown ───────────────────────────────────────────────────
+const ServicePicker: React.FC<{
+  services: ClinicService[];
+  onSelect: (svc: ClinicService) => void;
+  onClose:  () => void;
+}> = ({ services, onSelect, onClose }) => {
+  const [search, setSearch] = useState('');
+  const filtered = services.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div className="absolute z-20 top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-hidden flex flex-col">
+      <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2">
+        <Search className="w-3.5 h-3.5 text-gray-400" />
+        <input
+          autoFocus
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search services…"
+          className="flex-1 text-sm outline-none bg-transparent"
+        />
+        <button onClick={onClose} className="p-0.5 hover:bg-gray-100 rounded">
+          <X className="w-3.5 h-3.5 text-gray-400" />
+        </button>
+      </div>
+      <div className="overflow-y-auto flex-1">
+        {filtered.length === 0 && (
+          <p className="text-xs text-gray-400 px-3 py-4 text-center">No services found</p>
+        )}
+        {filtered.map(svc => (
+          <button
+            key={svc.id}
+            onClick={() => { onSelect(svc); onClose(); }}
+            className="w-full text-left px-3 py-2 hover:bg-sky-50 transition-colors flex items-center justify-between gap-2"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{svc.name}</p>
+              {svc.description && (
+                <p className="text-xs text-gray-400 truncate">{svc.description}</p>
+              )}
+            </div>
+            <span className="text-sm font-semibold text-sky-700 flex-shrink-0">
+              ₱{parseFloat(svc.price).toLocaleString()}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ── Invoice Tab Content ───────────────────────────────────────────────────────
 const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
   const qc = useQueryClient();
 
+  // ── State ────────────────────────────────────────────────────────────────
+  const [isEditing,   setIsEditing]   = useState(false);
+  const [editItems,   setEditItems]   = useState<EditableItem[]>([]);
+  const [editNotes,   setEditNotes]   = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [pickerIdx,   setPickerIdx]   = useState<number | null>(null);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
+
+  // ── Queries ──────────────────────────────────────────────────────────────
   const {
     data:      invoice,
     isLoading,
+    error:     fetchError,
     refetch,
   } = useQuery<Invoice | null>({
     queryKey: ['appointment-invoice', appointment.id],
-    queryFn:  () => invoiceApi.getByAppointment(appointment.id),
+    queryFn:  () => billingApi.getByAppointment(appointment.id),
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 404) return false;
+      return failureCount < 2;
+    },
   });
 
+  const { data: clinicServices = [] } = useQuery<ClinicService[]>({
+    queryKey: ['clinic-services'],
+    queryFn:  () => billingApi.getClinicServices(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Mutations ────────────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: () =>
-      invoiceApi.create({
+    mutationFn: (items?: EditableItem[]) =>
+      billingApi.createFromAppointment({
         appointment:  appointment.id,
-        patient:      appointment.patient_id,
-        clinic:       appointment.clinic_id,
         invoice_date: format(new Date(), 'yyyy-MM-dd'),
+        items: items?.map(i => ({
+          description: i.description,
+          quantity:    i.quantity,
+          unit_price:  i.unit_price,
+        })),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] });
@@ -60,6 +210,103 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     },
   });
 
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoice) throw new Error('No invoice');
+
+      // 1. Delete removed items
+      const keepIds = new Set(editItems.filter(i => i.id).map(i => i.id!));
+      const toDelete = invoice.items.filter(i => !keepIds.has(i.id));
+      for (const item of toDelete) {
+        await billingApi.deleteItem(item.id);
+      }
+
+      // 2. Update existing items
+      for (const item of editItems.filter(i => i.id)) {
+        await billingApi.updateItem(item.id!, {
+          description: item.description,
+          quantity:    item.quantity,
+          unit_price:  String(item.unit_price) as any,
+        });
+      }
+
+      // 3. Add new items
+      for (const item of editItems.filter(i => !i.id)) {
+        if (!item.description.trim()) continue;
+        await billingApi.addItem(invoice.id, {
+          invoice:     invoice.id,
+          description: item.description,
+          quantity:    item.quantity,
+          unit_price:  String(item.unit_price),
+        });
+      }
+
+      // 4. Update invoice-level fields
+      await billingApi.updateInvoice(invoice.id, {
+        notes:    editNotes,
+        due_date: editDueDate || null,
+      } as any);
+    },
+    onSuccess: () => {
+      setSaveError(null);
+      setIsEditing(false);
+      qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] });
+    },
+    onError: (error: any) => {
+      const detail = error?.response?.data;
+      if (typeof detail === 'string') setSaveError(detail);
+      else if (detail?.detail) setSaveError(detail.detail);
+      else setSaveError('Failed to save changes. Please try again.');
+    },
+  });
+
+  // ── Populate edit state from invoice ─────────────────────────────────────
+  const startEditing = useCallback(() => {
+    if (!invoice) return;
+    setEditItems(
+      invoice.items.map(item => ({
+        id:          item.id,
+        description: item.description,
+        quantity:    item.quantity,
+        unit_price:  parseFloat(item.unit_price),
+        _key:        String(item.id),
+      })),
+    );
+    setEditNotes(invoice.notes || '');
+    setEditDueDate(invoice.due_date || '');
+    setSaveError(null);
+    setIsEditing(true);
+  }, [invoice]);
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setPickerIdx(null);
+    setSaveError(null);
+  };
+
+  // ── Item helpers ─────────────────────────────────────────────────────────
+  const updateItem = (key: string, patch: Partial<EditableItem>) => {
+    setEditItems(prev => prev.map(i => (i._key === key ? { ...i, ...patch } : i)));
+  };
+
+  const removeItem = (key: string) => {
+    setEditItems(prev => prev.filter(i => i._key !== key));
+  };
+
+  const addServiceItem = (svc: ClinicService, idx: number) => {
+    setEditItems(prev =>
+      prev.map((item, i) =>
+        i === idx
+          ? { ...item, description: svc.name, unit_price: parseFloat(svc.price), service_id: svc.id }
+          : item,
+      ),
+    );
+  };
+
+  const computeSubtotal = () =>
+    editItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-400">
@@ -69,49 +316,359 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     );
   }
 
-  // ── No invoice yet ─────────────────────────────────────────────────────────
+  // ── No invoice yet ─────────────────────────────────────────────────────
   if (!invoice) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
-          <Receipt className="w-8 h-8 text-gray-400" />
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-gray-700">No invoice yet</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Generate an invoice for this appointment
-          </p>
-        </div>
+      <div className="space-y-4">
+        <AppointmentSummary appointment={appointment} />
 
-        {createMutation.isError && (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>
-              {JSON.stringify(
-                (createMutation.error as any)?.response?.data ??
-                'Failed to create invoice. Please try again.'
-              )}
-            </span>
+        <div className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
+            <Receipt className="w-8 h-8 text-gray-400" />
           </div>
-        )}
+          <div className="text-center">
+            <p className="text-sm font-semibold text-gray-700">No invoice yet</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Generate an invoice for this appointment
+            </p>
+          </div>
 
-        <button
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-        >
-          {createMutation.isPending
-            ? <RefreshCw className="w-4 h-4 animate-spin" />
-            : <Plus className="w-4 h-4" />}
-          {createMutation.isPending ? 'Generating…' : 'Generate Invoice'}
-        </button>
+          {fetchError && (fetchError as any)?.response?.status !== 404 && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Failed to check existing invoice. Please try refreshing.</span>
+            </div>
+          )}
+
+          {createMutation.isError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                {(() => {
+                  const err = createMutation.error as any;
+                  const detail = err?.response?.data;
+                  if (typeof detail === 'string') return detail;
+                  if (detail?.detail) return detail.detail;
+                  if (detail?.appointment && Array.isArray(detail.appointment))
+                    return detail.appointment.join(' ');
+                  if (typeof detail === 'object') return JSON.stringify(detail);
+                  return 'Failed to create invoice. Please try again.';
+                })()}
+              </span>
+            </div>
+          )}
+
+          {/* Service-based quick-add before generating */}
+          {clinicServices.length > 0 && (
+            <div className="w-full border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Select Services to Include
+                </p>
+              </div>
+              <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
+                {clinicServices.map(svc => {
+                  const isSelected = editItems.some(i => i.service_id === svc.id);
+                  return (
+                    <button
+                      key={svc.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setEditItems(prev => prev.filter(i => i.service_id !== svc.id));
+                        } else {
+                          setEditItems(prev => [
+                            ...prev,
+                            {
+                              description: svc.name,
+                              quantity:    1,
+                              unit_price:  parseFloat(svc.price),
+                              service_id:  svc.id,
+                              _key:        crypto.randomUUID(),
+                            },
+                          ]);
+                        }
+                      }}
+                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors ${
+                        isSelected ? 'bg-sky-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                          isSelected
+                            ? 'bg-sky-600 border-sky-600'
+                            : 'border-gray-300'
+                        }`}>
+                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{svc.name}</p>
+                          {svc.duration_minutes > 0 && (
+                            <p className="text-xs text-gray-400">{svc.duration_minutes} min</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">
+                        ₱{parseFloat(svc.price).toLocaleString()}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {editItems.length > 0 && (
+                <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    {editItems.length} service{editItems.length > 1 ? 's' : ''} selected
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    ₱{editItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => createMutation.mutate(editItems.length > 0 ? editItems : undefined)}
+            disabled={createMutation.isPending}
+            className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          >
+            {createMutation.isPending
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <Plus className="w-4 h-4" />}
+            {createMutation.isPending ? 'Generating…' : 'Generate Invoice'}
+          </button>
+        </div>
       </div>
     );
   }
 
-  // ── Invoice exists ─────────────────────────────────────────────────────────
+  // ── Invoice exists — Edit Mode ─────────────────────────────────────────
+  if (isEditing) {
+    return (
+      <div className="space-y-4">
+        <AppointmentSummary appointment={appointment} />
+
+        {/* Edit header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Editing Invoice</p>
+            <p className="text-base font-bold text-gray-900 font-mono">
+              {invoice.invoice_number}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={cancelEditing}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Cancel
+            </button>
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-medium hover:bg-sky-700 disabled:opacity-50 transition-colors"
+            >
+              {saveMutation.isPending
+                ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                : <Save className="w-3.5 h-3.5" />}
+              {saveMutation.isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {saveError && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
+        {/* Due date */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            <p className="text-xs text-gray-500">Invoice Date</p>
+            <p className="text-sm font-semibold text-gray-800 mt-0.5">
+              {format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
+            </p>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            <label className="text-xs text-gray-500 block">Due Date</label>
+            <input
+              type="date"
+              value={editDueDate}
+              onChange={e => setEditDueDate(e.target.value)}
+              className="mt-0.5 text-sm font-semibold text-gray-800 bg-transparent outline-none w-full"
+            />
+          </div>
+        </div>
+
+        {/* Editable line items */}
+        <div className="border border-gray-200 rounded-xl overflow-visible">
+          <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Line Items
+            </p>
+            <button
+              onClick={() => setEditItems(prev => [...prev, newBlankItem()])}
+              className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Item
+            </button>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {editItems.map((item, idx) => (
+              <div key={item._key} className="px-4 py-3 space-y-2 relative">
+                {/* Description row with service picker */}
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 relative">
+                    <label className="text-xs text-gray-400 block mb-0.5">Description</label>
+                    <div className="flex gap-1">
+                      <input
+                        value={item.description}
+                        onChange={e => updateItem(item._key, { description: e.target.value })}
+                        placeholder="Item description"
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
+                      />
+                      <button
+                        onClick={() => setPickerIdx(pickerIdx === idx ? null : idx)}
+                        className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors flex-shrink-0"
+                        title="Pick from clinic services"
+                        type="button"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {pickerIdx === idx && (
+                      <ServicePicker
+                        services={clinicServices}
+                        onSelect={svc => addServiceItem(svc, idx)}
+                        onClose={() => setPickerIdx(null)}
+                      />
+                    )}
+                  </div>
+                  <button
+                    onClick={() => removeItem(item._key)}
+                    className="mt-5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                    title="Remove"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Qty & Price row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Qty</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={item.quantity}
+                      onChange={e => updateItem(item._key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Unit Price (₱)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={item.unit_price}
+                      onChange={e => updateItem(item._key, { unit_price: parseFloat(e.target.value) || 0 })}
+                      className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-0.5">Line Total</label>
+                    <p className="text-sm font-semibold text-gray-800 px-2.5 py-1.5">
+                      ₱{(item.quantity * item.unit_price).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {editItems.length === 0 && (
+              <div className="px-4 py-8 text-center">
+                <p className="text-xs text-gray-400">No items. Click "Add Item" above.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Edit subtotal */}
+          <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-700">Subtotal</span>
+            <span className="text-sm font-bold text-gray-900">
+              ₱{computeSubtotal().toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {/* Quick-add from services */}
+        {clinicServices.length > 0 && (
+          <div className="border border-dashed border-sky-200 rounded-xl p-3">
+            <p className="text-xs font-semibold text-sky-700 mb-2 uppercase tracking-wide">
+              Quick Add from Services
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {clinicServices.map(svc => {
+                const alreadyAdded = editItems.some(i => i.service_id === svc.id);
+                return (
+                  <button
+                    key={svc.id}
+                    disabled={alreadyAdded}
+                    onClick={() => {
+                      setEditItems(prev => [
+                        ...prev,
+                        {
+                          description: svc.name,
+                          quantity:    1,
+                          unit_price:  parseFloat(svc.price),
+                          service_id:  svc.id,
+                          _key:        crypto.randomUUID(),
+                        },
+                      ]);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      alreadyAdded
+                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                        : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
+                    }`}
+                  >
+                    {svc.name} · ₱{parseFloat(svc.price).toLocaleString()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+            Notes
+          </label>
+          <textarea
+            value={editNotes}
+            onChange={e => setEditNotes(e.target.value)}
+            rows={3}
+            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 resize-none"
+            placeholder="Optional notes…"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Invoice exists — View Mode ─────────────────────────────────────────
+  const canEdit = invoice.status === 'DRAFT' || invoice.status === 'PENDING';
+
   return (
     <div className="space-y-4">
+      <AppointmentSummary appointment={appointment} />
 
       {/* Invoice header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -125,8 +682,17 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_STATUS_STYLES[invoice.status] ?? ''}`}>
             {invoice.status_display}
           </span>
+          {canEdit && (
+            <button
+              onClick={startEditing}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
           <button
-            onClick={() => invoiceApi.print(invoice.id)}
+            onClick={() => billingApi.print(invoice.id)}
             className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -198,9 +764,9 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
       {/* Totals */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
         {[
-          { label: 'Subtotal',         value: invoice.subtotal },
-          { label: 'Discount',         value: invoice.discount_amount },
-          { label: 'Tax',              value: invoice.tax_amount },
+          { label: 'Subtotal', value: invoice.subtotal },
+          { label: 'Discount', value: invoice.discount_amount },
+          { label: 'Tax',      value: invoice.tax_amount },
         ].map(({ label, value }) => (
           <div key={label} className="flex items-center justify-between text-sm">
             <span className="text-gray-500">{label}</span>
@@ -235,12 +801,12 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
         </div>
       )}
 
-      {/* Paid action */}
+      {/* Mark as paid action */}
       {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
         <div className="flex justify-end pt-1">
           <button
             onClick={async () => {
-              await invoiceApi.updateStatus(invoice.id, 'PAID');
+              await billingApi.updateStatus(invoice.id, 'PAID');
               qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] });
             }}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium"
@@ -266,8 +832,8 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   if (!isOpen || !appointment) return null;
 
-  const statusColors = APPOINTMENT_STATUS_COLORS[appointment.status];
-  const typeLabel    = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
+  const statusColors  = APPOINTMENT_STATUS_COLORS[appointment.status];
+  const typeLabel     = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
   const formattedTime = `${appointment.start_time} - ${appointment.end_time}`;
 
@@ -316,8 +882,8 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
           {/* ── Tabs ── */}
           <div className="flex border-b border-gray-200 flex-shrink-0">
             {([
-              { key: 'details', label: 'Details',  icon: FileText },
-              { key: 'invoice', label: 'Invoice',  icon: Receipt  },
+              { key: 'details', label: 'Details', icon: FileText },
+              { key: 'invoice', label: 'Invoice', icon: Receipt },
             ] as { key: Tab; label: string; icon: React.ElementType }[]).map(tab => (
               <button
                 key={tab.key}

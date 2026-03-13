@@ -1,57 +1,64 @@
-"""
-WebSocket consumer for real-time notifications.
-Each authenticated user connects to their own private room:
-  ws://host/ws/notifications/
-"""
 import json
 import logging
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
 
 
-class NotificationConsumer(AsyncWebsocketConsumer):
+class NotificationConsumer(AsyncJsonWebsocketConsumer):
+    """
+    WebSocket consumer for real-time notification push.
+
+    Each authenticated user joins their own private group:
+        notifications_<user_id>
+
+    The notification service pushes to ALL users in a clinic
+    by iterating their individual groups.
+    """
 
     async def connect(self):
-        user = self.scope.get('user')
+        self.user = self.scope.get('user', AnonymousUser())
 
-        # Reject unauthenticated connections
-        if not user or not user.is_authenticated:
+        if not self.user or not self.user.is_authenticated:
             await self.close(code=4001)
             return
 
-        # Each user gets their own group: notifications_<user_id>
-        self.group_name = f'notifications_{user.id}'
+        self.group_name = f'notifications_{self.user.id}'
 
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name,
+        )
         await self.accept()
-        logger.info('NotificationConsumer: user %s connected', user.id)
+
+        logger.debug(
+            '[WS:notifications] user %s connected to group %s',
+            self.user.id, self.group_name,
+        )
 
     async def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
-            logger.info('NotificationConsumer: disconnected (group=%s)', self.group_name)
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name,
+            )
+        logger.debug(
+            '[WS:notifications] user %s disconnected (code=%s)',
+            getattr(self.user, 'id', '?'), close_code,
+        )
 
-    # ── Receive message from WebSocket (client → server) ─────────────────────
-    async def receive(self, text_data):
-        """
-        Clients can send { "type": "ping" } to keep the connection alive.
-        """
-        try:
-            data = json.loads(text_data)
-            if data.get('type') == 'ping':
-                await self.send(text_data=json.dumps({'type': 'pong'}))
-        except Exception:
-            pass
+    async def receive_json(self, content, **kwargs):
+        """Handle incoming messages — currently just keepalive pings."""
+        msg_type = content.get('type', '')
 
-    # ── Receive event from channel layer (server → client) ───────────────────
+        if msg_type == 'ping':
+            await self.send_json({'type': 'pong'})
+
+    # ── Handler for notification.new events ───────────────────────────────────
     async def notification_new(self, event):
-        """
-        Called when channel_layer.group_send(..., {'type': 'notification.new', ...})
-        is invoked from notification_service.py.
-        Forwards the notification payload to the WebSocket client.
-        """
-        await self.send(text_data=json.dumps({
-            'type':         'notification.new',
+        """Called by channel layer group_send when a new notification is created."""
+        await self.send_json({
+            'type': 'notification.new',
             'notification': event['notification'],
-        }))
+        })

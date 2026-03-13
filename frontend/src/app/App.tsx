@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { SidebarProvider } from '@/contexts/SidebarContext';
-import { ProtectedRoute, PublicRoute, RoleBasedRoute } from './router';
+import { ProtectedRoute, PublicRoute, RoleBasedRoute, ClinicMemberRoute } from './router';
 import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 
@@ -30,7 +30,7 @@ import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
 
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 
-// ─── Routes where ClinicMessages should NOT appear ───────────────────────────
+// ─── Routes where ClinicMessages should NOT appear ────────────────────────────
 const PORTAL_PATHS = ['/portal'];
 
 const ClinicMessagesGuard = () => {
@@ -40,7 +40,7 @@ const ClinicMessagesGuard = () => {
   return <ClinicMessages />;
 };
 
-// ── NEW: Only show bell for authenticated users, not on portal/login ──────────
+// ── Only show bell for authenticated users, not on portal/login ───────────────
 const NotificationBellGuard = () => {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
@@ -53,7 +53,7 @@ const NotificationBellGuard = () => {
   return <NotificationBell />;
 };
 
-// ─── Global Logout Confirmation Modal ────────────────────────────────────────
+// ─── Global Logout Confirmation Modal ─────────────────────────────────────────
 const GlobalLogoutModal = () => {
   const { isOpen, close } = useLogoutConfirm();
   const { logout }        = useAuthStore();
@@ -72,7 +72,7 @@ const GlobalLogoutModal = () => {
   );
 };
 
-// ─── Static pages ─────────────────────────────────────────────────────────────
+// ─── Static pages ──────────────────────────────────────────────────────────────
 const Unauthorized = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="text-center">
@@ -91,7 +91,7 @@ const LoadingScreen = () => (
   </div>
 );
 
-// ─── App ──────────────────────────────────────────────────────────────────────
+// ─── App ───────────────────────────────────────────────────────────────────────
 function App() {
   const { verifyAuth }      = useAuthStore();
   const [isInitializing, setIsInitializing] = useState(true);
@@ -128,20 +128,20 @@ function App() {
         />
 
         <Routes>
-          {/* ── Public ──────────────────────────────────────────────── */}
+          {/* ── Public ────────────────────────────────────────────────── */}
           <Route path="/"                 element={<PublicRoute><LandingPage /></PublicRoute>} />
           <Route path="/login"            element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register"         element={<PublicRoute><AdminRegister /></PublicRoute>} />
           <Route path="/register/success" element={<PublicRoute><RegisterSuccess /></PublicRoute>} />
 
-          {/* ── Patient Portal — no auth, no clinic messages ─────────── */}
+          {/* ── Patient Portal — no auth, no clinic messages ──────────── */}
           <Route path="/portal/:token"         element={<PortalHome />} />
           <Route path="/portal/:token/success" element={<BookAppointmentSuccess />} />
 
-          {/* ── Misc ──────────────────────────────────────────────────── */}
+          {/* ── Misc ────────────────────────────────────────────────────── */}
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* ── Protected ───────────────────────────────────────────── */}
+          {/* ── Protected — any authenticated user ────────────────────── */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/diary"     element={<ProtectedRoute><Diary /></ProtectedRoute>} />
           <Route path="/clients"   element={<ProtectedRoute><Clients /></ProtectedRoute>} />
@@ -152,15 +152,15 @@ function App() {
           <Route path="/patients/:patientId" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
           <Route path="/clients/:id"         element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
 
-          {/* ── Clinical Notes ───────────────────────────────────────── */}
+          {/* ── Clinical Notes ─────────────────────────────────────────── */}
           <Route path="/clinical-notes"         element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
           <Route path="/clinical-notes/:noteId" element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
 
-          {/* ── Admin only ───────────────────────────────────────────── */}
-          <Route path="/manage" element={<RoleBasedRoute allowedRoles={['ADMIN']}><Manage /></RoleBasedRoute>} />
-          <Route path="/setup"  element={<RoleBasedRoute allowedRoles={['ADMIN']}><Setup /></RoleBasedRoute>} />
+          {/* ── Manage & Setup — all clinic members (Admin/Staff/Practitioner) ── */}
+          <Route path="/manage" element={<ClinicMemberRoute><Manage /></ClinicMemberRoute>} />
+          <Route path="/setup"  element={<ClinicMemberRoute><Setup /></ClinicMemberRoute>} />
 
-          {/* ── 404 ─────────────────────────────────────────────────── */}
+          {/* ── 404 ─────────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
@@ -170,7 +170,7 @@ function App() {
         {/* ── Notification Bell — shown for authenticated users only ── */}
         <NotificationBellGuard />
 
-        {/* Global logout modal — rendered once, accessible from anywhere */}
+        {/* Global logout modal */}
         <GlobalLogoutModal />
 
       </BrowserRouter>

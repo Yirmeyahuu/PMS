@@ -103,15 +103,6 @@ def _create_invoice_for_appointment(
 def preview_bulk_invoice(params: dict, user, main_clinic) -> dict:
     """
     Dry-run: returns a preview of appointments that WOULD be invoiced.
-    No DB writes except reading.
-
-    Returns:
-        {
-            "dry_run": True,
-            "total_appointments": int,
-            "preview": [ { appointment snapshot }, ... ],
-            "preview_capped_at": 100,
-        }
     """
     target_ids = _resolve_target_ids(params, main_clinic)
     if not target_ids:
@@ -160,14 +151,6 @@ def preview_bulk_invoice(params: dict, user, main_clinic) -> dict:
 def run_bulk_invoice(params: dict, user, main_clinic) -> InvoiceBatch:
     """
     Execute the bulk invoice operation.
-
-    Creates one InvoiceBatch, then iterates over matching appointments
-    creating one Invoice + one default InvoiceItem per appointment.
-
-    Each appointment is wrapped in its own atomic save so a single
-    failure does not roll back the entire batch.
-
-    Returns the saved InvoiceBatch instance.
     """
     target_ids = _resolve_target_ids(params, main_clinic)
     if not target_ids:
@@ -181,7 +164,6 @@ def run_bulk_invoice(params: dict, user, main_clinic) -> InvoiceBatch:
     discount_percent = params.get('discount_percent', 0)
     tax_percent      = params.get('tax_percent', 0)
 
-    # ── Create the batch record ───────────────────────────────────────────────
     batch = InvoiceBatch.objects.create(
         clinic             = main_clinic,
         created_by         = user,
@@ -203,7 +185,6 @@ def run_bulk_invoice(params: dict, user, main_clinic) -> InvoiceBatch:
     error_log: list[dict[str, Any]] = []
     total_invoiced = 0.0
 
-    # ── Process each appointment individually ─────────────────────────────────
     for appt in appt_qs:
         try:
             with transaction.atomic():
@@ -223,13 +204,12 @@ def run_bulk_invoice(params: dict, user, main_clinic) -> InvoiceBatch:
             failed += 1
             error_log.append({'appointment_id': appt.id, 'error': str(exc)})
             logger.error(
-                "Bulk invoice failed for appointment %s: %s", appt.id, exc
+                "Bulk invoice failed for appointment %s: %s", appt.id, exc,
             )
 
-    # ── Finalise batch ────────────────────────────────────────────────────────
     batch.status                = 'COMPLETED' if failed == 0 else 'FAILED'
     batch.total_created         = created
-    batch.total_skipped         = 0          # reserved for future use
+    batch.total_skipped         = 0
     batch.total_failed          = failed
     batch.error_log             = error_log
     batch.total_invoiced_amount = total_invoiced

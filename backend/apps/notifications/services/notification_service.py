@@ -1,19 +1,30 @@
 """
-Core low-level service for creating Notification records.
-After each create, pushes the notification to the user's WebSocket group.
+Core low-level service for creating clinic-wide Notification records.
+After creation, pushes the notification to ALL active users in the clinic
+via their individual WebSocket channels.
+
+✅ ONE notification record per clinic — WebSocket push to ALL clinic users
 """
 import logging
 from asgiref.sync import async_to_sync
-from django.utils import timezone
+from django.contrib.auth import get_user_model
 from apps.notifications.models import Notification
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
-def _push_to_websocket(notification: Notification) -> None:
+def _get_main_clinic(clinic):
+    """Resolve to the root/main clinic."""
+    if clinic.parent_clinic_id:
+        return clinic.parent_clinic
+    return clinic
+
+
+def _push_to_all_clinic_users(notification: Notification) -> None:
     """
-    Send the new notification to the user's WebSocket channel group.
-    Runs synchronously (called from signals/services).
+    Push the notification via WebSocket to every active user in the clinic.
+    Each user has their own private channel group: notifications_<user_id>
     """
     try:
         from channels.layers import get_channel_layer
@@ -21,25 +32,51 @@ def _push_to_websocket(notification: Notification) -> None:
 
         channel_layer = get_channel_layer()
         if channel_layer is None:
+            logger.warning('Channel layer is None — WebSocket push skipped')
             return
 
+        # Serialize WITHOUT request context — is_read will default to False
+        # which is correct: it's a brand-new notification, nobody has read it yet
         payload = NotificationSerializer(notification).data
+        # Force is_read=False and read_at=None for the broadcast
+        payload['is_read'] = False
+        payload['read_at'] = None
 
-        async_to_sync(channel_layer.group_send)(
-            f'notifications_{notification.user_id}',
-            {
-                'type':         'notification.new',   # maps to consumer.notification_new()
-                'notification': payload,
-            }
+        main_clinic = notification.clinic
+
+        # Get all active, non-deleted users that belong to this clinic family
+        from django.db.models import Q
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
         )
+
+        users = User.objects.filter(
+            is_active=True,
+            is_deleted=False,
+            clinic_id__in=all_branch_ids,
+        ).values_list('id', flat=True)
+
+        for user_id in users:
+            async_to_sync(channel_layer.group_send)(
+                f'notifications_{user_id}',
+                {
+                    'type': 'notification.new',
+                    'notification': payload,
+                }
+            )
+
+        logger.debug(
+            'Notification %s pushed to %d users in clinic %s via WebSocket',
+            notification.id, len(users), main_clinic.id
+        )
+
     except Exception as exc:
-        # Never let a push failure break the booking flow
-        logger.exception('_push_to_websocket failed: %s', exc)
+        logger.exception('_push_to_all_clinic_users failed: %s', exc)
 
 
 def create_notification(
     *,
-    user,
+    clinic,
     notification_type: str,
     title: str,
     message: str,
@@ -48,10 +85,21 @@ def create_notification(
     clinic_branch=None,
 ) -> Notification:
     """
-    Create a single Notification record and push it via WebSocket.
+    Create a single clinic-wide Notification and push it to all clinic users.
+
+    Args:
+        clinic:            The clinic (branch or main) — will be resolved to main clinic.
+        notification_type: 'NEW_BOOKING' or 'DAILY_SUMMARY'
+        title:             Notification title
+        message:           Notification body
+        link_url:          Frontend route to navigate to
+        appointment:       Optional Appointment FK
+        clinic_branch:     Optional — which branch this concerns (for display)
     """
+    main_clinic = _get_main_clinic(clinic)
+
     notification = Notification.objects.create(
-        user=user,
+        clinic=main_clinic,
         notification_type=notification_type,
         title=title,
         message=message,
@@ -59,29 +107,7 @@ def create_notification(
         appointment=appointment,
         clinic_branch=clinic_branch,
     )
-    _push_to_websocket(notification)
+
+    _push_to_all_clinic_users(notification)
+
     return notification
-
-
-def bulk_create_notifications(notifications: list[dict]) -> list[Notification]:
-    """
-    Bulk-create notifications and push each via WebSocket.
-    """
-    objs = [
-        Notification(
-            user=n['user'],
-            notification_type=n['notification_type'],
-            title=n['title'],
-            message=n['message'],
-            link_url=n.get('link_url', ''),
-            appointment=n.get('appointment'),
-            clinic_branch=n.get('clinic_branch'),
-        )
-        for n in notifications
-    ]
-    created = Notification.objects.bulk_create(objs)
-
-    for notification in created:
-        _push_to_websocket(notification)
-
-    return created

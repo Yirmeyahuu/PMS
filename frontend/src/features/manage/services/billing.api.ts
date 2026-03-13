@@ -1,173 +1,102 @@
 import axiosInstance from '@/lib/axios';
 import type {
-  AppointmentPrintFilters,
-  AppointmentPrintPayload,
-  AppointmentPrintRecord,
-  AppointmentPrintSummary,
+  Invoice,
+  InvoiceBatch,
   BulkInvoiceRequest,
   BulkPreviewResponse,
-  InvoiceBatch,
-  Invoice,
-  CreateInvoicePayload,
 } from '@/types/billing';
 
-// ── Paginated list response ───────────────────────────────────────────────────
 interface PaginatedResponse<T> {
-  count:    number;
-  next:     string | null;
+  count: number;
+  next: string | null;
   previous: string | null;
-  results:  T[];
+  results: T[];
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-function toParams(filters: AppointmentPrintFilters): Record<string, string> {
-  const p: Record<string, string> = {};
-  if (filters.date_from)    p.date_from    = filters.date_from;
-  if (filters.date_to)      p.date_to      = filters.date_to;
-  if (filters.date)         p.date         = filters.date;
-  if (filters.clinic)       p.clinic       = String(filters.clinic);
-  if (filters.practitioner) p.practitioner = String(filters.practitioner);
-  if (filters.patient_name) p.patient_name = filters.patient_name;
-  if (filters.ordering)     p.ordering     = filters.ordering;
-  if (filters.status?.length) p.status     = filters.status.join(',');
-  return p;
-}
+// ── Individual Invoice API (re-exports for manage pages that need it) ────────
 
-// ── Print Appointments API ────────────────────────────────────────────────────
-export const appointmentPrintApi = {
-  /**
-   * Paginated list — used for the preview table in the UI.
-   */
-  list: async (
-    filters: AppointmentPrintFilters = {},
-    page = 1,
-    pageSize = 50,
-  ): Promise<PaginatedResponse<AppointmentPrintRecord>> => {
-    const res = await axiosInstance.get('/appointments-print/', {
-      params: { ...toParams(filters), page, page_size: pageSize },
-    });
-    // Support both paginated and plain array responses
-    if (Array.isArray(res.data)) {
-      return { count: res.data.length, next: null, previous: null, results: res.data };
-    }
-    return res.data;
+export const invoiceApi = {
+  /** GET /api/invoices/by_appointment/{id}/ */
+  getByAppointment: (appointmentId: number) =>
+    axiosInstance.get(`/invoices/by_appointment/${appointmentId}/`).then(r => r.data),
+
+  /** POST /api/invoices/create_from_appointment/ */
+  create: async (payload: {
+    appointment: number;
+    patient?: number;
+    clinic?: number;
+    invoice_date: string;
+    due_date?: string;
+    notes?: string;
+  }): Promise<Invoice> => {
+    const { data } = await axiosInstance.post('/invoices/create_from_appointment/', payload);
+    return data;
   },
 
-  /**
-   * Aggregate counts for header stats.
-   */
-  summary: async (
-    filters: AppointmentPrintFilters = {},
-  ): Promise<AppointmentPrintSummary> => {
-    const res = await axiosInstance.get('/appointments-print/summary/', {
-      params: toParams(filters),
-    });
-    return res.data;
+  /** POST /api/invoices/{id}/update_status/ */
+  updateStatus: async (id: number, newStatus: string): Promise<Invoice> => {
+    const { data } = await axiosInstance.post(`/invoices/${id}/update_status/`, { status: newStatus });
+    return data;
   },
 
-  /**
-   * Full payload for browser print / export — no pagination.
-   */
-  payload: async (
-    filters: AppointmentPrintFilters = {},
-  ): Promise<AppointmentPrintPayload> => {
-    const res = await axiosInstance.get('/appointments-print/payload/', {
-      params: toParams(filters),
-    });
-    return res.data;
+  /** Open print view */
+  print: (id: number): void => {
+    window.open(`/invoices/${id}/print`, '_blank');
   },
 };
 
-// ── Bulk Invoicing API ────────────────────────────────────────────────────────
+// ── Bulk Invoicing API ───────────────────────────────────────────────────────
+
 export const bulkInvoicingApi = {
-  /**
-   * Dry-run: preview what WOULD be invoiced.
-   */
-  preview: async (req: BulkInvoiceRequest): Promise<BulkPreviewResponse> => {
-    const res = await axiosInstance.post('/invoice-batches/create_bulk/', {
-      ...req,
+  /** POST /api/invoice-batches/create_bulk/ with dry_run=true */
+  preview: async (request: BulkInvoiceRequest): Promise<BulkPreviewResponse> => {
+    const { data } = await axiosInstance.post('/invoice-batches/create_bulk/', {
+      ...request,
       dry_run: true,
     });
-    return res.data;
+    return data;
   },
 
-  /**
-   * Execute the bulk invoicing run.
-   */
-  run: async (req: BulkInvoiceRequest): Promise<InvoiceBatch> => {
-    const res = await axiosInstance.post('/invoice-batches/create_bulk/', {
-      ...req,
+  /** POST /api/invoice-batches/create_bulk/ with dry_run=false */
+  run: async (request: BulkInvoiceRequest): Promise<InvoiceBatch> => {
+    const { data } = await axiosInstance.post('/invoice-batches/create_bulk/', {
+      ...request,
       dry_run: false,
     });
-    return res.data;
+    return data;
   },
 
-  /**
-   * List all past batches.
-   */
-  listBatches: async (
-    status?: string,
-    page = 1,
-  ): Promise<PaginatedResponse<InvoiceBatch>> => {
-    const res = await axiosInstance.get('/invoice-batches/', {
-      params: { ...(status ? { status } : {}), page },
-    });
-    if (Array.isArray(res.data)) {
-      return { count: res.data.length, next: null, previous: null, results: res.data };
-    }
-    return res.data;
+  /** GET /api/invoice-batches/ */
+  listBatches: async (): Promise<PaginatedResponse<InvoiceBatch>> => {
+    const { data } = await axiosInstance.get('/invoice-batches/');
+    return data;
   },
 
-  /**
-   * Get a single batch by ID.
-   */
+  /** GET /api/invoice-batches/{id}/ */
   getBatch: async (id: number): Promise<InvoiceBatch> => {
-    const res = await axiosInstance.get(`/invoice-batches/${id}/`);
-    return res.data;
+    const { data } = await axiosInstance.get(`/invoice-batches/${id}/`);
+    return data;
   },
 };
 
-// ── Single Invoice API ────────────────────────────────────────────────────────
-export const invoiceApi = {
-  /**
-   * Get invoice(s) for a specific appointment.
-   */
-  getByAppointment: async (appointmentId: number): Promise<Invoice | null> => {
-    const res = await axiosInstance.get('/invoices/', {
-      params: { appointment: appointmentId },
-    });
-    const results = Array.isArray(res.data) ? res.data : res.data.results ?? [];
-    return results[0] ?? null;
+// ── Print Appointments API ───────────────────────────────────────────────────
+
+export const printAppointmentsApi = {
+  /** GET /api/appointments-print/ */
+  list: async (params?: Record<string, any>): Promise<PaginatedResponse<any>> => {
+    const { data } = await axiosInstance.get('/appointments-print/', { params });
+    return data;
   },
 
-  /**
-   * Get a single invoice by ID.
-   */
-  getById: async (id: number): Promise<Invoice> => {
-    const res = await axiosInstance.get(`/invoices/${id}/`);
-    return res.data;
+  /** GET /api/appointments-print/summary/ */
+  summary: async (params?: Record<string, any>): Promise<any> => {
+    const { data } = await axiosInstance.get('/appointments-print/summary/', { params });
+    return data;
   },
 
-  /**
-   * Create a new invoice.
-   */
-  create: async (payload: CreateInvoicePayload): Promise<Invoice> => {
-    const res = await axiosInstance.post('/invoices/', payload);
-    return res.data;
-  },
-
-  /**
-   * Update invoice status (e.g. mark as PAID).
-   */
-  updateStatus: async (id: number, status: string): Promise<Invoice> => {
-    const res = await axiosInstance.patch(`/invoices/${id}/`, { status });
-    return res.data;
-  },
-
-  /**
-   * Print / download invoice as PDF.
-   */
-  print: (id: number) => {
-    window.open(`/api/invoices/${id}/pdf/`, '_blank');
+  /** GET /api/appointments-print/payload/ */
+  payload: async (params?: Record<string, any>): Promise<any> => {
+    const { data } = await axiosInstance.get('/appointments-print/payload/', { params });
+    return data;
   },
 };

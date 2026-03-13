@@ -12,6 +12,15 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'total', 'created_at', 'updated_at']
 
 
+class InvoiceItemWriteSerializer(serializers.ModelSerializer):
+    """Used when creating/updating line items inline with an invoice."""
+    id = serializers.IntegerField(required=False)  # allow update of existing items
+
+    class Meta:
+        model  = InvoiceItem
+        fields = ['id', 'description', 'quantity', 'unit_price', 'discount_percent', 'tax_percent', 'service_code']
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
     patient_name     = serializers.CharField(source='patient.get_full_name', read_only=True)
     patient_number   = serializers.CharField(source='patient.patient_number', read_only=True)
@@ -20,12 +29,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
     status_display   = serializers.CharField(source='get_status_display',     read_only=True)
     items            = InvoiceItemSerializer(many=True, read_only=True)
 
-    appointment_date       = serializers.DateField(source='appointment.date',       read_only=True)
-    appointment_start_time = serializers.TimeField(source='appointment.start_time', read_only=True)
+    appointment_date       = serializers.DateField(source='appointment.date',       read_only=True, allow_null=True)
+    appointment_start_time = serializers.TimeField(source='appointment.start_time', read_only=True, allow_null=True)
 
     # Not required in the request body — set by perform_create or passed explicitly
-    clinic  = serializers.PrimaryKeyRelatedField(queryset=Clinic.objects.all(),   required=False)
-    patient = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all(),  required=False)
+    clinic  = serializers.PrimaryKeyRelatedField(queryset=Clinic.objects.all(),      required=False)
+    patient = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all(),     required=False)
+    appointment = serializers.PrimaryKeyRelatedField(
+        queryset=Appointment.objects.all(), required=False, allow_null=True,
+    )
+
+    # Optional inline items for creation
+    inline_items = InvoiceItemWriteSerializer(many=True, required=False, write_only=True)
 
     class Meta:
         model            = Invoice
@@ -34,19 +49,54 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'id', 'invoice_number', 'subtotal', 'total_amount',
             'amount_paid', 'balance_due', 'created_at', 'updated_at',
         ]
+        extra_kwargs = {
+            'inline_items': {'write_only': True},
+        }
 
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None
 
 
+class InvoiceCreateSerializer(serializers.Serializer):
+    """
+    Simplified serializer for creating an individual invoice from an appointment.
+    Used by the AppointmentView → "Generate Invoice" button.
+    """
+    appointment  = serializers.PrimaryKeyRelatedField(queryset=Appointment.objects.all())
+    patient      = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all(), required=False)
+    clinic       = serializers.PrimaryKeyRelatedField(queryset=Clinic.objects.all(), required=False)
+    invoice_date = serializers.DateField()
+    due_date     = serializers.DateField(required=False, allow_null=True)
+    notes        = serializers.CharField(required=False, allow_blank=True, default='')
+
+    # Optional line items to add immediately
+    items = InvoiceItemWriteSerializer(many=True, required=False, default=list)
+
+    def validate_appointment(self, value):
+        """Check appointment doesn't already have a non-deleted invoice."""
+        existing = Invoice.objects.filter(
+            appointment=value,
+            is_deleted=False,
+        ).first()
+        if existing:
+            raise serializers.ValidationError(
+                f"Appointment already has invoice {existing.invoice_number}. "
+                f"Delete it first or edit the existing one."
+            )
+        return value
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     invoice_number   = serializers.CharField(source='invoice.invoice_number', read_only=True)
-    received_by_name = serializers.CharField(source='received_by.get_full_name', read_only=True)
+    received_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model            = Payment
         fields           = '__all__'
         read_only_fields = ['id', 'receipt_number', 'created_at', 'updated_at']
+
+    def get_received_by_name(self, obj) -> str | None:
+        return obj.received_by.get_full_name() if obj.received_by else None
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -107,7 +157,7 @@ class AppointmentPrintSerializer(serializers.ModelSerializer):
     location_name    = serializers.SerializerMethodField()
     status_display   = serializers.CharField(source='get_status_display',     read_only=True)
     appointment_type_display = serializers.CharField(
-        source='get_appointment_type_display', read_only=True
+        source='get_appointment_type_display', read_only=True,
     )
     has_invoice      = serializers.SerializerMethodField()
 
@@ -135,4 +185,4 @@ class AppointmentPrintSerializer(serializers.ModelSerializer):
         return obj.location.name if obj.location else ''
 
     def get_has_invoice(self, obj) -> bool:
-        return obj.billing_invoices.filter(is_deleted=False).exists() 
+        return obj.billing_invoices.filter(is_deleted=False).exists()

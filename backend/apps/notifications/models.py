@@ -4,21 +4,28 @@ from apps.common.models import TimeStampedModel
 
 class Notification(TimeStampedModel):
     """
-    In-system notifications for staff users.
+    Clinic-wide notification.
+
+    ONE record per notification per clinic.  Every active user in that clinic
+    sees the same notification.  Per-user read status is tracked via the
+    NotificationRead join table.
+
     Covers:
-      - NEW_BOOKING  : fired when a patient books an appointment
-      - DAILY_SUMMARY: fired once per day per clinic branch listing today's appointments
+      - NEW_BOOKING   : fired when a patient books an appointment
+      - DAILY_SUMMARY : fired once per day per clinic branch
     """
 
     NOTIFICATION_TYPE_CHOICES = [
-        ('NEW_BOOKING',    'New Appointment Booking'),
-        ('DAILY_SUMMARY',  'Daily Appointments Summary'),
+        ('NEW_BOOKING',   'New Appointment Booking'),
+        ('DAILY_SUMMARY', 'Daily Appointments Summary'),
     ]
 
-    user = models.ForeignKey(
-        'accounts.User',
+    # ── Scoping — clinic-wide, NOT per-user ───────────────────────────────────
+    clinic = models.ForeignKey(
+        'clinics.Clinic',
         on_delete=models.CASCADE,
         related_name='notifications',
+        help_text='The root/main clinic this notification belongs to.',
     )
 
     notification_type = models.CharField(
@@ -31,7 +38,7 @@ class Notification(TimeStampedModel):
     message  = models.TextField()
     link_url = models.CharField(max_length=500, blank=True)
 
-    # For NEW_BOOKING
+    # Optional FK — for NEW_BOOKING
     appointment = models.ForeignKey(
         'appointments.Appointment',
         on_delete=models.SET_NULL,
@@ -40,28 +47,55 @@ class Notification(TimeStampedModel):
         related_name='notifications',
     )
 
-    # ✅ Fixed: Clinic model is the branch — no separate ClinicBranch model exists
+    # The specific branch this notification concerns (display purposes)
     clinic_branch = models.ForeignKey(
-        'clinics.Clinic',                          # ← was 'clinics.ClinicBranch'
+        'clinics.Clinic',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='daily_summary_notifications',
+        related_name='branch_notifications',
     )
 
-    is_read = models.BooleanField(default=False, db_index=True)
-    read_at = models.DateTimeField(null=True, blank=True)
-
     class Meta:
-        db_table = 'notifications'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['user', 'is_read', 'created_at']),
+        db_table   = 'notifications'
+        ordering   = ['-created_at']
+        indexes    = [
+            models.Index(fields=['clinic', 'created_at']),
             models.Index(fields=['notification_type', 'created_at']),
         ]
 
     def __str__(self):
-        return f"[{self.notification_type}] {self.title} → {self.user.get_full_name()}"
+        return f"[{self.notification_type}] {self.title} — clinic {self.clinic_id}"
+
+
+class NotificationRead(models.Model):
+    """
+    Per-user read receipt for a clinic-wide notification.
+    A row means the user HAS read that notification.
+    No row → unread.
+    """
+
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name='reads',
+    )
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='notification_reads',
+    )
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table         = 'notification_reads'
+        unique_together  = [('notification', 'user')]
+        indexes          = [
+            models.Index(fields=['user', 'notification']),
+        ]
+
+    def __str__(self):
+        return f"User {self.user_id} read notification {self.notification_id}"
 
 
 class EmailLog(TimeStampedModel):

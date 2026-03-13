@@ -1,54 +1,31 @@
 """
-Appointment-specific notification logic.
+Appointment-specific notification logic — clinic-wide.
 
   notify_new_booking(appointment)
-    → diary Appointment created/confirmed → notifies branch staff
+    → diary Appointment created/confirmed → ONE notification for the whole clinic
 
   notify_new_portal_booking(portal_booking)
-    → PortalBooking submitted via patient portal → notifies branch staff
+    → PortalBooking submitted via patient portal → ONE notification for the whole clinic
 
   send_daily_summary()
-    → scheduled job → per-branch daily appointment list
+    → scheduled job → ONE DAILY_SUMMARY per clinic branch
 """
 import logging
 from django.utils import timezone
-from django.contrib.auth import get_user_model
 
-from apps.notifications.services.notification_service import (
-    create_notification,
-    bulk_create_notifications,
-)
+from apps.notifications.services.notification_service import create_notification
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
-
-
-# ─── Helpers ─────────────────────────────────────────────────────────────────
-
-def _staff_users_for_branch(clinic_branch):
-    """
-    Return all active ADMIN / STAFF users that belong to the given branch.
-    Users with clinic_branch=None are treated as "all branches" — include them too.
-    """
-    from django.db.models import Q
-    return User.objects.filter(
-        is_active=True,
-        role__in=['ADMIN', 'STAFF'],
-        clinic=clinic_branch,           # scoped to the same root clinic family
-    ).filter(
-        Q(clinic_branch=clinic_branch) | Q(clinic_branch__isnull=True)
-    )
 
 
 def _format_time(dt):
     """Return '2:30 PM' style string from a time or datetime."""
     if dt is None:
         return '—'
-    # Works for both time and datetime objects
     try:
         return dt.strftime('%-I:%M %p')
     except ValueError:
-        return dt.strftime('%I:%M %p')  # Windows fallback (no %-I)
+        return dt.strftime('%I:%M %p')  # Windows fallback
 
 
 # ─── 1. Diary Appointment Notification ───────────────────────────────────────
@@ -56,7 +33,7 @@ def _format_time(dt):
 def notify_new_booking(appointment) -> None:
     """
     Fire when a diary Appointment is created or confirmed.
-    Notifies all staff in the appointment's clinic branch.
+    Creates ONE clinic-wide notification — all users in the clinic see it.
     """
     try:
         branch       = appointment.clinic
@@ -74,30 +51,18 @@ def notify_new_booking(appointment) -> None:
         )
         link_url = f"/diary?date={appointment.date.strftime('%Y-%m-%d')}&appointment={appointment.id}"
 
-        staff = _staff_users_for_branch(branch)
-
-        if not staff.exists():
-            logger.warning(
-                "notify_new_booking: no staff found for branch %s (appointment %s)",
-                branch, appointment.id,
-            )
-            return
-
-        bulk_create_notifications([
-            dict(
-                user=user,
-                notification_type='NEW_BOOKING',
-                title=title,
-                message=message,
-                link_url=link_url,
-                appointment=appointment,
-                clinic_branch=branch,
-            )
-            for user in staff
-        ])
+        create_notification(
+            clinic=branch,
+            notification_type='NEW_BOOKING',
+            title=title,
+            message=message,
+            link_url=link_url,
+            appointment=appointment,
+            clinic_branch=branch,
+        )
 
         logger.info(
-            "notify_new_booking: created notifications for appointment %s",
+            "notify_new_booking: created clinic-wide notification for appointment %s",
             appointment.id,
         )
 
@@ -113,8 +78,7 @@ def notify_new_booking(appointment) -> None:
 def notify_new_portal_booking(portal_booking) -> None:
     """
     Fire immediately when a patient submits a booking via the patient portal.
-    Uses PortalBooking fields directly — no Appointment FK yet at this stage.
-    Notifies all staff in the portal link's clinic branch.
+    Creates ONE clinic-wide notification.
     """
     try:
         branch = portal_booking.portal_link.clinic
@@ -126,7 +90,6 @@ def notify_new_portal_booking(portal_booking) -> None:
         appt_date = portal_booking.appointment_date
         appt_time = portal_booking.appointment_time
 
-        # Format time safely
         try:
             time_str = appt_time.strftime('%-I:%M %p')
         except (ValueError, AttributeError):
@@ -143,36 +106,22 @@ def notify_new_portal_booking(portal_booking) -> None:
         )
         link_url = f"/diary?date={appt_date.strftime('%Y-%m-%d')}"
 
-        staff = _staff_users_for_branch(branch)
-
-        if not staff.exists():
-            logger.warning(
-                "notify_new_portal_booking: no staff found for branch %s "
-                "(portal_booking %s)",
-                branch, portal_booking.id,
-            )
-            return
-
-        bulk_create_notifications([
-            dict(
-                user=user,
-                notification_type='NEW_BOOKING',
-                title=title,
-                message=message,
-                link_url=link_url,
-                appointment=None,        # No Appointment record yet
-                clinic_branch=branch,
-            )
-            for user in staff
-        ])
+        create_notification(
+            clinic=branch,
+            notification_type='NEW_BOOKING',
+            title=title,
+            message=message,
+            link_url=link_url,
+            appointment=None,
+            clinic_branch=branch,
+        )
 
         logger.info(
-            "notify_new_portal_booking: notified %d staff for portal booking #%s",
-            staff.count(), portal_booking.reference_number,
+            "notify_new_portal_booking: created clinic-wide notification for portal booking #%s",
+            portal_booking.reference_number,
         )
 
     except Exception as exc:
-        # Never crash the booking flow
         logger.exception(
             "notify_new_portal_booking failed for portal_booking %s: %s",
             getattr(portal_booking, 'id', '?'), exc,
@@ -184,8 +133,8 @@ def notify_new_portal_booking(portal_booking) -> None:
 def send_daily_summary() -> None:
     """
     Called once per day (via tasks.py / cron).
-    For every active clinic, creates a DAILY_SUMMARY notification
-    for each staff member listing today's appointments.
+    For every active clinic branch, creates ONE DAILY_SUMMARY notification
+    visible to all users in the clinic.
     """
     from apps.appointments.models import Appointment
     from apps.clinics.models import Clinic
@@ -209,10 +158,6 @@ def send_daily_summary() -> None:
         )
 
         count = appointments.count()
-        staff = _staff_users_for_branch(branch)
-
-        if not staff.exists():
-            continue
 
         if count == 0:
             title   = f"No Appointments Today — {branch.name}"
@@ -231,23 +176,20 @@ def send_daily_summary() -> None:
 
         link_url = f"/diary?date={today.strftime('%Y-%m-%d')}"
 
-        bulk_create_notifications([
-            dict(
-                user=user,
-                notification_type='DAILY_SUMMARY',
-                title=title,
-                message=message,
-                link_url=link_url,
-                clinic_branch=branch,
-            )
-            for user in staff
-        ])
-
-        total_sent += staff.count()
-
-        logger.info(
-            "send_daily_summary: branch '%s' — %d appts, %d notifications created",
-            branch.name, count, staff.count(),
+        create_notification(
+            clinic=branch,
+            notification_type='DAILY_SUMMARY',
+            title=title,
+            message=message,
+            link_url=link_url,
+            clinic_branch=branch,
         )
 
-    logger.info("send_daily_summary: total notifications created = %d", total_sent)
+        total_sent += 1
+
+        logger.info(
+            "send_daily_summary: branch '%s' — %d appts, 1 clinic-wide notification created",
+            branch.name, count,
+        )
+
+    logger.info("send_daily_summary: total clinic-wide notifications created = %d", total_sent)

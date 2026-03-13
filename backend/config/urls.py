@@ -48,11 +48,11 @@ router.register(r'outcome-measures', OutcomeMeasureViewSet, basename='outcome-me
 router.register(r'attachments',      AttachmentViewSet,     basename='attachments')
 
 # Billing
-router.register(r'invoices',             InvoiceViewSet,          basename='invoice')
-router.register(r'invoice-items',        InvoiceItemViewSet,      basename='invoice-item')
-router.register(r'payments',             PaymentViewSet,          basename='payment')
-router.register(r'services',             ServiceViewSet,          basename='service')
-router.register(r'invoice-batches',      InvoiceBatchViewSet,     basename='invoice-batch')
+router.register(r'invoices',             InvoiceViewSet,          basename='invoices')
+router.register(r'invoice-items',        InvoiceItemViewSet,      basename='invoice-items')
+router.register(r'payments',             PaymentViewSet,          basename='payments')
+router.register(r'services',             ServiceViewSet,          basename='services')
+router.register(r'invoice-batches',      InvoiceBatchViewSet,     basename='invoice-batches')
 router.register(r'appointments-print',   AppointmentPrintViewSet, basename='appointments-print')
 
 # Reports
@@ -72,7 +72,7 @@ urlpatterns = [
     path('api/', include('apps.inventory.urls')),
     path('api/', include('apps.contacts.urls')),
     path('api/', include('apps.messages.urls')),
-    path('api/', include('apps.notifications.urls')),  # ← notifications routes here only
+    path('api/', include('apps.notifications.urls')),
 
     path('api/auth/verify-token/', AuthViewSet.as_view({'post': 'verify_token'}), name='verify-token'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

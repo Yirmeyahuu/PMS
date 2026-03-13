@@ -1,6 +1,10 @@
 import logging
 
+from decimal import Decimal
+from django.db import transaction
 from django.db.models import Sum, Count
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -8,14 +12,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.appointments.models import Appointment
+from .authentication import QueryParamJWTAuthentication
 from .bulk_invoice_service import preview_bulk_invoice, run_bulk_invoice
 from .filters import AppointmentPrintFilter, InvoiceBatchFilter, InvoiceFilter
-from .models import Invoice, InvoiceItem, InvoiceBatch, Payment, Service
+from .models import Invoice, InvoiceItem, InvoiceBatch, InvoicePrintSettings, Payment, Service
 from .print_service import build_print_payload
 from .serializers import (
     AppointmentPrintSerializer,
     BulkInvoiceRequestSerializer,
     InvoiceBatchSerializer,
+    InvoiceCreateSerializer,
     InvoiceItemSerializer,
     InvoiceSerializer,
     PaymentSerializer,
@@ -28,58 +34,398 @@ logger = logging.getLogger(__name__)
 # ── Invoice ───────────────────────────────────────────────────────────────────
 
 class InvoiceViewSet(viewsets.ModelViewSet):
+    """Full CRUD for invoices + custom actions."""
+    lookup_field       = 'pk'
+    lookup_value_regex = r'[0-9]+'
+
     queryset = Invoice.objects.filter(is_deleted=False).select_related(
-        'clinic', 'patient', 'appointment', 'created_by', 'bulk_batch'
-    ).prefetch_related('items')
+        'clinic', 'patient', 'appointment', 'created_by', 'bulk_batch',
+    ).prefetch_related('items', 'payments')
+
     serializer_class   = InvoiceSerializer
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class    = InvoiceFilter
     search_fields      = ['invoice_number', 'patient__first_name', 'patient__last_name']
-    ordering_fields    = ['invoice_date', 'due_date', 'total_amount']
+    ordering_fields    = ['invoice_date', 'due_date', 'total_amount', 'created_at']
+    ordering           = ['-invoice_date', '-created_at']
 
     def get_queryset(self):
         user = self.request.user
         if not user.clinic:
             return self.queryset.none()
+
         main_clinic    = user.clinic.main_clinic
         all_branch_ids = list(
             main_clinic.get_all_branches().values_list('id', flat=True)
         )
-        return self.queryset.filter(clinic_id__in=all_branch_ids)
+        qs = self.queryset.filter(clinic_id__in=all_branch_ids)
+
+        appointment_id = self.request.query_params.get('appointment')
+        if appointment_id:
+            try:
+                qs = qs.filter(appointment_id=int(appointment_id))
+            except (ValueError, TypeError):
+                pass
+
+        return qs
 
     def perform_create(self, serializer):
-        clinic = self.request.user.clinic
-
-        # Auto-derive patient from appointment if not explicitly provided
+        clinic  = self.request.user.clinic
         patient = serializer.validated_data.get('patient')
         if not patient:
             appointment = serializer.validated_data.get('appointment')
             if appointment:
                 patient = appointment.patient
 
-        serializer.save(
+        instance = serializer.save(
             clinic     = clinic,
             patient    = patient,
             created_by = self.request.user,
         )
 
-    @action(detail=True, methods=['post'], url_path='mark_paid')
+        inline_items = self.request.data.get('inline_items', [])
+        if inline_items:
+            for item_data in inline_items:
+                InvoiceItem.objects.create(
+                    invoice          = instance,
+                    description      = item_data.get('description', ''),
+                    quantity         = item_data.get('quantity', 1),
+                    unit_price       = Decimal(str(item_data.get('unit_price', 0))),
+                    discount_percent = Decimal(str(item_data.get('discount_percent', 0))),
+                    tax_percent      = Decimal(str(item_data.get('tax_percent', 0))),
+                    service_code     = item_data.get('service_code', ''),
+                )
+            instance.update_totals()
+            instance.refresh_from_db()
+
+        logger.info(
+            "Invoice %s created for appointment %s by %s",
+            instance.invoice_number, instance.appointment_id, self.request.user.email,
+        )
+
+    # ── Create invoice from appointment ───────────────────────────────────────
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='create-from-appointment',
+        url_name='create-from-appointment',
+    )
+    def create_from_appointment(self, request):
+        """POST /api/invoices/create-from-appointment/"""
+        ser = InvoiceCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        appt    = data['appointment']
+        patient = data.get('patient') or appt.patient
+        clinic  = data.get('clinic')  or request.user.clinic
+
+        if not clinic:
+            return Response(
+                {'detail': 'User has no clinic assigned.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing = Invoice.objects.filter(
+            appointment=appt, is_deleted=False
+        ).first()
+        if existing:
+            return Response(
+                InvoiceSerializer(existing).data,
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            with transaction.atomic():
+                invoice = Invoice.objects.create(
+                    clinic       = clinic,
+                    patient      = patient,
+                    appointment  = appt,
+                    invoice_date = data['invoice_date'],
+                    due_date     = data.get('due_date'),
+                    notes        = data.get('notes', ''),
+                    created_by   = request.user,
+                    status       = 'DRAFT',
+                )
+
+                items = data.get('items', [])
+                if items:
+                    for item_data in items:
+                        InvoiceItem.objects.create(
+                            invoice          = invoice,
+                            description      = item_data.get('description', ''),
+                            quantity         = item_data.get('quantity', 1),
+                            unit_price       = Decimal(str(item_data.get('unit_price', 0))),
+                            discount_percent = Decimal(str(item_data.get('discount_percent', 0))),
+                            tax_percent      = Decimal(str(item_data.get('tax_percent', 0))),
+                            service_code     = item_data.get('service_code', ''),
+                        )
+                else:
+                    from apps.clinics.services.models import Service as ClinicService
+
+                    description = appt.get_appointment_type_display()
+                    unit_price  = Decimal('0')
+
+                    main_clinic    = clinic.main_clinic if hasattr(clinic, 'main_clinic') else clinic
+                    all_branch_ids = list(
+                        main_clinic.get_all_branches().values_list('id', flat=True)
+                    )
+
+                    service_qs = ClinicService.objects.filter(
+                        clinic_id__in=all_branch_ids,
+                        is_active=True,
+                        is_deleted=False,
+                    )
+
+                    matching_service = (
+                        service_qs.filter(name__iexact=description).first()
+                        or service_qs.filter(name__icontains=description).first()
+                        or service_qs.filter(name__icontains=appt.appointment_type).first()
+                        or service_qs.filter(name__iexact=appt.appointment_type).first()
+                    )
+
+                    # Word-by-word fallback
+                    if not matching_service:
+                        for word in [w for w in description.split() if len(w) > 3]:
+                            matching_service = service_qs.filter(name__icontains=word).first()
+                            if matching_service:
+                                break
+
+                    if matching_service:
+                        description = matching_service.name
+                        unit_price  = Decimal(str(matching_service.price))
+                        logger.info(
+                            "Auto-matched clinic service '%s' (₱%s) for appointment %s",
+                            matching_service.name, unit_price, appt.id,
+                        )
+                    else:
+                        if appt.practitioner and hasattr(appt.practitioner, 'consultation_fee'):
+                            unit_price = Decimal(str(appt.practitioner.consultation_fee or 0))
+                        logger.warning(
+                            "No clinic service matched for appointment %s (type=%s). unit_price=₱%s",
+                            appt.id, appt.appointment_type, unit_price,
+                        )
+
+                    InvoiceItem.objects.create(
+                        invoice     = invoice,
+                        description = description,
+                        quantity    = 1,
+                        unit_price  = unit_price,
+                    )
+
+                invoice.update_totals()
+
+        except Exception as exc:
+            logger.exception("Failed to create invoice for appointment %s: %s", appt.id, exc)
+            return Response(
+                {'detail': f'Failed to create invoice: {str(exc)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        logger.info(
+            "Invoice %s created from appointment %s by %s",
+            invoice.invoice_number, appt.id, request.user.email,
+        )
+        return Response(
+            InvoiceSerializer(invoice).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # ── Get invoice by appointment ID ─────────────────────────────────────────
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path=r'by-appointment/(?P<appointment_id>[0-9]+)',
+        url_name='by-appointment',
+    )
+    def by_appointment(self, request, appointment_id=None):
+        """GET /api/invoices/by-appointment/<appointment_id>/"""
+        try:
+            appt_id = int(appointment_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'detail': 'Invalid appointment ID.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invoice = self.get_queryset().filter(appointment_id=appt_id).first()
+
+        if not invoice:
+            return Response(None, status=status.HTTP_200_OK)
+
+        return Response(InvoiceSerializer(invoice).data)
+
+    # ── Mark as paid — scoped strictly to one invoice ─────────────────────────
+    @action(detail=True, methods=['post'], url_path='mark-paid', url_name='mark-paid')
     def mark_paid(self, request, pk=None):
+        """
+        POST /api/invoices/{id}/mark-paid/
+        Marks ONLY this invoice as paid. No other invoices are touched.
+        """
         invoice = self.get_object()
+
         if invoice.status == 'PAID':
             return Response(
                 {'detail': 'Invoice is already marked as paid.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        invoice.mark_paid(
-            payment_method    = request.data.get('payment_method', 'CASH'),
-            payment_reference = request.data.get('payment_reference', ''),
-        )
-        logger.info("Invoice %s marked PAID by %s", invoice.invoice_number, request.user.email)
-        return Response(InvoiceSerializer(invoice).data)
 
-    @action(detail=False, methods=['get'], url_path='stats')
+        payment_method    = request.data.get('payment_method', 'CASH')
+        payment_reference = request.data.get('payment_reference', '')
+
+        # Use scoped DB update — guarantees only this invoice row is modified
+        invoice.mark_paid(
+            payment_method    = payment_method,
+            payment_reference = payment_reference,
+        )
+
+        logger.info(
+            "Invoice %s (pk=%s) marked PAID by %s",
+            invoice.invoice_number, invoice.pk, request.user.email,
+        )
+
+        # Return fresh data from DB
+        fresh = Invoice.objects.get(pk=invoice.pk)
+        return Response(InvoiceSerializer(fresh).data)
+
+    # ── Update status — scoped strictly to one invoice ────────────────────────
+    @action(detail=True, methods=['post'], url_path='update-status', url_name='update-status')
+    def update_status(self, request, pk=None):
+        """
+        POST /api/invoices/{id}/update-status/
+        Updates ONLY this invoice's status.
+        """
+        invoice    = self.get_object()
+        new_status = request.data.get('status')
+
+        allowed = [s[0] for s in Invoice.STATUS_CHOICES]
+        if new_status not in allowed:
+            return Response(
+                {'detail': f'Status must be one of: {", ".join(allowed)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_status == 'PAID':
+            invoice.mark_paid(
+                payment_method    = request.data.get('payment_method', 'CASH'),
+                payment_reference = request.data.get('payment_reference', ''),
+            )
+        else:
+            # Scoped update — only this invoice's row
+            Invoice.objects.filter(pk=invoice.pk).update(status=new_status)
+
+        logger.info(
+            "Invoice %s (pk=%s) status → %s by %s",
+            invoice.invoice_number, invoice.pk, new_status, request.user.email,
+        )
+
+        fresh = Invoice.objects.get(pk=invoice.pk)
+        return Response(InvoiceSerializer(fresh).data)
+
+    # ── Add line item ─────────────────────────────────────────────────────────
+    @action(detail=True, methods=['post'], url_path='add-item', url_name='add-item')
+    def add_item(self, request, pk=None):
+        """POST /api/invoices/{id}/add-item/"""
+        invoice = self.get_object()
+
+        try:
+            description      = request.data.get('description', '')
+            quantity         = Decimal(str(request.data.get('quantity', 1)))
+            unit_price       = Decimal(str(request.data.get('unit_price', 0)))
+            discount_percent = Decimal(str(request.data.get('discount_percent', 0)))
+            tax_percent      = Decimal(str(request.data.get('tax_percent', 0)))
+            service_code     = request.data.get('service_code', '')
+
+            item = InvoiceItem(
+                invoice          = invoice,
+                description      = description,
+                quantity         = quantity,
+                unit_price       = unit_price,
+                discount_percent = discount_percent,
+                tax_percent      = tax_percent,
+                service_code     = service_code,
+            )
+            item.save()  # item.total is computed in InvoiceItem.save()
+
+        except Exception as exc:
+            logger.exception("Failed to add item to invoice %s: %s", invoice.invoice_number, exc)
+            return Response(
+                {'detail': f'Failed to add item: {str(exc)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invoice.update_totals()
+        fresh = Invoice.objects.get(pk=invoice.pk)
+        return Response(InvoiceSerializer(fresh).data, status=status.HTTP_201_CREATED)
+
+    # ── Print invoice (HTML) ──────────────────────────────────────────────────
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='print',
+        url_name='print',
+        authentication_classes=[QueryParamJWTAuthentication],
+    )
+    def print_invoice(self, request, pk=None):
+        """GET /api/invoices/{id}/print/ — Renders printable HTML for this invoice only."""
+        invoice = self.get_object()
+
+        # Force recalculate totals from items to ensure accuracy
+        invoice.update_totals()
+        invoice = Invoice.objects.get(pk=invoice.pk)  # fresh from DB
+
+        items    = list(invoice.items.all().order_by('id'))
+        payments = invoice.payments.all().order_by('-payment_date')
+
+        print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
+        clinic_display_name = print_settings.clinic_name or invoice.clinic.name
+
+        date_format = print_settings.date_format or '%B %d, %Y'
+        django_date_format_map = {
+            '%B %d, %Y': 'F j, Y',
+            '%m/%d/%Y':  'm/d/Y',
+            '%d/%m/%Y':  'd/m/Y',
+            '%Y-%m-%d':  'Y-m-d',
+            '%b %d, %Y': 'M j, Y',
+        }
+        template_date_format = django_date_format_map.get(date_format, 'F j, Y')
+
+        has_discounts = any(item.discount_percent > 0 for item in items)
+        has_taxes     = any(item.tax_percent > 0 for item in items)
+        currency      = print_settings.currency_symbol or '₱'
+
+        computed_subtotal    = sum(
+            Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items
+        )
+        computed_items_total = sum(Decimal(str(item.total)) for item in items)
+        discount_amount      = Decimal(str(invoice.discount_amount or 0))
+        tax_amount           = Decimal(str(invoice.tax_amount or 0))
+        philhealth           = Decimal(str(invoice.philhealth_coverage or 0))
+        hmo                  = Decimal(str(invoice.hmo_coverage or 0))
+        amount_paid          = Decimal(str(invoice.amount_paid or 0))
+        computed_total       = computed_items_total - discount_amount + tax_amount
+        computed_balance_due = max(computed_total - amount_paid - philhealth - hmo, Decimal('0'))
+
+        context = {
+            'invoice':              invoice,
+            'items':                items,
+            'payments':             payments,
+            'settings':             print_settings,
+            'clinic_display_name':  clinic_display_name,
+            'date_format':          template_date_format,
+            'has_discounts':        has_discounts,
+            'has_taxes':            has_taxes,
+            'currency':             currency,
+            'computed_subtotal':    f'{computed_subtotal:,.2f}',
+            'computed_total':       f'{computed_total:,.2f}',
+            'computed_balance_due': f'{computed_balance_due:,.2f}',
+        }
+
+        return TemplateResponse(request, 'billing/invoice_print.html', context)
+
+    # ── Stats ─────────────────────────────────────────────────────────────────
+    @action(detail=False, methods=['get'], url_path='stats', url_name='stats')
     def stats(self, request):
         qs  = self.filter_queryset(self.get_queryset())
         agg = qs.aggregate(
@@ -115,12 +461,22 @@ class InvoiceItemViewSet(viewsets.ModelViewSet):
     filterset_fields   = ['invoice']
 
     def get_queryset(self):
-        user = self.request.user
-        if not user.clinic:
+        user   = self.request.user
+        clinic = getattr(user, 'clinic', None)
+        if not clinic:
             return self.queryset.none()
-        main_clinic    = user.clinic.main_clinic
+        main_clinic    = clinic.main_clinic
         all_branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
         return self.queryset.filter(invoice__clinic_id__in=all_branch_ids)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        instance.invoice.update_totals()
+
+    def perform_destroy(self, instance):
+        invoice = instance.invoice
+        instance.delete()
+        invoice.update_totals()
 
 
 # ── Payment ───────────────────────────────────────────────────────────────────
@@ -165,10 +521,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
 # ── Invoice Batch (Bulk Invoicing) ────────────────────────────────────────────
 
 class InvoiceBatchViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    list/retrieve  →  GET  /api/invoice-batches/
-    create_bulk    →  POST /api/invoice-batches/create_bulk/
-    """
     serializer_class   = InvoiceBatchSerializer
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.OrderingFilter]
@@ -181,25 +533,8 @@ class InvoiceBatchViewSet(viewsets.ReadOnlyModelViewSet):
             return InvoiceBatch.objects.none()
         return InvoiceBatch.objects.filter(clinic=user.clinic.main_clinic)
 
-    @action(detail=False, methods=['post'], url_path='create_bulk')
+    @action(detail=False, methods=['post'], url_path='create-bulk', url_name='create-bulk')
     def create_bulk(self, request):
-        """
-        POST /api/invoice-batches/create_bulk/
-
-        Body (all optional except date_from / date_to):
-        {
-            "date_from":        "2026-03-01",
-            "date_to":          "2026-03-31",
-            "clinic_ids":       [],
-            "status_filter":    ["COMPLETED"],
-            "invoice_date":     "2026-03-31",
-            "due_date":         "2026-04-07",
-            "discount_percent": 0,
-            "tax_percent":      0,
-            "skip_existing":    true,
-            "dry_run":          false
-        }
-        """
         req_ser = BulkInvoiceRequestSerializer(data=request.data)
         req_ser.is_valid(raise_exception=True)
         params = req_ser.validated_data
@@ -213,14 +548,12 @@ class InvoiceBatchViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Dry run ────────────────────────────────────────────────────────────
         if params['dry_run']:
             preview = preview_bulk_invoice(params, user, main_clinic)
             if preview.get('error'):
                 return Response({'detail': preview['error']}, status=status.HTTP_400_BAD_REQUEST)
             return Response(preview)
 
-        # ── Live run ───────────────────────────────────────────────────────────
         try:
             batch = run_bulk_invoice(params, user, main_clinic)
         except ValueError as exc:
@@ -229,7 +562,7 @@ class InvoiceBatchViewSet(viewsets.ReadOnlyModelViewSet):
         http_status = (
             status.HTTP_201_CREATED
             if batch.status == 'COMPLETED'
-            else status.HTTP_207_MULTI_STATUS       # partial failures
+            else status.HTTP_207_MULTI_STATUS
         )
         return Response(InvoiceBatchSerializer(batch).data, status=http_status)
 
@@ -237,11 +570,6 @@ class InvoiceBatchViewSet(viewsets.ReadOnlyModelViewSet):
 # ── Print Appointments ────────────────────────────────────────────────────────
 
 class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    GET /api/appointments-print/          → paginated list (for table)
-    GET /api/appointments-print/summary/  → aggregate counts (for print header)
-    GET /api/appointments-print/payload/  → full print payload (no pagination)
-    """
     serializer_class   = AppointmentPrintSerializer
     permission_classes = [IsAuthenticated]
     filter_backends    = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
@@ -272,7 +600,6 @@ class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
-        """Aggregate counts for the print page header."""
         qs = self.filter_queryset(self.get_queryset())
         counts = (
             qs.values('status')
@@ -286,9 +613,5 @@ class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='payload')
     def payload(self, request):
-        """
-        Full print payload — no pagination, includes summary aggregates.
-        Intended for the browser print dialog / PDF generation.
-        """
         qs = self.filter_queryset(self.get_queryset())
         return Response(build_print_payload(qs))

@@ -24,11 +24,6 @@ def connect_signals():
     # ── 1. Diary Appointment created / confirmed ──────────────────────────────
     @receiver(post_save, sender=Appointment, weak=False)
     def on_appointment_saved(sender, instance, created, **kwargs):
-        """
-        Trigger NEW_BOOKING notification when a diary appointment is:
-          - freshly created  (created=True)
-          - OR status transitions to CONFIRMED
-        """
         if created:
             notify_new_booking(instance)
             return
@@ -45,9 +40,5 @@ def connect_signals():
     # ── 2. Portal Booking submitted by patient ────────────────────────────────
     @receiver(post_save, sender=PortalBooking, weak=False)
     def on_portal_booking_saved(sender, instance, created, **kwargs):
-        """
-        Trigger NEW_PORTAL_BOOKING notification the moment a patient
-        submits a booking through the portal — before any staff confirmation.
-        """
         if created:
             notify_new_portal_booking(instance)

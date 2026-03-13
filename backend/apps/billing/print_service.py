@@ -10,15 +10,6 @@ def build_print_payload(queryset: QuerySet) -> dict:
     """
     Given a filtered & ordered Appointment queryset, return a
     dict that the frontend can use to render / print the list.
-
-    Structure:
-    {
-        "total": <int>,
-        "by_status": { "SCHEDULED": 3, ... },
-        "by_practitioner": { "Dr. Juan": 5, ... },
-        "by_branch": { "Main Clinic": 8, ... },
-        "appointments": [ { ... }, ... ]
-    }
     """
     appointments = []
     for appt in queryset.select_related(
@@ -26,7 +17,6 @@ def build_print_payload(queryset: QuerySet) -> dict:
     ):
         appointments.append(_serialize_appointment(appt))
 
-    # ── Aggregate summaries ──────────────────────────────────────────────────
     status_counts = (
         queryset.values('status')
         .annotate(count=Count('id'))
@@ -82,23 +72,17 @@ def _serialize_appointment(appt) -> dict:
         'appointment_type': appt.appointment_type,
         'appointment_type_display': appt.get_appointment_type_display(),
 
-        # Patient
         'patient_id':       appt.patient_id,
         'patient_name':     appt.patient.get_full_name(),
         'patient_number':   appt.patient.patient_number,
 
-        # Practitioner
         'practitioner_id':   appt.practitioner_id,
         'practitioner_name': practitioner_name,
 
-        # Branch
         'clinic_id':         appt.clinic_id,
         'clinic_name':       appt.clinic.name if appt.clinic else '',
         'location_name':     appt.location.name if appt.location else '',
 
-        # Notes (internal, safe to print)
         'chief_complaint':   appt.chief_complaint,
-
-        # Billing indicator
         'has_invoice':       has_invoice,
     }

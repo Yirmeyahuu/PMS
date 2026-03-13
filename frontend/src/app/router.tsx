@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 
 /**
@@ -18,7 +18,6 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   if (!isAuthenticated) {
-    // Redirect to login — do NOT save location.state to prevent redirect abuse
     return <Navigate to="/login" replace />;
   }
 
@@ -41,7 +40,6 @@ export const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   if (isAuthenticated && user) {
-    // Always go to dashboard — never follow location.state.from
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -72,11 +70,38 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    // Redirect to login — no location.state saved
     return <Navigate to="/login" replace />;
   }
 
   if (user && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+/**
+ * ClinicMemberRoute - Requires user to belong to a clinic (any role)
+ * All clinic users (Admin, Staff, Practitioner) are allowed.
+ * Redirects to unauthorized if user has no clinic assigned.
+ */
+export const ClinicMemberRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Must have a clinic assigned — guards against superusers or orphaned accounts
+  if (!user?.clinic) {
     return <Navigate to="/unauthorized" replace />;
   }
 

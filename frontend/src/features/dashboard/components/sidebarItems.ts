@@ -37,7 +37,7 @@ export const sidebarItems: SidebarItem[] = [
     icon: Users,
   },
   {
-    id: 'contacts',
+    id: 'contacts', 
     label: 'Contacts',
     path: '/contacts',
     icon: Contact,
@@ -53,13 +53,11 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Manage',
     path: '/manage',
     icon: FolderCog,
-    adminOnly: true,
   },
   {
     id: 'setup',
     label: 'Setup',
     path: '/setup',
     icon: Settings,
-    adminOnly: true,
   },
 ];

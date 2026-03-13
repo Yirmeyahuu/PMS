@@ -149,7 +149,7 @@ export const AdminMenu2: React.FC = () => {
     clinic_ids:       [],
     status_filter:    ['COMPLETED'],
     invoice_date:     today(),
-    due_date:         '',
+    due_date:         undefined,
     discount_percent: 0,
     tax_percent:      0,
     skip_existing:    true,
@@ -366,9 +366,14 @@ export const AdminMenu2: React.FC = () => {
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
-                {(previewMutation.error as any)?.response?.data?.detail ??
-                 (runMutation.error    as any)?.response?.data?.detail ??
-                 'Something went wrong. Please try again.'}
+                {(() => {
+                  const err = (previewMutation.error ?? runMutation.error) as any;
+                  const detail = err?.response?.data;
+                  if (typeof detail === 'string') return detail;
+                  if (detail?.detail) return detail.detail;
+                  if (typeof detail === 'object') return JSON.stringify(detail);
+                  return 'Something went wrong. Please try again.';
+                })()}
               </span>
             </div>
           )}

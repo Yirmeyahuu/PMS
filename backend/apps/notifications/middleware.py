@@ -37,23 +37,19 @@ def get_user_from_token(token_str: str):
 class JWTAuthMiddleware(BaseMiddleware):
     """
     Drop-in middleware that authenticates WebSocket connections via JWT.
-    Usage in routing:  JWTAuthMiddleware(URLRouter(urlpatterns))
     """
 
     async def __call__(self, scope, receive, send):
-        # Try query string first: ws://host/ws/notifications/?token=xxx
         query_string = scope.get('query_string', b'').decode()
         params       = parse_qs(query_string)
         token_list   = params.get('token', [])
 
         token_str = token_list[0] if token_list else None
 
-        # Fallback: Sec-WebSocket-Protocol header
         if not token_str:
             headers = dict(scope.get('headers', []))
             protocol_header = headers.get(b'sec-websocket-protocol', b'').decode()
             if protocol_header:
-                # Some clients send "Bearer, <token>"
                 parts = [p.strip() for p in protocol_header.split(',')]
                 for part in parts:
                     if part and part.lower() != 'bearer':

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-import { appointmentPrintApi } from '@/features/manage/services/billing.api';
+import { printAppointmentsApi } from '../../services/billing.api';
 import type { AppointmentPrintFilters, AppointmentPrintRecord, AppointmentStatus } from '@/types/billing';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -55,13 +55,13 @@ export const AdminMenu1: React.FC = () => {
     isFetching,
   } = useQuery({
     queryKey: ['appointments-print-list', activeFilters],
-    queryFn:  () => appointmentPrintApi.list(activeFilters, 1, 200),
+    queryFn:  () => printAppointmentsApi.list(activeFilters, 1, 200),
     enabled:  !!(filters.date_from && filters.date_to),
   });
 
   const { data: summary } = useQuery({
     queryKey: ['appointments-print-summary', activeFilters],
-    queryFn:  () => appointmentPrintApi.summary(activeFilters),
+    queryFn:  () => printAppointmentsApi.summary(activeFilters),
     enabled:  !!(filters.date_from && filters.date_to),
   });
 
@@ -83,7 +83,7 @@ export const AdminMenu1: React.FC = () => {
 
   // ── print handler ──────────────────────────────────────────────────────────
   const handlePrint = useCallback(async () => {
-    const payload = await appointmentPrintApi.payload(activeFilters);
+    const payload = await printAppointmentsApi.payload(activeFilters);
     const win = window.open('', '_blank');
     if (!win) return;
 
