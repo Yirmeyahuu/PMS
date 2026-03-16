@@ -14,27 +14,46 @@ export interface AppointmentFilters {
   clinic_branch?: number;
   date_from?: string;
   date_to?: string;
-  // Backend also accepts start_date/end_date (used by diary)
   start_date?: string;
   end_date?: string;
   page?: number;
   page_size?: number;
 }
 
+// ── NEW: Edit payload (restricted fields only) ────────────────────────────────
+export interface AppointmentEditPayload {
+  practitioner?:    number | null;
+  chief_complaint?: string;
+  notes?:           string;
+  patient_notes?:   string;
+}
+
+// ── NEW: Cancel payload ───────────────────────────────────────────────────────
+export interface AppointmentCancelPayload {
+  cancellation_reason: string;
+}
+
+// ── NEW: Cancel response (extends Appointment with email meta) ────────────────
+export interface AppointmentCancelResponse extends Appointment {
+  email_sent:     boolean;
+  email_warning?: string;
+}
+
 export interface PortalBookingDiaryItem {
-  id:               number;
-  reference_number: string;
-  status:           'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
-  patient_name:     string;
-  patient_phone:    string;
-  patient_email:    string;
-  service_name:     string;
-  practitioner_name: string | null;
-  date:             string;   // yyyy-MM-dd
-  start_time:       string;   // HH:MM
-  end_time:         string;   // HH:MM
-  duration_minutes: number;
-  notes:            string;
+  id:                     number;
+  reference_number:       string;
+  status:                 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  patient_name:           string;
+  patient_phone:          string;
+  patient_email:          string;
+  service_name:           string;
+  practitioner_name:      string | null;
+  practitioner_branch_id: number | null;
+  date:                   string;
+  start_time:             string;
+  end_time:               string;
+  duration_minutes:       number;
+  notes:                  string;
 }
 
 /**
@@ -45,19 +64,18 @@ export const getAppointments = async (
 ): Promise<PaginatedResponse<Appointment>> => {
   const params = new URLSearchParams();
 
-  if (filters?.search)            params.append('search',           filters.search);
-  if (filters?.status)            params.append('status',           filters.status);
-  if (filters?.appointment_type)  params.append('appointment_type', filters.appointment_type);
-  if (filters?.patient)           params.append('patient',          String(filters.patient));
-  if (filters?.practitioner)      params.append('practitioner',     String(filters.practitioner));
-  if (filters?.clinic_branch)     params.append('clinic_branch',    String(filters.clinic_branch));
-  if (filters?.date_from)         params.append('date_from',        filters.date_from);
-  if (filters?.date_to)           params.append('date_to',          filters.date_to);
-  // Diary uses start_date/end_date — backend get_queryset reads these
-  if (filters?.start_date)        params.append('start_date',       filters.start_date);
-  if (filters?.end_date)          params.append('end_date',         filters.end_date);
-  if (filters?.page)              params.append('page',             String(filters.page));
-  if (filters?.page_size)         params.append('page_size',        String(filters.page_size));
+  if (filters?.search)           params.append('search',           filters.search);
+  if (filters?.status)           params.append('status',           filters.status);
+  if (filters?.appointment_type) params.append('appointment_type', filters.appointment_type);
+  if (filters?.patient)          params.append('patient',          String(filters.patient));
+  if (filters?.practitioner)     params.append('practitioner',     String(filters.practitioner));
+  if (filters?.clinic_branch)    params.append('clinic_branch',    String(filters.clinic_branch));
+  if (filters?.date_from)        params.append('date_from',        filters.date_from);
+  if (filters?.date_to)          params.append('date_to',          filters.date_to);
+  if (filters?.start_date)       params.append('start_date',       filters.start_date);
+  if (filters?.end_date)         params.append('end_date',         filters.end_date);
+  if (filters?.page)             params.append('page',             String(filters.page));
+  if (filters?.page_size)        params.append('page_size',        String(filters.page_size));
 
   const response = await axiosInstance.get<PaginatedResponse<Appointment>>(
     `/appointments/?${params.toString()}`
@@ -84,13 +102,43 @@ export const createAppointment = async (
 };
 
 /**
- * Update appointment
+ * Full update appointment (existing)
  */
 export const updateAppointment = async (
   id: number,
   data: Partial<CreateAppointmentData>
 ): Promise<Appointment> => {
   const response = await axiosInstance.patch<Appointment>(`/appointments/${id}/`, data);
+  return response.data;
+};
+
+/**
+ * NEW: Restricted edit — only practitioner, chief_complaint, notes, patient_notes
+ * PATCH /api/appointments/{id}/edit/
+ */
+export const editAppointment = async (
+  id: number,
+  data: AppointmentEditPayload
+): Promise<Appointment> => {
+  const response = await axiosInstance.patch<Appointment>(
+    `/appointments/${id}/edit/`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * NEW: Cancel appointment with required reason
+ * POST /api/appointments/{id}/cancel/
+ */
+export const cancelAppointment = async (
+  id: number,
+  data: AppointmentCancelPayload
+): Promise<AppointmentCancelResponse> => {
+  const response = await axiosInstance.post<AppointmentCancelResponse>(
+    `/appointments/${id}/cancel/`,
+    data
+  );
   return response.data;
 };
 

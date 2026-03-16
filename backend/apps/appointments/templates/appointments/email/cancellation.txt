@@ -1,0 +1,30 @@
+{# filepath: apps/appointments/templates/appointments/email/cancellation.txt #}
+APPOINTMENT CANCELLED — {{ clinic_name }}
+
+Dear {{ patient_first_name }},
+
+We're writing to let you know that your appointment has been cancelled.
+
+CANCELLED APPOINTMENT DETAILS
+------------------------------
+Date:         {{ appointment_date }}
+Time:         {{ appointment_time }}
+Type:         {{ appointment_type }}
+Practitioner: {{ practitioner_name }}
+Location:     {{ location_name }}
+{% if cancelled_at %}Cancelled on: {{ cancelled_at }}{% endif %}
+
+REASON FOR CANCELLATION
+------------------------
+{{ cancellation_reason }}
+
+If you believe this was a mistake or would like to reschedule,
+please contact us at your earliest convenience.
+
+{{ clinic_name }}
+{% if clinic_phone %}Phone: {{ clinic_phone }}{% endif %}
+{% if clinic_email %}Email: {{ clinic_email }}{% endif %}
+{% if clinic_address %}Address: {{ clinic_address }}{% endif %}
+
+---
+This is an automated notification. Please do not reply directly to this email.

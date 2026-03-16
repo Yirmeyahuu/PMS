@@ -394,6 +394,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Update staff / practitioner.
         ✅ Validates clinic_branch belongs to the same clinic family on update too.
+        ✅ Creates Practitioner profile when role is changed TO 'PRACTITIONER'.
         """
         if not request.user.is_admin:
             return Response(
@@ -415,12 +416,49 @@ class UserViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        old_role = instance.role
         self.perform_update(serializer)
+        instance.refresh_from_db()
+        new_role = instance.role
+
+        # ── Sync Practitioner profile when role changes ──────────────────────
+        practitioner_created = False
+        if new_role == 'PRACTITIONER' and old_role != 'PRACTITIONER':
+            # Role upgraded to PRACTITIONER — ensure profile exists
+            _, practitioner_created = Practitioner.objects.get_or_create(
+                user=instance,
+                defaults={
+                    'clinic':                 instance.clinic or request.user.clinic,
+                    'license_number':         '',
+                    'specialization':         '',
+                    'consultation_fee':       0,
+                    'is_accepting_patients':  True,
+                },
+            )
+            if practitioner_created:
+                logger.info(
+                    "Practitioner profile created on role change for: %s by %s",
+                    instance.email, request.user.email,
+                )
+
+        elif old_role == 'PRACTITIONER' and new_role != 'PRACTITIONER':
+            # Role downgraded from PRACTITIONER — soft-delete or deactivate profile
+            Practitioner.objects.filter(user=instance).update(is_deleted=True)
+            logger.info(
+                "Practitioner profile deactivated on role change for: %s by %s",
+                instance.email, request.user.email,
+            )
 
         logger.info(
-            f"Staff account updated: {instance.email} by {request.user.email}"
+            "Staff account updated: %s (role: %s → %s) by %s",
+            instance.email, old_role, new_role, request.user.email,
         )
-        return Response(serializer.data)
+
+        response_data = self.get_serializer(instance).data
+        return Response({
+            **response_data,
+            **({'practitioner_profile_created': True} if practitioner_created else {}),
+        })
 
     def destroy(self, request, *args, **kwargs):
         """Soft delete user."""

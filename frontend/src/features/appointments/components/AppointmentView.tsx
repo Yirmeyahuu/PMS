@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
   Receipt, Plus, Printer, CheckCircle, AlertCircle,
@@ -11,7 +11,13 @@ import type { Appointment } from '@/types';
 import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_TYPE_LABELS } from '@/types';
 import { billingApi } from '@/features/billing/billing.api';
 import type { ClinicService } from '@/features/billing/billing.api';
-import type { Invoice, InvoiceItem } from '@/types/billing';
+import type { Invoice } from '@/types/billing';
+
+import { AppointmentEditForm }    from './AppointmentEditForm';
+import { CancelAppointmentModal } from './CancelAppointmentModal';
+import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
+import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';
+import type { AppointmentEditPayload } from '../appointment.api';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const INVOICE_STATUS_STYLES: Record<string, string> = {
@@ -31,16 +37,16 @@ interface AppointmentViewProps {
   appointment: Appointment | null;
   onEdit?:     (appointment: Appointment) => void;
   onDelete?:   (appointment: Appointment) => void;
+  onUpdated?:  (appointment: Appointment) => void;
 }
 
-// ── editable line-item shape ──────────────────────────────────────────────────
 interface EditableItem {
-  id?:          number;       // existing DB id — undefined for new items
-  description:  string;
-  quantity:     number;
-  unit_price:   number;
-  service_id?:  number;       // linked clinic service
-  _key:         string;       // local React key
+  id?:         number;
+  description: string;
+  quantity:    number;
+  unit_price:  number;
+  service_id?: number;
+  _key:        string;
 }
 
 const newBlankItem = (): EditableItem => ({
@@ -72,7 +78,9 @@ const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointmen
           <User className="w-4 h-4 text-sky-500 flex-shrink-0" />
           <div>
             <p className="text-xs text-gray-500">Practitioner</p>
-            <p className="font-semibold text-gray-800">{appointment.practitioner_name}</p>
+            <p className="font-semibold text-gray-800">
+              {appointment.practitioner_name ?? 'Unassigned'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -157,11 +165,10 @@ const ServicePicker: React.FC<{
   );
 };
 
-// ── Invoice Tab Content ───────────────────────────────────────────────────────
+// ── Invoice Tab ───────────────────────────────────────────────────────────────
 const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
   const qc = useQueryClient();
 
-  // ── State ────────────────────────────────────────────────────────────────
   const [isEditing,   setIsEditing]   = useState(false);
   const [editItems,   setEditItems]   = useState<EditableItem[]>([]);
   const [editNotes,   setEditNotes]   = useState('');
@@ -169,13 +176,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   const [pickerIdx,   setPickerIdx]   = useState<number | null>(null);
   const [saveError,   setSaveError]   = useState<string | null>(null);
 
-  // ── Queries ──────────────────────────────────────────────────────────────
-  const {
-    data:      invoice,
-    isLoading,
-    error:     fetchError,
-    refetch,
-  } = useQuery<Invoice | null>({
+  const { data: invoice, isLoading, error: fetchError, refetch } = useQuery<Invoice | null>({
     queryKey: ['appointment-invoice', appointment.id],
     queryFn:  () => billingApi.getByAppointment(appointment.id),
     retry: (failureCount, error: any) => {
@@ -190,7 +191,6 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── Mutations ────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (items?: EditableItem[]) =>
       billingApi.createFromAppointment({
@@ -213,15 +213,9 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!invoice) throw new Error('No invoice');
-
-      // 1. Delete removed items
-      const keepIds = new Set(editItems.filter(i => i.id).map(i => i.id!));
+      const keepIds  = new Set(editItems.filter(i => i.id).map(i => i.id!));
       const toDelete = invoice.items.filter(i => !keepIds.has(i.id));
-      for (const item of toDelete) {
-        await billingApi.deleteItem(item.id);
-      }
-
-      // 2. Update existing items
+      for (const item of toDelete) await billingApi.deleteItem(item.id);
       for (const item of editItems.filter(i => i.id)) {
         await billingApi.updateItem(item.id!, {
           description: item.description,
@@ -229,8 +223,6 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           unit_price:  String(item.unit_price) as any,
         });
       }
-
-      // 3. Add new items
       for (const item of editItems.filter(i => !i.id)) {
         if (!item.description.trim()) continue;
         await billingApi.addItem(invoice.id, {
@@ -240,8 +232,6 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           unit_price:  String(item.unit_price),
         });
       }
-
-      // 4. Update invoice-level fields
       await billingApi.updateInvoice(invoice.id, {
         notes:    editNotes,
         due_date: editDueDate || null,
@@ -260,86 +250,57 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     },
   });
 
-  // ── Populate edit state from invoice ─────────────────────────────────────
   const startEditing = useCallback(() => {
     if (!invoice) return;
-    setEditItems(
-      invoice.items.map(item => ({
-        id:          item.id,
-        description: item.description,
-        quantity:    item.quantity,
-        unit_price:  parseFloat(item.unit_price),
-        _key:        String(item.id),
-      })),
-    );
+    setEditItems(invoice.items.map(item => ({
+      id: item.id, description: item.description,
+      quantity: item.quantity, unit_price: parseFloat(item.unit_price),
+      _key: String(item.id),
+    })));
     setEditNotes(invoice.notes || '');
     setEditDueDate(invoice.due_date || '');
     setSaveError(null);
     setIsEditing(true);
   }, [invoice]);
 
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setPickerIdx(null);
-    setSaveError(null);
-  };
-
-  // ── Item helpers ─────────────────────────────────────────────────────────
-  const updateItem = (key: string, patch: Partial<EditableItem>) => {
-    setEditItems(prev => prev.map(i => (i._key === key ? { ...i, ...patch } : i)));
-  };
-
-  const removeItem = (key: string) => {
+  const cancelEditing = () => { setIsEditing(false); setPickerIdx(null); setSaveError(null); };
+  const updateItem    = (key: string, patch: Partial<EditableItem>) =>
+    setEditItems(prev => prev.map(i => i._key === key ? { ...i, ...patch } : i));
+  const removeItem    = (key: string) =>
     setEditItems(prev => prev.filter(i => i._key !== key));
-  };
-
-  const addServiceItem = (svc: ClinicService, idx: number) => {
-    setEditItems(prev =>
-      prev.map((item, i) =>
-        i === idx
-          ? { ...item, description: svc.name, unit_price: parseFloat(svc.price), service_id: svc.id }
-          : item,
-      ),
-    );
-  };
-
+  const addServiceItem = (svc: ClinicService, idx: number) =>
+    setEditItems(prev => prev.map((item, i) =>
+      i === idx ? { ...item, description: svc.name, unit_price: parseFloat(svc.price), service_id: svc.id } : item
+    ));
   const computeSubtotal = () =>
     editItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
 
-  // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-400">
-        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-        Loading invoice…
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading invoice…
       </div>
     );
   }
 
-  // ── No invoice yet ─────────────────────────────────────────────────────
   if (!invoice) {
     return (
       <div className="space-y-4">
         <AppointmentSummary appointment={appointment} />
-
         <div className="flex flex-col items-center justify-center py-8 space-y-4">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
             <Receipt className="w-8 h-8 text-gray-400" />
           </div>
           <div className="text-center">
             <p className="text-sm font-semibold text-gray-700">No invoice yet</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Generate an invoice for this appointment
-            </p>
+            <p className="text-xs text-gray-400 mt-1">Generate an invoice for this appointment</p>
           </div>
-
           {fetchError && (fetchError as any)?.response?.status !== 404 && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>Failed to check existing invoice. Please try refreshing.</span>
             </div>
           )}
-
           {createMutation.isError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -349,92 +310,55 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
                   const detail = err?.response?.data;
                   if (typeof detail === 'string') return detail;
                   if (detail?.detail) return detail.detail;
-                  if (detail?.appointment && Array.isArray(detail.appointment))
-                    return detail.appointment.join(' ');
+                  if (detail?.appointment && Array.isArray(detail.appointment)) return detail.appointment.join(' ');
                   if (typeof detail === 'object') return JSON.stringify(detail);
                   return 'Failed to create invoice. Please try again.';
                 })()}
               </span>
             </div>
           )}
-
-          {/* Service-based quick-add before generating */}
           {clinicServices.length > 0 && (
             <div className="w-full border border-gray-200 rounded-xl overflow-hidden">
               <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  Select Services to Include
-                </p>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Select Services to Include</p>
               </div>
               <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
                 {clinicServices.map(svc => {
                   const isSelected = editItems.some(i => i.service_id === svc.id);
                   return (
-                    <button
-                      key={svc.id}
+                    <button key={svc.id}
                       onClick={() => {
-                        if (isSelected) {
-                          setEditItems(prev => prev.filter(i => i.service_id !== svc.id));
-                        } else {
-                          setEditItems(prev => [
-                            ...prev,
-                            {
-                              description: svc.name,
-                              quantity:    1,
-                              unit_price:  parseFloat(svc.price),
-                              service_id:  svc.id,
-                              _key:        crypto.randomUUID(),
-                            },
-                          ]);
-                        }
+                        if (isSelected) setEditItems(prev => prev.filter(i => i.service_id !== svc.id));
+                        else setEditItems(prev => [...prev, { description: svc.name, quantity: 1, unit_price: parseFloat(svc.price), service_id: svc.id, _key: crypto.randomUUID() }]);
                       }}
-                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors ${
-                        isSelected ? 'bg-sky-50' : 'hover:bg-gray-50'
-                      }`}
+                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors ${isSelected ? 'bg-sky-50' : 'hover:bg-gray-50'}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                          isSelected
-                            ? 'bg-sky-600 border-sky-600'
-                            : 'border-gray-300'
-                        }`}>
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-sky-600 border-sky-600' : 'border-gray-300'}`}>
                           {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{svc.name}</p>
-                          {svc.duration_minutes > 0 && (
-                            <p className="text-xs text-gray-400">{svc.duration_minutes} min</p>
-                          )}
+                          {svc.duration_minutes > 0 && <p className="text-xs text-gray-400">{svc.duration_minutes} min</p>}
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">
-                        ₱{parseFloat(svc.price).toLocaleString()}
-                      </span>
+                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">₱{parseFloat(svc.price).toLocaleString()}</span>
                     </button>
                   );
                 })}
               </div>
               {editItems.length > 0 && (
                 <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">
-                    {editItems.length} service{editItems.length > 1 ? 's' : ''} selected
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    ₱{editItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toLocaleString()}
-                  </span>
+                  <span className="text-xs text-gray-500">{editItems.length} service{editItems.length > 1 ? 's' : ''} selected</span>
+                  <span className="text-sm font-bold text-gray-900">₱{editItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toLocaleString()}</span>
                 </div>
               )}
             </div>
           )}
-
-          <button
-            onClick={() => createMutation.mutate(editItems.length > 0 ? editItems : undefined)}
+          <button onClick={() => createMutation.mutate(editItems.length > 0 ? editItems : undefined)}
             disabled={createMutation.isPending}
-            className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-          >
-            {createMutation.isPending
-              ? <RefreshCw className="w-4 h-4 animate-spin" />
-              : <Plus className="w-4 h-4" />}
+            className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium">
+            {createMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {createMutation.isPending ? 'Generating…' : 'Generate Invoice'}
           </button>
         </div>
@@ -442,202 +366,99 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     );
   }
 
-  // ── Invoice exists — Edit Mode ─────────────────────────────────────────
   if (isEditing) {
     return (
       <div className="space-y-4">
         <AppointmentSummary appointment={appointment} />
-
-        {/* Edit header */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Editing Invoice</p>
-            <p className="text-base font-bold text-gray-900 font-mono">
-              {invoice.invoice_number}
-            </p>
+            <p className="text-base font-bold text-gray-900 font-mono">{invoice.invoice_number}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={cancelEditing}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              Cancel
+            <button onClick={cancelEditing} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <XCircle className="w-3.5 h-3.5" />Cancel
             </button>
-            <button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-medium hover:bg-sky-700 disabled:opacity-50 transition-colors"
-            >
-              {saveMutation.isPending
-                ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                : <Save className="w-3.5 h-3.5" />}
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-medium hover:bg-sky-700 disabled:opacity-50 transition-colors">
+              {saveMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saveMutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </div>
-
         {saveError && (
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{saveError}</span>
+            <AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{saveError}</span>
           </div>
         )}
-
-        {/* Due date */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
             <p className="text-xs text-gray-500">Invoice Date</p>
-            <p className="text-sm font-semibold text-gray-800 mt-0.5">
-              {format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
-            </p>
+            <p className="text-sm font-semibold text-gray-800 mt-0.5">{format(new Date(invoice.invoice_date), 'MMM d, yyyy')}</p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
             <label className="text-xs text-gray-500 block">Due Date</label>
-            <input
-              type="date"
-              value={editDueDate}
-              onChange={e => setEditDueDate(e.target.value)}
-              className="mt-0.5 text-sm font-semibold text-gray-800 bg-transparent outline-none w-full"
-            />
+            <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} className="mt-0.5 text-sm font-semibold text-gray-800 bg-transparent outline-none w-full" />
           </div>
         </div>
-
-        {/* Editable line items */}
         <div className="border border-gray-200 rounded-xl overflow-visible">
           <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Line Items
-            </p>
-            <button
-              onClick={() => setEditItems(prev => [...prev, newBlankItem()])}
-              className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Item
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Line Items</p>
+            <button onClick={() => setEditItems(prev => [...prev, newBlankItem()])} className="flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700">
+              <Plus className="w-3.5 h-3.5" />Add Item
             </button>
           </div>
-
           <div className="divide-y divide-gray-100">
             {editItems.map((item, idx) => (
               <div key={item._key} className="px-4 py-3 space-y-2 relative">
-                {/* Description row with service picker */}
                 <div className="flex items-start gap-2">
                   <div className="flex-1 relative">
                     <label className="text-xs text-gray-400 block mb-0.5">Description</label>
                     <div className="flex gap-1">
-                      <input
-                        value={item.description}
-                        onChange={e => updateItem(item._key, { description: e.target.value })}
-                        placeholder="Item description"
-                        className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
-                      />
-                      <button
-                        onClick={() => setPickerIdx(pickerIdx === idx ? null : idx)}
-                        className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors flex-shrink-0"
-                        title="Pick from clinic services"
-                        type="button"
-                      >
+                      <input value={item.description} onChange={e => updateItem(item._key, { description: e.target.value })} placeholder="Item description" className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200" />
+                      <button onClick={() => setPickerIdx(pickerIdx === idx ? null : idx)} className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors flex-shrink-0" type="button">
                         <Search className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    {pickerIdx === idx && (
-                      <ServicePicker
-                        services={clinicServices}
-                        onSelect={svc => addServiceItem(svc, idx)}
-                        onClose={() => setPickerIdx(null)}
-                      />
-                    )}
+                    {pickerIdx === idx && <ServicePicker services={clinicServices} onSelect={svc => addServiceItem(svc, idx)} onClose={() => setPickerIdx(null)} />}
                   </div>
-                  <button
-                    onClick={() => removeItem(item._key)}
-                    className="mt-5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                    title="Remove"
-                  >
+                  <button onClick={() => removeItem(item._key)} className="mt-5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-
-                {/* Qty & Price row */}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="text-xs text-gray-400 block mb-0.5">Qty</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={e => updateItem(item._key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
-                    />
+                    <input type="number" min={1} value={item.quantity} onChange={e => updateItem(item._key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-0.5">Unit Price (₱)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.unit_price}
-                      onChange={e => updateItem(item._key, { unit_price: parseFloat(e.target.value) || 0 })}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200"
-                    />
+                    <input type="number" min={0} step="0.01" value={item.unit_price} onChange={e => updateItem(item._key, { unit_price: parseFloat(e.target.value) || 0 })} className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-0.5">Line Total</label>
-                    <p className="text-sm font-semibold text-gray-800 px-2.5 py-1.5">
-                      ₱{(item.quantity * item.unit_price).toLocaleString()}
-                    </p>
+                    <p className="text-sm font-semibold text-gray-800 px-2.5 py-1.5">₱{(item.quantity * item.unit_price).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
             ))}
-
-            {editItems.length === 0 && (
-              <div className="px-4 py-8 text-center">
-                <p className="text-xs text-gray-400">No items. Click "Add Item" above.</p>
-              </div>
-            )}
+            {editItems.length === 0 && <div className="px-4 py-8 text-center"><p className="text-xs text-gray-400">No items. Click "Add Item" above.</p></div>}
           </div>
-
-          {/* Edit subtotal */}
           <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <span className="text-sm font-semibold text-gray-700">Subtotal</span>
-            <span className="text-sm font-bold text-gray-900">
-              ₱{computeSubtotal().toLocaleString()}
-            </span>
+            <span className="text-sm font-bold text-gray-900">₱{computeSubtotal().toLocaleString()}</span>
           </div>
         </div>
-
-        {/* Quick-add from services */}
         {clinicServices.length > 0 && (
           <div className="border border-dashed border-sky-200 rounded-xl p-3">
-            <p className="text-xs font-semibold text-sky-700 mb-2 uppercase tracking-wide">
-              Quick Add from Services
-            </p>
+            <p className="text-xs font-semibold text-sky-700 mb-2 uppercase tracking-wide">Quick Add from Services</p>
             <div className="flex flex-wrap gap-1.5">
               {clinicServices.map(svc => {
                 const alreadyAdded = editItems.some(i => i.service_id === svc.id);
                 return (
-                  <button
-                    key={svc.id}
-                    disabled={alreadyAdded}
-                    onClick={() => {
-                      setEditItems(prev => [
-                        ...prev,
-                        {
-                          description: svc.name,
-                          quantity:    1,
-                          unit_price:  parseFloat(svc.price),
-                          service_id:  svc.id,
-                          _key:        crypto.randomUUID(),
-                        },
-                      ]);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                      alreadyAdded
-                        ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                        : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'
-                    }`}
-                  >
+                  <button key={svc.id} disabled={alreadyAdded}
+                    onClick={() => setEditItems(prev => [...prev, { description: svc.name, quantity: 1, unit_price: parseFloat(svc.price), service_id: svc.id, _key: crypto.randomUUID() }])}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${alreadyAdded ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : 'bg-white text-sky-700 border-sky-200 hover:bg-sky-50'}`}>
                     {svc.name} · ₱{parseFloat(svc.price).toLocaleString()}
                   </button>
                 );
@@ -645,94 +466,45 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
             </div>
           </div>
         )}
-
-        {/* Notes */}
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
-            Notes
-          </label>
-          <textarea
-            value={editNotes}
-            onChange={e => setEditNotes(e.target.value)}
-            rows={3}
-            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 resize-none"
-            placeholder="Optional notes…"
-          />
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes</label>
+          <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 resize-none" placeholder="Optional notes…" />
         </div>
       </div>
     );
   }
 
-  // ── Invoice exists — View Mode ─────────────────────────────────────────
   const canEdit = invoice.status === 'DRAFT' || invoice.status === 'PENDING';
 
   return (
     <div className="space-y-4">
       <AppointmentSummary appointment={appointment} />
-
-      {/* Invoice header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-500">Invoice Number</p>
-          <p className="text-base font-bold text-gray-900 font-mono">
-            {invoice.invoice_number}
-          </p>
+          <p className="text-base font-bold text-gray-900 font-mono">{invoice.invoice_number}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_STATUS_STYLES[invoice.status] ?? ''}`}>
-            {invoice.status_display}
-          </span>
-          {canEdit && (
-            <button
-              onClick={startEditing}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Edit
-            </button>
-          )}
-          <button
-            onClick={() => billingApi.print(invoice.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            Print
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_STATUS_STYLES[invoice.status] ?? ''}`}>{invoice.status_display}</span>
+          {canEdit && <button onClick={startEditing} className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"><Edit3 className="w-3.5 h-3.5" />Edit</button>}
+          <button onClick={() => billingApi.print(invoice.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"><Printer className="w-3.5 h-3.5" />Print</button>
+          <button onClick={() => refetch()} className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"><RefreshCw className="w-3.5 h-3.5" /></button>
         </div>
       </div>
-
-      {/* Dates */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
           <p className="text-xs text-gray-500">Invoice Date</p>
-          <p className="text-sm font-semibold text-gray-800 mt-0.5">
-            {format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
-          </p>
+          <p className="text-sm font-semibold text-gray-800 mt-0.5">{format(new Date(invoice.invoice_date), 'MMM d, yyyy')}</p>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
           <p className="text-xs text-gray-500">Due Date</p>
-          <p className="text-sm font-semibold text-gray-800 mt-0.5">
-            {invoice.due_date
-              ? format(new Date(invoice.due_date), 'MMM d, yyyy')
-              : <span className="text-gray-400">—</span>}
-          </p>
+          <p className="text-sm font-semibold text-gray-800 mt-0.5">{invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : <span className="text-gray-400">—</span>}</p>
         </div>
       </div>
-
-      {/* Line items */}
       {invoice.items.length > 0 && (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
           <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Items
-            </p>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Items</p>
           </div>
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100">
@@ -748,20 +520,14 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 text-gray-800">{item.description}</td>
                   <td className="px-4 py-2.5 text-right text-gray-600">{item.quantity}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">
-                    ₱{parseFloat(item.unit_price).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">
-                    ₱{parseFloat(item.total).toLocaleString()}
-                  </td>
+                  <td className="px-4 py-2.5 text-right text-gray-600">₱{parseFloat(item.unit_price).toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">₱{parseFloat(item.total).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-
-      {/* Totals */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
         {[
           { label: 'Subtotal', value: invoice.subtotal },
@@ -775,44 +541,28 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
         ))}
         <div className="border-t border-gray-200 pt-2 flex items-center justify-between">
           <span className="text-sm font-bold text-gray-900">Total</span>
-          <span className="text-base font-bold text-gray-900">
-            ₱{parseFloat(invoice.total_amount).toLocaleString()}
-          </span>
+          <span className="text-base font-bold text-gray-900">₱{parseFloat(invoice.total_amount).toLocaleString()}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Amount Paid</span>
-          <span className="text-green-600 font-medium">
-            ₱{parseFloat(invoice.amount_paid).toLocaleString()}
-          </span>
+          <span className="text-green-600 font-medium">₱{parseFloat(invoice.amount_paid).toLocaleString()}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold text-gray-700">Balance Due</span>
-          <span className={`font-bold ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-            ₱{parseFloat(invoice.balance_due).toLocaleString()}
-          </span>
+          <span className={`font-bold ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{parseFloat(invoice.balance_due).toLocaleString()}</span>
         </div>
       </div>
-
-      {/* Notes */}
       {invoice.notes && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
           <p className="text-xs font-semibold text-amber-700 mb-1">Notes</p>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
         </div>
       )}
-
-      {/* Mark as paid action */}
       {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
         <div className="flex justify-end pt-1">
-          <button
-            onClick={async () => {
-              await billingApi.updateStatus(invoice.id, 'PAID');
-              qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] });
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium"
-          >
-            <CheckCircle className="w-4 h-4" />
-            Mark as Paid
+          <button onClick={async () => { await billingApi.updateStatus(invoice.id, 'PAID'); qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] }); }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium">
+            <CheckCircle className="w-4 h-4" />Mark as Paid
           </button>
         </div>
       )}
@@ -820,15 +570,62 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main AppointmentView Component ────────────────────────────────────────────
 export const AppointmentView: React.FC<AppointmentViewProps> = ({
   isOpen,
   onClose,
-  appointment,
+  appointment: initialAppointment,
   onEdit,
   onDelete,
+  onUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('details');
+  const [activeTab,       setActiveTab]       = useState<Tab>('details');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // ── KEY FIX: Track the last appointment ID we loaded ─────────────────────
+  // Only reset local state when a DIFFERENT appointment is opened,
+  // not on every prop change (which would overwrite our optimistic update).
+  const lastAppointmentIdRef = useRef<number | null>(null);
+
+  // ── Local appointment state — source of truth inside the modal ───────────
+  const [appointment, setAppointment] = useState<Appointment | null>(initialAppointment);
+
+  // ── Sync ONLY when a new appointment is opened (id changes) ───────────────
+  useEffect(() => {
+    if (!initialAppointment) {
+      setAppointment(null);
+      lastAppointmentIdRef.current = null;
+      return;
+    }
+
+    // A different appointment was selected — reset everything
+    if (initialAppointment.id !== lastAppointmentIdRef.current) {
+      setAppointment(initialAppointment);
+      lastAppointmentIdRef.current = initialAppointment.id;
+    }
+    // If same appointment id, do NOT overwrite — we may have local edits
+    // applied from a successful save that haven't propagated up yet.
+  }, [initialAppointment]);
+
+  const {
+    isEditing, isSaving, isDirty, editError,
+    isCancelling, cancelError,
+    startEdit, cancelEdit, saveEdit,
+    cancelAppointmentAction, markDirty,
+  } = useAppointmentEdit();
+
+  const { practitioners, loading: loadingPractitioners } = usePractitioners();
+
+  // ── Reset modal state when closed ────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen) {
+      cancelEdit();
+      setShowCancelModal(false);
+      setActiveTab('details');
+      // Reset the ID tracker so next open always seeds fresh
+      lastAppointmentIdRef.current = null;
+    }
+  }, [isOpen, cancelEdit]);
 
   if (!isOpen || !appointment) return null;
 
@@ -836,24 +633,50 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const typeLabel     = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
   const formattedTime = `${appointment.start_time} - ${appointment.end_time}`;
+  const isCancelled   = appointment.status === 'CANCELLED';
+  const isCompleted   = appointment.status === 'COMPLETED';
+  const isTerminal    = isCancelled || isCompleted;
 
   const formatDuration = (minutes: number): string => {
     if (minutes < 60) return `${minutes} min`;
     const hours = Math.floor(minutes / 60);
     const mins  = minutes % 60;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
+    return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+  };
+
+  // ── KEY FIX: After save, update local state directly from API response ────
+  const handleSaveEdit = async (payload: AppointmentEditPayload) => {
+    const updated = await saveEdit(appointment.id, payload);
+    if (updated) {
+      // ✅ Immediately update the modal's local state with the full
+      //    appointment returned by the backend — no reload needed.
+      setAppointment(updated);
+      // Also update the ref so the parent sync useEffect won't overwrite us
+      lastAppointmentIdRef.current = updated.id;
+      // Bubble up to parent (Calendar/Diary) to update its list too
+      onUpdated?.(updated);
+    }
+  };
+
+  const handleCancelAppointment = async (reason: string) => {
+    const updated = await cancelAppointmentAction(appointment.id, {
+      cancellation_reason: reason,
+    });
+    if (updated) {
+      setAppointment(updated);
+      lastAppointmentIdRef.current = updated.id;
+      onUpdated?.(updated);
+      setShowCancelModal(false);
+    }
   };
 
   return (
     <>
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 transition-opacity duration-300"
-        onClick={onClose}
+        className="fixed inset-0 bg-black/50 z-50 backdrop-blur-md transition-opacity duration-300"
+        onClick={isEditing ? undefined : onClose}
       />
 
-      {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
@@ -862,11 +685,20 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                isCancelled ? 'bg-red-100' : 'bg-sky-600'
+              }`}>
+                <Calendar className={`w-5 h-5 ${isCancelled ? 'text-red-500' : 'text-white'}`} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-900">Appointment Details</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-gray-900">Appointment Details</h2>
+                  {isEditing && (
+                    <span className="px-2 py-0.5 bg-sky-100 text-sky-700 text-xs font-semibold rounded-full">
+                      Editing
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">{appointment.patient_name}</p>
               </div>
             </div>
@@ -887,7 +719,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
             ] as { key: Tab; label: string; icon: React.ElementType }[]).map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { setActiveTab(tab.key); if (isEditing) cancelEdit(); }}
                 className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
                   activeTab === tab.key
                     ? 'border-sky-500 text-sky-600'
@@ -902,146 +734,189 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
           {/* ── Content ── */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
-
-            {/* ── Details Tab ── */}
             {activeTab === 'details' && (
               <div className="space-y-4">
-                {/* Status + Type */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
-                    {appointment.status.replace('_', ' ')}
-                  </span>
-                  <span className="text-gray-300 text-sm">·</span>
-                  <span className="text-sm font-medium text-gray-600">{typeLabel}</span>
-                </div>
 
-                {/* Date & Time */}
-                <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Cancelled banner */}
+                {isCancelled && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-1">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-sky-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-sky-600 font-medium">Date</p>
-                        <p className="text-sm font-semibold text-gray-900">{formattedDate}</p>
+                      <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-red-700">This appointment has been cancelled.</p>
+                    </div>
+                    {appointment.cancellation_reason && (
+                      <p className="text-xs text-red-600 pl-6">
+                        Reason: {appointment.cancellation_reason}
+                      </p>
+                    )}
+                    {appointment.cancelled_at && (
+                      <p className="text-xs text-red-500 pl-6">
+                        Cancelled on {format(new Date(appointment.cancelled_at), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit Form OR Read-only view */}
+                {isEditing ? (
+                  <AppointmentEditForm
+                    appointment={appointment}
+                    practitioners={practitioners}
+                    loadingPractitioners={loadingPractitioners}
+                    isSaving={isSaving}
+                    isDirty={isDirty}
+                    editError={editError}
+                    onSave={handleSaveEdit}
+                    onCancel={cancelEdit}
+                    onMarkDirty={markDirty}
+                  />
+                ) : (
+                  <>
+                    {/* Status + Type */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
+                        {appointment.status.replace('_', ' ')}
+                      </span>
+                      <span className="text-gray-300 text-sm">·</span>
+                      <span className="text-sm font-medium text-gray-600">{typeLabel}</span>
+                    </div>
+
+                    {/* Date & Time */}
+                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-sky-600 font-medium">Date</p>
+                            <p className="text-sm font-semibold text-gray-900">{formattedDate}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-sky-600 font-medium">Time</p>
+                            <p className="text-sm font-semibold text-gray-900">{formattedTime}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-sky-600 font-medium">Duration</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {formatDuration(appointment.duration_minutes)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-sky-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-sky-600 font-medium">Time</p>
-                        <p className="text-sm font-semibold text-gray-900">{formattedTime}</p>
+
+                    {/* Patient & Practitioner */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <User className="w-4 h-4 text-sky-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Patient</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900">{appointment.patient_name}</p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-sky-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-sky-600 font-medium">Duration</p>
+                      <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <User className="w-4 h-4 text-sky-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Practitioner</span>
+                        </div>
                         <p className="text-sm font-semibold text-gray-900">
-                          {formatDuration(appointment.duration_minutes)}
+                          {appointment.practitioner_name ?? (
+                            <span className="text-gray-400 font-normal italic">Unassigned</span>
+                          )}
                         </p>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Patient & Practitioner */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <User className="w-4 h-4 text-sky-600" />
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Patient</span>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900">{appointment.patient_name}</p>
-                  </div>
-                  <div className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <User className="w-4 h-4 text-sky-600" />
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Practitioner</span>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900">{appointment.practitioner_name}</p>
-                  </div>
-                </div>
+                    {/* Location */}
+                    {appointment.location_name && (
+                      <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <MapPin className="w-4 h-4 text-sky-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Location</span>
+                        </div>
+                        <p className="text-sm text-gray-900">{appointment.location_name}</p>
+                      </div>
+                    )}
 
-                {/* Location */}
-                {appointment.location_name && (
-                  <div className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <MapPin className="w-4 h-4 text-sky-600" />
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Location</span>
-                    </div>
-                    <p className="text-sm text-gray-900">{appointment.location_name}</p>
-                  </div>
-                )}
+                    {/* Chief Complaint */}
+                    {appointment.chief_complaint ? (
+                      <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <FileText className="w-4 h-4 text-sky-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Chief Complaint</span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.chief_complaint}</p>
+                      </div>
+                    ) : (
+                      !isTerminal && (
+                        <div className="border border-dashed border-gray-200 rounded-xl p-4 text-center">
+                          <p className="text-xs text-gray-400">No chief complaint recorded.</p>
+                        </div>
+                      )
+                    )}
 
-                {/* Chief Complaint */}
-                {appointment.chief_complaint && (
-                  <div className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <FileText className="w-4 h-4 text-sky-600" />
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Chief Complaint</span>
-                    </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.chief_complaint}</p>
-                  </div>
-                )}
+                    {/* Internal Notes */}
+                    {appointment.notes ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <FileText className="w-4 h-4 text-amber-600" />
+                          <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Internal Notes</span>
+                          <span className="text-xs text-amber-500">(Staff Only)</span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.notes}</p>
+                      </div>
+                    ) : null}
 
-                {/* Internal Notes */}
-                {appointment.notes && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <FileText className="w-4 h-4 text-amber-600" />
-                      <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Internal Notes</span>
-                      <span className="text-xs text-amber-500">(Staff Only)</span>
-                    </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.notes}</p>
-                  </div>
-                )}
+                    {/* Patient Notes */}
+                    {appointment.patient_notes ? (
+                      <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <FileText className="w-4 h-4 text-sky-600" />
+                          <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">Patient Notes</span>
+                          <span className="text-xs text-sky-500">(Visible to Patient)</span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.patient_notes}</p>
+                      </div>
+                    ) : null}
 
-                {/* Patient Notes */}
-                {appointment.patient_notes && (
-                  <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <FileText className="w-4 h-4 text-sky-600" />
-                      <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">Patient Notes</span>
-                      <span className="text-xs text-sky-500">(Visible to Patient)</span>
-                    </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.patient_notes}</p>
-                  </div>
-                )}
-
-                {/* Metadata */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
-                  {[
-                    { label: 'Created by', value: appointment.created_by_name || 'Unknown' },
-                    { label: 'Created at', value: format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a') },
-                    ...(appointment.updated_by_name
-                      ? [
+                    {/* Metadata — shows updated_by after a save */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+                      {[
+                        { label: 'Created by', value: appointment.created_by_name || 'Unknown' },
+                        { label: 'Created at', value: format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a') },
+                        ...(appointment.updated_by_name ? [
                           { label: 'Last updated by', value: appointment.updated_by_name },
                           { label: 'Updated at',      value: format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a') },
-                        ]
-                      : []),
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">{label}</span>
-                      <span className="text-xs font-medium text-gray-900">{value}</span>
+                        ] : []),
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">{label}</span>
+                          <span className="text-xs font-medium text-gray-900">{value}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                {/* Quick link to invoice tab */}
-                <button
-                  onClick={() => setActiveTab('invoice')}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-sky-600" />
-                    <span className="text-sm font-medium text-sky-700">View / Generate Invoice</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-sky-400" />
-                </button>
+                    {/* Quick link to invoice tab */}
+                    <button
+                      onClick={() => setActiveTab('invoice')}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Receipt className="w-4 h-4 text-sky-600" />
+                        <span className="text-sm font-medium text-sky-700">View / Generate Invoice</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-sky-400" />
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
-            {/* ── Invoice Tab ── */}
             {activeTab === 'invoice' && (
               <InvoiceTab appointment={appointment} />
             )}
@@ -1055,31 +930,41 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
             >
               Close
             </button>
-            {activeTab === 'details' && (
+
+            {activeTab === 'details' && !isEditing && (
               <div className="flex items-center gap-2">
-                {onEdit && (
+                {!isTerminal && (
                   <button
-                    onClick={() => onEdit(appointment)}
-                    className="px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
+                    onClick={startEdit}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
                   >
+                    <Edit3 className="w-3.5 h-3.5" />
                     Edit
                   </button>
                 )}
-                {onDelete &&
-                  appointment.status !== 'COMPLETED' &&
-                  appointment.status !== 'CANCELLED' && (
-                    <button
-                      onClick={() => onDelete(appointment)}
-                      className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      Cancel Appointment
-                    </button>
-                  )}
+                {!isTerminal && (
+                  <button
+                    onClick={() => setShowCancelModal(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    Cancel Appointment
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <CancelAppointmentModal
+        isOpen={showCancelModal}
+        appointment={appointment}
+        isCancelling={isCancelling}
+        cancelError={cancelError}
+        onConfirm={handleCancelAppointment}
+        onClose={() => setShowCancelModal(false)}
+      />
     </>
   );
 };

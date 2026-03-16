@@ -153,7 +153,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50 transition-opacity duration-300" onClick={handleClose} />
+      <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-md transition-opacity duration-300" onClick={handleClose} />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div

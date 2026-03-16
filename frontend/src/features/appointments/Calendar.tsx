@@ -57,7 +57,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const { startDate, endDate } = getDateRange();
 
-  const { appointments, portalBookings, loading, refetch, removePortalBooking } = useAppointments({
+  const { appointments, portalBookings, loading, refetch, removePortalBooking, updateAppointmentInState } = useAppointments({
     startDate,
     endDate,
     practitionerId: selectedPractitionerId,
@@ -368,6 +368,10 @@ export const Calendar: React.FC<CalendarProps> = ({
           appointment={selectedAppointment}
           onEdit={(apt) => console.log('Edit:', apt)}
           onDelete={(apt) => console.log('Delete:', apt)}
+          onUpdated={(updated) => {
+            updateAppointmentInState(updated);
+            setSelectedAppointment(updated);
+          }}
         />
         <AppointmentConfirmationModal
           isOpen={isConfirmModalOpen}
@@ -489,7 +493,15 @@ export const Calendar: React.FC<CalendarProps> = ({
         </div>
 
         <AppointmentModal isOpen={isOpen} onClose={handleModalClose} selectedSlot={selectedSlot} />
-        <AppointmentView isOpen={isViewOpen} onClose={handleViewClose} appointment={selectedAppointment} />
+        <AppointmentView
+          isOpen={isViewOpen}
+          onClose={handleViewClose}
+          appointment={selectedAppointment}
+          onUpdated={(updated) => {
+            updateAppointmentInState(updated);
+            setSelectedAppointment(updated);
+          }}
+        />
         <AppointmentConfirmationModal
           isOpen={isConfirmModalOpen}
           booking={selectedPortalBooking}
@@ -618,7 +630,16 @@ export const Calendar: React.FC<CalendarProps> = ({
           </div>
         </div>
 
-        <AppointmentView isOpen={isViewOpen} onClose={handleViewClose} appointment={selectedAppointment} />
+        <AppointmentModal isOpen={isOpen} onClose={handleModalClose} selectedSlot={selectedSlot} />
+        <AppointmentView
+          isOpen={isViewOpen}
+          onClose={handleViewClose}
+          appointment={selectedAppointment}
+          onUpdated={(updated) => {
+            updateAppointmentInState(updated);
+            setSelectedAppointment(updated);
+          }}
+        />
         <AppointmentConfirmationModal
           isOpen={isConfirmModalOpen}
           booking={selectedPortalBooking}

@@ -10,7 +10,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
+from rest_framework.views import APIView
 from apps.appointments.models import Appointment
 from .authentication import QueryParamJWTAuthentication
 from .bulk_invoice_service import preview_bulk_invoice, run_bulk_invoice
@@ -615,3 +615,209 @@ class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
     def payload(self, request):
         qs = self.filter_queryset(self.get_queryset())
         return Response(build_print_payload(qs))
+
+
+
+class UninvoicedBookingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    # ── Shared logic ──────────────────────────────────────────────────────────
+    def _get_data(self, request):
+        user = request.user
+        if not user.clinic:
+            return None, Response(
+                {'detail': 'User has no clinic assigned.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        main_clinic    = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
+        start_date_str = request.query_params.get('start_date')
+        end_date_str   = request.query_params.get('end_date')
+        practitioner_id = request.query_params.get('practitioner_id')
+        branch_id       = request.query_params.get('branch_id')
+
+        # ── FIXED: include all meaningful statuses, not just COMPLETED ────────
+        # "No invoice yet" can appear on COMPLETED, CHECKED_IN, IN_PROGRESS, etc.
+        status_param = request.query_params.get('status', 'ALL')
+
+        BILLABLE_STATUSES = ['COMPLETED', 'CHECKED_IN', 'IN_PROGRESS', 'CONFIRMED', 'SCHEDULED']
+
+        if status_param == 'ALL':
+            target_statuses = BILLABLE_STATUSES
+        elif status_param == 'COMPLETED':
+            target_statuses = ['COMPLETED']
+        else:
+            target_statuses = [status_param] if status_param in BILLABLE_STATUSES else BILLABLE_STATUSES
+
+        try:
+            from datetime import date as date_type
+            start_date = date_type.fromisoformat(start_date_str) if start_date_str else None
+            end_date   = date_type.fromisoformat(end_date_str)   if end_date_str   else None
+        except ValueError:
+            return None, Response(
+                {'detail': 'Invalid date format. Use YYYY-MM-DD.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.appointments.models import Appointment
+        from apps.billing.models import Invoice
+
+        qs = (
+            Appointment.objects
+            .filter(
+                clinic_id__in=all_branch_ids,
+                is_deleted=False,
+                patient__is_archived=False,
+                status__in=target_statuses,
+            )
+            .select_related('patient', 'practitioner__user', 'clinic')
+            .prefetch_related('billing_invoices')
+            .order_by('date', 'start_time')
+        )
+
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+        if practitioner_id:
+            try:
+                qs = qs.filter(practitioner_id=int(practitioner_id))
+            except (ValueError, TypeError):
+                pass
+        if branch_id:
+            try:
+                bid = int(branch_id)
+                if bid in all_branch_ids:
+                    qs = qs.filter(clinic_id=bid)
+            except (ValueError, TypeError):
+                pass
+
+        total_in_range   = qs.count()
+        skipped_invoiced = 0
+        results          = []
+        today            = date_type.today()
+
+        # ── Statuses that mean "properly invoiced — no action needed" ─────────
+        # DRAFT and PENDING = invoice exists but unpaid = still "uninvoiced"
+        INVOICED_STATUSES = {'PAID', 'PARTIALLY_PAID', 'OVERDUE'}
+
+        for appt in qs:
+            active_invoices = [
+                inv for inv in appt.billing_invoices.all()
+                if not getattr(inv, 'is_deleted', False)
+            ]
+
+            has_real_invoice = any(
+                inv.status in INVOICED_STATUSES
+                for inv in active_invoices
+            )
+
+            if has_real_invoice:
+                skipped_invoiced += 1
+                continue
+
+            # Determine invoice_status to show
+            invoice_status = None
+            invoice_number = None
+            if active_invoices:
+                # Priority: PENDING > DRAFT (most urgent first)
+                priority = {'PENDING': 0, 'DRAFT': 1}
+                sorted_inv = sorted(
+                    active_invoices,
+                    key=lambda i: priority.get(i.status, 99)
+                )
+                invoice_status = sorted_inv[0].status
+                invoice_number = sorted_inv[0].invoice_number
+
+            days_since = None
+            if appt.status == 'COMPLETED':
+                days_since = (today - appt.date).days
+
+            results.append({
+                'appointment_id':       appt.id,
+                'date':                 str(appt.date),
+                'start_time':           appt.start_time.strftime('%H:%M'),
+                'end_time':             appt.end_time.strftime('%H:%M'),
+                'appointment_type':     appt.appointment_type,
+                'appointment_status':   appt.status,
+                'patient_id':           appt.patient_id,
+                'patient_name':         appt.patient.get_full_name(),
+                'patient_number':       appt.patient.patient_number,
+                'practitioner_name':    (
+                    appt.practitioner.user.get_full_name()
+                    if appt.practitioner else ''
+                ),
+                'branch_name':          appt.clinic.name if appt.clinic else None,
+                'days_since_completed': days_since,
+                'invoice_status':       invoice_status,
+                'invoice_number':       invoice_number,
+            })
+
+        from django.utils import timezone
+
+        return {
+            'report_type':  'uninvoiced_bookings',
+            'tab':          'administration',
+            'start_date':   start_date_str or '',
+            'end_date':     end_date_str   or '',
+            'total_count':  len(results),
+            'generated_at': timezone.now().isoformat(),
+            'filters': {
+                'status':           status_param,
+                'practitioner_id':  practitioner_id,
+                'branch_id':        branch_id,
+            },
+            'results': results,
+            # ── Debug block (remove in production) ───────────────────────────
+            '_debug': {
+                'branch_ids':                   all_branch_ids,
+                'target_statuses':              target_statuses,
+                'total_appointments_in_range':  total_in_range,
+                'skipped_invoiced':             skipped_invoiced,
+                'result_count':                 len(results),
+            },
+        }, None
+
+    def get(self, request):
+        data, err = self._get_data(request)
+        if err:
+            return err
+        return Response(data)
+    
+
+
+class UninvoicedBookingsPrintView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        base_view = UninvoicedBookingsView()
+        base_view.request = request
+        data, err = base_view._get_data(request)
+        if err:
+            return err
+
+        results = data['results']
+        today   = __import__('datetime').date.today()
+
+        overdue_count    = sum(1 for r in results if (r['days_since_completed'] or 0) > 7)
+        this_week_count  = sum(1 for r in results if r['days_since_completed'] is not None and (r['days_since_completed'] or 0) <= 7)
+        no_invoice_count = sum(1 for r in results if r['invoice_status'] is None)
+        draft_only_count = sum(1 for r in results if r['invoice_status'] == 'DRAFT')
+
+        practitioners = sorted({r['practitioner_name'] for r in results if r['practitioner_name']})
+        branches      = sorted({r['branch_name'] for r in results if r['branch_name']})
+
+        data['summary'] = {
+            'overdue_count':    overdue_count,
+            'this_week_count':  this_week_count,
+            'no_invoice_count': no_invoice_count,
+            'draft_only_count': draft_only_count,
+            'practitioners':    practitioners,
+            'branches':         branches,
+        }
+
+        return Response(data)

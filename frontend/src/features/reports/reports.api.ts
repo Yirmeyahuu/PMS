@@ -13,14 +13,24 @@ export interface UninvoicedBookingItem {
   start_time:           string;
   end_time:             string;
   appointment_type:     string;
-  status:               string;
+  appointment_status:   string;
   patient_id:           number;
   patient_name:         string;
   patient_number:       string;
   practitioner_name:    string;
-  service_name:         string;
   branch_name:          string | null;
   days_since_completed: number | null;
+  invoice_status:       string | null;
+  invoice_number:       string | null;
+}
+
+export interface UninvoicedBookingsSummary {
+  overdue_count:    number;
+  this_week_count:  number;
+  no_invoice_count: number;
+  draft_only_count: number;
+  practitioners:    string[];
+  branches:         string[];
 }
 
 export interface UninvoicedBookingsResponse {
@@ -29,10 +39,18 @@ export interface UninvoicedBookingsResponse {
   start_date:   string;
   end_date:     string;
   total_count:  number;
+  generated_at: string;
+  filters:      Record<string, unknown>;
   results:      UninvoicedBookingItem[];
 }
 
+export interface UninvoicedBookingsPrintResponse extends UninvoicedBookingsResponse {
+  summary: UninvoicedBookingsSummary;
+}
+
+// ── Single, clean interface (removed duplicate) ───────────────────────────────
 export interface UninvoicedBookingsParams extends ReportDateRange {
+  status?:          string;   // 'ALL' | 'COMPLETED' | 'CONFIRMED' | etc.
   practitioner_id?: number;
   branch_id?:       number;
 }
@@ -40,7 +58,31 @@ export interface UninvoicedBookingsParams extends ReportDateRange {
 export const getUninvoicedBookings = async (
   params?: UninvoicedBookingsParams
 ): Promise<UninvoicedBookingsResponse> => {
-  const response = await axiosInstance.get('/reports/uninvoiced_bookings/', { params });
+  console.log(
+    '%c[reports.api] GET /reports/uninvoiced_bookings/',
+    'color: blue',
+    'params →', params
+  );
+  const response = await axiosInstance.get('/reports/uninvoiced_bookings/', {
+    params: {
+      status: 'ALL', // default — can be overridden by params
+      ...params,
+    },
+  });
+  return response.data;
+};
+
+// NOTE: getUninvoicedBookingsPrint is kept for backward compat but
+// UninvoicedBookings.tsx now builds print HTML from local state instead.
+export const getUninvoicedBookingsPrint = async (
+  params?: UninvoicedBookingsParams
+): Promise<UninvoicedBookingsPrintResponse> => {
+  const response = await axiosInstance.get('/reports/uninvoiced_bookings/print/', {
+    params: {
+      status: 'ALL',
+      ...params,
+    },
+  });
   return response.data;
 };
 
@@ -58,10 +100,16 @@ export interface CancellationItem {
   patient_name:      string;
   patient_number:    string;
   practitioner_name: string;
-  service_name:      string;
   branch_name:       string | null;
   cancelled_by:      string | null;
   reason:            string | null;
+}
+
+export interface CancellationsSummary {
+  with_reason_count:    number;
+  without_reason_count: number;
+  practitioners:        string[];
+  branches:             string[];
 }
 
 export interface CancellationsResponse {
@@ -72,7 +120,13 @@ export interface CancellationsResponse {
   total_count:     number;
   cancelled_count: number;
   no_show_count:   number;
+  generated_at:    string;
+  filters:         Record<string, unknown>;
   results:         CancellationItem[];
+}
+
+export interface CancellationsPrintResponse extends CancellationsResponse {
+  summary: CancellationsSummary;
 }
 
 export interface CancellationsParams extends ReportDateRange {
@@ -85,6 +139,13 @@ export const getCancellations = async (
   params?: CancellationsParams
 ): Promise<CancellationsResponse> => {
   const response = await axiosInstance.get('/reports/cancellations/', { params });
+  return response.data;
+};
+
+export const getCancellationsPrint = async (
+  params?: CancellationsParams
+): Promise<CancellationsPrintResponse> => {
+  const response = await axiosInstance.get('/reports/cancellations/print/', { params });
   return response.data;
 };
 

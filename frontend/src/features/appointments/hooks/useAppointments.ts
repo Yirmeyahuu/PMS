@@ -1,4 +1,3 @@
-// filepath: useAppointments.ts
 import { useState, useEffect, useCallback } from 'react';
 import { getAppointments, getPortalBookingsForDiary } from '../appointment.api';
 import { format } from 'date-fns';
@@ -32,24 +31,26 @@ export const useAppointments = ({
     setError(null);
 
     try {
-      // Backend get_queryset reads 'start_date' and 'end_date'
       const apptParams: Record<string, any> = {
         start_date: startDateStr,
         end_date:   endDateStr,
         page_size:  1000,
       };
 
-      // Always send clinic_branch when selected — this is what scopes to a branch
       if (clinicBranchId !== null) apptParams.clinic_branch = clinicBranchId;
-      // Only add practitioner if one is selected
-      if (practitionerId !== null) apptParams.practitioner = practitionerId;
+      if (practitionerId !== null) apptParams.practitioner  = practitionerId;
 
+      // ── Portal bookings: fetch ALL for the date range (no branch/practitioner filter)
+      // We do client-side filtering below so we can correctly handle:
+      //   - "Any Available" bookings (practitioner_branch_id = null) → show in ALL branches
+      //   - Practitioner-specific bookings → show only in their assigned branch
       const portalParams: Record<string, any> = {
         start_date: startDateStr,
         end_date:   endDateStr,
       };
-      if (clinicBranchId !== null) portalParams.clinic_branch = clinicBranchId;
-      if (practitionerId !== null) portalParams.practitioner  = practitionerId;
+      // Only pass practitioner filter to backend — NOT clinic_branch
+      // (branch filtering is done client-side to handle null practitioner_branch_id correctly)
+      if (practitionerId !== null) portalParams.practitioner = practitionerId;
 
       const [apptResponse, portalResponse] = await Promise.all([
         getAppointments(apptParams),
@@ -57,7 +58,34 @@ export const useAppointments = ({
       ]);
 
       setAppointments(apptResponse.results);
-      setPortalBookings(portalResponse.filter((b: PortalBookingDiaryItem) => b.status === 'PENDING'));
+
+      // ── Client-side portal booking filter ─────────────────────────────────
+      // Step 1: only PENDING bookings
+      const pendingBookings = portalResponse.filter(
+        (b: PortalBookingDiaryItem) => b.status === 'PENDING'
+      );
+
+      // Step 2: apply branch filter
+      // Rule:
+      //   No branch selected (All Branches)  → show ALL pending bookings
+      //   Branch selected →
+      //     practitioner_branch_id === null   → "Any Available" → SHOW (visible everywhere)
+      //     practitioner_branch_id === branchId → practitioner is in THIS branch → SHOW
+      //     practitioner_branch_id !== branchId → practitioner is in ANOTHER branch → HIDE
+      const filteredBookings =
+        clinicBranchId === null
+          ? pendingBookings
+          : pendingBookings.filter((b: PortalBookingDiaryItem) => {
+              // "Any Available" — no specific practitioner → show in every branch tab
+              if (b.practitioner_id === null) return true;
+              // Practitioner has no branch assigned → show everywhere
+              if (b.practitioner_branch_id === null) return true;
+              // Practitioner is assigned to the selected branch → show
+              return b.practitioner_branch_id === clinicBranchId;
+            });
+
+      setPortalBookings(filteredBookings);
+
     } catch (err: any) {
       console.error('Failed to fetch appointments:', err);
       const msg = err.response?.data?.detail || 'Failed to load appointments';
@@ -76,5 +104,19 @@ export const useAppointments = ({
     setPortalBookings(prev => prev.filter(b => b.id !== bookingId));
   }, []);
 
-  return { appointments, portalBookings, loading, error, refetch: fetchAppointments, removePortalBooking };
+  const updateAppointmentInState = useCallback((updated: Appointment) => {
+    setAppointments(prev =>
+      prev.map(appt => appt.id === updated.id ? updated : appt)
+    );
+  }, []);
+
+  return {
+    appointments,
+    portalBookings,
+    loading,
+    error,
+    refetch: fetchAppointments,
+    removePortalBooking,
+    updateAppointmentInState,
+  };
 };
