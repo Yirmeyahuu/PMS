@@ -9,8 +9,8 @@ import { useDragSelection }     from './hooks/useDragSelection';
 import { useAppointments }      from './hooks/useAppointments';
 import { AppointmentModal }     from './components/AppointmentModal';
 import { AppointmentView }      from './components/AppointmentView';
-import { APPOINTMENT_STATUS_COLORS }   from '@/types';
-import type { Appointment }            from '@/types';
+import { APPOINTMENT_STATUS_COLORS } from '@/types';
+import type { Appointment }          from '@/types';
 
 type CalendarView = 'day' | 'week' | 'month';
 
@@ -21,6 +21,50 @@ interface CalendarProps {
   selectedPractitionerId: number | null;
   selectedClinicBranchId: number | null;
 }
+
+// ── Hex color helpers ──────────────────────────────────────────────────────────
+/**
+ * Given a hex color string, returns a slightly transparent version for backgrounds
+ * and the original for borders/accents.
+ */
+const hexToRgba = (hex: string, alpha: number): string => {
+  const cleaned = hex.replace('#', '');
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/**
+ * Determines if a hex color is "dark" so we can pick contrasting text.
+ */
+const isColorDark = (hex: string): boolean => {
+  const cleaned = hex.replace('#', '');
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  // Perceived luminance formula
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+};
+
+type BlockColors =
+  | {
+      useHex:  true;
+      hex:     string;
+      bgStyle: React.CSSProperties;
+      textColor: string;
+      subTextColor: string;
+      label:   string | null;
+    }
+  | {
+      useHex:  false;
+      hex:     null;
+      bg:      string;
+      border:  string;
+      text:    string;
+      label:   string | null;
+    };
 
 export const Calendar: React.FC<CalendarProps> = ({
   view,
@@ -52,22 +96,31 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   // ── Service-aware block colors ─────────────────────────────────────────────
-  const getBlockColors = (apt: Appointment) => {
+  const getBlockColors = (apt: Appointment): BlockColors => {
     if (apt.service_color) {
+      const dark = isColorDark(apt.service_color);
       return {
-        useHex: true  as const,
+        useHex: true,
         hex:    apt.service_color,
-        label:  apt.service_name ?? apt.chief_complaint,
+        bgStyle: {
+          backgroundColor: hexToRgba(apt.service_color, 0.15),
+          borderColor:     apt.service_color,
+          borderLeftWidth: '3px',
+          borderLeftColor: apt.service_color,
+        },
+        textColor:    dark ? apt.service_color : apt.service_color,
+        subTextColor: apt.service_color,
+        label: apt.service_name ?? apt.chief_complaint ?? null,
       };
     }
     const c = APPOINTMENT_STATUS_COLORS[apt.status];
     return {
-      useHex: false as const,
+      useHex: false,
       hex:    null,
       bg:     c.bg,
       border: c.border,
       text:   c.text,
-      label:  apt.chief_complaint,
+      label:  apt.chief_complaint ?? null,
     };
   };
 
@@ -244,6 +297,145 @@ export const Calendar: React.FC<CalendarProps> = ({
     </>
   );
 
+  // ── Appointment Card — Day/Week ────────────────────────────────────────────
+  const renderTimelineCard = (apt: Appointment, compact = false) => {
+    const style = getAppointmentStyle(apt);
+    const col   = getBlockColors(apt);
+
+    const containerStyle: React.CSSProperties = {
+      ...style,
+      position: 'absolute',
+      left: '4px',
+      right: '4px',
+      zIndex: 10,
+      overflow: 'hidden',
+      borderRadius: '8px',
+      border: '1px solid',
+      padding: compact ? '2px 6px' : '6px 8px',
+      cursor: 'pointer',
+      transition: 'filter 0.15s',
+      ...(col.useHex ? col.bgStyle : {}),
+    };
+
+    return (
+      <div
+        key={apt.id}
+        style={containerStyle}
+        onClick={() => handleAppointmentClick(apt)}
+        className={`hover:brightness-95 ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
+      >
+        {/* Color accent dot for service */}
+        {col.useHex && (
+          <div
+            className="absolute top-0 left-0 bottom-0 w-1 rounded-l-lg"
+            style={{ backgroundColor: col.hex }}
+          />
+        )}
+
+        <div className={compact ? 'pl-2' : 'pl-2'}>
+          <div
+            className="text-xs font-semibold truncate"
+            style={col.useHex ? { color: col.hex } : { color: undefined }}
+          >
+            <span className={!col.useHex ? col.text : ''}>
+              {apt.patient_name}
+            </span>
+          </div>
+
+          {!compact && (
+            <div
+              className="text-xs truncate mt-0.5"
+              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+            >
+              <span className={!col.useHex ? 'text-gray-600' : ''}>
+                {apt.start_time} – {apt.end_time}
+              </span>
+            </div>
+          )}
+
+          {compact && (
+            <div
+              className="text-xs truncate"
+              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+            >
+              <span className={!col.useHex ? 'text-gray-600' : ''}>
+                {apt.start_time}
+              </span>
+            </div>
+          )}
+
+          {col.label && !compact && (
+            <div
+              className="text-xs truncate mt-1 font-medium"
+              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
+            >
+              <span className={!col.useHex ? 'text-gray-500' : ''}>
+                {col.label}
+              </span>
+            </div>
+          )}
+
+          {col.label && compact && (
+            <div
+              className="text-xs truncate"
+              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
+            >
+              <span className={!col.useHex ? 'text-gray-500' : ''}>
+                {col.label}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Appointment Card — Month ───────────────────────────────────────────────
+  const renderMonthCard = (apt: Appointment) => {
+    const col = getBlockColors(apt);
+
+    const containerStyle: React.CSSProperties = col.useHex
+      ? {
+          backgroundColor: hexToRgba(col.hex, 0.12),
+          borderColor:     col.hex,
+          borderLeftColor: col.hex,
+          borderLeftWidth: '3px',
+        }
+      : {};
+
+    return (
+      <div
+        key={apt.id}
+        onClick={e => { e.stopPropagation(); handleAppointmentClick(apt); }}
+        style={containerStyle}
+        className={`
+          border rounded px-2 py-1 cursor-pointer transition-all hover:brightness-95
+          ${!col.useHex ? `${col.bg} ${col.border}` : ''}
+        `}
+      >
+        <div
+          className="text-xs font-semibold truncate"
+          style={col.useHex ? { color: col.hex } : {}}
+        >
+          <span className={!col.useHex ? col.text : ''}>
+            {apt.start_time} · {apt.patient_name}
+          </span>
+        </div>
+
+        {apt.service_name && (
+          <div
+            className="text-xs truncate mt-0.5"
+            style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+          >
+            <span className={!col.useHex ? 'text-gray-500' : ''}>
+              {apt.service_name}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── DAY VIEW ───────────────────────────────────────────────────────────────
   if (view === 'day') {
     return (
@@ -309,39 +501,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                 {/* Appointments */}
                 {appointments
                   .filter(apt => apt.date === format(currentDate, 'yyyy-MM-dd'))
-                  .map(apt => {
-                    const style = getAppointmentStyle(apt);
-                    const col   = getBlockColors(apt);
-                    return (
-                      <div
-                        key={apt.id}
-                        style={{
-                          ...style,
-                          ...(col.useHex
-                            ? { backgroundColor: col.hex!, borderColor: col.hex! }
-                            : {}),
-                        }}
-                        onClick={() => handleAppointmentClick(apt)}
-                        className={`
-                          absolute left-1 right-1 border rounded-lg p-2
-                          cursor-pointer hover:brightness-90 transition-all z-10 overflow-hidden
-                          ${!col.useHex ? `${col.bg} ${col.border}` : ''}
-                        `}
-                      >
-                        <div className={`text-xs font-semibold truncate ${col.useHex ? 'text-white' : col.text}`}>
-                          {apt.patient_name}
-                        </div>
-                        <div className={`text-xs truncate ${col.useHex ? 'text-white/80' : 'text-gray-600'}`}>
-                          {apt.start_time} – {apt.end_time}
-                        </div>
-                        {col.label && (
-                          <div className={`text-xs truncate mt-1 ${col.useHex ? 'text-white/70' : 'text-gray-500'}`}>
-                            {col.label}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  .map(apt => renderTimelineCard(apt, false))
+                }
               </div>
             </div>
           </div>
@@ -432,39 +593,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                   {/* Appointments */}
                   {appointments
                     .filter(apt => apt.date === format(day, 'yyyy-MM-dd'))
-                    .map(apt => {
-                      const style = getAppointmentStyle(apt);
-                      const col   = getBlockColors(apt);
-                      return (
-                        <div
-                          key={apt.id}
-                          style={{
-                            ...style,
-                            ...(col.useHex
-                              ? { backgroundColor: col.hex!, borderColor: col.hex! }
-                              : {}),
-                          }}
-                          onClick={() => handleAppointmentClick(apt)}
-                          className={`
-                            absolute left-1 right-1 border rounded-lg p-1
-                            cursor-pointer hover:brightness-90 transition-all z-10 overflow-hidden
-                            ${!col.useHex ? `${col.bg} ${col.border}` : ''}
-                          `}
-                        >
-                          <div className={`text-xs font-semibold truncate ${col.useHex ? 'text-white' : col.text}`}>
-                            {apt.patient_name}
-                          </div>
-                          <div className={`text-xs truncate ${col.useHex ? 'text-white/80' : 'text-gray-600'}`}>
-                            {apt.start_time}
-                          </div>
-                          {col.label && (
-                            <div className={`text-xs truncate mt-0.5 ${col.useHex ? 'text-white/70' : 'text-gray-500'}`}>
-                              {col.label}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    .map(apt => renderTimelineCard(apt, true))
+                  }
                 </div>
               ))}
             </div>
@@ -536,33 +666,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                       </div>
 
                       <div className="space-y-1 mt-2">
-                        {dayAppts.slice(0, 3).map(apt => {
-                          const col = getBlockColors(apt);
-                          return (
-                            <div
-                              key={apt.id}
-                              onClick={e => { e.stopPropagation(); handleAppointmentClick(apt); }}
-                              style={col.useHex
-                                ? { backgroundColor: col.hex!, borderColor: col.hex! }
-                                : {}
-                              }
-                              className={`
-                                border rounded px-2 py-1
-                                hover:brightness-90 transition-all
-                                ${!col.useHex ? `${col.bg} ${col.border}` : ''}
-                              `}
-                            >
-                              <div className={`text-xs font-semibold truncate ${col.useHex ? 'text-white' : col.text}`}>
-                                {apt.start_time} · {apt.patient_name}
-                              </div>
-                              {apt.service_name && (
-                                <div className={`text-xs truncate ${col.useHex ? 'text-white/70' : 'text-gray-500'}`}>
-                                  {apt.service_name}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                        {dayAppts.slice(0, 3).map(apt => renderMonthCard(apt))}
 
                         {count > 3 && (
                           <div className="text-xs text-gray-500 font-medium px-2">

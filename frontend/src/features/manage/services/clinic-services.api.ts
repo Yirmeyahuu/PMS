@@ -24,10 +24,10 @@ export interface ClinicServicePayload {
   duration_minutes: number;
   price:            string;
   color_hex:        string;
-  sort_order:       number;
   is_active:        boolean;
   show_in_portal:   boolean;
 }
+
 
 export const clinicServicesApi = {
   list: async (): Promise<ClinicService[]> => {

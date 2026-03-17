@@ -47,6 +47,7 @@ export interface PortalBookingDiaryItem {
   patient_phone:          string;
   patient_email:          string;
   service_name:           string;
+  service_color:          string | null;   // ← ADD
   practitioner_name:      string | null;
   practitioner_branch_id: number | null;
   date:                   string;

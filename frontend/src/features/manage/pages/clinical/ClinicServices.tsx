@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Plus, Search, Pencil, Trash2, ToggleLeft, ToggleRight,
-  Globe, X, Clock, DollarSign, Loader2, AlertCircle,
+  Globe, X, Clock, Loader2, AlertCircle,
 } from 'lucide-react';
 import { useClinicServices } from '../../hooks/useClinicServices';
 import { ServiceFormModal } from './components/ServiceFormModal';
@@ -179,7 +179,7 @@ export const ClinicServices: React.FC = () => {
                   {/* Price */}
                   <td className="px-4 py-3 text-right font-medium text-gray-800">
                     <div className="flex items-center justify-end gap-0.5">
-                      <DollarSign className="w-3 h-3 text-gray-400" />
+                      <span className="text-xs text-gray-400">₱</span>
                       {parseFloat(svc.price).toLocaleString('en-PH', {
                         minimumFractionDigits: 2,
                       })}

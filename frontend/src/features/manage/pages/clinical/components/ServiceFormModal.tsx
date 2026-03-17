@@ -139,7 +139,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           {/* Duration + Price row */}
           <div className="grid grid-cols-2 gap-4">
 
-            {/* Duration — 15-min increment dropdown */}
+            {/* Duration */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 Duration <span className="text-red-500">*</span>
@@ -177,39 +177,27 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             </div>
           </div>
 
-          {/* Color + Sort order row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
-                Calendar Colour
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={form.color_hex}
-                  onChange={(e) => set('color_hex', e.target.value)}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-                />
-                <input
-                  type="text"
-                  value={form.color_hex}
-                  onChange={(e) => set('color_hex', e.target.value)}
-                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="#0D9488"
-                />
-              </div>
-              {errors.color_hex && <p className="text-xs text-red-500 mt-1">{errors.color_hex}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Sort Order</label>
+          {/* Color — full width now that sort order is removed */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Calendar Colour
+            </label>
+            <div className="flex items-center gap-2">
               <input
-                type="number"
-                min={0}
-                value={form.sort_order}
-                onChange={(e) => set('sort_order', parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                type="color"
+                value={form.color_hex}
+                onChange={(e) => set('color_hex', e.target.value)}
+                className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+              />
+              <input
+                type="text"
+                value={form.color_hex}
+                onChange={(e) => set('color_hex', e.target.value)}
+                className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="#0D9488"
               />
             </div>
+            {errors.color_hex && <p className="text-xs text-red-500 mt-1">{errors.color_hex}</p>}
           </div>
 
           {/* Toggles */}

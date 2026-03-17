@@ -49,7 +49,7 @@ class IntakeFormSerializer(serializers.ModelSerializer):
 class ServiceCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model  = ServiceCategory
-        fields = ['id', 'name', 'description', 'sort_order', 'is_active']
+        fields = ['id', 'name', 'description', 'is_active']
 
 
 class PortalServiceSerializer(serializers.ModelSerializer):
@@ -60,7 +60,7 @@ class PortalServiceSerializer(serializers.ModelSerializer):
         model  = PortalService
         fields = [
             'id', 'name', 'description', 'duration_minutes',
-            'price', 'image_url', 'is_active', 'sort_order',
+            'price', 'image_url', 'is_active',
             'category', 'category_name',
         ]
 
@@ -97,7 +97,7 @@ class PortalClinicServiceSerializer(serializers.ModelSerializer):
         model  = ClinicService
         fields = [
             'id', 'name', 'description', 'duration_minutes',
-            'price', 'image_url', 'is_active', 'sort_order',
+            'price', 'image_url', 'is_active',
             'category', 'category_name', 'color_hex',
         ]
 
@@ -149,7 +149,7 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
             is_active=True,
             show_in_portal=True,
             is_deleted=False,
-        ).order_by('sort_order', 'name')
+        ).order_by('name')
 
         if not services.exists():
             return []

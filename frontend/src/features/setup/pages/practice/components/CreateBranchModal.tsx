@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, GitBranch, Hash } from 'lucide-react';
+import { PhLocationSelect } from '@/components/location/PhLocationSelect';
 import type { ClinicBranch, CreateBranchData } from '@/types/clinic';
 
 interface CreateBranchModalProps {
@@ -9,7 +10,6 @@ interface CreateBranchModalProps {
   branch?: ClinicBranch | null;
   mode: 'create' | 'edit';
   saving: boolean;
-  /** The root clinic name — used to build the branch display name */
   mainClinicName: string;
 }
 
@@ -26,8 +26,6 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
   const [form, setForm]     = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Derive the "location" suffix from an existing branch name
-  // e.g. "Clinic Test - BGC" → "BGC"
   const extractLocation = (fullName: string): string => {
     const sep = fullName.indexOf(' - ');
     return sep !== -1 ? fullName.slice(sep + 3) : fullName;
@@ -60,7 +58,6 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
-  // Preview the final composed name
   const composedName = form.location.trim()
     ? `${mainClinicName} - ${form.location.trim()}`
     : mainClinicName;
@@ -135,7 +132,6 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-            {/* Scrollable body */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
               {/* Auto-generated ID notice */}
@@ -174,11 +170,9 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                   Branch Name <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center gap-0 mb-2 rounded-lg border border-gray-300 overflow-hidden focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
-                  {/* Fixed prefix */}
                   <span className="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-500 border-r border-gray-300 whitespace-nowrap flex-shrink-0">
                     {mainClinicName} —
                   </span>
-                  {/* Location suffix input */}
                   <input
                     type="text"
                     name="location"
@@ -191,7 +185,6 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                 {errors.location && (
                   <p className="text-red-500 text-xs mt-1">{errors.location}</p>
                 )}
-                {/* Live preview */}
                 {form.location.trim() && (
                   <p className="text-xs text-gray-400 mt-1.5">
                     Full name preview:&nbsp;
@@ -239,34 +232,31 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                 {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
               </div>
 
-              {/* City + Province + Postal */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelBase}>City <span className="text-red-500">*</span></label>
-                  <input
-                    type="text" name="city" value={form.city} onChange={handleChange}
-                    placeholder="Taguig"
-                    className={`${inputBase} ${errors.city ? inputErr : ''}`}
-                  />
-                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-                </div>
-                <div>
-                  <label className={labelBase}>Province <span className="text-red-500">*</span></label>
-                  <input
-                    type="text" name="province" value={form.province} onChange={handleChange}
-                    placeholder="Metro Manila"
-                    className={`${inputBase} ${errors.province ? inputErr : ''}`}
-                  />
-                  {errors.province && <p className="text-red-500 text-xs mt-1">{errors.province}</p>}
-                </div>
-                <div>
-                  <label className={labelBase}>Postal Code</label>
-                  <input
-                    type="text" name="postal_code" value={form.postal_code} onChange={handleChange}
-                    placeholder="1634"
-                    className={inputBase}
-                  />
-                </div>
+              {/* ── Province + City via PhLocationSelect ── */}
+              <PhLocationSelect
+                province={form.province}
+                city={form.city}
+                onProvinceChange={(val) => {
+                  setForm((prev) => ({ ...prev, province: val, city: '' }));
+                  if (errors.province) setErrors((prev) => ({ ...prev, province: '' }));
+                }}
+                onCityChange={(val) => {
+                  setForm((prev) => ({ ...prev, city: val }));
+                  if (errors.city) setErrors((prev) => ({ ...prev, city: '' }));
+                }}
+                provinceError={errors.province}
+                cityError={errors.city}
+                required
+              />
+
+              {/* Postal Code */}
+              <div>
+                <label className={labelBase}>Postal Code</label>
+                <input
+                  type="text" name="postal_code" value={form.postal_code} onChange={handleChange}
+                  placeholder="1634"
+                  className={inputBase}
+                />
               </div>
 
               {/* Website + TIN */}
@@ -300,7 +290,7 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
               )}
             </div>
 
-            {/* Footer — always pinned to bottom */}
+            {/* Footer */}
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
               <button
                 type="button" onClick={onClose} disabled={saving}
