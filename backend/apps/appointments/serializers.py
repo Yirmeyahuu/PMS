@@ -1,40 +1,61 @@
 from rest_framework import serializers
 from .models import Appointment, PractitionerSchedule, AppointmentReminder
+from apps.clinics.services.models import Service
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
-    # ✅ FIX: Handle nullable practitioner
-    practitioner_name = serializers.SerializerMethodField(read_only=True)
-    location_name = serializers.CharField(source='location.name', read_only=True)
+    patient_name      = serializers.CharField(source='patient.get_full_name', read_only=True)
+    practitioner_name = serializers.CharField(source='practitioner.user.get_full_name', read_only=True, allow_null=True)
+    location_name     = serializers.CharField(source='location.name', read_only=True, allow_null=True)
+    created_by_name   = serializers.CharField(source='created_by.get_full_name', read_only=True, allow_null=True)
+    updated_by_name   = serializers.CharField(source='updated_by.get_full_name', read_only=True, allow_null=True)
 
-    # Add tracking fields
-    created_by_name = serializers.SerializerMethodField(read_only=True)
-    updated_by_name = serializers.SerializerMethodField(read_only=True)
+    # ── NEW: service detail fields ────────────────────────────────────────────
+    service_name          = serializers.CharField(source='service.name',             read_only=True, allow_null=True)
+    service_color         = serializers.CharField(source='service.color_hex',        read_only=True, allow_null=True)
+    service_duration      = serializers.IntegerField(source='service.duration_minutes', read_only=True, allow_null=True)
 
     class Meta:
-        model = Appointment
-        fields = '__all__'
+        model  = Appointment
+        fields = [
+            'id', 'clinic', 'patient', 'patient_name',
+            'practitioner', 'practitioner_name',
+            'location', 'location_name',
+            # service fields
+            'service', 'service_name', 'service_color', 'service_duration',
+            # legacy
+            'appointment_type',
+            'status',
+            'date', 'start_time', 'end_time', 'duration_minutes',
+            'chief_complaint', 'notes', 'patient_notes',
+            'reminder_sent', 'reminder_sent_at',
+            'created_by', 'created_by_name',
+            'updated_by', 'updated_by_name',
+            'cancelled_by', 'cancellation_reason', 'cancelled_at',
+            'created_at', 'updated_at',
+        ]
         read_only_fields = [
-            'id', 'created_at', 'updated_at', 'created_by', 'updated_by',
-            'reminder_sent_at', 'cancelled_at',
+            'id', 'patient_name', 'practitioner_name', 'location_name',
+            'service_name', 'service_color', 'service_duration',
+            'created_by_name', 'updated_by_name',
+            'created_at', 'updated_at',
         ]
 
-    def get_practitioner_name(self, obj):
-        if obj.practitioner and obj.practitioner.user:
-            return obj.practitioner.user.get_full_name()
-        return 'Unassigned'
-
-    def get_created_by_name(self, obj):
-        return obj.created_by.get_full_name() if obj.created_by else None
-
-    def get_updated_by_name(self, obj):
-        return obj.updated_by.get_full_name() if obj.updated_by else None
-
     def validate(self, data):
-        if data.get('end_time') and data.get('start_time'):
-            if data['end_time'] <= data['start_time']:
-                raise serializers.ValidationError("End time must be after start time")
+        service = data.get('service') or (self.instance.service if self.instance else None)
+
+        # Auto-fill duration from service when not explicitly provided
+        if service and 'duration_minutes' not in data:
+            data['duration_minutes'] = service.duration_minutes
+
+        # Validate service belongs to the same clinic
+        request = self.context.get('request')
+        if service and request:
+            clinic = request.user.clinic
+            if clinic and service.clinic_id != clinic.id:
+                raise serializers.ValidationError(
+                    {'service': 'This service does not belong to your clinic.'}
+                )
         return data
 
 

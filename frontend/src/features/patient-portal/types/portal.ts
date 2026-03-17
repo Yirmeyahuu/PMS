@@ -1,5 +1,5 @@
 export interface PortalPractitioner {
-  id:             number | null;   // null = "Any Available"
+  id:             number | null;
   full_name:      string;
   specialization: string;
   bio:            string;
@@ -17,7 +17,7 @@ export interface PortalService {
   sort_order:       number;
   category:         number | null;
   category_name:    string | null;
-  color_hex:        string;   // ✅ add this
+  color_hex:        string;
 }
 
 export interface PortalCategory {
@@ -73,6 +73,6 @@ export interface BookingConfirmation {
 }
 
 export interface SlotsResponse {
-  date: string;
-  slots: string[];   // ['09:00', '10:00', ...]
+  date:  string;
+  slots: string[];
 }

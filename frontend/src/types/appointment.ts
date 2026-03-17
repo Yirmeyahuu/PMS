@@ -3,11 +3,20 @@ export interface Appointment {
   clinic: number;
   patient: number;
   patient_name: string;
-  practitioner: number | null;  // ✅ CHANGED: Allow null
-  practitioner_name: string | null;  // ✅ CHANGED: Allow null
+  practitioner: number | null;
+  practitioner_name: string | null;
   location: number | null;
   location_name: string | null;
-  appointment_type: 'INITIAL' | 'FOLLOW_UP' | 'THERAPY' | 'ASSESSMENT';
+
+  // ── Service (primary "appointment type") ─────────────────────────────────
+  service:          number | null;
+  service_name:     string | null;
+  service_color:    string | null;
+  service_duration: number | null;
+
+  // Legacy — kept for backward compat
+  appointment_type: string;
+
   status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
   date: string;
   start_time: string;
@@ -18,12 +27,12 @@ export interface Appointment {
   patient_notes: string;
   reminder_sent: boolean;
   reminder_sent_at: string | null;
-  
+
   created_by: number | null;
   created_by_name: string | null;
   updated_by: number | null;
   updated_by_name: string | null;
-  
+
   cancelled_by: number | null;
   cancellation_reason: string;
   cancelled_at: string | null;
@@ -34,9 +43,10 @@ export interface Appointment {
 export interface CreateAppointmentData {
   clinic: number;
   patient: number;
-  practitioner?: number | null;  // ✅ CHANGED: Make optional and nullable
+  practitioner?: number | null;
   location?: number | null;
-  appointment_type: string;
+  service?: number | null;           // ← primary
+  appointment_type?: string;         // ← legacy fallback
   date: string;
   start_time: string;
   end_time: string;
@@ -70,21 +80,19 @@ export interface AppointmentReminder {
   error_message: string;
 }
 
-// Appointment status badge colors
 export const APPOINTMENT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  SCHEDULED: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  CONFIRMED: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
-  CHECKED_IN: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  SCHEDULED:   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200'   },
+  CONFIRMED:   { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200'  },
+  CHECKED_IN:  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   IN_PROGRESS: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
-  COMPLETED: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
-  CANCELLED: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
-  NO_SHOW: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  COMPLETED:   { bg: 'bg-gray-50',   text: 'text-gray-700',   border: 'border-gray-200'   },
+  CANCELLED:   { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200'    },
+  NO_SHOW:     { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
 };
 
-// Appointment type display names
 export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
-  INITIAL: 'Initial Consultation',
-  FOLLOW_UP: 'Follow-up',
-  THERAPY: 'Therapy Session',
+  INITIAL:    'Initial Consultation',
+  FOLLOW_UP:  'Follow-up',
+  THERAPY:    'Therapy Session',
   ASSESSMENT: 'Assessment',
-}; 
+};

@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { SidebarProvider } from '@/contexts/SidebarContext';
-import { ProtectedRoute, PublicRoute, RoleBasedRoute, ClinicMemberRoute } from './router';
+import { ProtectedRoute, PublicRoute, RoleBasedRoute, ClinicMemberRoute, ClinicSetupRoute } from './router';
 import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 
@@ -27,52 +27,38 @@ import { Profile }        from '@/features/profile/Profile';
 import { PatientProfile } from '@/features/patients/PatientProfile';
 import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
 import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
-
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 
+// ── NEW: Clinic Setup ─────────────────────────────────────────────────────────
+import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
+
 // ─── Routes where ClinicMessages should NOT appear ────────────────────────────
-const PORTAL_PATHS = ['/portal'];
+const HIDDEN_MESSAGE_PATHS = ['/portal', '/clinic-setup'];
 
 const ClinicMessagesGuard = () => {
   const location = useLocation();
-  const isPortal = PORTAL_PATHS.some(path => location.pathname.startsWith(path));
-  if (isPortal) return null;
+  const isHidden = HIDDEN_MESSAGE_PATHS.some(p => location.pathname.startsWith(p));
+  if (isHidden) return null;
   return <ClinicMessages />;
 };
 
-// ── Only show bell for authenticated users, not on portal/login ───────────────
 const NotificationBellGuard = () => {
   const { isAuthenticated } = useAuthStore();
-  const location = useLocation();
-
-  const isPublicPage = ['/login', '/register', '/portal'].some(p =>
+  const location            = useLocation();
+  const isPublicPage        = ['/login', '/register', '/portal', '/clinic-setup'].some(p =>
     location.pathname.startsWith(p)
   );
-
   if (!isAuthenticated || isPublicPage) return null;
   return <NotificationBell />;
 };
 
-// ─── Global Logout Confirmation Modal ─────────────────────────────────────────
 const GlobalLogoutModal = () => {
   const { isOpen, close } = useLogoutConfirm();
   const { logout }        = useAuthStore();
-
-  const handleConfirm = () => {
-    close();
-    logout();
-  };
-
-  return (
-    <LogoutConfirmModal
-      isOpen={isOpen}
-      onConfirm={handleConfirm}
-      onCancel={close}
-    />
-  );
+  const handleConfirm = () => { close(); logout(); };
+  return <LogoutConfirmModal isOpen={isOpen} onConfirm={handleConfirm} onCancel={close} />;
 };
 
-// ─── Static pages ──────────────────────────────────────────────────────────────
 const Unauthorized = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="text-center">
@@ -91,17 +77,14 @@ const LoadingScreen = () => (
   </div>
 );
 
-// ─── App ───────────────────────────────────────────────────────────────────────
 function App() {
-  const { verifyAuth }      = useAuthStore();
+  const { verifyAuth }       = useAuthStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
-      console.log('🚀 App initializing...');
       await verifyAuth();
       setIsInitializing(false);
-      console.log('✅ App initialized');
     };
     initAuth();
   }, [verifyAuth]);
@@ -116,11 +99,9 @@ function App() {
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#fff',
-              color: '#363636',
-              padding: '16px',
-              borderRadius: '12px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+              background: '#fff', color: '#363636',
+              padding: '16px', borderRadius: '12px',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
             },
             success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
             error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
@@ -128,20 +109,30 @@ function App() {
         />
 
         <Routes>
-          {/* ── Public ────────────────────────────────────────────────── */}
+          {/* ── Public ─────────────────────────────────────────────── */}
           <Route path="/"                 element={<PublicRoute><LandingPage /></PublicRoute>} />
           <Route path="/login"            element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register"         element={<PublicRoute><AdminRegister /></PublicRoute>} />
           <Route path="/register/success" element={<PublicRoute><RegisterSuccess /></PublicRoute>} />
 
-          {/* ── Patient Portal — no auth, no clinic messages ──────────── */}
+          {/* ── Patient Portal ──────────────────────────────────────── */}
           <Route path="/portal/:token"         element={<PortalHome />} />
           <Route path="/portal/:token/success" element={<BookAppointmentSuccess />} />
 
-          {/* ── Misc ────────────────────────────────────────────────────── */}
+          {/* ── Clinic Setup (first-login admin only) ───────────────── */}
+          <Route
+            path="/clinic-setup"
+            element={
+              <ClinicSetupRoute>
+                <ClinicSetupPage />
+              </ClinicSetupRoute>
+            }
+          />
+
+          {/* ── Misc ────────────────────────────────────────────────── */}
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* ── Protected — any authenticated user ────────────────────── */}
+          {/* ── Protected ───────────────────────────────────────────── */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/diary"     element={<ProtectedRoute><Diary /></ProtectedRoute>} />
           <Route path="/clients"   element={<ProtectedRoute><Clients /></ProtectedRoute>} />
@@ -152,27 +143,19 @@ function App() {
           <Route path="/patients/:patientId" element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
           <Route path="/clients/:id"         element={<ProtectedRoute><PatientProfile /></ProtectedRoute>} />
 
-          {/* ── Clinical Notes ─────────────────────────────────────────── */}
           <Route path="/clinical-notes"         element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
           <Route path="/clinical-notes/:noteId" element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
 
-          {/* ── Manage & Setup — all clinic members (Admin/Staff/Practitioner) ── */}
           <Route path="/manage" element={<ClinicMemberRoute><Manage /></ClinicMemberRoute>} />
           <Route path="/setup"  element={<ClinicMemberRoute><Setup /></ClinicMemberRoute>} />
 
-          {/* ── 404 ─────────────────────────────────────────────────────── */}
+          {/* ── 404 ─────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Must be inside <BrowserRouter> to use useLocation() */}
         <ClinicMessagesGuard />
-
-        {/* ── Notification Bell — shown for authenticated users only ── */}
         <NotificationBellGuard />
-
-        {/* Global logout modal */}
         <GlobalLogoutModal />
-
       </BrowserRouter>
     </SidebarProvider>
   );

@@ -1,7 +1,8 @@
 import api from '@/lib/axios';
-import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/types/clinic';
 import { axiosInstance } from '../../lib/axios';
+import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/types/clinic';
 
+// ── Existing: Practitioner types ──────────────────────────────────────────────
 export interface Practitioner {
   id:                 number;
   name:               string;
@@ -17,18 +18,60 @@ export interface PractitionersResponse {
   practitioners: Practitioner[];
 }
 
+// ── NEW: Full clinic profile (returned by my_clinic / setup_profile) ──────────
+export interface ClinicProfile {
+  id:                       number;
+  name:                     string;
+  branch_code:              string | null;
+  email:                    string;
+  phone:                    string;
+  address:                  string;
+  city:                     string;
+  province:                 string;
+  postal_code:              string;
+  website:                  string;
+  tin:                      string;
+  philhealth_accreditation: string;
+  logo:                     string | null;
+  logo_url:                 string | null;
+  timezone:                 string;
+  is_main_branch:           boolean;
+  is_active:                boolean;
+  setup_complete:           boolean;
+  subscription_plan:        string;
+  created_at:               string;
+  updated_at:               string;
+}
+
+// ── NEW: Payload for clinic profile setup ─────────────────────────────────────
+export interface ClinicProfileSetupPayload {
+  name?:                    string;
+  email?:                   string;
+  phone?:                   string;
+  address?:                 string;
+  city?:                    string;
+  province?:                string;
+  postal_code?:             string;
+  website?:                 string;
+  tin?:                     string;
+  philhealth_accreditation?: string;
+  timezone?:                string;
+  logo?:                    File | null;
+}
+
+// ── Existing functions ────────────────────────────────────────────────────────
+
 export const getPractitioners = async (
   clinicBranchId?: number | null
 ): Promise<{ practitioners: Practitioner[] }> => {
   const params: any = {};
   if (clinicBranchId != null) params.clinic_branch = clinicBranchId;
-
   const response = await axiosInstance.get('/appointments/practitioners/', { params });
   return response.data;
 };
 
 export const getClinicBranches = async (): Promise<ClinicBranchesResponse> => {
-  const response = await api.get<ClinicBranchesResponse>('/clinics/branches/');
+  const response = await axiosInstance.get<ClinicBranchesResponse>('/clinics/branches/');
   return response.data;
 };
 
@@ -37,9 +80,6 @@ export const getPractitioner = async (id: number): Promise<Practitioner> => {
   return response.data;
 };
 
-/**
- * Create a new branch under the given main clinic
- */
 export const createClinicBranch = async (
   mainClinicId: number,
   data: CreateBranchData
@@ -51,13 +91,50 @@ export const createClinicBranch = async (
   return response.data;
 };
 
-/**
- * Update an existing clinic branch
- */
 export const updateClinicBranch = async (
   id: number,
   data: Partial<CreateBranchData>
 ): Promise<ClinicBranch> => {
   const response = await api.patch<ClinicBranch>(`/clinics/${id}/`, data);
   return response.data;
+};
+
+// ── NEW functions ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/clinics/my_clinic/
+ * Returns the main clinic record for the authenticated admin.
+ */
+export const getMyClinic = async (): Promise<ClinicProfile> => {
+  const res = await axiosInstance.get<ClinicProfile>('/clinics/my_clinic/');
+  return res.data;
+};
+
+/**
+ * PATCH /api/clinics/{id}/setup_profile/
+ * Saves clinic profile fields + marks setup_complete = true.
+ * Accepts FormData for logo upload.
+ */
+export const setupClinicProfile = async (
+  clinicId: number,
+  payload:  ClinicProfileSetupPayload,
+): Promise<ClinicProfile> => {
+  const form = new FormData();
+
+  (Object.keys(payload) as (keyof ClinicProfileSetupPayload)[]).forEach((key) => {
+    const val = payload[key];
+    if (val === undefined || val === null) return;
+    if (key === 'logo' && val instanceof File) {
+      form.append('logo', val);
+    } else if (key !== 'logo') {
+      form.append(key, String(val));
+    }
+  });
+
+  const res = await axiosInstance.patch<ClinicProfile>(
+    `/clinics/${clinicId}/setup_profile/`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return res.data;
 };

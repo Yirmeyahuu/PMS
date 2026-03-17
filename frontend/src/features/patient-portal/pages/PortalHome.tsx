@@ -17,13 +17,13 @@ import type {
 } from '@/types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
 
-type Step = 'practitioner' | 'services' | 'datetime' | 'details';
+// ── 3-step flow: practitioner → services (with inline calendar) → details ──
+type Step = 'practitioner' | 'services' | 'details';
 
 const STEP_NUMBER: Record<Step, number> = {
   practitioner: 1,
   services:     2,
-  datetime:     3,
-  details:      4,
+  details:      3,
 };
 
 const EMPTY_FORM: PatientFormData = {
@@ -49,11 +49,9 @@ export const PortalHome: React.FC = () => {
   const [selectedService,      setSelectedService]      = useState<PortalService | null>(null);
   const [search,               setSearch]               = useState('');
 
-  // ── Date / time ──────────────────────────────────────────────────────────
-  const [selectedDate,   setSelectedDate]   = useState('');
-  const [selectedSlot,   setSelectedSlot]   = useState('');
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [slotsLoading,   setSlotsLoading]   = useState(false);
+  // ── Date / time (set by inline calendar inside ServiceCard) ─────────────
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState('');
 
   // ── Patient form ─────────────────────────────────────────────────────────
   const [formData,   setFormData]   = useState<PatientFormData>(EMPTY_FORM);
@@ -69,24 +67,6 @@ export const PortalHome: React.FC = () => {
       .finally(() => setLoading(false));
   }, [token]);
 
-  // ── Fetch slots when service + date are set (datetime step only) ─────────
-  useEffect(() => {
-    if (step !== 'datetime') return;
-    if (!token || !selectedService || !selectedDate) return;
-    setSlotsLoading(true);
-    import('../portal.api').then(({ fetchAvailableSlots }) =>
-      fetchAvailableSlots(
-        token,
-        selectedService.id,
-        selectedDate,
-        selectedPractitioner?.id ?? null,
-      )
-        .then((r) => setAvailableSlots(r.slots))
-        .catch(() => setAvailableSlots([]))
-        .finally(() => setSlotsLoading(false))
-    );
-  }, [step, token, selectedService, selectedDate, selectedPractitioner]);
-
   // ── Navigation handlers ──────────────────────────────────────────────────
   const handleSelectPractitioner = (p: PortalPractitioner) => {
     setSelectedPractitioner(p);
@@ -96,19 +76,11 @@ export const PortalHome: React.FC = () => {
     setSelectedService(svc);
     setSelectedDate('');
     setSelectedSlot('');
-    setAvailableSlots([]);
-  };
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setSelectedSlot('');
   };
 
   /**
-   * Called when the user picks a date + slot directly from the inline
-   * PortalAvailabilityCalendar inside ServiceCard.
-   * We store the picked values and jump straight to 'details', skipping
-   * the separate 'datetime' step entirely.
+   * Called by the inline PortalAvailabilityCalendar inside ServiceCard.
+   * Stores date + slot and jumps straight to 'details'.
    */
   const handleInlineDateTimeConfirm = (date: string, slot: string) => {
     setSelectedDate(date);
@@ -118,13 +90,11 @@ export const PortalHome: React.FC = () => {
 
   const handleContinue = () => {
     if (step === 'practitioner' && selectedPractitioner) setStep('services');
-    if (step === 'services'     && selectedService)      setStep('datetime');
-    if (step === 'datetime'     && selectedDate && selectedSlot) setStep('details');
+    // 'services' step advances via handleInlineDateTimeConfirm (inline calendar)
   };
 
   const handleBack = () => {
-    if (step === 'details')  { setStep('datetime');     return; }
-    if (step === 'datetime') { setStep('services');     return; }
+    if (step === 'details')  { setStep('services');     return; }
     if (step === 'services') { setStep('practitioner'); return; }
   };
 
@@ -169,16 +139,10 @@ export const PortalHome: React.FC = () => {
   };
 
   // ── canContinue per step ─────────────────────────────────────────────────
-  // On 'services' step, the user can either:
-  //   a) select a service and click Continue (goes to datetime step), or
-  //   b) use the inline calendar to jump directly to details.
-  // So Continue is enabled as soon as a service is selected.
   const canContinue =
-    (step === 'practitioner' && !!selectedPractitioner) ||
-    (step === 'services'     && !!selectedService)       ||
-    (step === 'datetime'     && !!(selectedDate && selectedSlot));
-
-  const todayStr = new Date().toISOString().split('T')[0];
+    (step === 'practitioner' && !!selectedPractitioner);
+  // 'services' step has no Continue button — inline calendar handles progression
+  // 'details' step uses Submit
 
   // ── Loading / error states ───────────────────────────────────────────────
   if (loading) {
@@ -270,23 +234,9 @@ export const PortalHome: React.FC = () => {
               categories={filteredCategories}
               selectedService={selectedService}
               onSelectService={handleSelectService}
-              // ── inline calendar props ──
               token={token}
               selectedPractitioner={selectedPractitioner}
               onDateTimeConfirm={handleInlineDateTimeConfirm}
-            />
-          )}
-
-          {step === 'datetime' && selectedService && (
-            <DateTimeStep
-              selectedService={selectedService}
-              selectedDate={selectedDate}
-              selectedSlot={selectedSlot}
-              availableSlots={availableSlots}
-              slotsLoading={slotsLoading}
-              todayStr={todayStr}
-              onDateChange={handleDateChange}
-              onSlotChange={setSelectedSlot}
             />
           )}
 

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Save, X, AlertCircle, Stethoscope,
-  FileText, RefreshCw, Info,
-} from 'lucide-react';
+import { Save, XCircle, AlertCircle, Layers } from 'lucide-react';
 import type { Appointment } from '@/types';
 import type { AppointmentEditPayload } from '../appointment.api';
+import { useAppointmentServices } from '../hooks/useAppointmentServices';
 
 interface Practitioner {
   id:             number;
@@ -13,15 +11,15 @@ interface Practitioner {
 }
 
 interface AppointmentEditFormProps {
-  appointment:  Appointment;
-  practitioners: Practitioner[];
+  appointment:          Appointment;
+  practitioners:        Practitioner[];
   loadingPractitioners: boolean;
-  isSaving:     boolean;
-  isDirty:      boolean;
-  editError:    string | null;
-  onSave:       (payload: AppointmentEditPayload) => void;
-  onCancel:     () => void;
-  onMarkDirty:  () => void;
+  isSaving:             boolean;
+  isDirty:              boolean;
+  editError:            string | null;
+  onSave:               (payload: AppointmentEditPayload) => void;
+  onCancel:             () => void;
+  onMarkDirty:          () => void;
 }
 
 export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
@@ -35,184 +33,204 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
   onCancel,
   onMarkDirty,
 }) => {
-  // ── Local form state — seeded from the appointment ────────────────────────
-  const [practitioner,    setPractitioner]    = useState<number | ''>(
-    appointment.practitioner ?? ''
-  );
-  const [chiefComplaint,  setChiefComplaint]  = useState(appointment.chief_complaint  || '');
-  const [notes,           setNotes]           = useState(appointment.notes            || '');
-  const [patientNotes,    setPatientNotes]    = useState(appointment.patient_notes    || '');
+  const { services, loading: loadingServices } = useAppointmentServices();
 
-  // Re-seed if appointment prop changes (e.g. after a successful save)
+  const [practitioner,   setPractitioner]   = useState<number | ''>(appointment.practitioner ?? '');
+  const [service,        setService]        = useState<number | ''>(appointment.service ?? '');
+  const [chiefComplaint, setChiefComplaint] = useState(appointment.chief_complaint || '');
+  const [notes,          setNotes]          = useState(appointment.notes || '');
+  const [patientNotes,   setPatientNotes]   = useState(appointment.patient_notes || '');
+
+  // Reset when a different appointment is opened
   useEffect(() => {
     setPractitioner(appointment.practitioner ?? '');
-    setChiefComplaint(appointment.chief_complaint  || '');
-    setNotes(appointment.notes            || '');
-    setPatientNotes(appointment.patient_notes    || '');
-  }, [appointment]);
+    setService(appointment.service ?? '');
+    setChiefComplaint(appointment.chief_complaint || '');
+    setNotes(appointment.notes || '');
+    setPatientNotes(appointment.patient_notes || '');
+  }, [appointment.id]);
 
-  // ── Helper: mark dirty on any change ─────────────────────────────────────
-  const handleChange = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
-    setter(value);
-    onMarkDirty();
-  };
+  const selectedService = services.find(s => s.id === Number(service));
 
-  // ── Build payload and delegate to parent ──────────────────────────────────
-  const handleSave = () => {
-    const payload: AppointmentEditPayload = {
-      practitioner:    practitioner === '' ? null : Number(practitioner),
-      chief_complaint: chiefComplaint,
-      notes:           notes,
-      patient_notes:   patientNotes,
-    };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload: AppointmentEditPayload = {};
+
+    if (String(practitioner) !== String(appointment.practitioner ?? '')) {
+      payload.practitioner = practitioner === '' ? null : Number(practitioner);
+    }
+    if (String(service) !== String(appointment.service ?? '')) {
+      payload.service = service === '' ? null : Number(service);
+    }
+    if (chiefComplaint !== (appointment.chief_complaint || '')) {
+      payload.chief_complaint = chiefComplaint;
+    }
+    if (notes !== (appointment.notes || '')) {
+      payload.notes = notes;
+    }
+    if (patientNotes !== (appointment.patient_notes || '')) {
+      payload.patient_notes = patientNotes;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      onCancel();
+      return;
+    }
+
     onSave(payload);
   };
 
-  const inputBase =
-    'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg ' +
-    'focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent ' +
-    'bg-white transition-colors';
+  const inputBase = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent';
 
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
 
-      {/* ── Edit mode banner ── */}
-      <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3">
-        <Info className="w-4 h-4 text-sky-500 flex-shrink-0" />
-        <p className="text-xs text-sky-700 font-medium">
-          You are editing this appointment. Only the fields below can be changed.
-        </p>
-      </div>
-
-      {/* ── Error banner ── */}
       {editError && (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-red-700">{editError}</p>
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>{editError}</span>
         </div>
       )}
 
-      {/* ── 1. Assigned Practitioner ── */}
+      {/* ── Service ── */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          <span className="flex items-center gap-1.5">
-            <Stethoscope className="w-3.5 h-3.5 text-sky-500" />
-            Assigned Practitioner
-            <span className="text-xs font-normal text-gray-400">(Optional)</span>
-          </span>
+          Service / Appointment Type
         </label>
-        {loadingPractitioners ? (
-          <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
-            <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />
-            <span className="text-sm text-gray-400">Loading practitioners…</span>
+        {loadingServices ? (
+          <div className="flex items-center gap-2 py-2 text-xs text-gray-400">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent" />
+            Loading services…
           </div>
         ) : (
-          <div className="relative">
-            <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <select
-              value={practitioner}
-              onChange={e => handleChange(
-                setPractitioner,
-                e.target.value === '' ? '' : Number(e.target.value)
-              )}
-              className={`${inputBase} pl-9`}
-            >
-              <option value="">Unassigned</option>
-              {practitioners.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.specialization ? ` — ${p.specialization}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="relative">
+              <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={service}
+                onChange={e => {
+                  setService(e.target.value === '' ? '' : Number(e.target.value));
+                  onMarkDirty();
+                }}
+                className={`${inputBase} pl-9`}
+              >
+                <option value="">— No service selected —</option>
+                {services.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.duration_minutes ? ` (${s.duration_minutes} min)` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedService && (
+              <div
+                className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: selectedService.color_hex || '#0D9488' }}
+              >
+                <span className="w-2 h-2 rounded-full bg-white/70" />
+                {selectedService.name}&nbsp;·&nbsp;{selectedService.duration_minutes} min
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* ── 2. Chief Complaint ── */}
+      {/* ── Practitioner ── */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          <span className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-sky-500" />
-            Chief Complaint
-          </span>
+          Practitioner
+          <span className="ml-2 text-xs font-normal text-gray-400">(Optional)</span>
+        </label>
+        {loadingPractitioners ? (
+          <div className="flex items-center gap-2 py-2 text-xs text-gray-400">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent" />
+            Loading practitioners…
+          </div>
+        ) : (
+          <select
+            value={practitioner}
+            onChange={e => {
+              setPractitioner(e.target.value === '' ? '' : Number(e.target.value));
+              onMarkDirty();
+            }}
+            className={inputBase}
+          >
+            <option value="">Unassigned</option>
+            {practitioners.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}{p.specialization && ` — ${p.specialization}`}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* ── Chief Complaint ── */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+          Chief Complaint
         </label>
         <textarea
           value={chiefComplaint}
-          onChange={e => handleChange(setChiefComplaint, e.target.value)}
+          onChange={e => { setChiefComplaint(e.target.value); onMarkDirty(); }}
           rows={2}
-          placeholder="Primary reason for visit…"
           className={`${inputBase} resize-none`}
+          placeholder="Primary reason for visit…"
         />
       </div>
 
-      {/* ── 3. Internal Notes ── */}
+      {/* ── Internal Notes ── */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          <span className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-amber-500" />
-            Internal Notes
-            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-normal">
-              Staff Only
-            </span>
-          </span>
+          Internal Notes
+          <span className="ml-2 text-xs font-normal text-gray-400">(Staff only)</span>
         </label>
         <textarea
           value={notes}
-          onChange={e => handleChange(setNotes, e.target.value)}
-          rows={3}
-          placeholder="Internal notes visible to staff only…"
-          className={`${inputBase} resize-none border-amber-200 focus:ring-amber-400`}
+          onChange={e => { setNotes(e.target.value); onMarkDirty(); }}
+          rows={2}
+          className={`${inputBase} resize-none`}
+          placeholder="Notes visible to staff only…"
         />
       </div>
 
-      {/* ── 4. Patient Notes ── */}
+      {/* ── Patient Notes ── */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          <span className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-sky-500" />
-            Patient Notes
-            <span className="px-1.5 py-0.5 bg-sky-100 text-sky-700 text-xs rounded-full font-normal">
-              Visible to Patient
-            </span>
-          </span>
+          Patient Notes
+          <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
         </label>
         <textarea
           value={patientNotes}
-          onChange={e => handleChange(setPatientNotes, e.target.value)}
-          rows={3}
-          placeholder="Notes that will be visible to the patient…"
+          onChange={e => { setPatientNotes(e.target.value); onMarkDirty(); }}
+          rows={2}
           className={`${inputBase} resize-none`}
+          placeholder="Notes visible to the patient…"
         />
       </div>
 
-      {/* ── Dirty indicator ── */}
-      {isDirty && (
-        <div className="flex items-center gap-1.5 text-xs text-amber-600">
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          Unsaved changes
-        </div>
-      )}
-
-      {/* ── Action buttons ── */}
-      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+      {/* ── Actions ── */}
+      <div className="flex items-center gap-2 justify-end pt-1">
         <button
           type="button"
           onClick={onCancel}
           disabled={isSaving}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
-          <X className="w-3.5 h-3.5" />
-          Discard
+          <XCircle className="w-3.5 h-3.5" />
+          Cancel
         </button>
         <button
-          type="button"
-          onClick={handleSave}
+          type="submit"
           disabled={isSaving || !isDirty}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSaving ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
               Saving…
             </>
           ) : (
@@ -223,6 +241,6 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
           )}
         </button>
       </div>
-    </div>
+    </form>
   );
 };

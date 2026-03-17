@@ -4,41 +4,45 @@ from .models import User, Role, Permission
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for User model"""
-    
-    password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
-    needs_password_change = serializers.BooleanField(read_only=True)
+    password               = serializers.CharField(write_only=True, required=False, validators=[validate_password])
+    needs_password_change  = serializers.BooleanField(read_only=True)
+    clinic_branch_name     = serializers.SerializerMethodField()
 
-    # ✅ NEW: expose the branch name as a read-only convenience field
-    clinic_branch_name = serializers.SerializerMethodField()
+    # ── NEW: expose whether the admin has completed clinic setup ──────────────
+    clinic_setup_complete  = serializers.SerializerMethodField()
 
     class Meta:
-        model = User
+        model  = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'role', 'phone',
             'avatar', 'is_active', 'clinic', 'clinic_branch', 'clinic_branch_name',
             'created_at', 'password', 'password_changed', 'needs_password_change',
+            'clinic_setup_complete',   # ← NEW
         ]
         read_only_fields = ['id', 'created_at', 'password_changed']
 
     def get_clinic_branch_name(self, obj) -> str | None:
-        """Return the branch name for display purposes."""
         if obj.clinic_branch:
             return obj.clinic_branch.name
         return None
 
+    def get_clinic_setup_complete(self, obj) -> bool:
+        """
+        Returns True if the user's main clinic has completed setup.
+        Non-admin users always see True (they don't do setup).
+        """
+        if not obj.is_admin:
+            return True
+        if obj.clinic:
+            return obj.clinic.main_clinic.setup_complete
+        return False
+
     def validate_clinic_branch(self, value):
-        """
-        Ensure the branch belongs to the same main clinic as the user's clinic.
-        Only validated on create/update when a branch is supplied.
-        """
         if value is None:
             return value
-
         request = self.context.get('request')
         if request and request.user and request.user.clinic:
             main_clinic = request.user.clinic.main_clinic
-            # The branch must be either the main clinic itself or one of its branches
             if value.id != main_clinic.id and value.parent_clinic_id != main_clinic.id:
                 raise serializers.ValidationError(
                     "The selected branch does not belong to your clinic."
@@ -47,12 +51,12 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        user = User.objects.create(**validated_data)
+        user     = User.objects.create(**validated_data)
         if password:
             user.set_password(password)
             user.save()
         return user
-    
+
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
         for attr, value in validated_data.items():
@@ -65,25 +69,18 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class AdminRegistrationSerializer(serializers.Serializer):
-    """
-    Serializer for admin/company owner registration.
-    Password is auto-generated and sent via email.
-    """
-    
-    first_name = serializers.CharField(max_length=150, required=True)
-    last_name = serializers.CharField(max_length=150, required=True)
+    first_name   = serializers.CharField(max_length=150, required=True)
+    last_name    = serializers.CharField(max_length=150, required=True)
     company_name = serializers.CharField(max_length=255, required=True)
-    email = serializers.EmailField(required=True)
-    phone = serializers.CharField(max_length=15, required=False, allow_blank=True)
-    
+    email        = serializers.EmailField(required=True)
+    phone        = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
     def validate_email(self, value):
-        """Check if email already exists"""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value.lower()
-    
+
     def validate_phone(self, value):
-        """Validate Philippine phone number format"""
         if value:
             cleaned = value.replace(' ', '').replace('-', '')
             if not (cleaned.startswith('09') and len(cleaned) == 11) and \
@@ -95,24 +92,22 @@ class AdminRegistrationSerializer(serializers.Serializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """Serializer for regular user registration"""
-    
-    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password         = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
-    
+
     class Meta:
-        model = User
+        model  = User
         fields = ['email', 'first_name', 'last_name', 'password', 'password_confirm', 'role', 'phone']
-    
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
         return attrs
-    
+
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
-        user = User.objects.create(**validated_data)
+        user     = User.objects.create(**validated_data)
         user.set_password(password)
         user.password_changed = True
         user.save()
@@ -120,17 +115,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    """Serializer for changing password"""
-    
-    old_password = serializers.CharField(required=True, write_only=True)
-    new_password = serializers.CharField(required=True, write_only=True, validators=[validate_password])
+    old_password         = serializers.CharField(required=True, write_only=True)
+    new_password         = serializers.CharField(required=True, write_only=True, validators=[validate_password])
     new_password_confirm = serializers.CharField(required=True, write_only=True)
-    
+
     def validate(self, attrs):
         if attrs['new_password'] != attrs['new_password_confirm']:
             raise serializers.ValidationError({"new_password": "Password fields didn't match."})
         return attrs
-    
+
     def validate_old_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
@@ -140,13 +133,13 @@ class PasswordChangeSerializer(serializers.Serializer):
 
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Permission
+        model  = Permission
         fields = '__all__'
 
 
 class RoleSerializer(serializers.ModelSerializer):
     permissions = PermissionSerializer(many=True, read_only=True)
-    
+
     class Meta:
-        model = Role
+        model  = Role
         fields = '__all__'

@@ -45,15 +45,17 @@ class AuthViewSet(viewsets.GenericViewSet):
             with transaction.atomic():
                 temp_password = PasswordService.generate_temporary_password()
 
-                # ✅ FIX: Provide all required non-nullable fields with safe defaults
+                # Clinic is created with minimal data — admin fills in the rest
+                # during the clinic profile setup step (including clinic email).
+                # Admin email is personal only and NOT copied to the clinic.
                 clinic = Clinic.objects.create(
                     name=serializer.validated_data['company_name'],
                     phone=serializer.validated_data.get('phone', ''),
-                    email=serializer.validated_data['email'],  # ✅ use admin email as clinic email
-                    address='',        # ✅ blank default — admin fills this in setup
-                    city='',           # ✅ blank default
-                    province='',       # ✅ blank default
-                    postal_code='',    # ✅ blank default
+                    email='',          # ✅ left blank — admin fills during setup
+                    address='',
+                    city='',
+                    province='',
+                    postal_code='',
                     is_active=True,
                     is_main_branch=True,
                 )

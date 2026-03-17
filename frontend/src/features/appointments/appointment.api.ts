@@ -9,6 +9,7 @@ export interface AppointmentFilters {
   search?: string;
   status?: string;
   appointment_type?: string;
+  service?: number;
   patient?: number;
   practitioner?: number;
   clinic_branch?: number;
@@ -20,20 +21,19 @@ export interface AppointmentFilters {
   page_size?: number;
 }
 
-// ── NEW: Edit payload (restricted fields only) ────────────────────────────────
+// ── Edit payload — service added ──────────────────────────────────────────────
 export interface AppointmentEditPayload {
   practitioner?:    number | null;
+  service?:         number | null;    // ← NEW
   chief_complaint?: string;
   notes?:           string;
   patient_notes?:   string;
 }
 
-// ── NEW: Cancel payload ───────────────────────────────────────────────────────
 export interface AppointmentCancelPayload {
   cancellation_reason: string;
 }
 
-// ── NEW: Cancel response (extends Appointment with email meta) ────────────────
 export interface AppointmentCancelResponse extends Appointment {
   email_sent:     boolean;
   email_warning?: string;
@@ -56,9 +56,6 @@ export interface PortalBookingDiaryItem {
   notes:                  string;
 }
 
-/**
- * Get all appointments with filters
- */
 export const getAppointments = async (
   filters?: AppointmentFilters
 ): Promise<PaginatedResponse<Appointment>> => {
@@ -67,6 +64,7 @@ export const getAppointments = async (
   if (filters?.search)           params.append('search',           filters.search);
   if (filters?.status)           params.append('status',           filters.status);
   if (filters?.appointment_type) params.append('appointment_type', filters.appointment_type);
+  if (filters?.service)          params.append('service',          String(filters.service));
   if (filters?.patient)          params.append('patient',          String(filters.patient));
   if (filters?.practitioner)     params.append('practitioner',     String(filters.practitioner));
   if (filters?.clinic_branch)    params.append('clinic_branch',    String(filters.clinic_branch));
@@ -83,17 +81,11 @@ export const getAppointments = async (
   return response.data;
 };
 
-/**
- * Get single appointment by ID
- */
 export const getAppointment = async (id: number): Promise<Appointment> => {
   const response = await axiosInstance.get<Appointment>(`/appointments/${id}/`);
   return response.data;
 };
 
-/**
- * Create new appointment
- */
 export const createAppointment = async (
   data: CreateAppointmentData
 ): Promise<Appointment> => {
@@ -101,9 +93,6 @@ export const createAppointment = async (
   return response.data;
 };
 
-/**
- * Full update appointment (existing)
- */
 export const updateAppointment = async (
   id: number,
   data: Partial<CreateAppointmentData>
@@ -112,10 +101,6 @@ export const updateAppointment = async (
   return response.data;
 };
 
-/**
- * NEW: Restricted edit — only practitioner, chief_complaint, notes, patient_notes
- * PATCH /api/appointments/{id}/edit/
- */
 export const editAppointment = async (
   id: number,
   data: AppointmentEditPayload
@@ -127,10 +112,6 @@ export const editAppointment = async (
   return response.data;
 };
 
-/**
- * NEW: Cancel appointment with required reason
- * POST /api/appointments/{id}/cancel/
- */
 export const cancelAppointment = async (
   id: number,
   data: AppointmentCancelPayload
@@ -142,16 +123,10 @@ export const cancelAppointment = async (
   return response.data;
 };
 
-/**
- * Delete appointment
- */
 export const deleteAppointment = async (id: number): Promise<void> => {
   await axiosInstance.delete(`/appointments/${id}/`);
 };
 
-/**
- * Get clinical notes for an appointment
- */
 export const getAppointmentClinicalNotes = async (appointmentId: number) => {
   const response = await axiosInstance.get(
     `/clinical-notes/?appointment=${appointmentId}`
@@ -159,9 +134,6 @@ export const getAppointmentClinicalNotes = async (appointmentId: number) => {
   return response.data;
 };
 
-/**
- * Get invoice for an appointment
- */
 export const getAppointmentInvoice = async (appointmentId: number) => {
   const response = await axiosInstance.get(
     `/invoices/?appointment=${appointmentId}`
@@ -182,9 +154,6 @@ export const getPortalBookingsForDiary = async (params: {
   return response.data;
 };
 
-/**
- * Update portal booking status (CONFIRMED / CANCELLED)
- */
 export const updatePortalBookingStatus = async (
   id: number,
   newStatus: 'CONFIRMED' | 'CANCELLED'

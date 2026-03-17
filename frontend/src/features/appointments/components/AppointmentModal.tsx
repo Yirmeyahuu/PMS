@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Timer, User, FileText, AlertCircle, UserPlus, Stethoscope } from 'lucide-react';
+import {
+  X, Calendar, Clock, Timer, User, FileText,
+  AlertCircle, UserPlus, Stethoscope, Layers,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getPatients } from '@/features/patients/patient.api';
 import { createAppointment } from '../appointment.api';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
+import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import { useAuthStore } from '@/store/auth.store';
 import type { Patient, CreateAppointmentData } from '@/types';
 import toast from 'react-hot-toast';
@@ -21,13 +25,10 @@ interface AppointmentModalProps {
   } | null;
 }
 
-interface AppointmentFormData {
-  patient: number | '';
+interface FormData {
+  patient:      number | '';
   practitioner: number | '';
-  appointment_type: string;
-  chief_complaint: string;
-  notes: string;
-  patient_notes: string;
+  service:      number | '';
 }
 
 export const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -38,24 +39,37 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients,        setPatients]        = useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving,          setSaving]          = useState(false);
+  const [errors,          setErrors]          = useState<Record<string, string>>({});
+  const [chiefComplaint,  setChiefComplaint]  = useState('');
+  const [notes,           setNotes]           = useState('');
+  const [patientNotes,    setPatientNotes]    = useState('');
 
-  const { practitioners, loading: loadingPractitioners } = usePractitioners();
-
-  const [formData, setFormData] = useState<AppointmentFormData>({
-    patient: '',
+  const [formData, setFormData] = useState<FormData>({
+    patient:      '',
     practitioner: '',
-    appointment_type: 'INITIAL',
-    chief_complaint: '',
-    notes: '',
-    patient_notes: '',
+    service:      '',
   });
 
+  const { practitioners, loading: loadingPractitioners } = usePractitioners();
+  const { services,      loading: loadingServices }      = useAppointmentServices();
+
+  // Derive selected service object for duration + color pill
+  const selectedService = services.find(s => s.id === Number(formData.service));
+  const effectiveDuration = selectedService?.duration_minutes ?? selectedSlot?.duration ?? 60;
+
+  // Reset form when modal opens
   useEffect(() => {
-    if (isOpen) loadPatients();
+    if (isOpen) {
+      loadPatients();
+      setFormData({ patient: '', practitioner: '', service: '' });
+      setChiefComplaint('');
+      setNotes('');
+      setPatientNotes('');
+      setErrors({});
+    }
   }, [isOpen]);
 
   const loadPatients = async () => {
@@ -63,65 +77,73 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     try {
       const response = await getPatients({ is_active: true, page_size: 1000 });
       setPatients(response.results || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load patients');
     } finally {
       setLoadingPatients(false);
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.patient) newErrors.patient = 'Please select a patient';
-    if (!formData.appointment_type) newErrors.appointment_type = 'Please select appointment type';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!formData.patient) errs.patient  = 'Please select a patient.';
+    if (!formData.service) errs.service  = 'Please select a service / appointment type.';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm() || !selectedSlot || !user?.clinic) return;
+    if (!validate() || !selectedSlot || !user?.clinic) return;
 
     setSaving(true);
     try {
-      const endMinutes = selectedSlot.hour * 60 + selectedSlot.minutes + selectedSlot.duration;
-      const endHour = Math.floor(endMinutes / 60);
-      const endMin = endMinutes % 60;
+      const startH  = selectedSlot.hour;
+      const startM  = selectedSlot.minutes;
+      const endMin  = startH * 60 + startM + effectiveDuration;
+      const endH    = Math.floor(endMin / 60);
+      const endMm   = endMin % 60;
 
-      const appointmentData: CreateAppointmentData = {
-        clinic: user.clinic,
-        patient: Number(formData.patient),
+      const data: CreateAppointmentData = {
+        clinic:           user.clinic,
+        patient:          Number(formData.patient),
+        service:          Number(formData.service),
         ...(formData.practitioner && { practitioner: Number(formData.practitioner) }),
-        appointment_type: formData.appointment_type,
-        date: format(selectedSlot.date, 'yyyy-MM-dd'),
-        start_time: `${selectedSlot.hour.toString().padStart(2, '0')}:${selectedSlot.minutes.toString().padStart(2, '0')}`,
-        end_time: `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`,
-        duration_minutes: selectedSlot.duration,
-        chief_complaint: formData.chief_complaint,
-        notes: formData.notes,
-        patient_notes: formData.patient_notes,
+        appointment_type: 'INITIAL',   // legacy fallback
+        date:             format(selectedSlot.date, 'yyyy-MM-dd'),
+        start_time:       `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
+        end_time:         `${String(endH).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`,
+        duration_minutes: effectiveDuration,
+        chief_complaint:  chiefComplaint,
+        notes,
+        patient_notes:    patientNotes,
       };
 
-      await createAppointment(appointmentData);
+      await createAppointment(data);
       toast.success('Appointment created successfully!');
       handleClose();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || error.response?.data?.message || 'Failed to create appointment');
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        'Failed to create appointment'
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleClose = () => {
-    setFormData({ patient: '', practitioner: '', appointment_type: 'INITIAL', chief_complaint: '', notes: '', patient_notes: '' });
+    setFormData({ patient: '', practitioner: '', service: '' });
+    setChiefComplaint('');
+    setNotes('');
+    setPatientNotes('');
     setErrors({});
     onClose();
   };
@@ -133,32 +155,36 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   if (!isOpen || !selectedSlot) return null;
 
-  const formattedDate = format(selectedSlot.date, 'EEEE, MMMM d, yyyy');
-  const formattedTime = `${selectedSlot.hour > 12 ? selectedSlot.hour - 12 : selectedSlot.hour}:${selectedSlot.minutes.toString().padStart(2, '0')} ${selectedSlot.hour >= 12 ? 'PM' : 'AM'}`;
-  const endMinutes = selectedSlot.hour * 60 + selectedSlot.minutes + selectedSlot.duration;
-  const endHour = Math.floor(endMinutes / 60);
-  const endMin = endMinutes % 60;
-  const formattedEndTime = `${endHour > 12 ? endHour - 12 : endHour}:${endMin.toString().padStart(2, '0')} ${endHour >= 12 ? 'PM' : 'AM'}`;
+  // Time display helpers
+  const fmt12 = (h: number, m: number) => {
+    const h12 = h > 12 ? h - 12 : h || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
+  const endMin = selectedSlot.hour * 60 + selectedSlot.minutes + effectiveDuration;
+  const endH   = Math.floor(endMin / 60);
+  const endMm  = endMin % 60;
 
-  const formatDuration = (minutes: number): string => {
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (mins === 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
-    return `${hours} hour${hours > 1 ? 's' : ''} ${mins} minutes`;
+  const fmtDuration = (min: number) => {
+    if (min < 60) return `${min} min`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
   };
 
-  const inputBase = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent';
+  const inputBase  = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent';
   const inputError = 'border-red-300 bg-red-50';
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-md transition-opacity duration-300" onClick={handleClose} />
+      <div
+        className="fixed inset-0 bg-black/50 z-50 backdrop-blur-md transition-opacity duration-300"
+        onClick={handleClose}
+      />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
@@ -171,40 +197,118 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <p className="text-xs text-gray-500">Schedule a new appointment</p>
               </div>
             </div>
-            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Close modal">
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Close modal"
+            >
               <X className="w-4 h-4 text-gray-500" />
             </button>
           </div>
 
-          {/* ── Content ── */}
+          {/* ── Body ── */}
           <div className="flex-1 overflow-y-auto">
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
 
-              {/* Selected Slot */}
+              {/* Slot summary */}
               <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="flex items-center gap-2 text-sky-700">
                     <Calendar className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">{formattedDate}</span>
+                    <span className="text-sm font-medium">
+                      {format(selectedSlot.date, 'EEEE, MMMM d, yyyy')}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sky-700">
                     <Clock className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">{formattedTime} – {formattedEndTime}</span>
+                    <span className="text-sm font-medium">
+                      {fmt12(selectedSlot.hour, selectedSlot.minutes)} – {fmt12(endH, endMm)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sky-700">
                     <Timer className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">{formatDuration(selectedSlot.duration)}</span>
+                    <span className="text-sm font-medium">{fmtDuration(effectiveDuration)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Patient */}
+              {/* ── Service / Appointment Type ── */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Service / Appointment Type <span className="text-red-500">*</span>
+                </label>
+
+                {loadingServices ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
+                  </div>
+                ) : services.length === 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800 mb-1">
+                          No services configured
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          Ask an admin to add clinic services under{' '}
+                          <strong>Setup → Clinic Services</strong> before booking appointments.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <select
+                        name="service"
+                        value={formData.service}
+                        onChange={handleSelectChange}
+                        className={`${inputBase} pl-9 ${errors.service ? inputError : ''}`}
+                      >
+                        <option value="">— Select a service —</option>
+                        {services.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                            {s.duration_minutes ? ` (${s.duration_minutes} min)` : ''}
+                            {parseFloat(s.price) > 0
+                              ? ` · ₱${parseFloat(s.price).toLocaleString()}`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {errors.service && (
+                      <p className="mt-1 text-xs text-red-600">{errors.service}</p>
+                    )}
+
+                    {/* Selected service color pill */}
+                    {selectedService && (
+                      <div
+                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: selectedService.color_hex || '#0D9488' }}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-white/70" />
+                        {selectedService.name}
+                        &nbsp;·&nbsp;{selectedService.duration_minutes} min
+                        {parseFloat(selectedService.price) > 0 &&
+                          ` · ₱${parseFloat(selectedService.price).toLocaleString()}`}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ── Patient ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Patient / Client <span className="text-red-500">*</span>
                 </label>
+
                 {loadingPatients ? (
-                  <div className="flex items-center justify-center py-6">
+                  <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
                   </div>
                 ) : patients.length === 0 ? (
@@ -213,7 +317,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-amber-800 mb-1">No patients found</p>
-                        <p className="text-xs text-amber-700 mb-3">Create a patient before scheduling an appointment.</p>
+                        <p className="text-xs text-amber-700 mb-3">
+                          Create a patient before scheduling an appointment.
+                        </p>
                         <button
                           type="button"
                           onClick={handleCreatePatient}
@@ -232,19 +338,20 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       <select
                         name="patient"
                         value={formData.patient}
-                        onChange={handleChange}
+                        onChange={handleSelectChange}
                         className={`${inputBase} pl-9 ${errors.patient ? inputError : ''}`}
-                        required
                       >
-                        <option value="">Select a patient...</option>
-                        {patients.map((p) => (
+                        <option value="">Select a patient…</option>
+                        {patients.map(p => (
                           <option key={p.id} value={p.id}>
                             {p.full_name} — {p.patient_number}
                           </option>
                         ))}
                       </select>
                     </div>
-                    {errors.patient && <p className="mt-1 text-xs text-red-600">{errors.patient}</p>}
+                    {errors.patient && (
+                      <p className="mt-1 text-xs text-red-600">{errors.patient}</p>
+                    )}
                     <button
                       type="button"
                       onClick={handleCreatePatient}
@@ -257,14 +364,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 )}
               </div>
 
-              {/* Practitioner */}
+              {/* ── Practitioner ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Assigned Practitioner
                   <span className="ml-2 text-xs font-normal text-gray-400">(Optional)</span>
                 </label>
+
                 {loadingPractitioners ? (
-                  <div className="flex items-center justify-center py-6">
+                  <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
                   </div>
                 ) : (
@@ -273,11 +381,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     <select
                       name="practitioner"
                       value={formData.practitioner}
-                      onChange={handleChange}
+                      onChange={handleSelectChange}
                       className={`${inputBase} pl-9`}
                     >
                       <option value="">Unassigned</option>
-                      {practitioners.map((p) => (
+                      {practitioners.map(p => (
                         <option key={p.id} value={p.id}>
                           {p.name}{p.specialization && ` — ${p.specialization}`}
                         </option>
@@ -292,40 +400,21 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 </p>
               </div>
 
-              {/* Appointment Type */}
+              {/* ── Chief Complaint ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Appointment Type <span className="text-red-500">*</span>
+                  Chief Complaint
                 </label>
-                <select
-                  name="appointment_type"
-                  value={formData.appointment_type}
-                  onChange={handleChange}
-                  className={`${inputBase} ${errors.appointment_type ? inputError : ''}`}
-                  required
-                >
-                  <option value="INITIAL">Initial Consultation</option>
-                  <option value="FOLLOW_UP">Follow-up</option>
-                  <option value="THERAPY">Therapy Session</option>
-                  <option value="ASSESSMENT">Assessment</option>
-                </select>
-                {errors.appointment_type && <p className="mt-1 text-xs text-red-600">{errors.appointment_type}</p>}
-              </div>
-
-              {/* Chief Complaint */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Chief Complaint</label>
                 <textarea
-                  name="chief_complaint"
-                  value={formData.chief_complaint}
-                  onChange={handleChange}
+                  value={chiefComplaint}
+                  onChange={e => setChiefComplaint(e.target.value)}
                   rows={2}
                   className={`${inputBase} resize-none`}
-                  placeholder="Primary reason for visit..."
+                  placeholder="Primary reason for visit…"
                 />
               </div>
 
-              {/* Internal Notes */}
+              {/* ── Internal Notes ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Internal Notes
@@ -334,29 +423,27 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <div className="relative">
                   <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                   <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    rows={3}
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    rows={2}
                     className={`${inputBase} pl-9 resize-none`}
-                    placeholder="Internal notes for staff..."
+                    placeholder="Internal notes for staff…"
                   />
                 </div>
               </div>
 
-              {/* Patient Notes */}
+              {/* ── Patient Notes ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Patient Notes
                   <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
                 </label>
                 <textarea
-                  name="patient_notes"
-                  value={formData.patient_notes}
-                  onChange={handleChange}
-                  rows={3}
+                  value={patientNotes}
+                  onChange={e => setPatientNotes(e.target.value)}
+                  rows={2}
                   className={`${inputBase} resize-none`}
-                  placeholder="Notes for patient..."
+                  placeholder="Notes for patient…"
                 />
               </div>
 
@@ -365,9 +452,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">
-                      Created by: <span className="font-medium text-gray-700">{user.first_name} {user.last_name}</span>
+                      Created by:{' '}
+                      <span className="font-medium text-gray-700">
+                        {user.first_name} {user.last_name}
+                      </span>
                     </span>
-                    <span className="text-gray-400">{format(new Date(), 'MMM d, yyyy h:mm a')}</span>
+                    <span className="text-gray-400">
+                      {format(new Date(), 'MMM d, yyyy h:mm a')}
+                    </span>
                   </div>
                 </div>
               )}
@@ -387,13 +479,13 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={saving || patients.length === 0}
+              disabled={saving || services.length === 0 || patients.length === 0}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
                   <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
-                  Saving...
+                  Saving…
                 </>
               ) : (
                 <>

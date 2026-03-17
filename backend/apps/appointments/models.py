@@ -5,24 +5,25 @@ from apps.common.models import TimeStampedModel, SoftDeleteModel
 
 class Appointment(TimeStampedModel, SoftDeleteModel):
     """Patient appointments with practitioners"""
-    
+
     STATUS_CHOICES = [
-        ('SCHEDULED', 'Scheduled'),
-        ('CONFIRMED', 'Confirmed'),
-        ('CHECKED_IN', 'Checked In'),
+        ('SCHEDULED',   'Scheduled'),
+        ('CONFIRMED',   'Confirmed'),
+        ('CHECKED_IN',  'Checked In'),
         ('IN_PROGRESS', 'In Progress'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-        ('NO_SHOW', 'No Show'),
+        ('COMPLETED',   'Completed'),
+        ('CANCELLED',   'Cancelled'),
+        ('NO_SHOW',     'No Show'),
     ]
-    
+
+    # ── Keep for legacy / fallback but no longer the primary type mechanism ──
     APPOINTMENT_TYPE_CHOICES = [
-        ('INITIAL', 'Initial Consultation'),
+        ('INITIAL',   'Initial Consultation'),
         ('FOLLOW_UP', 'Follow-up'),
-        ('THERAPY', 'Therapy Session'),
-        ('ASSESSMENT', 'Assessment'),
+        ('THERAPY',   'Therapy Session'),
+        ('ASSESSMENT','Assessment'),
     ]
-    
+
     clinic = models.ForeignKey(
         'clinics.Clinic',
         on_delete=models.CASCADE,
@@ -34,13 +35,12 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='appointments'
     )
-    # ✅ FIX: Make practitioner optional (can be assigned later)
     practitioner = models.ForeignKey(
         'clinics.Practitioner',
         on_delete=models.CASCADE,
         related_name='appointments',
-        null=True,  # ✅ ADDED
-        blank=True  # ✅ ADDED
+        null=True,
+        blank=True,
     )
     location = models.ForeignKey(
         'clinics.Location',
@@ -49,53 +49,53 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
         blank=True,
         related_name='appointments'
     )
-    
-    # Appointment details
-    appointment_type = models.CharField(max_length=20, choices=APPOINTMENT_TYPE_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
-    
-    # Date and time
-    date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    duration_minutes = models.IntegerField(default=60)
-    
-    # Additional information
-    chief_complaint = models.TextField(blank=True)
-    notes = models.TextField(blank=True, help_text='Internal notes')
-    patient_notes = models.TextField(blank=True, help_text='Notes from patient')
-    
-    # Reminder tracking
-    reminder_sent = models.BooleanField(default=False)
-    reminder_sent_at = models.DateTimeField(null=True, blank=True)
-    
-    # Audit tracking
-    created_by = models.ForeignKey(
-        'accounts.User',
+
+    # ── NEW: link to a clinic Service (the "appointment type") ───────────────
+    service = models.ForeignKey(
+        'clinic_services.Service',   # ← use the app label from apps.py
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        related_name='appointments',
+        help_text='Clinic service this appointment is for (replaces hardcoded type)',
+    )
+
+    # Legacy type — kept for backward-compat; auto-populated from service when possible
+    appointment_type = models.CharField(
+        max_length=20,
+        choices=APPOINTMENT_TYPE_CHOICES,
+        default='INITIAL',
+        blank=True,
+    )
+
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
+    date             = models.DateField()
+    start_time       = models.TimeField()
+    end_time         = models.TimeField()
+    duration_minutes = models.IntegerField(default=60)
+
+    chief_complaint = models.TextField(blank=True)
+    notes           = models.TextField(blank=True, help_text='Internal notes')
+    patient_notes   = models.TextField(blank=True, help_text='Notes from patient')
+
+    reminder_sent    = models.BooleanField(default=False)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='appointments_created'
     )
     updated_by = models.ForeignKey(
-        'accounts.User',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='appointments_updated'
     )
-    
-    # Cancellation
     cancelled_by = models.ForeignKey(
-        'accounts.User',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='cancelled_appointments'
     )
     cancellation_reason = models.TextField(blank=True)
-    cancelled_at = models.DateTimeField(null=True, blank=True)
-    
+    cancelled_at        = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'appointments'
         ordering = ['-date', '-start_time']
@@ -103,26 +103,32 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
             models.Index(fields=['clinic', 'date', 'status']),
             models.Index(fields=['practitioner', 'date']),
             models.Index(fields=['patient', 'date']),
+            models.Index(fields=['service', 'date']),   # NEW
         ]
-    
+
     def __str__(self):
-        return f"{self.patient.get_full_name()} - {self.date} {self.start_time}"
-    
+        service_label = self.service.name if self.service else self.appointment_type
+        return f"{self.patient.get_full_name()} — {service_label} @ {self.date} {self.start_time}"
+
+    def save(self, *args, **kwargs):
+        # Auto-populate duration from service if not explicitly set
+        if self.service and not self.duration_minutes:
+            self.duration_minutes = self.service.duration_minutes
+        super().save(*args, **kwargs)
+
     def clean(self):
-        # Validate that end_time is after start_time
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValidationError('End time must be after start time')
-        
-        # ✅ FIX: Only check for overlapping if practitioner is assigned
+
         if self.practitioner and self.date and self.start_time and self.end_time:
             overlapping = Appointment.objects.filter(
                 practitioner=self.practitioner,
                 date=self.date,
                 status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS']
             ).exclude(pk=self.pk)
-            
+
             for apt in overlapping:
-                if (self.start_time < apt.end_time and self.end_time > apt.start_time):
+                if self.start_time < apt.end_time and self.end_time > apt.start_time:
                     raise ValidationError('This appointment overlaps with an existing appointment')
 
 

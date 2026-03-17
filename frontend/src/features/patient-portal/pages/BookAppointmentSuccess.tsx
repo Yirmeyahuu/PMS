@@ -1,146 +1,117 @@
 import React from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  CheckCircle, Calendar, Clock, User,
-  Stethoscope, Phone, Mail,
-} from 'lucide-react';
+import { useLocation, useParams, Link } from 'react-router-dom';
+import { CheckCircle, Calendar, Clock, User, Stethoscope, MapPin } from 'lucide-react';
 import type { BookingConfirmation } from '@/types/portal';
+
+const fmt12 = (time: string) => {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m);
+  return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
 
 export const BookAppointmentSuccess: React.FC = () => {
   const { token }    = useParams<{ token: string }>();
-  const location     = useLocation();
-  const navigate     = useNavigate();
-  const confirmation = location.state?.confirmation as BookingConfirmation | undefined;
+  const { state }    = useLocation();
+  const confirmation = state?.confirmation as BookingConfirmation | undefined;
 
   if (!confirmation) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center p-8">
-          <p className="text-gray-600 mb-4">No booking information found.</p>
-          <button
-            onClick={() => navigate(`/portal/${token}`)}
-            className="px-6 py-2 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700"
-          >
-            Go back to booking
-          </button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-gray-500">No booking information found.</p>
+          <Link to={`/portal/${token}`} className="mt-4 inline-block text-teal-600 underline text-sm">
+            Go back to booking portal
+          </Link>
         </div>
       </div>
     );
   }
 
-  const apptDate = new Date(
-    confirmation.appointment_date + 'T00:00:00',
-  ).toLocaleDateString('en-PH', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  });
-
-  const apptTime = (() => {
-    const [h, m] = confirmation.appointment_time.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m);
-    return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
-  })();
-
-  const priceStr = `₱ ${parseFloat(confirmation.service_price).toLocaleString('en-PH', {
-    minimumFractionDigits: 0,
-  })}`;
-
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-gray-200 rounded-2xl p-8 max-w-lg w-full shadow-lg">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-md overflow-hidden">
 
-        {/* Practitioner card */}
-        <div className="flex justify-center mb-6">
-          <div className="bg-white rounded-2xl p-5 flex flex-col items-center gap-2 w-48 shadow-sm">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-              <User className="w-8 h-8 text-gray-400" />
+        {/* Header */}
+        <div className="bg-teal-600 px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <CheckCircle className="w-9 h-9 text-white" />
+          </div>
+          <h1 className="text-xl font-bold text-white">Booking Confirmed!</h1>
+          <p className="text-teal-100 text-sm mt-1">
+            Your appointment has been successfully booked.
+          </p>
+        </div>
+
+        {/* Reference number */}
+        <div className="bg-teal-50 border-b border-teal-100 px-6 py-3 text-center">
+          <p className="text-xs text-teal-600 font-medium uppercase tracking-wide">Reference Number</p>
+          <p className="text-lg font-bold text-teal-800 font-mono">#{confirmation.reference_number}</p>
+        </div>
+
+        {/* Details */}
+        <div className="px-6 py-5 space-y-4">
+
+          <div className="flex items-start gap-3">
+            <User className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-gray-500">Patient</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {confirmation.patient_first_name} {confirmation.patient_last_name}
+              </p>
+              <p className="text-xs text-gray-500">{confirmation.patient_email}</p>
             </div>
-            <p className="text-sm font-semibold text-gray-800 text-center">
-              {confirmation.practitioner_name ?? confirmation.clinic_name}
-            </p>
-            <p className="text-xs text-gray-400 text-center">
-              {confirmation.practitioner_specialization ?? confirmation.service_name}
-            </p>
           </div>
-        </div>
-
-        {/* Heading */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <CheckCircle className="w-7 h-7 text-teal-500" />
-            <h1 className="text-2xl font-bold text-gray-800">You are booked!</h1>
-          </div>
-          <p className="text-gray-500 text-sm">
-            Your appointment has been received and is pending confirmation.
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Reference:{' '}
-            <span className="font-mono font-semibold">
-              {confirmation.reference_number}
-            </span>
-          </p>
-        </div>
-
-        {/* Details card */}
-        <div className="bg-white rounded-xl p-5 space-y-3 mb-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Appointment Details
-          </h2>
 
           <div className="flex items-start gap-3">
             <Stethoscope className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-gray-800">
-                {confirmation.service_name}
-              </p>
-              <p className="text-xs text-gray-400">
-                {confirmation.service_duration} min · {priceStr}
-              </p>
+              <p className="text-xs text-gray-500">Service</p>
+              <p className="text-sm font-semibold text-gray-900">{confirmation.service_name}</p>
+              <p className="text-xs text-gray-500">{confirmation.service_duration} minutes</p>
+              {confirmation.practitioner_name && (
+                <p className="text-xs text-gray-500">with {confirmation.practitioner_name}</p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <p className="text-sm text-gray-700">{apptDate}</p>
+          <div className="flex items-start gap-3">
+            <Calendar className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-gray-500">Date & Time</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {new Date(confirmation.appointment_date + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+              <p className="text-xs text-gray-500">{fmt12(confirmation.appointment_time)}</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <p className="text-sm text-gray-700">{apptTime}</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <p className="text-sm text-gray-700">
-              {confirmation.patient_first_name} {confirmation.patient_last_name}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <p className="text-sm text-gray-700">{confirmation.patient_email}</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <p className="text-sm text-gray-700">{confirmation.patient_phone}</p>
+          <div className="flex items-start gap-3">
+            <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-gray-500">Clinic</p>
+              <p className="text-sm font-semibold text-gray-900">{confirmation.clinic_name}</p>
+            </div>
           </div>
         </div>
 
-        {/* Footer buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate(`/portal/${token}`)}
-            className="flex-1 px-6 py-3 bg-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-400 transition-colors text-sm"
+        {/* Notice */}
+        <div className="mx-6 mb-5 bg-teal-50 border border-teal-200 rounded-xl p-3">
+          <p className="text-xs text-teal-700 text-center">
+            A confirmation has been recorded. Please arrive a few minutes early for your appointment.
+          </p>
+        </div>
+
+        {/* CTA */}
+        <div className="px-6 pb-6">
+          <Link
+            to={`/portal/${token}`}
+            className="block w-full text-center py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors"
           >
-            Book Another
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors text-sm"
-          >
-            Print / Save
-          </button>
+            Book Another Appointment
+          </Link>
         </div>
       </div>
     </div>

@@ -105,58 +105,30 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     # ── NEW: Partial edit action (restricted fields only) ─────────────────────
     @action(detail=True, methods=['patch'], url_path='edit')
     def edit(self, request, pk=None):
-        """
-        PATCH /api/appointments/{id}/edit/
-        Allows editing only:
-          - practitioner
-          - chief_complaint
-          - notes
-          - patient_notes
-
-        Always stamps updated_by = request.user and updated_at (auto).
-        Returns the full appointment via AppointmentSerializer so the
-        frontend cache can be updated in one round-trip.
-        """
         appointment = self.get_object()
 
-        # Reject edits on terminal states
         if appointment.status in ('CANCELLED', 'COMPLETED'):
             return Response(
                 {'detail': 'Cannot edit a cancelled or completed appointment.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Only accept the 4 allowed fields — strip anything else
-        allowed_fields = {'practitioner', 'chief_complaint', 'notes', 'patient_notes'}
+        # ── service added to editable fields ────────────────────────────────
+        allowed_fields = {'practitioner', 'service', 'chief_complaint', 'notes', 'patient_notes'}
         filtered_data  = {k: v for k, v in request.data.items() if k in allowed_fields}
 
         if not filtered_data:
             return Response(
                 {'detail': 'No editable fields provided. '
-                           'Allowed: practitioner, chief_complaint, notes, patient_notes'},
+                           'Allowed: practitioner, service, chief_complaint, notes, patient_notes'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = AppointmentEditSerializer(
-            appointment,
-            data=filtered_data,
-            partial=True,
-        )
+        serializer = AppointmentEditSerializer(appointment, data=filtered_data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by=request.user)
 
-        logger.info(
-            "Appointment #%s edited by %s. Changed fields: %s",
-            appointment.id,
-            request.user.email,
-            list(filtered_data.keys()),
-        )
-
-        # Return full appointment data so the frontend can update its cache
-        full_serializer = AppointmentSerializer(
-            appointment,
-            context={'request': request},
-        )
+        full_serializer = AppointmentSerializer(appointment, context={'request': request})
         return Response(full_serializer.data, status=status.HTTP_200_OK)
 
     # ── ENHANCED: Cancel with reason + email ─────────────────────────────────

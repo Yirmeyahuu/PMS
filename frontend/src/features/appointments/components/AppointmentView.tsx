@@ -59,7 +59,11 @@ const newBlankItem = (): EditableItem => ({
 // ── Appointment Summary Card ──────────────────────────────────────────────────
 const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
   const formattedDate = format(new Date(appointment.date), 'MMM d, yyyy');
-  const typeLabel     = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
+
+  // ── Use service_name when available ───────────────────────────────────────
+  const typeLabel = appointment.service_name
+    ?? APPOINTMENT_TYPE_LABELS[appointment.appointment_type]
+    ?? appointment.appointment_type;
 
   return (
     <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
@@ -95,8 +99,17 @@ const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointmen
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4 text-sky-500 flex-shrink-0" />
           <div>
-            <p className="text-xs text-gray-500">Type</p>
-            <p className="font-semibold text-gray-800">{typeLabel}</p>
+            <p className="text-xs text-gray-500">Service</p>
+            {appointment.service_color ? (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold text-white mt-0.5"
+                style={{ backgroundColor: appointment.service_color }}
+              >
+                {typeLabel}
+              </span>
+            ) : (
+              <p className="font-semibold text-gray-800">{typeLabel}</p>
+            )}
           </div>
         </div>
         {appointment.location_name && (
@@ -630,7 +643,15 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   if (!isOpen || !appointment) return null;
 
   const statusColors  = APPOINTMENT_STATUS_COLORS[appointment.status];
-  const typeLabel     = APPOINTMENT_TYPE_LABELS[appointment.appointment_type];
+
+  // ── Use service_name when available, fall back to legacy type label ────────
+  const typeLabel = appointment.service_name
+    ?? APPOINTMENT_TYPE_LABELS[appointment.appointment_type]
+    ?? appointment.appointment_type;
+
+  // ── Service color for the type badge ─────────────────────────────────────
+  const serviceColor = appointment.service_color;
+
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
   const formattedTime = `${appointment.start_time} - ${appointment.end_time}`;
   const isCancelled   = appointment.status === 'CANCELLED';
@@ -778,7 +799,17 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                         {appointment.status.replace('_', ' ')}
                       </span>
                       <span className="text-gray-300 text-sm">·</span>
-                      <span className="text-sm font-medium text-gray-600">{typeLabel}</span>
+                      {serviceColor ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
+                          style={{ backgroundColor: serviceColor }}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
+                          {typeLabel}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-medium text-gray-600">{typeLabel}</span>
+                      )}
                     </div>
 
                     {/* Date & Time */}

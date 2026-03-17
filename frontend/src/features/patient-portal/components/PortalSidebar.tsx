@@ -1,6 +1,13 @@
 import React from 'react';
-import { MapPin, Calendar, Clock, User } from 'lucide-react';
+import { MapPin, Phone, Mail, CheckCircle, Circle } from 'lucide-react';
 import type { PortalData, PortalPractitioner, PortalService } from '@/types/portal';
+
+const fmt12 = (slot: string) => {
+  const [h, m] = slot.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m);
+  return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
 
 interface PortalSidebarProps {
   portal:               PortalData;
@@ -8,10 +15,14 @@ interface PortalSidebarProps {
   selectedService:      PortalService | null;
   selectedDate:         string;
   selectedSlot:         string;
-  currentStep:          number;   // 1=practitioner, 2=service, 3=details
+  currentStep:          number;
 }
 
-const STEPS = ['Practitioner', 'Service', 'Your Details'];
+const STEPS = [
+  { number: 1, label: 'Choose Practitioner' },
+  { number: 2, label: 'Select Service & Time' },
+  { number: 3, label: 'Your Details' },
+];
 
 export const PortalSidebar: React.FC<PortalSidebarProps> = ({
   portal,
@@ -22,120 +33,131 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
   currentStep,
 }) => {
   return (
-    <aside className="w-64 flex-shrink-0 bg-teal-600 min-h-screen flex flex-col p-4 gap-3">
+    <aside className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen">
 
-      {/* Logo */}
-      <div className="bg-white rounded-xl p-4 flex items-center justify-center h-28 shadow-sm">
-        {portal.clinic_logo ? (
-          <img
-            src={portal.clinic_logo}
-            alt={portal.clinic_name}
-            className="max-h-full max-w-full object-contain"
-          />
-        ) : (
-          <span className="text-lg font-bold text-gray-700 text-center leading-tight">
-            {portal.clinic_name}
-          </span>
-        )}
-      </div>
+      {/* Clinic info */}
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex items-center gap-3 mb-4">
+          {portal.clinic_logo ? (
+            <img
+              src={portal.clinic_logo}
+              alt={portal.clinic_name}
+              className="w-12 h-12 rounded-xl object-cover border border-gray-200"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold text-lg">
+              {portal.clinic_name.charAt(0)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="font-bold text-gray-900 text-sm truncate">{portal.clinic_name}</h2>
+            {portal.clinic_address && (
+              <p className="text-xs text-gray-500 truncate">{portal.clinic_address}</p>
+            )}
+          </div>
+        </div>
 
-      {/* Address */}
-      <div className="bg-white rounded-xl p-3 shadow-sm">
-        <div className="flex items-start gap-2 text-sm text-gray-600">
-          <MapPin className="w-4 h-4 mt-0.5 text-teal-500 flex-shrink-0" />
-          <span className="leading-snug">
-            {portal.clinic_address || portal.clinic_name}
-          </span>
+        <div className="space-y-1.5">
+          {portal.clinic_phone && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Phone className="w-3 h-3 flex-shrink-0 text-teal-500" />
+              {portal.clinic_phone}
+            </div>
+          )}
+          {portal.clinic_email && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Mail className="w-3 h-3 flex-shrink-0 text-teal-500" />
+              {portal.clinic_email}
+            </div>
+          )}
+          {portal.clinic_address && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <MapPin className="w-3 h-3 flex-shrink-0 text-teal-500" />
+              {portal.clinic_address}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Steps tracker */}
-      <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-        {STEPS.map((label, i) => {
-          const stepNum  = i + 1;
-          const isDone   = currentStep > stepNum;
-          const isActive = currentStep === stepNum;
-          return (
-            <div key={label} className="flex items-center gap-3">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 border-2 ${
-                  isDone
-                    ? 'bg-teal-500 border-teal-500 text-white'
-                    : isActive
-                    ? 'border-teal-500 text-teal-600 bg-white'
-                    : 'border-gray-300 text-gray-400 bg-white'
-                }`}
-              >
-                {isDone ? '✓' : stepNum}
+      {/* Steps */}
+      <div className="p-6 border-b border-gray-100">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          Booking Steps
+        </p>
+        <div className="space-y-3">
+          {STEPS.map((step) => {
+            const isDone    = currentStep > step.number;
+            const isCurrent = currentStep === step.number;
+            return (
+              <div key={step.number} className="flex items-center gap-3">
+                <div className={`
+                  w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
+                  ${isDone    ? 'bg-teal-600' : isCurrent ? 'bg-teal-600' : 'bg-gray-100'}
+                `}>
+                  {isDone ? (
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  ) : (
+                    <span className={`text-xs font-bold ${isCurrent ? 'text-white' : 'text-gray-400'}`}>
+                      {step.number}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-sm ${isCurrent ? 'font-semibold text-gray-900' : isDone ? 'text-teal-700 font-medium' : 'text-gray-400'}`}>
+                  {step.label}
+                </span>
               </div>
-              <span
-                className={`text-sm font-medium ${
-                  isActive ? 'text-teal-700' : isDone ? 'text-gray-600' : 'text-gray-400'
-                }`}
-              >
-                {label}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Selected practitioner */}
-      {selectedPractitioner && (
-        <div className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center gap-2">
-          <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0">
-            {selectedPractitioner.avatar_url ? (
-              <img
-                src={selectedPractitioner.avatar_url}
-                alt={selectedPractitioner.full_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <User className="w-8 h-8 text-gray-400" />
-            )}
-          </div>
-          <p className="text-sm font-semibold text-gray-800 text-center leading-tight">
-            {selectedPractitioner.full_name}
-          </p>
-          {selectedPractitioner.specialization && (
-            <p className="text-xs text-gray-400 text-center">
-              {selectedPractitioner.specialization}
+      {/* Booking summary */}
+      <div className="p-6 flex-1">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          Your Selection
+        </p>
+        <div className="space-y-3">
+          {selectedPractitioner && (
+            <div className="bg-teal-50 rounded-xl p-3">
+              <p className="text-xs text-teal-500 font-medium">Practitioner</p>
+              <p className="text-sm font-semibold text-teal-800 mt-0.5">
+                {selectedPractitioner.id === null ? 'Any Available' : selectedPractitioner.full_name}
+              </p>
+              {selectedPractitioner.specialization && (
+                <p className="text-xs text-teal-600">{selectedPractitioner.specialization}</p>
+              )}
+            </div>
+          )}
+
+          {selectedService && (
+            <div className="bg-teal-50 rounded-xl p-3">
+              <p className="text-xs text-teal-500 font-medium">Service</p>
+              <p className="text-sm font-semibold text-teal-800 mt-0.5">{selectedService.name}</p>
+              <p className="text-xs text-teal-600">
+                {selectedService.duration_minutes} min · ₱{parseFloat(selectedService.price).toLocaleString('en-PH')}
+              </p>
+            </div>
+          )}
+
+          {selectedDate && selectedSlot && (
+            <div className="bg-teal-50 rounded-xl p-3">
+              <p className="text-xs text-teal-500 font-medium">Date &amp; Time</p>
+              <p className="text-sm font-semibold text-teal-800 mt-0.5">
+                {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+              <p className="text-xs text-teal-600">{fmt12(selectedSlot)}</p>
+            </div>
+          )}
+
+          {!selectedPractitioner && !selectedService && (
+            <p className="text-xs text-gray-400 italic">
+              Your selections will appear here as you progress.
             </p>
           )}
         </div>
-      )}
-
-      {/* Selected service */}
-      {selectedService && (
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-            Service
-          </p>
-          <p className="text-sm font-medium text-gray-800">{selectedService.name}</p>
-          <p className="text-xs text-gray-400">{selectedService.duration_minutes} min</p>
-        </div>
-      )}
-
-      {/* Appointment details */}
-      {selectedService && selectedDate && selectedSlot && (
-        <div className="bg-white rounded-xl p-3 shadow-sm space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Appointment
-          </p>
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span>
-              {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-PH', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span>{selectedSlot}</span>
-          </div>
-        </div>
-      )}
+      </div>
     </aside>
   );
 };

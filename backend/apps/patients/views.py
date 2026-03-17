@@ -107,6 +107,7 @@ def _confirm_portal_booking(booking, confirmed_by_user):
             duration_minutes=duration,
             chief_complaint=booking.notes or '',
             notes=f'Created from portal booking #{booking.reference_number}',
+            # confirmed_by_user may be None for auto-confirms
             created_by=confirmed_by_user,
             updated_by=confirmed_by_user,
         )
@@ -120,6 +121,7 @@ def _confirm_portal_booking(booking, confirmed_by_user):
     booking.save(update_fields=['appointment'])
 
     return patient, appointment
+
 
 
 # ─── Patient ViewSet ──────────────────────────────────────────────────────────
@@ -410,10 +412,22 @@ class PublicPortalBookView(APIView):
 
         booking = serializer.save(portal_link=portal_link)
 
-        logger.info(
-            f"New portal booking #{booking.reference_number} "
-            f"for clinic '{portal_link.clinic.name}'"
-        )
+        # ── Auto-confirm: skip PENDING, immediately create patient + appointment ──
+        try:
+            # Set status to CONFIRMED right away
+            booking.status = 'CONFIRMED'
+            booking.save(update_fields=['status', 'updated_at'])
+
+            # Create patient + diary appointment
+            _confirm_portal_booking(booking, confirmed_by_user=None)
+
+            logger.info(
+                f"Portal booking #{booking.reference_number} auto-confirmed "
+                f"for clinic '{portal_link.clinic.name}'"
+            )
+        except Exception as e:
+            logger.error(f"Auto-confirm failed for portal booking #{booking.reference_number}: {e}")
+            # Still return success to the patient — staff can confirm manually if needed
 
         response_serializer = PortalBookingResponseSerializer(
             booking, context={'request': request}

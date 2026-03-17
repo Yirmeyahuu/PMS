@@ -3,12 +3,12 @@ import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout
 import { ManageNavbar } from './components/ManageNavbar';
 import type { ManageCategory } from './types/manage.types';
 
-
 import { AdminMenu1 } from './pages/administration/PrintAppointments';
 import { AdminMenu2 } from './pages/administration/BulkInvoicing';
 import { ClinicalMenu1 } from './pages/clinical/ClinicalMenu1';
 import { ClinicalMenu2 } from './pages/clinical/ClinicalMenu2';
 import { ClinicServices } from './pages/clinical/ClinicServices';
+import { ClinicProfile } from './pages/clinical/ClinicProfile';
 import { EmailReminder } from './pages/communications/EmailReminder';
 import { Records } from './pages/communications/Records';
 import { Notifications } from './pages/communications/Notifications';
@@ -19,16 +19,17 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     label: 'Administration',
     items: [
       { id: 'admin1', label: 'Print Appointments', path: 'admin1', component: AdminMenu1 },
-      { id: 'admin2', label: 'Bulk Invoicing', path: 'admin2', component: AdminMenu2 },
+      { id: 'admin2', label: 'Bulk Invoicing',     path: 'admin2', component: AdminMenu2 },
     ],
   },
   {
     id: 'clinical',
     label: 'Clinical',
     items: [
-      { id: 'clinical1', label: 'Clinic Link Portal', path: 'clinical1', component: ClinicalMenu1 },
-      { id: 'clinical2', label: 'Clinical Templates', path: 'clinical2', component: ClinicalMenu2 },
-      { id: 'clinical3', label: 'Clinic Services', path: 'clinical3', component: ClinicServices },
+      { id: 'clinical1', label: 'Clinic Link Portal',   path: 'clinical1', component: ClinicalMenu1 },
+      { id: 'clinical2', label: 'Clinical Templates',   path: 'clinical2', component: ClinicalMenu2 },
+      { id: 'clinical3', label: 'Clinic Services',      path: 'clinical3', component: ClinicServices },
+      { id: 'clinical4', label: 'Clinic Profile',       path: 'clinical4', component: ClinicProfile },
     ],
   },
   {
@@ -36,8 +37,8 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     label: 'Communications',
     items: [
       { id: 'comm1', label: 'Email Reminder', path: 'comm1', component: EmailReminder },
-      { id: 'comm2', label: 'Records', path: 'comm2', component: Records },
-      { id: 'comm3', label: 'Notifications', path: 'comm3', component: Notifications },
+      { id: 'comm2', label: 'Records',        path: 'comm2', component: Records },
+      { id: 'comm3', label: 'Notifications',  path: 'comm3', component: Notifications },
     ],
   },
 ];
