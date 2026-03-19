@@ -58,6 +58,8 @@ export interface PortalBookingDiaryItem {
   notes:                  string;
 }
 
+
+
 export const getAppointments = async (
   filters?: AppointmentFilters
 ): Promise<PaginatedResponse<Appointment>> => {
@@ -110,6 +112,23 @@ export const editAppointment = async (
   const response = await axiosInstance.patch<Appointment>(
     `/appointments/${id}/edit/`,
     data
+  );
+  return response.data;
+};
+
+export interface RescheduleAppointmentPayload {
+  date:       string;   // yyyy-MM-dd
+  start_time: string;   // HH:mm
+  end_time:   string;   // HH:mm
+}
+
+export const rescheduleAppointment = async (
+  id: number,
+  data: RescheduleAppointmentPayload
+): Promise<Appointment> => {
+  const response = await axiosInstance.patch<Appointment>(
+    `/appointments/${id}/`,
+    data,
   );
   return response.data;
 };

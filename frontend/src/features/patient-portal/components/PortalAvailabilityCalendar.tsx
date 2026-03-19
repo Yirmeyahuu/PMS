@@ -5,7 +5,7 @@ import {
   startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, X, Coffee } from 'lucide-react';
 import { fetchAvailableSlots } from '../portal.api';
 import type { PortalService, PortalPractitioner } from '@/types/portal';
 
@@ -17,11 +17,26 @@ interface PortalAvailabilityCalendarProps {
   onClose:      () => void;
 }
 
-const fmt12 = (slot: string) => {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Convert "HH:MM" → "h:MM AM/PM" */
+const fmt12 = (slot: string): string => {
   const [h, m] = slot.split(':').map(Number);
-  const d = new Date();
-  d.setHours(h, m);
-  return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12    = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+/** Return true if this "HH:MM" slot falls in the lunch window [12:00, 13:00) */
+const isLunchSlot = (slot: string): boolean => {
+  const [h, m] = slot.split(':').map(Number);
+  return (h === 12) || (h === 13 && m === 0);
+};
+
+/** Return true if this "HH:MM" slot is within clinic hours [06:00, 21:00) */
+const isWithinClinicHours = (slot: string): boolean => {
+  const [h] = slot.split(':').map(Number);
+  return h >= 6 && h < 21;
 };
 
 export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProps> = ({
@@ -69,6 +84,23 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
     setSelectedDate(str);
   };
 
+  // ── Filter + split slots into morning / afternoon ─────────────────────────
+  const visibleSlots = availableSlots.filter(
+    s => isWithinClinicHours(s) && !isLunchSlot(s)
+  );
+
+  const morningSlots   = visibleSlots.filter(s => {
+    const [h] = s.split(':').map(Number);
+    return h < 12;
+  });
+  const afternoonSlots = visibleSlots.filter(s => {
+    const [h] = s.split(':').map(Number);
+    return h >= 13;
+  });
+
+  // Were any slots removed because they fell in lunch / outside hours?
+  const hiddenCount = availableSlots.length - visibleSlots.length;
+
   const weekDayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
   return (
@@ -84,6 +116,11 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
           {practitioner?.id != null && (
             <p className="text-[10px] text-gray-500 truncate">with {practitioner.full_name}</p>
           )}
+        </div>
+        {/* Clinic hours badge */}
+        <div className="hidden sm:flex items-center gap-1 text-[10px] text-teal-600 font-medium bg-teal-100 rounded-full px-2 py-0.5 mr-2 whitespace-nowrap">
+          <Clock className="w-2.5 h-2.5" />
+          6 AM – 9 PM
         </div>
         <button
           onClick={onClose}
@@ -117,10 +154,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
         {/* ── Weekday labels ── */}
         <div className="grid grid-cols-7">
           {weekDayLabels.map((d) => (
-            <div
-              key={d}
-              className="text-center text-[10px] font-semibold text-gray-400 pb-1"
-            >
+            <div key={d} className="text-center text-[10px] font-semibold text-gray-400 pb-1">
               {d}
             </div>
           ))}
@@ -166,9 +200,9 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
 
         {/* ── Available time slots ── */}
         {selectedDate && (
-          <div className="border-t border-gray-100 pt-3 space-y-2">
+          <div className="border-t border-gray-100 pt-3 space-y-3">
 
-            {/* Label */}
+            {/* Label row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3 h-3 text-gray-400" />
@@ -190,31 +224,84 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
             )}
 
             {/* No slots */}
-            {!loadingSlots && availableSlots.length === 0 && (
+            {!loadingSlots && visibleSlots.length === 0 && (
               <p className="text-[11px] text-gray-400 text-center py-4 bg-gray-50 rounded-md">
                 No available slots for this date. Try another day.
               </p>
             )}
 
-            {/* Slot pills — matches wireframe layout */}
-            {!loadingSlots && availableSlots.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {availableSlots.map((slot) => (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedSlot(slot)}
-                    className={`
-                      px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
-                      ${selectedSlot === slot
-                        ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
-                      }
-                    `}
-                  >
-                    {fmt12(slot)}
-                  </button>
-                ))}
+            {/* ── Morning slots ── */}
+            {!loadingSlots && morningSlots.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Morning
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {morningSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`
+                        px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
+                        ${selectedSlot === slot
+                          ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {fmt12(slot)}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* ── Lunch break banner ── */}
+            {!loadingSlots && visibleSlots.length > 0 && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <Coffee className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+                    Lunch Break
+                  </p>
+                  <p className="text-[10px] text-amber-600">
+                    12:00 PM – 1:00 PM · No appointments available
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Afternoon slots ── */}
+            {!loadingSlots && afternoonSlots.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Afternoon
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {afternoonSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`
+                        px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
+                        ${selectedSlot === slot
+                          ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {fmt12(slot)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Note if backend returned slots outside clinic hours */}
+            {!loadingSlots && hiddenCount > 0 && (
+              <p className="text-[10px] text-gray-400 text-center">
+                {hiddenCount} slot{hiddenCount > 1 ? 's' : ''} outside clinic hours hidden
+              </p>
             )}
           </div>
         )}
