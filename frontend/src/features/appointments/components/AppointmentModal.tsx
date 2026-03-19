@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Calendar, Clock, Timer, User, FileText,
-  AlertCircle, UserPlus, Stethoscope, Layers,
+  AlertCircle, UserPlus, Stethoscope, Layers, Building2,  // ← ADD Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -9,20 +9,23 @@ import { getPatients } from '@/features/patients/patient.api';
 import { createAppointment } from '../appointment.api';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
+import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';   // ← ADD
 import { useAuthStore } from '@/store/auth.store';
-import type { Patient, CreateAppointmentData } from '@/types';
+import type { Patient, CreateAppointmentData, Appointment } from '@/types';
 import toast from 'react-hot-toast';
 
 interface AppointmentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen:                 boolean;
+  onClose:                () => void;
+  onCreated?:             (appointment: Appointment) => void;
   selectedSlot: {
-    date: Date;
-    time: string;
-    hour: number;
-    minutes: number;
+    date:     Date;
+    time:     string;
+    hour:     number;
+    minutes:  number;
     duration: number;
   } | null;
+  selectedClinicBranchId?: number | null;   // ← ADD
 }
 
 interface FormData {
@@ -34,7 +37,9 @@ interface FormData {
 export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   isOpen,
   onClose,
+  onCreated,
   selectedSlot,
+  selectedClinicBranchId,   // ← ADD
 }) => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -53,14 +58,19 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     service:      '',
   });
 
-  const { practitioners, loading: loadingPractitioners } = usePractitioners();
-  const { services,      loading: loadingServices }      = useAppointmentServices();
+  // Filter practitioners by selected branch
+  const { practitioners, loading: loadingPractitioners } = usePractitioners({
+    clinicBranchId: selectedClinicBranchId ?? null,   // ← ADD: filter by branch
+  });
+  const { services, loading: loadingServices } = useAppointmentServices();
 
-  // Derive selected service object for duration + color pill
-  const selectedService = services.find(s => s.id === Number(formData.service));
+  // Resolve branch name for display
+  const { branches } = useClinicBranches();
+  const selectedBranchName = branches.find(b => b.id === selectedClinicBranchId)?.name ?? null;
+
+  const selectedService   = services.find(s => s.id === Number(formData.service));
   const effectiveDuration = selectedService?.duration_minutes ?? selectedSlot?.duration ?? 60;
 
-  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       loadPatients();
@@ -92,8 +102,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!formData.patient) errs.patient  = 'Please select a patient.';
-    if (!formData.service) errs.service  = 'Please select a service / appointment type.';
+    if (!formData.patient) errs.patient = 'Please select a patient.';
+    if (!formData.service) errs.service = 'Please select a service / appointment type.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -104,18 +114,30 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     setSaving(true);
     try {
-      const startH  = selectedSlot.hour;
-      const startM  = selectedSlot.minutes;
-      const endMin  = startH * 60 + startM + effectiveDuration;
-      const endH    = Math.floor(endMin / 60);
-      const endMm   = endMin % 60;
+      const startH = selectedSlot.hour;
+      const startM = selectedSlot.minutes;
+      const endMin = startH * 60 + startM + effectiveDuration;
+      const endH   = Math.floor(endMin / 60);
+      const endMm  = endMin % 60;
+
+      // ── Derive clinic/branch from selected practitioner first,
+      //    then fall back to the active diary branch tab,
+      //    then fall back to user's own clinic. ──────────────────────────────
+      const selectedPractitionerObj = formData.practitioner
+        ? practitioners.find(p => p.id === Number(formData.practitioner))
+        : null;
+
+      const clinicId =
+        selectedPractitionerObj?.clinic_branch_id   // practitioner's assigned branch
+        ?? selectedClinicBranchId                   // active diary tab branch
+        ?? user.clinic;                             // user's clinic fallback
 
       const data: CreateAppointmentData = {
-        clinic:           user.clinic,
+        clinic:           clinicId,
         patient:          Number(formData.patient),
         service:          Number(formData.service),
         ...(formData.practitioner && { practitioner: Number(formData.practitioner) }),
-        appointment_type: 'INITIAL',   // legacy fallback
+        appointment_type: 'INITIAL',
         date:             format(selectedSlot.date, 'yyyy-MM-dd'),
         start_time:       `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
         end_time:         `${String(endH).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`,
@@ -125,8 +147,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         patient_notes:    patientNotes,
       };
 
-      await createAppointment(data);
+      const created = await createAppointment(data);
       toast.success('Appointment created successfully!');
+      onCreated?.(created);
       handleClose();
     } catch (err: any) {
       toast.error(
@@ -155,7 +178,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   if (!isOpen || !selectedSlot) return null;
 
-  // Time display helpers
   const fmt12 = (h: number, m: number) => {
     const h12 = h > 12 ? h - 12 : h || 12;
     return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
@@ -194,14 +216,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-900">New Appointment</h2>
-                <p className="text-xs text-gray-500">Schedule a new appointment</p>
+                <p className="text-xs text-gray-500">
+                  {selectedBranchName
+                    ? <>Scheduling at <span className="font-semibold text-sky-600">{selectedBranchName}</span></>
+                    : 'Schedule a new appointment'
+                  }
+                </p>
               </div>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Close modal"
-            >
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Close modal">
               <X className="w-4 h-4 text-gray-500" />
             </button>
           </div>
@@ -215,29 +238,32 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="flex items-center gap-2 text-sky-700">
                     <Calendar className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">
-                      {format(selectedSlot.date, 'EEEE, MMMM d, yyyy')}
-                    </span>
+                    <span className="text-sm font-medium">{format(selectedSlot.date, 'EEEE, MMMM d, yyyy')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sky-700">
                     <Clock className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm font-medium">
-                      {fmt12(selectedSlot.hour, selectedSlot.minutes)} – {fmt12(endH, endMm)}
-                    </span>
+                    <span className="text-sm font-medium">{fmt12(selectedSlot.hour, selectedSlot.minutes)} – {fmt12(endH, endMm)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sky-700">
                     <Timer className="w-4 h-4 flex-shrink-0" />
                     <span className="text-sm font-medium">{fmtDuration(effectiveDuration)}</span>
                   </div>
                 </div>
+
+                {/* Branch indicator */}
+                {selectedBranchName && (
+                  <div className="mt-3 pt-3 border-t border-sky-100 flex items-center gap-2 text-sky-600">
+                    <Building2 className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-xs font-semibold">{selectedBranchName}</span>
+                  </div>
+                )}
               </div>
 
-              {/* ── Service / Appointment Type ── */}
+              {/* ── Service ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Service / Appointment Type <span className="text-red-500">*</span>
                 </label>
-
                 {loadingServices ? (
                   <div className="flex items-center justify-center py-6">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
@@ -247,13 +273,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-amber-800 mb-1">
-                          No services configured
-                        </p>
-                        <p className="text-xs text-amber-700">
-                          Ask an admin to add clinic services under{' '}
-                          <strong>Setup → Clinic Services</strong> before booking appointments.
-                        </p>
+                        <p className="text-sm font-semibold text-amber-800 mb-1">No services configured</p>
+                        <p className="text-xs text-amber-700">Ask an admin to add clinic services under <strong>Setup → Clinic Services</strong>.</p>
                       </div>
                     </div>
                   </div>
@@ -261,40 +282,22 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <>
                     <div className="relative">
                       <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <select
-                        name="service"
-                        value={formData.service}
-                        onChange={handleSelectChange}
-                        className={`${inputBase} pl-9 ${errors.service ? inputError : ''}`}
-                      >
+                      <select name="service" value={formData.service} onChange={handleSelectChange} className={`${inputBase} pl-9 ${errors.service ? inputError : ''}`}>
                         <option value="">— Select a service —</option>
                         {services.map(s => (
                           <option key={s.id} value={s.id}>
-                            {s.name}
-                            {s.duration_minutes ? ` (${s.duration_minutes} min)` : ''}
-                            {parseFloat(s.price) > 0
-                              ? ` · ₱${parseFloat(s.price).toLocaleString()}`
-                              : ''}
+                            {s.name}{s.duration_minutes ? ` (${s.duration_minutes} min)` : ''}
+                            {parseFloat(s.price) > 0 ? ` · ₱${parseFloat(s.price).toLocaleString()}` : ''}
                           </option>
                         ))}
                       </select>
                     </div>
-
-                    {errors.service && (
-                      <p className="mt-1 text-xs text-red-600">{errors.service}</p>
-                    )}
-
-                    {/* Selected service color pill */}
+                    {errors.service && <p className="mt-1 text-xs text-red-600">{errors.service}</p>}
                     {selectedService && (
-                      <div
-                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: selectedService.color_hex || '#0D9488' }}
-                      >
+                      <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: selectedService.color_hex || '#0D9488' }}>
                         <span className="w-2 h-2 rounded-full bg-white/70" />
-                        {selectedService.name}
-                        &nbsp;·&nbsp;{selectedService.duration_minutes} min
-                        {parseFloat(selectedService.price) > 0 &&
-                          ` · ₱${parseFloat(selectedService.price).toLocaleString()}`}
+                        {selectedService.name}&nbsp;·&nbsp;{selectedService.duration_minutes} min
+                        {parseFloat(selectedService.price) > 0 && ` · ₱${parseFloat(selectedService.price).toLocaleString()}`}
                       </div>
                     )}
                   </>
@@ -306,7 +309,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Patient / Client <span className="text-red-500">*</span>
                 </label>
-
                 {loadingPatients ? (
                   <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
@@ -317,14 +319,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-amber-800 mb-1">No patients found</p>
-                        <p className="text-xs text-amber-700 mb-3">
-                          Create a patient before scheduling an appointment.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleCreatePatient}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
-                        >
+                        <p className="text-xs text-amber-700 mb-3">Create a patient before scheduling an appointment.</p>
+                        <button type="button" onClick={handleCreatePatient} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
                           <UserPlus className="w-3.5 h-3.5" />
                           Create New Patient
                         </button>
@@ -335,28 +331,15 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <select
-                        name="patient"
-                        value={formData.patient}
-                        onChange={handleSelectChange}
-                        className={`${inputBase} pl-9 ${errors.patient ? inputError : ''}`}
-                      >
+                      <select name="patient" value={formData.patient} onChange={handleSelectChange} className={`${inputBase} pl-9 ${errors.patient ? inputError : ''}`}>
                         <option value="">Select a patient…</option>
                         {patients.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.full_name} — {p.patient_number}
-                          </option>
+                          <option key={p.id} value={p.id}>{p.full_name} — {p.patient_number}</option>
                         ))}
                       </select>
                     </div>
-                    {errors.patient && (
-                      <p className="mt-1 text-xs text-red-600">{errors.patient}</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleCreatePatient}
-                      className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium"
-                    >
+                    {errors.patient && <p className="mt-1 text-xs text-red-600">{errors.patient}</p>}
+                    <button type="button" onClick={handleCreatePatient} className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium">
                       <UserPlus className="w-3.5 h-3.5" />
                       Create new patient
                     </button>
@@ -368,9 +351,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Assigned Practitioner
-                  <span className="ml-2 text-xs font-normal text-gray-400">(Optional)</span>
+                  <span className="ml-2 text-xs font-normal text-gray-400">Select to Assign</span>
                 </label>
-
                 {loadingPractitioners ? (
                   <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
@@ -378,88 +360,53 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 ) : (
                   <div className="relative">
                     <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select
-                      name="practitioner"
-                      value={formData.practitioner}
-                      onChange={handleSelectChange}
-                      className={`${inputBase} pl-9`}
-                    >
+                    <select name="practitioner" value={formData.practitioner} onChange={handleSelectChange} className={`${inputBase} pl-9`}>
                       <option value="">Unassigned</option>
                       {practitioners.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}{p.specialization && ` — ${p.specialization}`}
-                        </option>
+                        <option key={p.id} value={p.id}>{p.name}{p.specialization && ` — ${p.specialization}`}</option>
                       ))}
                     </select>
                   </div>
                 )}
                 <p className="mt-1 text-xs text-gray-400">
                   {practitioners.length === 0
-                    ? 'No practitioners available. Contact admin to add practitioners.'
+                    ? selectedClinicBranchId
+                      ? 'No practitioners assigned to this branch.'
+                      : 'No practitioners available. Contact admin to add practitioners.'
                     : 'Select a practitioner or leave unassigned to assign later.'}
                 </p>
               </div>
 
               {/* ── Chief Complaint ── */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Chief Complaint
-                </label>
-                <textarea
-                  value={chiefComplaint}
-                  onChange={e => setChiefComplaint(e.target.value)}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                  placeholder="Primary reason for visit…"
-                />
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Chief Complaint</label>
+                <textarea value={chiefComplaint} onChange={e => setChiefComplaint(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Primary reason for visit…" />
               </div>
 
               {/* ── Internal Notes ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Internal Notes
-                  <span className="ml-2 text-xs font-normal text-gray-400">(Staff only)</span>
+                  Internal Notes <span className="ml-2 text-xs font-normal text-gray-400">(Staff only)</span>
                 </label>
                 <div className="relative">
                   <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                  <textarea
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    rows={2}
-                    className={`${inputBase} pl-9 resize-none`}
-                    placeholder="Internal notes for staff…"
-                  />
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${inputBase} pl-9 resize-none`} placeholder="Internal notes for staff…" />
                 </div>
               </div>
 
               {/* ── Patient Notes ── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Patient Notes
-                  <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
+                  Patient Notes <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
                 </label>
-                <textarea
-                  value={patientNotes}
-                  onChange={e => setPatientNotes(e.target.value)}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                  placeholder="Notes for patient…"
-                />
+                <textarea value={patientNotes} onChange={e => setPatientNotes(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Notes for patient…" />
               </div>
 
-              {/* Created by */}
               {user && (
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">
-                      Created by:{' '}
-                      <span className="font-medium text-gray-700">
-                        {user.first_name} {user.last_name}
-                      </span>
-                    </span>
-                    <span className="text-gray-400">
-                      {format(new Date(), 'MMM d, yyyy h:mm a')}
-                    </span>
+                    <span className="text-gray-500">Created by: <span className="font-medium text-gray-700">{user.first_name} {user.last_name}</span></span>
+                    <span className="text-gray-400">{format(new Date(), 'MMM d, yyyy h:mm a')}</span>
                   </div>
                 </div>
               )}
@@ -468,14 +415,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
           {/* ── Footer ── */}
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={handleClose} disabled={saving} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
             <button
               type="submit"
               onClick={handleSubmit}
@@ -483,15 +423,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
-                  Saving…
-                </>
+                <><div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />Saving…</>
               ) : (
-                <>
-                  <Calendar className="w-3.5 h-3.5" />
-                  Create Appointment
-                </>
+                <><Calendar className="w-3.5 h-3.5" />Create Appointment</>
               )}
             </button>
           </div>

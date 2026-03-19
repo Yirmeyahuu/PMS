@@ -1,9 +1,25 @@
+export interface PortalBranch {
+  id:            number;
+  name:          string;
+  address:       string;
+  city:          string;
+  province:      string;
+  phone:         string;
+  email:         string;
+  is_main_branch: boolean;
+}
+
 export interface PortalPractitioner {
-  id:             number | null;
+  id:             number | null;   // null = "Any Available"
   full_name:      string;
+  title?:         string | null;
   specialization: string;
+  position?:      string | null;
+  occupation:     string;
+  discipline?:    string | null;
   bio:            string;
   avatar_url:     string | null;
+  branch_id?:     number | null;   // ← MUST match User.clinic_branch_id from backend
 }
 
 export interface PortalService {
@@ -36,12 +52,14 @@ export interface PortalData {
   clinic_address: string;
   clinic_phone:   string;
   clinic_email:   string;
+  branches:       PortalBranch[];
   categories:     PortalCategory[];
   practitioners:  PortalPractitioner[];
 }
 
 export interface BookingPayload {
   service:            number;
+  branch?:            number | null;
   practitioner?:      number | null;
   patient_first_name: string;
   patient_last_name:  string;
@@ -69,6 +87,7 @@ export interface BookingConfirmation {
   practitioner_name:           string | null;
   practitioner_specialization: string | null;
   clinic_name:                 string;
+  branch_name:                 string | null;
   created_at:                  string;
 }
 

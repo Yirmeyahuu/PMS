@@ -1,3 +1,4 @@
+from apps.clinics import models
 from rest_framework import serializers
 from .models import Appointment, PractitionerSchedule, AppointmentReminder
 from apps.clinics.services.models import Service
@@ -10,20 +11,20 @@ class AppointmentSerializer(serializers.ModelSerializer):
     created_by_name   = serializers.CharField(source='created_by.get_full_name', read_only=True, allow_null=True)
     updated_by_name   = serializers.CharField(source='updated_by.get_full_name', read_only=True, allow_null=True)
 
-    # ── NEW: service detail fields ────────────────────────────────────────────
-    service_name          = serializers.CharField(source='service.name',             read_only=True, allow_null=True)
-    service_color         = serializers.CharField(source='service.color_hex',        read_only=True, allow_null=True)
-    service_duration      = serializers.IntegerField(source='service.duration_minutes', read_only=True, allow_null=True)
+    service_name     = serializers.CharField(source='service.name',             read_only=True, allow_null=True)
+    service_color    = serializers.CharField(source='service.color_hex',        read_only=True, allow_null=True)
+    service_duration = serializers.IntegerField(source='service.duration_minutes', read_only=True, allow_null=True)
+
+    # ── Expose the branch_id consistently ────────────────────────────────────
+    branch_id = serializers.SerializerMethodField()
 
     class Meta:
         model  = Appointment
         fields = [
-            'id', 'clinic', 'patient', 'patient_name',
+            'id', 'clinic', 'branch_id', 'patient', 'patient_name',
             'practitioner', 'practitioner_name',
             'location', 'location_name',
-            # service fields
             'service', 'service_name', 'service_color', 'service_duration',
-            # legacy
             'appointment_type',
             'status',
             'date', 'start_time', 'end_time', 'duration_minutes',
@@ -35,27 +36,57 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'patient_name', 'practitioner_name', 'location_name',
+            'id', 'branch_id', 'patient_name', 'practitioner_name', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name',
             'created_at', 'updated_at',
         ]
 
-    def validate(self, data):
-        service = data.get('service') or (self.instance.service if self.instance else None)
+    def get_branch_id(self, obj) -> int | None:
+        """
+        Canonical branch_id for this appointment.
+        Priority: practitioner's clinic_branch_id → appointment's clinic_id
+        """
+        if obj.practitioner:
+            branch_id = getattr(obj.practitioner.user, 'clinic_branch_id', None)
+            if branch_id:
+                return branch_id
+        return obj.clinic_id
 
-        # Auto-fill duration from service when not explicitly provided
+    def validate(self, data):
+        practitioner = data.get('practitioner') or (self.instance.practitioner if self.instance else None)
+        service      = data.get('service')      or (self.instance.service      if self.instance else None)
+
+        # ── Auto-set clinic from practitioner's branch ────────────────────────
+        if practitioner:
+            branch_id = getattr(practitioner.user, 'clinic_branch_id', None)
+            if branch_id:
+                from apps.clinics.models import Clinic
+                try:
+                    data['clinic'] = Clinic.objects.get(pk=branch_id)
+                except Clinic.DoesNotExist:
+                    pass
+
+        # Auto-fill duration from service
         if service and 'duration_minutes' not in data:
             data['duration_minutes'] = service.duration_minutes
 
-        # Validate service belongs to the same clinic
+        # Validate service belongs to the same clinic group
         request = self.context.get('request')
         if service and request:
-            clinic = request.user.clinic
-            if clinic and service.clinic_id != clinic.id:
-                raise serializers.ValidationError(
-                    {'service': 'This service does not belong to your clinic.'}
+            clinic = data.get('clinic') or (self.instance.clinic if self.instance else None)
+            if clinic:
+                from apps.clinics.models import Clinic as ClinicModel
+                main = clinic.main_clinic
+                all_branch_ids = list(
+                    ClinicModel.objects.filter(
+                        models.Q(id=main.id) | models.Q(parent_clinic=main)
+                    ).values_list('id', flat=True)
                 )
+                if service.clinic_id not in all_branch_ids:
+                    raise serializers.ValidationError(
+                        {'service': 'This service does not belong to your clinic.'}
+                    )
         return data
 
 

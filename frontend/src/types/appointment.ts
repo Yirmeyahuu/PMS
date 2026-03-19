@@ -1,43 +1,42 @@
 export interface Appointment {
-  id: number;
-  clinic: number;
-  patient: number;
+  id:         number;
+  clinic:     number;
+  branch_id:  number | null;   // ← ADD: canonical branch, derived server-side
+  patient:    number;
   patient_name: string;
-  practitioner: number | null;
+  practitioner:      number | null;
   practitioner_name: string | null;
-  location: number | null;
+  location:      number | null;
   location_name: string | null;
 
-  // ── Service (primary "appointment type") ─────────────────────────────────
   service:          number | null;
   service_name:     string | null;
   service_color:    string | null;
   service_duration: number | null;
 
-  // Legacy — kept for backward compat
   appointment_type: string;
 
   status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
-  date: string;
-  start_time: string;
-  end_time: string;
+  date:             string;
+  start_time:       string;
+  end_time:         string;
   duration_minutes: number;
-  chief_complaint: string;
-  notes: string;
-  patient_notes: string;
-  reminder_sent: boolean;
+  chief_complaint:  string;
+  notes:            string;
+  patient_notes:    string;
+  reminder_sent:    boolean;
   reminder_sent_at: string | null;
 
-  created_by: number | null;
+  created_by:      number | null;
   created_by_name: string | null;
-  updated_by: number | null;
+  updated_by:      number | null;
   updated_by_name: string | null;
 
-  cancelled_by: number | null;
-  cancellation_reason: string;
-  cancelled_at: string | null;
-  created_at: string;
-  updated_at: string;
+  cancelled_by:         number | null;
+  cancellation_reason:  string;
+  cancelled_at:         string | null;
+  created_at:           string;
+  updated_at:           string;
 }
 
 export interface CreateAppointmentData {

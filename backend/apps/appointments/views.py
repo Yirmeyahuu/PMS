@@ -254,6 +254,12 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             if booking.practitioner and booking.practitioner.user.clinic_branch_id:
                 practitioner_branch_id = booking.practitioner.user.clinic_branch_id
 
+            portal_clinic_id = (
+                booking.portal_link.clinic.id
+                if booking.portal_link and booking.portal_link.clinic
+                else None
+            )
+
             data.append({
                 'id':                     booking.id,
                 'type':                   'portal_booking',
@@ -269,6 +275,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                     if booking.practitioner else 'Any Available'
                 ),
                 'practitioner_branch_id': practitioner_branch_id,
+                'portal_clinic_id':       portal_clinic_id,
                 'date':                   booking.appointment_date.isoformat(),
                 'start_time':             booking.appointment_time.strftime('%H:%M'),
                 'end_time':               end_dt.time().strftime('%H:%M'),

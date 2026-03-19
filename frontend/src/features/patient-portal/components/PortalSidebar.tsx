@@ -1,6 +1,6 @@
 import React from 'react';
-import { MapPin, Phone, Mail, CheckCircle, Circle } from 'lucide-react';
-import type { PortalData, PortalPractitioner, PortalService } from '@/types/portal';
+import { MapPin, Phone, Mail, CheckCircle, RefreshCw } from 'lucide-react';
+import type { PortalData, PortalBranch, PortalPractitioner, PortalService } from '@/types/portal';
 
 const fmt12 = (slot: string) => {
   const [h, m] = slot.split(':').map(Number);
@@ -11,26 +11,30 @@ const fmt12 = (slot: string) => {
 
 interface PortalSidebarProps {
   portal:               PortalData;
+  selectedBranch:       PortalBranch | null;
   selectedPractitioner: PortalPractitioner | null;
   selectedService:      PortalService | null;
   selectedDate:         string;
   selectedSlot:         string;
   currentStep:          number;
+  onChangeBranch:       () => void;
 }
 
 const STEPS = [
-  { number: 1, label: 'Choose Practitioner' },
-  { number: 2, label: 'Select Service & Time' },
-  { number: 3, label: 'Your Details' },
+  { number: 2, label: 'Choose Practitioner'   },
+  { number: 3, label: 'Select Service & Time' },
+  { number: 4, label: 'Your Details'          },
 ];
 
 export const PortalSidebar: React.FC<PortalSidebarProps> = ({
   portal,
+  selectedBranch,
   selectedPractitioner,
   selectedService,
   selectedDate,
   selectedSlot,
   currentStep,
+  onChangeBranch,
 }) => {
   return (
     <aside className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen">
@@ -79,6 +83,39 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
         </div>
       </div>
 
+      {/* Selected branch banner */}
+      {selectedBranch && (
+        <div className="mx-4 mt-4 bg-teal-600 rounded-xl p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs text-teal-200 font-medium uppercase tracking-wide mb-0.5">
+                Selected Location
+              </p>
+              <p className="text-sm font-bold text-white leading-tight truncate">
+                {selectedBranch.name}
+              </p>
+              {(selectedBranch.city || selectedBranch.province) && (
+                <p className="text-xs text-teal-200 mt-0.5">
+                  {[selectedBranch.city, selectedBranch.province].filter(Boolean).join(', ')}
+                </p>
+              )}
+              {selectedBranch.address && (
+                <p className="text-xs text-teal-200 mt-0.5 truncate">
+                  {selectedBranch.address}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onChangeBranch}
+              className="flex-shrink-0 flex items-center gap-1 text-xs font-medium text-teal-100 hover:text-white bg-teal-700 hover:bg-teal-800 px-2 py-1 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Change
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Steps */}
       <div className="p-6 border-b border-gray-100">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
@@ -92,7 +129,7 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
               <div key={step.number} className="flex items-center gap-3">
                 <div className={`
                   w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
-                  ${isDone    ? 'bg-teal-600' : isCurrent ? 'bg-teal-600' : 'bg-gray-100'}
+                  ${isDone || isCurrent ? 'bg-teal-600' : 'bg-gray-100'}
                 `}>
                   {isDone ? (
                     <CheckCircle className="w-4 h-4 text-white" />
@@ -102,7 +139,11 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
                     </span>
                   )}
                 </div>
-                <span className={`text-sm ${isCurrent ? 'font-semibold text-gray-900' : isDone ? 'text-teal-700 font-medium' : 'text-gray-400'}`}>
+                <span className={`text-sm ${
+                  isCurrent ? 'font-semibold text-gray-900'
+                  : isDone  ? 'text-teal-700 font-medium'
+                  : 'text-gray-400'
+                }`}>
                   {step.label}
                 </span>
               </div>
@@ -117,6 +158,7 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
           Your Selection
         </p>
         <div className="space-y-3">
+
           {selectedPractitioner && (
             <div className="bg-teal-50 rounded-xl p-3">
               <p className="text-xs text-teal-500 font-medium">Practitioner</p>

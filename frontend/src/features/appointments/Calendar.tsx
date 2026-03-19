@@ -22,11 +22,6 @@ interface CalendarProps {
   selectedClinicBranchId: number | null;
 }
 
-// ── Hex color helpers ──────────────────────────────────────────────────────────
-/**
- * Given a hex color string, returns a slightly transparent version for backgrounds
- * and the original for borders/accents.
- */
 const hexToRgba = (hex: string, alpha: number): string => {
   const cleaned = hex.replace('#', '');
   const r = parseInt(cleaned.substring(0, 2), 16);
@@ -35,36 +30,18 @@ const hexToRgba = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-/**
- * Determines if a hex color is "dark" so we can pick contrasting text.
- */
 const isColorDark = (hex: string): boolean => {
   const cleaned = hex.replace('#', '');
   const r = parseInt(cleaned.substring(0, 2), 16);
   const g = parseInt(cleaned.substring(2, 4), 16);
   const b = parseInt(cleaned.substring(4, 6), 16);
-  // Perceived luminance formula
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance < 0.5;
 };
 
 type BlockColors =
-  | {
-      useHex:  true;
-      hex:     string;
-      bgStyle: React.CSSProperties;
-      textColor: string;
-      subTextColor: string;
-      label:   string | null;
-    }
-  | {
-      useHex:  false;
-      hex:     null;
-      bg:      string;
-      border:  string;
-      text:    string;
-      label:   string | null;
-    };
+  | { useHex: true;  hex: string; bgStyle: React.CSSProperties; textColor: string; subTextColor: string; label: string | null; }
+  | { useHex: false; hex: null;   bg: string; border: string; text: string; label: string | null; };
 
 export const Calendar: React.FC<CalendarProps> = ({
   view,
@@ -78,7 +55,6 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isViewOpen,           setIsViewOpen]           = useState(false);
 
-  // ── Date range ──────────────────────────────────────────────────────────────
   const getDateRange = () => {
     if (view === 'day') {
       return { startDate: currentDate, endDate: currentDate };
@@ -95,7 +71,6 @@ export const Calendar: React.FC<CalendarProps> = ({
     }
   };
 
-  // ── Service-aware block colors ─────────────────────────────────────────────
   const getBlockColors = (apt: Appointment): BlockColors => {
     if (apt.service_color) {
       const dark = isColorDark(apt.service_color);
@@ -131,6 +106,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     loading,
     refetch,
     updateAppointmentInState,
+    addAppointmentToState,   // ← NEW
   } = useAppointments({
     startDate,
     endDate,
@@ -152,7 +128,6 @@ export const Calendar: React.FC<CalendarProps> = ({
   const isDraggingRef    = useRef(false);
   const dragStartTimeRef = useRef<number>(0);
 
-  // ── Time slots 6 AM – 9 PM ────────────────────────────────────────────────
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 6; hour <= 21; hour++) {
@@ -174,33 +149,25 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const timeSlots = generateTimeSlots();
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const getAppointmentsForSlot = (date: Date, hour: number, minutes: number): Appointment[] => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return appointments.filter(apt => {
-      if (apt.date !== dateStr) return false;
-      const slotTime = hour * 60 + minutes;
-      const [sH, sM] = apt.start_time.split(':').map(Number);
-      const [eH, eM] = apt.end_time.split(':').map(Number);
-      return slotTime >= sH * 60 + sM && slotTime < eH * 60 + eM;
-    });
-  };
-
-  const getAppointmentsForDay = (date: Date): Appointment[] => {
+  // ── Fix: robust slot-overlap check for Day/Week appointment rendering ──────
+  const getAppointmentsForDate = (date: Date): Appointment[] => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return appointments.filter(apt => apt.date === dateStr);
   };
 
+  const getAppointmentsForDay = (date: Date): Appointment[] =>
+    getAppointmentsForDate(date);
+
   const getAppointmentStyle = (apt: Appointment) => {
     const [sH, sM] = apt.start_time.split(':').map(Number);
     const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+    const durationSlots  = Math.max(apt.duration_minutes / 15, 1);
     return {
       top:    `${startSlotIndex * 1.25}rem`,
-      height: `${Math.max((apt.duration_minutes / 15) * 1.25, 1.25)}rem`,
+      height: `${durationSlots * 1.25}rem`,
     };
   };
 
-  // ── Event handlers ─────────────────────────────────────────────────────────
   const handleAppointmentClick = (apt: Appointment) => {
     setSelectedAppointment(apt);
     setIsViewOpen(true);
@@ -246,9 +213,16 @@ export const Calendar: React.FC<CalendarProps> = ({
     openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
   };
 
+  /**
+   * Called by AppointmentModal when a new appointment is successfully created.
+   * Adds it to local state immediately — no refetch needed.
+   */
+  const handleAppointmentCreated = (appointment: Appointment) => {
+    addAppointmentToState(appointment);
+  };
+
   const handleModalClose = () => {
     closeModal();
-    setTimeout(() => refetch(), 300);
   };
 
   const handleViewClose = () => {
@@ -283,7 +257,9 @@ export const Calendar: React.FC<CalendarProps> = ({
       <AppointmentModal
         isOpen={isOpen}
         onClose={handleModalClose}
+        onCreated={handleAppointmentCreated}
         selectedSlot={selectedSlot}
+        selectedClinicBranchId={selectedClinicBranchId}   // ← ADD
       />
       <AppointmentView
         isOpen={isViewOpen}
@@ -324,65 +300,31 @@ export const Calendar: React.FC<CalendarProps> = ({
         onClick={() => handleAppointmentClick(apt)}
         className={`hover:brightness-95 ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
       >
-        {/* Color accent dot for service */}
         {col.useHex && (
-          <div
-            className="absolute top-0 left-0 bottom-0 w-1 rounded-l-lg"
-            style={{ backgroundColor: col.hex }}
-          />
+          <div className="absolute top-0 left-0 bottom-0 w-1 rounded-l-lg" style={{ backgroundColor: col.hex }} />
         )}
-
-        <div className={compact ? 'pl-2' : 'pl-2'}>
-          <div
-            className="text-xs font-semibold truncate"
-            style={col.useHex ? { color: col.hex } : { color: undefined }}
-          >
-            <span className={!col.useHex ? col.text : ''}>
-              {apt.patient_name}
-            </span>
+        <div className="pl-2">
+          <div className="text-xs font-semibold truncate" style={col.useHex ? { color: col.hex } : {}}>
+            <span className={!col.useHex ? col.text : ''}>{apt.patient_name}</span>
           </div>
-
           {!compact && (
-            <div
-              className="text-xs truncate mt-0.5"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
-            >
-              <span className={!col.useHex ? 'text-gray-600' : ''}>
-                {apt.start_time} – {apt.end_time}
-              </span>
+            <div className="text-xs truncate mt-0.5" style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}>
+              <span className={!col.useHex ? 'text-gray-600' : ''}>{apt.start_time} – {apt.end_time}</span>
             </div>
           )}
-
           {compact && (
-            <div
-              className="text-xs truncate"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
-            >
-              <span className={!col.useHex ? 'text-gray-600' : ''}>
-                {apt.start_time}
-              </span>
+            <div className="text-xs truncate" style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}>
+              <span className={!col.useHex ? 'text-gray-600' : ''}>{apt.start_time}</span>
             </div>
           )}
-
           {col.label && !compact && (
-            <div
-              className="text-xs truncate mt-1 font-medium"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
-            >
-              <span className={!col.useHex ? 'text-gray-500' : ''}>
-                {col.label}
-              </span>
+            <div className="text-xs truncate mt-1 font-medium" style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}>
+              <span className={!col.useHex ? 'text-gray-500' : ''}>{col.label}</span>
             </div>
           )}
-
           {col.label && compact && (
-            <div
-              className="text-xs truncate"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
-            >
-              <span className={!col.useHex ? 'text-gray-500' : ''}>
-                {col.label}
-              </span>
+            <div className="text-xs truncate" style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}>
+              <span className={!col.useHex ? 'text-gray-500' : ''}>{col.label}</span>
             </div>
           )}
         </div>
@@ -393,43 +335,26 @@ export const Calendar: React.FC<CalendarProps> = ({
   // ── Appointment Card — Month ───────────────────────────────────────────────
   const renderMonthCard = (apt: Appointment) => {
     const col = getBlockColors(apt);
-
-    const containerStyle: React.CSSProperties = col.useHex
-      ? {
-          backgroundColor: hexToRgba(col.hex, 0.12),
-          borderColor:     col.hex,
-          borderLeftColor: col.hex,
-          borderLeftWidth: '3px',
-        }
-      : {};
+    const containerStyle: React.CSSProperties = col.useHex ? {
+      backgroundColor: hexToRgba(col.hex, 0.12),
+      borderColor:     col.hex,
+      borderLeftColor: col.hex,
+      borderLeftWidth: '3px',
+    } : {};
 
     return (
       <div
         key={apt.id}
         onClick={e => { e.stopPropagation(); handleAppointmentClick(apt); }}
         style={containerStyle}
-        className={`
-          border rounded px-2 py-1 cursor-pointer transition-all hover:brightness-95
-          ${!col.useHex ? `${col.bg} ${col.border}` : ''}
-        `}
+        className={`border rounded px-2 py-1 cursor-pointer transition-all hover:brightness-95 ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
       >
-        <div
-          className="text-xs font-semibold truncate"
-          style={col.useHex ? { color: col.hex } : {}}
-        >
-          <span className={!col.useHex ? col.text : ''}>
-            {apt.start_time} · {apt.patient_name}
-          </span>
+        <div className="text-xs font-semibold truncate" style={col.useHex ? { color: col.hex } : {}}>
+          <span className={!col.useHex ? col.text : ''}>{apt.start_time} · {apt.patient_name}</span>
         </div>
-
         {apt.service_name && (
-          <div
-            className="text-xs truncate mt-0.5"
-            style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
-          >
-            <span className={!col.useHex ? 'text-gray-500' : ''}>
-              {apt.service_name}
-            </span>
+          <div className="text-xs truncate mt-0.5" style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}>
+            <span className={!col.useHex ? 'text-gray-500' : ''}>{apt.service_name}</span>
           </div>
         )}
       </div>
@@ -457,11 +382,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                 {timeSlots.map((slot, i) => (
                   <div
                     key={i}
-                    className={`
-                      h-5 px-3 text-xs font-medium text-gray-500 text-right
-                      flex items-center justify-end
-                      ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-                    `}
+                    className={`h-5 px-3 text-xs font-medium text-gray-500 text-right flex items-center justify-end
+                      ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}`}
                   >
                     {slot.label}
                   </div>
@@ -470,44 +392,31 @@ export const Calendar: React.FC<CalendarProps> = ({
 
               {/* Day column */}
               <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                {/* ── Slot grid ── */}
                 {timeSlots.map((slot, i) => {
-                  const isSelected       = isSlotSelected(slot);
-                  const slotAppointments = getAppointmentsForSlot(currentDate, slot.hour, slot.minutes);
+                  const isSelected = isSlotSelected(slot);
                   return (
                     <div
                       key={i}
                       onMouseDown={() => handleMouseDown(currentDate, slot)}
                       onMouseEnter={() => handleMouseEnter(slot)}
                       onDoubleClick={() => handleDoubleClick(currentDate, slot)}
-                      className={`
-                        h-5 transition-colors cursor-pointer relative select-none
+                      className={`h-5 transition-colors cursor-pointer relative select-none
                         ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-                        ${isSelected
-                          ? 'bg-sky-200 hover:bg-sky-300'
-                          : slotAppointments.length > 0
-                            ? 'bg-gray-50'
-                            : 'hover:bg-sky-50'
-                        }
-                      `}
+                        ${isSelected ? 'bg-sky-200 hover:bg-sky-300' : 'hover:bg-sky-50'}`}
                       title="Double-click for 15-min appointment, or drag to select duration"
                     >
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
-                      )}
+                      {isSelected && <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />}
                     </div>
                   );
                 })}
 
-                {/* Appointments */}
-                {appointments
-                  .filter(apt => apt.date === format(currentDate, 'yyyy-MM-dd'))
-                  .map(apt => renderTimelineCard(apt, false))
-                }
+                {/* ── Appointment cards (absolutely positioned over grid) ── */}
+                {getAppointmentsForDate(currentDate).map(apt => renderTimelineCard(apt, false))}
               </div>
             </div>
           </div>
         </div>
-
         {sharedModals}
       </>
     );
@@ -526,16 +435,8 @@ export const Calendar: React.FC<CalendarProps> = ({
             <div className="p-4" />
             {weekDays.map(day => (
               <div key={day.toISOString()} className="p-4 text-center border-l border-gray-200">
-                <div className="text-xs font-medium text-gray-500 uppercase">
-                  {format(day, 'EEE')}
-                </div>
-                <div className={`
-                  text-sm font-semibold mt-1
-                  ${isSameDay(day, new Date())
-                    ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs'
-                    : 'text-gray-700'
-                  }
-                `}>
+                <div className="text-xs font-medium text-gray-500 uppercase">{format(day, 'EEE')}</div>
+                <div className={`text-sm font-semibold mt-1 ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs' : 'text-gray-700'}`}>
                   {format(day, 'd')}
                 </div>
               </div>
@@ -550,11 +451,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                 {timeSlots.map((slot, i) => (
                   <div
                     key={i}
-                    className={`
-                      h-5 px-3 text-xs font-medium text-gray-500 text-right
-                      flex items-center justify-end
-                      ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-                    `}
+                    className={`h-5 px-3 text-xs font-medium text-gray-500 text-right flex items-center justify-end
+                      ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}`}
                   >
                     {slot.label}
                   </div>
@@ -568,6 +466,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                   className="border-l border-gray-200 relative"
                   onMouseUp={() => handleMouseUp(day)}
                 >
+                  {/* ── Slot grid ── */}
                   {timeSlots.map((slot, i) => {
                     const isSelected = isSlotSelected(slot);
                     return (
@@ -576,31 +475,23 @@ export const Calendar: React.FC<CalendarProps> = ({
                         onMouseDown={() => handleMouseDown(day, slot)}
                         onMouseEnter={() => handleMouseEnter(slot)}
                         onDoubleClick={() => handleDoubleClick(day, slot)}
-                        className={`
-                          h-5 transition-colors cursor-pointer relative select-none
+                        className={`h-5 transition-colors cursor-pointer relative select-none
                           ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-                          ${isSelected ? 'bg-sky-200 hover:bg-sky-300' : 'hover:bg-sky-50'}
-                        `}
+                          ${isSelected ? 'bg-sky-200 hover:bg-sky-300' : 'hover:bg-sky-50'}`}
                         title="Double-click for 15-min appointment, or drag to select duration"
                       >
-                        {isSelected && (
-                          <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
-                        )}
+                        {isSelected && <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />}
                       </div>
                     );
                   })}
 
-                  {/* Appointments */}
-                  {appointments
-                    .filter(apt => apt.date === format(day, 'yyyy-MM-dd'))
-                    .map(apt => renderTimelineCard(apt, true))
-                  }
+                  {/* ── Appointment cards (absolutely positioned over grid) ── */}
+                  {getAppointmentsForDate(day).map(apt => renderTimelineCard(apt, true))}
                 </div>
               ))}
             </div>
           </div>
         </div>
-
         {sharedModals}
       </>
     );
@@ -614,16 +505,9 @@ export const Calendar: React.FC<CalendarProps> = ({
     return (
       <>
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-
-          {/* Month header */}
           <div className="flex-shrink-0 grid grid-cols-7 border-b border-gray-200 bg-gray-50">
             {weekDayNames.map(d => (
-              <div
-                key={d}
-                className="p-4 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0"
-              >
-                {d}
-              </div>
+              <div key={d} className="p-4 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0">{d}</div>
             ))}
           </div>
 
@@ -633,46 +517,27 @@ export const Calendar: React.FC<CalendarProps> = ({
                 {week.map(day => {
                   const dayAppts = getAppointmentsForDay(day);
                   const count    = dayAppts.length;
-
                   return (
                     <div
                       key={day.toISOString()}
                       onClick={() => onDateChange(day)}
-                      className={`
-                        min-h-[120px] p-2 border-r border-gray-200 last:border-r-0
-                        hover:bg-sky-50 transition-colors cursor-pointer
+                      className={`min-h-[120px] p-2 border-r border-gray-200 last:border-r-0 hover:bg-sky-50 transition-colors cursor-pointer
                         ${!isSameMonth(day, currentDate) ? 'bg-gray-50' : ''}
-                        ${isSameDay(day, new Date()) ? 'bg-sky-50' : ''}
-                      `}
+                        ${isSameDay(day, new Date()) ? 'bg-sky-50' : ''}`}
                     >
-                      {/* Date + badge row */}
                       <div className="flex items-center justify-between mb-1">
-                        <div className={`
-                          text-sm font-medium
+                        <div className={`text-sm font-medium
                           ${!isSameMonth(day, currentDate) ? 'text-gray-400' : 'text-gray-700'}
-                          ${isSameDay(day, new Date())
-                            ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold'
-                            : ''
-                          }
-                        `}>
+                          ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold' : ''}`}>
                           {format(day, 'd')}
                         </div>
-
                         {count > 0 && (
-                          <div className="bg-green-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
-                            {count}
-                          </div>
+                          <div className="bg-green-600 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">{count}</div>
                         )}
                       </div>
-
                       <div className="space-y-1 mt-2">
                         {dayAppts.slice(0, 3).map(apt => renderMonthCard(apt))}
-
-                        {count > 3 && (
-                          <div className="text-xs text-gray-500 font-medium px-2">
-                            +{count - 3} more
-                          </div>
-                        )}
+                        {count > 3 && <div className="text-xs text-gray-500 font-medium px-2">+{count - 3} more</div>}
                       </div>
                     </div>
                   );
@@ -681,7 +546,6 @@ export const Calendar: React.FC<CalendarProps> = ({
             ))}
           </div>
         </div>
-
         {sharedModals}
       </>
     );

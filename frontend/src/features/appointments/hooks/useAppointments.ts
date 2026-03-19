@@ -9,7 +9,7 @@ interface UseAppointmentsParams {
   startDate:       Date;
   endDate:         Date;
   practitionerId?: number | null;
-  clinicBranchId?: number | null;
+  clinicBranchId?: number | null;   // the selected diary tab branch_id
 }
 
 export const useAppointments = ({
@@ -31,25 +31,19 @@ export const useAppointments = ({
     setError(null);
 
     try {
+      // ── Fetch ALL appointments for the clinic group (no branch filter on API) ──
+      // We filter client-side using branch_id so practitioner-branch logic works.
       const apptParams: Record<string, any> = {
         start_date: startDateStr,
         end_date:   endDateStr,
         page_size:  1000,
       };
+      if (practitionerId !== null) apptParams.practitioner = practitionerId;
 
-      if (clinicBranchId !== null) apptParams.clinic_branch = clinicBranchId;
-      if (practitionerId !== null) apptParams.practitioner  = practitionerId;
-
-      // ── Portal bookings: fetch ALL for the date range (no branch/practitioner filter)
-      // We do client-side filtering below so we can correctly handle:
-      //   - "Any Available" bookings (practitioner_branch_id = null) → show in ALL branches
-      //   - Practitioner-specific bookings → show only in their assigned branch
       const portalParams: Record<string, any> = {
         start_date: startDateStr,
         end_date:   endDateStr,
       };
-      // Only pass practitioner filter to backend — NOT clinic_branch
-      // (branch filtering is done client-side to handle null practitioner_branch_id correctly)
       if (practitionerId !== null) portalParams.practitioner = practitionerId;
 
       const [apptResponse, portalResponse] = await Promise.all([
@@ -57,32 +51,32 @@ export const useAppointments = ({
         getPortalBookingsForDiary(portalParams),
       ]);
 
-      setAppointments(apptResponse.results);
+      // ── Filter appointments by branch_id ──────────────────────────────────
+      // branch_id is set server-side: practitioner.user.clinic_branch_id ?? clinic_id
+      const allAppointments: Appointment[] = apptResponse.results;
 
-      // ── Client-side portal booking filter ─────────────────────────────────
-      // Step 1: only PENDING bookings
+      const filteredAppointments = clinicBranchId === null
+        ? allAppointments
+        : allAppointments.filter(apt => {
+            const aptBranch = apt.branch_id ?? apt.clinic;
+            return aptBranch === clinicBranchId;
+          });
+
+      setAppointments(filteredAppointments);
+
+      // ── Filter portal bookings by branch_id ───────────────────────────────
       const pendingBookings = portalResponse.filter(
         (b: PortalBookingDiaryItem) => b.status === 'PENDING'
       );
 
-      // Step 2: apply branch filter
-      // Rule:
-      //   No branch selected (All Branches)  → show ALL pending bookings
-      //   Branch selected →
-      //     practitioner_branch_id === null   → "Any Available" → SHOW (visible everywhere)
-      //     practitioner_branch_id === branchId → practitioner is in THIS branch → SHOW
-      //     practitioner_branch_id !== branchId → practitioner is in ANOTHER branch → HIDE
-      const filteredBookings =
-        clinicBranchId === null
-          ? pendingBookings
-          : pendingBookings.filter((b: PortalBookingDiaryItem) => {
-              // "Any Available" — no specific practitioner → show in every branch tab
-              if (b.practitioner_id === null) return true;
-              // Practitioner has no branch assigned → show everywhere
-              if (b.practitioner_branch_id === null) return true;
-              // Practitioner is assigned to the selected branch → show
-              return b.practitioner_branch_id === clinicBranchId;
-            });
+      const filteredBookings = clinicBranchId === null
+        ? pendingBookings
+        : pendingBookings.filter((b: PortalBookingDiaryItem) => {
+            // Use practitioner_branch_id as the canonical branch for portal bookings
+            const bookingBranch = b.practitioner_branch_id ?? b.portal_clinic_id ?? null;
+            if (bookingBranch === null) return true;   // unassigned → show everywhere
+            return bookingBranch === clinicBranchId;
+          });
 
       setPortalBookings(filteredBookings);
 
@@ -110,6 +104,13 @@ export const useAppointments = ({
     );
   }, []);
 
+  const addAppointmentToState = useCallback((appointment: Appointment) => {
+    setAppointments(prev => {
+      if (prev.some(a => a.id === appointment.id)) return prev;
+      return [...prev, appointment];
+    });
+  }, []);
+
   return {
     appointments,
     portalBookings,
@@ -118,5 +119,6 @@ export const useAppointments = ({
     refetch: fetchAppointments,
     removePortalBooking,
     updateAppointmentInState,
+    addAppointmentToState,
   };
 };

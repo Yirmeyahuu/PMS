@@ -72,20 +72,65 @@ class PortalServiceSerializer(serializers.ModelSerializer):
 
 
 class PortalPractitionerSerializer(serializers.Serializer):
-    id             = serializers.IntegerField(source='pk')
+    """
+    Serializes practitioner data for the public portal response.
+    Includes branch_id so the frontend can filter by selected branch.
+    """
+    id             = serializers.SerializerMethodField()
     full_name      = serializers.SerializerMethodField()
-    specialization = serializers.CharField()
-    bio            = serializers.CharField()
+    title          = serializers.SerializerMethodField()
+    specialization = serializers.SerializerMethodField()
+    position       = serializers.SerializerMethodField()
+    occupation     = serializers.SerializerMethodField()
+    discipline     = serializers.SerializerMethodField()
+    bio            = serializers.SerializerMethodField()
     avatar_url     = serializers.SerializerMethodField()
+    branch_id      = serializers.SerializerMethodField()   # ← critical field
 
-    def get_full_name(self, obj) -> str:
+    def get_id(self, obj):
+        return obj.id
+
+    def get_full_name(self, obj):
         return obj.user.get_full_name()
 
-    def get_avatar_url(self, obj) -> str | None:
+    def get_title(self, obj):
+        # title lives on User (from staff.types: TitleType)
+        return getattr(obj.user, 'title', None)
+
+    def get_specialization(self, obj):
+        return obj.specialization or ''
+
+    def get_position(self, obj):
+        return getattr(obj.user, 'position', None)
+
+    def get_occupation(self, obj):
+        # occupation == position for display purposes
+        return getattr(obj.user, 'position', None) or ''
+
+    def get_discipline(self, obj):
+        return getattr(obj.user, 'discipline', None)
+
+    def get_bio(self, obj):
+        return getattr(obj, 'bio', '') or ''
+
+    def get_avatar_url(self, obj):
         request = self.context.get('request')
-        if obj.user.avatar and request:
-            return request.build_absolute_uri(obj.user.avatar.url)
+        avatar  = obj.user.avatar
+        if avatar and request:
+            return request.build_absolute_uri(avatar.url)
         return None
+
+    def get_branch_id(self, obj):
+        """
+        User.clinic_branch_id = the branch the staff member belongs to.
+        This is what the frontend filters on when a branch is selected.
+        Falls back to Practitioner.clinic_id if clinic_branch is not set.
+        """
+        branch_id = obj.user.clinic_branch_id
+        if branch_id is not None:
+            return branch_id
+        # Fallback: use the practitioner's own clinic FK
+        return obj.clinic_id
 
 
 class PortalClinicServiceSerializer(serializers.ModelSerializer):
@@ -114,12 +159,34 @@ class PortalClinicServiceSerializer(serializers.ModelSerializer):
         return None
 
 
+class PortalBranchSerializer(serializers.Serializer):
+    id             = serializers.IntegerField()
+    name           = serializers.CharField()
+    address        = serializers.SerializerMethodField()
+    city           = serializers.CharField()
+    province       = serializers.CharField()
+    phone          = serializers.SerializerMethodField()
+    email          = serializers.SerializerMethodField()
+    is_main_branch = serializers.BooleanField()
+
+    def get_address(self, obj) -> str:
+        # Return only the street address — city/province shown separately
+        return obj.address or ''
+
+    def get_phone(self, obj) -> str:
+        return obj.phone or ''
+
+    def get_email(self, obj) -> str:
+        return obj.email or ''
+
+
 class PortalLinkPublicSerializer(serializers.ModelSerializer):
     clinic_name    = serializers.CharField(source='clinic.name',   read_only=True)
     clinic_logo    = serializers.SerializerMethodField()
     clinic_address = serializers.SerializerMethodField()
     clinic_phone   = serializers.CharField(source='clinic.phone',  read_only=True)
     clinic_email   = serializers.EmailField(source='clinic.email', read_only=True)
+    branches       = serializers.SerializerMethodField()   # ← NEW
     categories     = serializers.SerializerMethodField()
     practitioners  = serializers.SerializerMethodField()
 
@@ -129,6 +196,7 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
             'token', 'heading', 'description',
             'clinic_name', 'clinic_logo', 'clinic_address',
             'clinic_phone', 'clinic_email',
+            'branches',       # ← NEW
             'categories', 'practitioners',
         ]
 
@@ -142,6 +210,18 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
         c     = obj.clinic
         parts = [c.address, c.city, c.province, c.postal_code]
         return ', '.join(p for p in parts if p)
+
+    def get_branches(self, obj):
+        """Return main clinic + all active sub-branches as selectable portal branches."""
+        from django.db.models import Q
+        from apps.clinics.models import Clinic
+
+        main_clinic = obj.clinic  # portal_link.clinic is always the main clinic
+        all_branches = Clinic.objects.filter(
+            Q(id=main_clinic.id) | Q(parent_clinic=main_clinic)
+        ).filter(is_deleted=False, is_active=True).order_by('-is_main_branch', 'name')
+
+        return PortalBranchSerializer(all_branches, many=True).data
 
     def get_categories(self, obj):
         services = ClinicService.objects.filter(
@@ -168,26 +248,50 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
         ]
 
     def get_practitioners(self, obj):
+        """
+        Return ALL active practitioners across all branches of this clinic's
+        main clinic family — the frontend filters by branch_id client-side.
+        Also prepend the 'Any Available' pseudo-entry.
+        """
         from apps.clinics.models import Practitioner
+
+        main_clinic    = obj.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
         practitioners = Practitioner.objects.filter(
-            clinic=obj.clinic,
-            is_accepting_patients=True,
-            is_deleted=False,
+            clinic_id__in=all_branch_ids,
             user__is_active=True,
-        ).select_related('user').order_by('user__last_name', 'user__first_name')
+            user__is_deleted=False,
+        ).select_related(
+            'user',
+            'user__clinic_branch',  # ← ensures clinic_branch_id is loaded, not lazy-fetched
+            'clinic',
+        )
 
-        serialized = PortalPractitionerSerializer(
-            practitioners, many=True, context=self.context
-        ).data
-
+        # Prepend "Any Available" pseudo-entry
         any_available = {
             'id':             None,
             'full_name':      'Any Available',
+            'title':          None,
             'specialization': '',
+            'position':       None,
+            'occupation':     '',
+            'discipline':     None,
             'bio':            '',
             'avatar_url':     None,
+            'branch_id':      None,
         }
+
+        serialized = PortalPractitionerSerializer(
+            practitioners,
+            many=True,
+            context=self.context,
+        ).data
+
         return [any_available] + list(serialized)
+
 
 
 class PortalLinkAdminSerializer(serializers.ModelSerializer):

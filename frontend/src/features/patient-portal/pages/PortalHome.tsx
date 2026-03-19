@@ -2,28 +2,30 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
-import { fetchPortal, submitBooking } from '../portal.api';
-import { PortalSidebar }       from '../components/PortalSidebar';
-import { PractitionerStep }    from '../components/PractitionerStep';
-import { ServiceList }         from '../components/ServiceList';
-import { PatientDetailsForm }  from '../components/PatientDetailsForm';
-import { PortalFooterActions } from '../components/PortalFooterActions';
+import { fetchPortal, submitBooking }  from '../portal.api';
+import { PortalSidebar }              from '../components/PortalSidebar';
+import { BranchStep }                 from '../components/BranchStep';
+import { PractitionerStep }           from '../components/PractitionerStep';
+import { ServiceList }                from '../components/ServiceList';
+import { PatientDetailsForm }         from '../components/PatientDetailsForm';
+import { PortalFooterActions }        from '../components/PortalFooterActions';
 
 import type {
   PortalData,
+  PortalBranch,
   PortalPractitioner,
   PortalService,
   BookingPayload,
 } from '@/types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
 
-// ── 3-step flow: practitioner → services (with inline calendar) → details ──
-type Step = 'practitioner' | 'services' | 'details';
+// ── After branch is picked, 3-step inner flow ─────────────────────────────────
+type InnerStep = 'practitioner' | 'services' | 'details';
 
-const STEP_NUMBER: Record<Step, number> = {
-  practitioner: 1,
-  services:     2,
-  details:      3,
+const INNER_STEP_NUMBER: Record<InnerStep, number> = {
+  practitioner: 2,
+  services:     3,
+  details:      4,
 };
 
 const EMPTY_FORM: PatientFormData = {
@@ -43,13 +45,16 @@ export const PortalHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
-  // ── Selections ───────────────────────────────────────────────────────────
-  const [step,                 setStep]                 = useState<Step>('practitioner');
+  // ── Branch gate ──────────────────────────────────────────────────────────
+  const [selectedBranch, setSelectedBranch] = useState<PortalBranch | null>(null);
+
+  // ── Inner step (only active after branch is chosen) ──────────────────────
+  const [innerStep,            setInnerStep]            = useState<InnerStep>('practitioner');
   const [selectedPractitioner, setSelectedPractitioner] = useState<PortalPractitioner | null>(null);
   const [selectedService,      setSelectedService]      = useState<PortalService | null>(null);
   const [search,               setSearch]               = useState('');
 
-  // ── Date / time (set by inline calendar inside ServiceCard) ─────────────
+  // ── Date / time ──────────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
 
@@ -58,7 +63,7 @@ export const PortalHome: React.FC = () => {
   const [formError,  setFormError]  = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Load portal on mount ─────────────────────────────────────────────────
+  // ── Load portal ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
     fetchPortal(token)
@@ -67,10 +72,19 @@ export const PortalHome: React.FC = () => {
       .finally(() => setLoading(false));
   }, [token]);
 
-  // ── Navigation handlers ──────────────────────────────────────────────────
-  const handleSelectPractitioner = (p: PortalPractitioner) => {
-    setSelectedPractitioner(p);
+  // ── Branch selected → enter inner flow ───────────────────────────────────
+  const handleSelectBranch = (branch: PortalBranch) => {
+    setSelectedBranch(branch);
+    // Reset downstream when re-choosing branch
+    setSelectedPractitioner(null);
+    setSelectedService(null);
+    setSelectedDate('');
+    setSelectedSlot('');
+    setInnerStep('practitioner');
   };
+
+  // ── Inner navigation ─────────────────────────────────────────────────────
+  const handleSelectPractitioner = (p: PortalPractitioner) => setSelectedPractitioner(p);
 
   const handleSelectService = (svc: PortalService) => {
     setSelectedService(svc);
@@ -78,27 +92,24 @@ export const PortalHome: React.FC = () => {
     setSelectedSlot('');
   };
 
-  /**
-   * Called by the inline PortalAvailabilityCalendar inside ServiceCard.
-   * Stores date + slot and jumps straight to 'details'.
-   */
   const handleInlineDateTimeConfirm = (date: string, slot: string) => {
     setSelectedDate(date);
     setSelectedSlot(slot);
-    setStep('details');
+    setInnerStep('details');
   };
 
   const handleContinue = () => {
-    if (step === 'practitioner' && selectedPractitioner) setStep('services');
-    // 'services' step advances via handleInlineDateTimeConfirm (inline calendar)
+    if (innerStep === 'practitioner' && selectedPractitioner) setInnerStep('services');
   };
 
   const handleBack = () => {
-    if (step === 'details')  { setStep('services');     return; }
-    if (step === 'services') { setStep('practitioner'); return; }
+    if (innerStep === 'details')      { setInnerStep('services');     return; }
+    if (innerStep === 'services')     { setInnerStep('practitioner'); return; }
+    // Back from first inner step → return to branch selection
+    if (innerStep === 'practitioner') { setSelectedBranch(null);      return; }
   };
 
-  // ── Submit booking ───────────────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!token || !selectedService || !selectedDate || !selectedSlot) return;
     setFormError(null);
@@ -115,6 +126,7 @@ export const PortalHome: React.FC = () => {
 
     const payload: BookingPayload = {
       service:            selectedService.id,
+      branch:             selectedBranch?.id ?? null,
       practitioner:       selectedPractitioner?.id ?? null,
       patient_first_name: formData.first_name,
       patient_last_name:  formData.last_name,
@@ -138,13 +150,40 @@ export const PortalHome: React.FC = () => {
     }
   };
 
-  // ── canContinue per step ─────────────────────────────────────────────────
-  const canContinue =
-    (step === 'practitioner' && !!selectedPractitioner);
-  // 'services' step has no Continue button — inline calendar handles progression
-  // 'details' step uses Submit
+  const canContinue = innerStep === 'practitioner' && !!selectedPractitioner;
 
-  // ── Loading / error states ───────────────────────────────────────────────
+  // ── Filter practitioners by selected branch ───────────────────────────────
+  const branchPractitioners = React.useMemo(() => {
+    const all = portal?.practitioners ?? [];
+
+    // ── DEV: log to confirm branch_id values are present ────────────────
+    if (process.env.NODE_ENV === 'development' && selectedBranch) {
+      console.debug(
+        '[Portal] Selected branch id:', selectedBranch.id,
+        '\n[Portal] All practitioners:',
+        all.map((p) => ({ id: p.id, name: p.full_name, branch_id: p.branch_id })),
+      );
+    }
+
+    return all.filter((p) => {
+      if (p.id === null) return true;               // "Any Available" — always show
+      return p.branch_id === selectedBranch?.id;    // strict number equality
+    });
+  }, [portal?.practitioners, selectedBranch]);
+
+  // ── Filter services for search ────────────────────────────────────────────
+  const filteredCategories = (portal?.categories ?? [])
+    .map((cat) => ({
+      ...cat,
+      services: cat.services.filter(
+        (s) =>
+          s.name.toLowerCase().includes(search.toLowerCase()) ||
+          s.description.toLowerCase().includes(search.toLowerCase()),
+      ),
+    }))
+    .filter((cat) => cat.services.length > 0);
+
+  // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -163,30 +202,61 @@ export const PortalHome: React.FC = () => {
     );
   }
 
-  // ── Filter services for search ───────────────────────────────────────────
-  const filteredCategories = portal.categories
-    .map((cat) => ({
-      ...cat,
-      services: cat.services.filter(
-        (s) =>
-          s.name.toLowerCase().includes(search.toLowerCase()) ||
-          s.description.toLowerCase().includes(search.toLowerCase()),
-      ),
-    }))
-    .filter((cat) => cat.services.length > 0);
+  // ── GATE: Branch not yet selected → full-screen branch picker ────────────
+  if (!selectedBranch) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
 
-  // ── Render ───────────────────────────────────────────────────────────────
+        {/* Top header */}
+        <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-center gap-4">
+          {portal.clinic_logo ? (
+            <img
+              src={portal.clinic_logo}
+              alt={portal.clinic_name}
+              className="w-10 h-10 rounded-xl object-cover border border-gray-200"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+              {portal.clinic_name.charAt(0)}
+            </div>
+          )}
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">
+              {portal.heading || portal.clinic_name}
+            </h1>
+            {portal.description && (
+              <p className="text-sm text-gray-500">{portal.description}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Branch picker */}
+        <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full">
+          <BranchStep
+            branches={portal.branches ?? []}
+            selectedBranch={null}
+            clinicName={portal.clinic_name}
+            onSelect={handleSelectBranch}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── MAIN: Branch selected → sidebar + inner steps ─────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar */}
       <PortalSidebar
         portal={portal}
+        selectedBranch={selectedBranch}
         selectedPractitioner={selectedPractitioner}
         selectedService={selectedService}
         selectedDate={selectedDate}
         selectedSlot={selectedSlot}
-        currentStep={STEP_NUMBER[step]}
+        currentStep={INNER_STEP_NUMBER[innerStep]}
+        onChangeBranch={() => setSelectedBranch(null)}
       />
 
       {/* Main content */}
@@ -203,8 +273,7 @@ export const PortalHome: React.FC = () => {
             )}
           </div>
 
-          {/* Search bar — only on services step */}
-          {step === 'services' && (
+          {innerStep === 'services' && (
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -221,15 +290,15 @@ export const PortalHome: React.FC = () => {
         {/* Step content */}
         <div className="flex-1 overflow-y-auto p-8">
 
-          {step === 'practitioner' && (
+          {innerStep === 'practitioner' && (
             <PractitionerStep
-              practitioners={portal.practitioners}
+              practitioners={branchPractitioners}
               selectedPractitioner={selectedPractitioner}
               onSelect={handleSelectPractitioner}
             />
           )}
 
-          {step === 'services' && (
+          {innerStep === 'services' && (
             <ServiceList
               categories={filteredCategories}
               selectedService={selectedService}
@@ -240,7 +309,7 @@ export const PortalHome: React.FC = () => {
             />
           )}
 
-          {step === 'details' && (
+          {innerStep === 'details' && (
             <PatientDetailsForm
               formData={formData}
               formError={formError}
@@ -249,10 +318,10 @@ export const PortalHome: React.FC = () => {
           )}
         </div>
 
-        {/* Footer actions */}
+        {/* Footer */}
         <div className="px-8 pb-6">
           <PortalFooterActions
-            step={step}
+            step={innerStep}
             canContinue={canContinue}
             submitting={submitting}
             onBack={handleBack}

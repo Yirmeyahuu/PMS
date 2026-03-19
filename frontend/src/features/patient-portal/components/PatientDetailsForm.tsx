@@ -138,7 +138,7 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">
             Notes{' '}
-            <span className="text-gray-400 font-normal">(optional)</span>
+            <span className="text-gray-400 font-normal">Please specify your concerns...</span>
           </label>
           <div className="relative">
             <FileText className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />

@@ -47,9 +47,10 @@ export interface PortalBookingDiaryItem {
   patient_phone:          string;
   patient_email:          string;
   service_name:           string;
-  service_color:          string | null;   // ← ADD
+  service_color:          string | null;
   practitioner_name:      string | null;
-  practitioner_branch_id: number | null;
+  practitioner_branch_id: number | null;   // practitioner's assigned branch
+  portal_clinic_id:       number | null;   // ← ADD: the clinic the portal link belongs to
   date:                   string;
   start_time:             string;
   end_time:               string;
