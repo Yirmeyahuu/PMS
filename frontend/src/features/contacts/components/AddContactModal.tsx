@@ -9,7 +9,7 @@ interface AddContactModalProps {
   editingContact?: Contact | null;
 }
 
-type ContactType = 'DOCTOR' | 'PRACTITIONER' | 'CLINIC' | 'LABORATORY' | 'PHARMACY' | 'SUPPLIER' | 'OTHER';
+type ContactType = 'DOCTOR' | 'PRACTITIONER' | 'CLINIC' | 'LABORATORY' | 'PHARMACY' | 'OTHER';
 
 interface FormErrors {
   first_name?:    string;
@@ -28,7 +28,6 @@ const CONTACT_TYPES: { value: ContactType; label: string }[] = [
   { value: 'CLINIC',        label: 'Clinic'        },
   { value: 'LABORATORY',    label: 'Laboratory'    },
   { value: 'PHARMACY',      label: 'Pharmacy'      },
-  { value: 'SUPPLIER',      label: 'Supplier'      },
   { value: 'OTHER',         label: 'Other'         },
 ];
 
