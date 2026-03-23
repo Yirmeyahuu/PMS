@@ -35,15 +35,13 @@ interface AppointmentViewProps {
   isOpen:      boolean;
   onClose:     () => void;
   appointment: Appointment | null;
-  onEdit?:     (appointment: Appointment) => void;
-  onDelete?:   (appointment: Appointment) => void;
   onUpdated?:  (appointment: Appointment) => void;
 }
 
 interface EditableItem {
   id?:         number;
   description: string;
-  quantity:    number;
+  quantity:    number;   // always number
   unit_price:  number;
   service_id?: number;
   _key:        string;
@@ -60,7 +58,6 @@ const newBlankItem = (): EditableItem => ({
 const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
   const formattedDate = format(new Date(appointment.date), 'MMM d, yyyy');
 
-  // ── Use service_name when available ───────────────────────────────────────
   const typeLabel = appointment.service_name
     ?? APPOINTMENT_TYPE_LABELS[appointment.appointment_type]
     ?? appointment.appointment_type;
@@ -241,7 +238,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
         await billingApi.addItem(invoice.id, {
           invoice:     invoice.id,
           description: item.description,
-          quantity:    item.quantity,
+          quantity:    String(item.quantity),
           unit_price:  String(item.unit_price),
         });
       }
@@ -266,9 +263,13 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   const startEditing = useCallback(() => {
     if (!invoice) return;
     setEditItems(invoice.items.map(item => ({
-      id: item.id, description: item.description,
-      quantity: item.quantity, unit_price: parseFloat(item.unit_price),
-      _key: String(item.id),
+      id:          item.id,
+      description: item.description,
+      // FIX: item.quantity from the API is a string — parse to number
+      quantity:    parseInt(String(item.quantity), 10) || 1,
+      // FIX: item.unit_price from the API is a string — parse to number
+      unit_price:  parseFloat(item.unit_price),
+      _key:        String(item.id),
     })));
     setEditNotes(invoice.notes || '');
     setEditDueDate(invoice.due_date || '');
@@ -588,36 +589,24 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   isOpen,
   onClose,
   appointment: initialAppointment,
-  onEdit,
-  onDelete,
   onUpdated,
 }) => {
   const [activeTab,       setActiveTab]       = useState<Tab>('details');
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  // ── KEY FIX: Track the last appointment ID we loaded ─────────────────────
-  // Only reset local state when a DIFFERENT appointment is opened,
-  // not on every prop change (which would overwrite our optimistic update).
   const lastAppointmentIdRef = useRef<number | null>(null);
-
-  // ── Local appointment state — source of truth inside the modal ───────────
   const [appointment, setAppointment] = useState<Appointment | null>(initialAppointment);
 
-  // ── Sync ONLY when a new appointment is opened (id changes) ───────────────
   useEffect(() => {
     if (!initialAppointment) {
       setAppointment(null);
       lastAppointmentIdRef.current = null;
       return;
     }
-
-    // A different appointment was selected — reset everything
     if (initialAppointment.id !== lastAppointmentIdRef.current) {
       setAppointment(initialAppointment);
       lastAppointmentIdRef.current = initialAppointment.id;
     }
-    // If same appointment id, do NOT overwrite — we may have local edits
-    // applied from a successful save that haven't propagated up yet.
   }, [initialAppointment]);
 
   const {
@@ -629,13 +618,11 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   const { practitioners, loading: loadingPractitioners } = usePractitioners();
 
-  // ── Reset modal state when closed ────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) {
       cancelEdit();
       setShowCancelModal(false);
       setActiveTab('details');
-      // Reset the ID tracker so next open always seeds fresh
       lastAppointmentIdRef.current = null;
     }
   }, [isOpen, cancelEdit]);
@@ -644,12 +631,10 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   const statusColors  = APPOINTMENT_STATUS_COLORS[appointment.status];
 
-  // ── Use service_name when available, fall back to legacy type label ────────
   const typeLabel = appointment.service_name
     ?? APPOINTMENT_TYPE_LABELS[appointment.appointment_type]
     ?? appointment.appointment_type;
 
-  // ── Service color for the type badge ─────────────────────────────────────
   const serviceColor = appointment.service_color;
 
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
@@ -665,16 +650,11 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
     return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
   };
 
-  // ── KEY FIX: After save, update local state directly from API response ────
   const handleSaveEdit = async (payload: AppointmentEditPayload) => {
     const updated = await saveEdit(appointment.id, payload);
     if (updated) {
-      // ✅ Immediately update the modal's local state with the full
-      //    appointment returned by the backend — no reload needed.
       setAppointment(updated);
-      // Also update the ref so the parent sync useEffect won't overwrite us
       lastAppointmentIdRef.current = updated.id;
-      // Bubble up to parent (Calendar/Diary) to update its list too
       onUpdated?.(updated);
     }
   };
@@ -758,7 +738,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
             {activeTab === 'details' && (
               <div className="space-y-4">
 
-                {/* Cancelled banner */}
                 {isCancelled && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-1">
                     <div className="flex items-center gap-2">
@@ -778,7 +757,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                   </div>
                 )}
 
-                {/* Edit Form OR Read-only view */}
                 {isEditing ? (
                   <AppointmentEditForm
                     appointment={appointment}
@@ -793,7 +771,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                   />
                 ) : (
                   <>
-                    {/* Status + Type */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
                         {appointment.status.replace('_', ' ')}
@@ -812,7 +789,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       )}
                     </div>
 
-                    {/* Date & Time */}
                     <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="flex items-center gap-2">
@@ -841,7 +817,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Patient & Practitioner */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="border border-gray-200 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -863,7 +838,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Location */}
                     {appointment.location_name && (
                       <div className="border border-gray-200 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -874,7 +848,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       </div>
                     )}
 
-                    {/* Chief Complaint */}
                     {appointment.chief_complaint ? (
                       <div className="border border-gray-200 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -891,7 +864,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       )
                     )}
 
-                    {/* Internal Notes */}
                     {appointment.notes ? (
                       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -903,7 +875,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       </div>
                     ) : null}
 
-                    {/* Patient Notes */}
                     {appointment.patient_notes ? (
                       <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -915,7 +886,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       </div>
                     ) : null}
 
-                    {/* Metadata — shows updated_by after a save */}
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
                       {[
                         { label: 'Created by', value: appointment.created_by_name || 'Unknown' },
@@ -932,7 +902,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       ))}
                     </div>
 
-                    {/* Quick link to invoice tab */}
                     <button
                       onClick={() => setActiveTab('invoice')}
                       className="w-full flex items-center justify-between px-4 py-3 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors"
