@@ -55,7 +55,7 @@ export const AdminMenu1: React.FC = () => {
     isFetching,
   } = useQuery({
     queryKey: ['appointments-print-list', activeFilters],
-    queryFn:  () => printAppointmentsApi.list(activeFilters, 1, 200),
+    queryFn:  () => printAppointmentsApi.list(activeFilters),
     enabled:  !!(filters.date_from && filters.date_to),
   });
 
@@ -87,7 +87,7 @@ export const AdminMenu1: React.FC = () => {
     const win = window.open('', '_blank');
     if (!win) return;
 
-    const rows = payload.appointments.map(a => `
+    const rows = payload.appointments.map((a: AppointmentPrintRecord) => `
       <tr>
         <td>${a.date}</td>
         <td>${a.start_time} – ${a.end_time}</td>
