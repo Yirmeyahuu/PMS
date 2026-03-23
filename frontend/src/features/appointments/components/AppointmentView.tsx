@@ -229,7 +229,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
       for (const item of editItems.filter(i => i.id)) {
         await billingApi.updateItem(item.id!, {
           description: item.description,
-          quantity:    item.quantity,
+          quantity:    String(item.quantity) as any,
           unit_price:  String(item.unit_price) as any,
         });
       }
@@ -238,8 +238,8 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
         await billingApi.addItem(invoice.id, {
           invoice:     invoice.id,
           description: item.description,
-          quantity:    String(item.quantity),
-          unit_price:  String(item.unit_price),
+          quantity:    item.quantity,
+          unit_price:  item.unit_price,
         });
       }
       await billingApi.updateInvoice(invoice.id, {

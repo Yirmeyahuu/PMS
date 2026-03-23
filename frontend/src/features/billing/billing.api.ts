@@ -120,11 +120,17 @@ export const billingApi = {
   /** POST /api/invoices/{id}/add-item/ */
   addItem: async (
     invoiceId: number,
-    item: { description: string; quantity: number; unit_price: number | string; invoice: number }
+    item: { 
+      description: string; 
+      quantity: number;  // ← Expect number
+      unit_price: number;  // ← Expect number
+      invoice: number 
+    }
   ): Promise<Invoice> => {
     const payload = {
       ...item,
-      unit_price: String(item.unit_price),
+      quantity: item.quantity,
+      unit_price: item.unit_price,
     };
     const { data } = await axiosInstance.post(`/invoices/${invoiceId}/add-item/`, payload);
     return data;
