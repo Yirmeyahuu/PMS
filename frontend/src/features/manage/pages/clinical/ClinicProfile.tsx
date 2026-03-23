@@ -40,7 +40,8 @@ const EditField: React.FC<{
   textarea?:   boolean;
   required?:   boolean;
   hint?:       string;
-}> = ({ label, name, value, onChange, error, type = 'text', placeholder, textarea, required, hint }) => (
+  mono?:       boolean;
+}> = ({ label, name, value, onChange, error, type = 'text', placeholder, textarea, required, hint, mono }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label} {required && <span className="text-red-500">*</span>}
@@ -65,6 +66,7 @@ const EditField: React.FC<{
         placeholder={placeholder}
         className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2
           focus:ring-sky-400
+          ${mono ? 'font-mono' : ''}
           ${error ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-sky-400'}`}
       />
     )}
