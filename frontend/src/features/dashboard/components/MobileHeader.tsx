@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell, Search } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import MESLogo from '@/assets/MESLogo.svg';
