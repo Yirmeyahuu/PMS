@@ -5,7 +5,7 @@ import {
   updateStaff,
   deleteStaff,
   toggleStaffStatus,
-} from '../services/staffService';
+} from '../services/StaffService';
 import type { StaffMember, CreateStaffData } from '../types/staff.types';
 import toast from 'react-hot-toast';
 
@@ -22,7 +22,7 @@ export const useStaffManagement = () => {
       const data = await getStaff();
       // Filter only STAFF and PRACTITIONER roles, exclude ADMIN
       const filteredStaff = data.filter(
-        (member) => member.role === 'STAFF' || member.role === 'PRACTITIONER'
+        (member: StaffMember) => member.role === 'STAFF' || member.role === 'PRACTITIONER'
       );
       setStaff(filteredStaff);
     } catch (err: any) {

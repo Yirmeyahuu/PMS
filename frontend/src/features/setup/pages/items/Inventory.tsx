@@ -120,7 +120,7 @@ export const Inventory: React.FC = () => {
       {stats && stats.low_stock_count > 0 && !showArchived && (
         <div
           className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 cursor-pointer hover:bg-red-100 transition-colors"
-          onClick={() => setFilters(f => ({ ...f, low_stock: true }))}
+          onClick={() => setFilters((f: ProductFilters) => ({ ...f, low_stock: true }))}
         >
           <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
           <span className="text-sm text-red-700 font-medium">
@@ -137,7 +137,7 @@ export const Inventory: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             value={search}
-            onChange={e => { setSearch(e.target.value); setFilters(f => ({ ...f, page: 1 })); }}
+            onChange={e => { setSearch(e.target.value); setFilters((f: ProductFilters) => ({ ...f, page: 1 })); }}
             placeholder="Search by name, SKU, barcode…"
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
           />
@@ -145,7 +145,7 @@ export const Inventory: React.FC = () => {
 
         {/* Toggle archived */}
         <button
-          onClick={() => { setShowArchived(v => !v); setFilters(f => ({ ...f, page: 1 })); }}
+          onClick={() => { setShowArchived(v => !v); setFilters((f: ProductFilters) => ({ ...f, page: 1 })); }}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
             showArchived
               ? 'bg-gray-700 text-white border-gray-700'
@@ -159,7 +159,7 @@ export const Inventory: React.FC = () => {
         {/* Clear low-stock filter chip */}
         {filters.low_stock && (
           <button
-            onClick={() => setFilters(f => ({ ...f, low_stock: undefined }))}
+            onClick={() => setFilters((f: ProductFilters) => ({ ...f, low_stock: undefined }))}
             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
@@ -204,14 +204,14 @@ export const Inventory: React.FC = () => {
           <div className="flex gap-2">
             <button
               disabled={!productsPage.previous}
-              onClick={() => setFilters(f => ({ ...f, page: (f.page ?? 1) - 1 }))}
+              onClick={() => setFilters((f: ProductFilters) => ({ ...f, page: (f.page ?? 1) - 1 }))}
               className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
             >
               Previous
             </button>
             <button
               disabled={!productsPage.next}
-              onClick={() => setFilters(f => ({ ...f, page: (f.page ?? 1) + 1 }))}
+              onClick={() => setFilters((f: ProductFilters) => ({ ...f, page: (f.page ?? 1) + 1 }))}
               className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
             >
               Next
