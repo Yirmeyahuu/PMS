@@ -80,10 +80,9 @@ export const ProductTable: React.FC<Props> = ({
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900">{p.name}</span>
                   {p.is_low_stock && !p.is_archived && (
-                    <AlertTriangle
-                      className="w-3.5 h-3.5 text-red-400 flex-shrink-0"
-                      title="Low stock"
-                    />
+                    <div title="Low stock">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                    </div>
                   )}
                 </div>
               </td>
