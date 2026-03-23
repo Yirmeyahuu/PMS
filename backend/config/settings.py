@@ -22,7 +22,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Allowed Hosts
 if os.getenv("RENDER"):
-    ALLOWED_HOSTS = ["mespms.com", "www.mespms.com", "api.mespms.com"]
+    ALLOWED_HOSTS = ["mespms.com", "www.mespms.com", "api.mespms.com", "malasakit-jato.onrender.com",]
 else:
     ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
