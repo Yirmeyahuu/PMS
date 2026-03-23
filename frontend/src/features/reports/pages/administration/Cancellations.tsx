@@ -182,7 +182,6 @@ export const Cancellations: React.FC = () => {
   });
 
   const withReasonCount    = filteredResults.filter((r) => r.reason).length;
-  const withoutReasonCount = filteredResults.filter((r) => !r.reason).length;
 
   return (
     <div className="flex flex-col h-full">

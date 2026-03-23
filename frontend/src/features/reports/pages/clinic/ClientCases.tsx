@@ -125,6 +125,8 @@ export const ClientCases: React.FC = () => {
                 label="Total Clients"
                 value={data.total_patients}
                 color="text-gray-900"
+                bg="bg-gray-50"
+                border="border-gray-200"
                 icon={<Users className="w-4 h-4" />}
               />
               <StatCard

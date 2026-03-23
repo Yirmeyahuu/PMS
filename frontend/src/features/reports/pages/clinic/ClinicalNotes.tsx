@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { FileText, FileMinus, FileWarning, Stethoscope, Building2, Clock, AlertTriangle } from 'lucide-react';
+import { FileText, FileMinus, FileWarning, Stethoscope, Building2, AlertTriangle } from 'lucide-react';
 import {
   getClinicalNotes,
   type ClinicalNotesResponse,
