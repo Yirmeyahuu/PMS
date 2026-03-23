@@ -5,14 +5,12 @@ import type { PortalBranch } from '@/types/portal';
 interface BranchStepProps {
   branches:       PortalBranch[];
   selectedBranch: PortalBranch | null;
-  clinicName:     string;
   onSelect:       (branch: PortalBranch) => void;
 }
 
 export const BranchStep: React.FC<BranchStepProps> = ({
   branches = [],
   selectedBranch,
-  clinicName,
   onSelect,
 }) => {
   const [search, setSearch] = useState('');

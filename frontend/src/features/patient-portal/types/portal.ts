@@ -10,7 +10,7 @@ export interface PortalBranch {
 }
 
 export interface PortalPractitioner {
-  id:             number | null;   // null = "Any Available"
+  id:             number | null;
   full_name:      string;
   title?:         string | null;
   specialization: string;
@@ -19,7 +19,7 @@ export interface PortalPractitioner {
   discipline?:    string | null;
   bio:            string;
   avatar_url:     string | null;
-  branch_id?:     number | null;   // ← MUST match User.clinic_branch_id from backend
+  branch_id?:     number | null;
 }
 
 export interface PortalService {
