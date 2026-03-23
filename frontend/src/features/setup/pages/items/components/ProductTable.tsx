@@ -120,13 +120,17 @@ export const ProductTable: React.FC<Props> = ({
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
                     Archived
                   </span>
-                ) : p.is_active ? (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Active
+                ) : p.modified_by_name ? (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
+                    Modified by: {p.modified_by_name}
+                  </span>
+                ) : p.created_by_name ? (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
+                    Created by: {p.created_by_name}
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-                    Inactive
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Active
                   </span>
                 )}
               </td>

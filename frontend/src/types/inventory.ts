@@ -51,6 +51,10 @@ export interface ProductListItem {
   is_low_stock:      boolean;
   is_active:         boolean;
   is_archived:       boolean;
+  created_by:        number | null;
+  created_by_name:   string | null;
+  modified_by:       number | null;
+  modified_by_name:  string | null;
 }
 
 export interface StockMovement {

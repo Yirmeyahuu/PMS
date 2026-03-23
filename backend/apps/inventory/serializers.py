@@ -13,6 +13,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     category_name  = serializers.CharField(source='category.name',            read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
     is_low_stock   = serializers.BooleanField(read_only=True)
     stock_value    = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
@@ -29,11 +30,16 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None
 
+    def get_modified_by_name(self, obj) -> str | None:
+        return obj.modified_by.get_full_name() if obj.modified_by else None
+
 
 class ProductListSerializer(serializers.ModelSerializer):
     """Lighter serializer for the list view — omits heavy fields."""
 
     category_name = serializers.CharField(source='category.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
     is_low_stock  = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -42,7 +48,14 @@ class ProductListSerializer(serializers.ModelSerializer):
             'id', 'name', 'sku', 'item_type', 'category', 'category_name',
             'selling_price', 'quantity_in_stock', 'unit',
             'reorder_level', 'is_low_stock', 'is_active', 'is_archived',
+            'created_by', 'created_by_name', 'modified_by', 'modified_by_name',
         ]
+
+    def get_created_by_name(self, obj) -> str | None:
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+    def get_modified_by_name(self, obj) -> str | None:
+        return obj.modified_by.get_full_name() if obj.modified_by else None
 
 
 class StockMovementSerializer(serializers.ModelSerializer):

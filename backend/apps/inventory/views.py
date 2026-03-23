@@ -67,7 +67,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         qs = (
             Product.objects
             .filter(clinic_id__in=all_branch_ids, is_deleted=False)
-            .select_related('category', 'created_by', 'clinic')
+            .select_related('category', 'created_by', 'clinic', 'modified_by')
         )
         return qs
 
@@ -76,6 +76,9 @@ class ProductViewSet(viewsets.ModelViewSet):
             clinic     = self.request.user.clinic,
             created_by = self.request.user,
         )
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     # ── Archive / Restore ─────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], url_path='archive')
@@ -88,7 +91,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             )
         product.is_archived = True
         product.is_active   = False
-        product.save(update_fields=['is_archived', 'is_active', 'updated_at'])
+        product.modified_by = request.user
+        product.save(update_fields=['is_archived', 'is_active', 'modified_by', 'updated_at'])
         logger.info("Product %s archived by %s", product.name, request.user.email)
         return Response(ProductSerializer(product).data)
 
@@ -102,7 +106,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             )
         product.is_archived = False
         product.is_active   = True
-        product.save(update_fields=['is_archived', 'is_active', 'updated_at'])
+        product.modified_by = request.user
+        product.save(update_fields=['is_archived', 'is_active', 'modified_by', 'updated_at'])
         logger.info("Product %s restored by %s", product.name, request.user.email)
         return Response(ProductSerializer(product).data)
 
@@ -134,7 +139,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 product.quantity_in_stock = quantity
 
             qty_after = product.quantity_in_stock
-            product.save(update_fields=['quantity_in_stock', 'updated_at'])
+            product.modified_by = request.user
+            product.save(update_fields=['quantity_in_stock', 'modified_by', 'updated_at'])
 
             StockMovement.objects.create(
                 product         = product,

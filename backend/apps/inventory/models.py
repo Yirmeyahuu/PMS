@@ -74,6 +74,13 @@ class Product(TimeStampedModel, SoftDeleteModel):
         blank=True,
         related_name='created_inventory_products',
     )
+    modified_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modified_inventory_products',
+    )
 
     barcode = models.CharField(
         max_length=100,
