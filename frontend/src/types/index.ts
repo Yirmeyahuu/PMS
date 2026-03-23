@@ -4,6 +4,7 @@ export * from './patient';
 export * from './appointment';
 export * from './contact';
 export * from './clinic';
+export * from './inventory';
 
 
 // Common types
@@ -23,10 +24,10 @@ export interface ApiError {
 export type { User, LoginCredentials, RegisterData, AuthTokens } from './auth';
 
 // Patient types
-export type { Patient, CreatePatientData, PatientFilters } from './patient';
+export type { Patient, CreatePatientData } from './patient';
 
 // Clinic types
-export type { Clinic, Location, Practitioner } from './clinic';
+export type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from './clinic';
 
 // Appointment types
 export type {
@@ -40,6 +41,18 @@ export {
   APPOINTMENT_STATUS_COLORS,
   APPOINTMENT_TYPE_LABELS,
 } from './appointment';
+
+// Inventory types
+export type {
+  Product,
+  ProductListItem,
+  CreateProductPayload,
+  ProductFilters,
+  InventoryStats,
+  Category,
+  StockMovement,
+  StockAdjustmentPayload,
+} from './inventory';
 
 // ✅ ADD: Explicit clinical template exports
 export type {
