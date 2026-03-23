@@ -17,7 +17,7 @@ import type {
   PortalService,
   PortalCategory,
   BookingPayload,
-} from '@/types/portal';
+} from '../types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
 
 // ── After branch is picked, 3-step inner flow ─────────────────────────────────

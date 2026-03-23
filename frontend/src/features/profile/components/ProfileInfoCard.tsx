@@ -217,10 +217,9 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
           <div className="flex items-center gap-3 py-3 px-4 bg-gray-50 rounded-xl
                           border border-gray-100">
             <p className="text-sm font-medium text-gray-800 truncate flex-1">{user.email}</p>
-            <AlertCircle
-              className="w-4 h-4 text-gray-300 flex-shrink-0"
-              title="Email cannot be changed"
-            />
+            <div title="Email cannot be changed">
+              <AlertCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />
+            </div>
           </div>
           <p className="text-xs text-gray-400">Email address cannot be changed</p>
         </div>
