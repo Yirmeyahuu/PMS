@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ServiceCard } from './ServiceCard';
-import type { PortalCategory, PortalService, PortalPractitioner } from '@/types/portal';
+import type { PortalCategory, PortalService, PortalPractitioner } from '../types/portal';
 
 interface ServiceListProps {
   categories:           PortalCategory[];

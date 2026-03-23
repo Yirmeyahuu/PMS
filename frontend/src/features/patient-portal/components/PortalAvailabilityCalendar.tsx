@@ -7,7 +7,8 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Clock, X, Coffee } from 'lucide-react';
 import { fetchAvailableSlots } from '../portal.api';
-import type { PortalService, PortalPractitioner } from '@/types/portal';
+import type { PortalService, PortalPractitioner } from '../types/portal';
+
 
 interface PortalAvailabilityCalendarProps {
   token:        string;

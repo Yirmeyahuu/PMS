@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, User } from 'lucide-react';
-import type { PortalPractitioner } from '@/types/portal';
+import type { PortalPractitioner } from '../types/portal';
 
 // ── Discipline label map (mirrors DISCIPLINE_OPTIONS in staff.types.ts) ───────
 const DISCIPLINE_LABELS: Record<string, string> = {

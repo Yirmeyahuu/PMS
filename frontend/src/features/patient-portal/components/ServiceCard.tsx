@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, ChevronRight } from 'lucide-react';
-import type { PortalService, PortalPractitioner } from '@/types/portal';
+import type { PortalService, PortalPractitioner } from '../types/portal';
 import { PortalAvailabilityCalendar } from './PortalAvailabilityCalendar';
 
 interface ServiceCardProps {

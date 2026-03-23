@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Building2, CheckCircle, Star, Search } from 'lucide-react';
-import type { PortalBranch } from '@/types/portal';
+import type { PortalBranch } from '../types/portal';
 
 interface BranchStepProps {
   branches:       PortalBranch[];
