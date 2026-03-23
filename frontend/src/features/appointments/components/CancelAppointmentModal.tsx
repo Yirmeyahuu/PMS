@@ -26,8 +26,8 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   onConfirm,
   onClose,
 }) => {
-  const [reason,      setReason]      = useState('');
-  const [touched,     setTouched]     = useState(false);
+  const [reason,  setReason]  = useState('');
+  const [touched, setTouched] = useState(false);
 
   // Reset on open/close
   useEffect(() => {
@@ -42,11 +42,6 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   const reasonTooShort = reason.trim().length < MIN_REASON_LENGTH;
   const showError      = touched && reasonTooShort;
   const charsLeft      = MAX_REASON_LENGTH - reason.length;
-  const hasEmail       = Boolean(
-    // We don't have patient email in the Appointment type directly,
-    // but we can note it in the UI. The backend handles the email guard.
-    true
-  );
 
   const handleConfirm = () => {
     setTouched(true);

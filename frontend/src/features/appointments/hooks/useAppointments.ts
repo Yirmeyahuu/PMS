@@ -9,7 +9,7 @@ interface UseAppointmentsParams {
   startDate:       Date;
   endDate:         Date;
   practitionerId?: number | null;
-  clinicBranchId?: number | null;   // the selected diary tab branch_id
+  clinicBranchId?: number | null;
 }
 
 export const useAppointments = ({
@@ -31,16 +31,15 @@ export const useAppointments = ({
     setError(null);
 
     try {
-      // ── Fetch ALL appointments for the clinic group (no branch filter on API) ──
-      // We filter client-side using branch_id so practitioner-branch logic works.
-      const apptParams: Record<string, any> = {
+      // FIX: Build params with proper typing
+      const apptParams: { start_date: string; end_date: string; practitioner?: number; page_size?: number } = {
         start_date: startDateStr,
         end_date:   endDateStr,
         page_size:  1000,
       };
       if (practitionerId !== null) apptParams.practitioner = practitionerId;
 
-      const portalParams: Record<string, any> = {
+      const portalParams: { start_date: string; end_date: string; practitioner?: number } = {
         start_date: startDateStr,
         end_date:   endDateStr,
       };
@@ -51,8 +50,6 @@ export const useAppointments = ({
         getPortalBookingsForDiary(portalParams),
       ]);
 
-      // ── Filter appointments by branch_id ──────────────────────────────────
-      // branch_id is set server-side: practitioner.user.clinic_branch_id ?? clinic_id
       const allAppointments: Appointment[] = apptResponse.results;
 
       const filteredAppointments = clinicBranchId === null
@@ -64,7 +61,6 @@ export const useAppointments = ({
 
       setAppointments(filteredAppointments);
 
-      // ── Filter portal bookings by branch_id ───────────────────────────────
       const pendingBookings = portalResponse.filter(
         (b: PortalBookingDiaryItem) => b.status === 'PENDING'
       );
@@ -72,9 +68,8 @@ export const useAppointments = ({
       const filteredBookings = clinicBranchId === null
         ? pendingBookings
         : pendingBookings.filter((b: PortalBookingDiaryItem) => {
-            // Use practitioner_branch_id as the canonical branch for portal bookings
             const bookingBranch = b.practitioner_branch_id ?? b.portal_clinic_id ?? null;
-            if (bookingBranch === null) return true;   // unassigned → show everywhere
+            if (bookingBranch === null) return true;
             return bookingBranch === clinicBranchId;
           });
 

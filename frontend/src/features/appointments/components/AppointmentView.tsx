@@ -259,16 +259,16 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
       else setSaveError('Failed to save changes. Please try again.');
     },
   });
-
+  
   const startEditing = useCallback(() => {
     if (!invoice) return;
     setEditItems(invoice.items.map(item => ({
       id:          item.id,
       description: item.description,
-      // FIX: item.quantity from the API is a string — parse to number
+      // FIX: Parse string to number
       quantity:    parseInt(String(item.quantity), 10) || 1,
-      // FIX: item.unit_price from the API is a string — parse to number
-      unit_price:  parseFloat(item.unit_price),
+      // FIX: Parse string to number
+      unit_price:  parseFloat(String(item.unit_price)) || 0,
       _key:        String(item.id),
     })));
     setEditNotes(invoice.notes || '');
@@ -276,6 +276,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     setSaveError(null);
     setIsEditing(true);
   }, [invoice]);
+
 
   const cancelEditing = () => { setIsEditing(false); setPickerIdx(null); setSaveError(null); };
   const updateItem    = (key: string, patch: Partial<EditableItem>) =>

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 
 interface TimeSlot {
   hour: number;
@@ -53,7 +53,6 @@ export const useDragSelection = () => {
     });
   };
 
-  // Calculate if a slot is within the selection range
   const isSlotSelected = (slot: TimeSlot): boolean => {
     if (!selection.startSlot || !selection.endSlot) return false;
 
@@ -67,7 +66,6 @@ export const useDragSelection = () => {
     return currentIndex >= minIndex && currentIndex <= maxIndex;
   };
 
-  // Calculate total duration in minutes
   const getSelectionDuration = (): number => {
     if (!selection.startSlot || !selection.endSlot) return 15;
 
@@ -75,10 +73,9 @@ export const useDragSelection = () => {
     const endIndex = selection.endSlot.hour * 4 + selection.endSlot.quarter;
 
     const slots = Math.abs(endIndex - startIndex) + 1;
-    return slots * 15; // 15 minutes per slot
+    return slots * 15;
   };
 
-  // Get the start time of the selection
   const getSelectionStartTime = (): { hour: number; minutes: number } | null => {
     if (!selection.startSlot || !selection.endSlot) return null;
 

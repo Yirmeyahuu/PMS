@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { ChatMessage }     from './ChatMessage';
 import { ChatInput }       from './ChatInput';
-import { TypingIndicator } from './TyipingIndicator';
+import { TypingIndicator } from './TypingIndicator';
 import { useMessages }     from '../hooks/useMessages';
 import { useWebSocket }    from '../hooks/useWebSocket';
 import type { Conversation, MessageItem } from '../types/messages.types';

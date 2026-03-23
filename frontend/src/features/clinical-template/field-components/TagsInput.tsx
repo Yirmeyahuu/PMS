@@ -1,4 +1,5 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 
 interface TagsInputProps {

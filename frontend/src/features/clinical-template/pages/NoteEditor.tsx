@@ -20,22 +20,20 @@ export const NoteEditor: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSigning, setIsSigning] = useState(false);
 
-  // Initialize form values from note
   useEffect(() => {
     if (note?.decrypted_content) {
       setFormValues(note.decrypted_content);
     }
   }, [note]);
 
-  // Auto-save functionality
   const { lastSaved, isAutoSaving } = useAutoSave({
     data: formValues,
     onSave: async (data) => {
       if (!isNewNote && !note?.is_signed) {
-        await saveNote({ content: data }, true); // autosave flag
+        await saveNote({ content: data }, true);
       }
     },
-    interval: 30000, // 30 seconds
+    interval: 30000,
     enabled: !isNewNote && !note?.is_signed,
   });
 
@@ -45,11 +43,11 @@ export const NoteEditor: React.FC = () => {
       [fieldId]: value,
     }));
     
-    // Clear error when field is updated
-    setErrors((prev) => ({
-      ...prev,
-      [fieldId]: undefined,
-    }));
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldId];
+      return newErrors;
+    });
   }, []);
 
   const validateForm = (): boolean => {

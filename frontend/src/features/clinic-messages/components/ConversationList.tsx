@@ -24,13 +24,12 @@ const groupByBranch = (convs: Conversation[]) => {
 
 export const ConversationList = ({
   conversations,
-  contacts,
   activeId,
   isLoading,
   onSelect,
   onNewChat,
 }: Props) => {
-  const [search,           setSearch]           = useState('');
+  const [search,             setSearch]             = useState('');
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() =>

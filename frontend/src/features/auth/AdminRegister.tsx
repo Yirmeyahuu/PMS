@@ -7,7 +7,6 @@ import {
   validateName,
   validateCompanyName,
   sanitizeInput,
-  formatPhoneNumber
 } from '@/utils/validation';
 import { Mail, User, Building2, Phone, CheckCircle, AlertCircle } from 'lucide-react';
 import type { AdminRegisterData, AuthError } from '@/types/auth';
@@ -33,8 +32,6 @@ export const AdminRegister: React.FC = () => {
    */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
-    // Sanitize input
     const sanitized = sanitizeInput(value);
     
     setFormData(prev => ({
@@ -42,7 +39,6 @@ export const AdminRegister: React.FC = () => {
       [name]: sanitized
     }));
 
-    // Clear validation error for this field
     setValidationErrors(prev => ({
       ...prev,
       [name]: ''

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { authService } from '@/services/authService';
 import { Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { setAuth } = useAuthStore();
   
   const [credentials, setCredentials] = useState<LoginCredentials>({
@@ -20,16 +19,12 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  // Get the page they were trying to access before login
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setCredentials(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
-  // Remove the 'from' line entirely — always go to dashboard
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -44,12 +39,10 @@ export const Login: React.FC = () => {
     try {
       const response = await authService.login(credentials);
       
-      // Store auth state
       setAuth(response.user, response.tokens);
       
       toast.success(`Hello there, ${response.user.first_name}!`);
       
-      // Always redirect to dashboard on login
       navigate('/dashboard', { replace: true });
       
     } catch (error: any) {
