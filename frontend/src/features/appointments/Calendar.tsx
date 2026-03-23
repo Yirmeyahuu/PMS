@@ -416,7 +416,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   };
 
-  const getMonthDays = (date: Date) => {
+  const getMonthDays = () => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd   = endOfMonth(currentDate);
     const start      = startOfWeek(monthStart, { weekStartsOn: 1 });
