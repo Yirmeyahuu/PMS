@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 import { SidebarProvider } from '@/contexts/SidebarContext';
-import { ProtectedRoute, PublicRoute, RoleBasedRoute, ClinicMemberRoute, ClinicSetupRoute } from './router';
+import { ProtectedRoute, PublicRoute, ClinicMemberRoute, ClinicSetupRoute } from './router';
 import { LogoutConfirmModal } from '@/components/modals/LogoutConfirmModal';
 import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 
