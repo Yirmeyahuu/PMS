@@ -846,7 +846,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // ── MONTH VIEW ────────────────────────────────────────────────────────────
   if (view === 'month') {
-    const monthDays    = getMonthDays(currentDate);
+    const monthDays    = getMonthDays();
     const weekDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     return (

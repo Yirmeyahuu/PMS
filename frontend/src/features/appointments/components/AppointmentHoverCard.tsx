@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Clock, User, Stethoscope, Tag, FileText,
-  Building2, CalendarDays, Phone, Hash,
+  User, Stethoscope, Tag, FileText,
+  Building2, CalendarDays
 } from 'lucide-react';
 import type { Appointment } from '@/types';
 import { APPOINTMENT_STATUS_COLORS } from '@/types';
@@ -102,16 +102,6 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
                 {apt.patient_name}
               </span>
             </p>
-            {apt.patient_number && (
-              <p
-                className="text-[10px] mt-0.5 opacity-80 font-medium"
-                style={apt.service_color ? { color: '#fff' } : undefined}
-              >
-                <span className={!apt.service_color ? statusColors.text : ''}>
-                  # {apt.patient_number}
-                </span>
-              </p>
-            )}
           </div>
 
           {/* Status badge */}
@@ -207,23 +197,15 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
           />
         )}
 
-        {/* Patient phone */}
-        {apt.patient_phone && (
-          <Row
-            icon={<Phone className="w-3.5 h-3.5" />}
-            label="Contact"
-            value={apt.patient_phone}
-          />
-        )}
-
-        {/* Branch */}
-        {apt.clinic_branch_name && (
+        {/* Branch — uses location_name from Appointment type */}
+        {apt.location_name && (
           <Row
             icon={<Building2 className="w-3.5 h-3.5" />}
             label="Branch"
-            value={apt.clinic_branch_name}
+            value={apt.location_name}
           />
         )}
+
       </div>
 
       {/* ── Subtle footer tip ── */}

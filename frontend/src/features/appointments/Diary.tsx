@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { Calendar } from './Calendar';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';

@@ -43,17 +43,23 @@ export const AppointmentConfirmationModal: React.FC<AppointmentConfirmationModal
 
       // ✅ Immediately remove orange block from calendar
       onRemove(booking.id);
-      onClose();
 
       if (result.warning) {
         toast.error(result.warning);
-      } else if (result.patient_name && result.patient_number) {
+        onClose();
+      } else if (result.patient_name && result.patient_number && result.patient_id) {
+        setCreatedPatient({
+          id: result.patient_id,
+          name: result.patient_name,
+          number: result.patient_number,
+        });
         toast.success(
           `Booking confirmed! ${result.patient_name} (${result.patient_number}) added to Clients list.`,
           { duration: 5000 }
         );
       } else {
         toast.success('Booking confirmed!');
+        onClose();
       }
 
       // Refetch in background to load the new green Appointment block
