@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, Clock, User, Stethoscope, MapPin } from 'lucide-react';
-import type { BookingConfirmation } from '@/types/portal';
+import { CheckCircle, Calendar, User, Stethoscope, MapPin } from 'lucide-react';
+import type { BookingConfirmation } from '../types/portal';
 
 const fmt12 = (time: string) => {
   const [h, m] = time.split(':').map(Number);

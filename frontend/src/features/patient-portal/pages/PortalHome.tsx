@@ -15,6 +15,7 @@ import type {
   PortalBranch,
   PortalPractitioner,
   PortalService,
+  PortalCategory,
   BookingPayload,
 } from '@/types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
@@ -29,11 +30,12 @@ const INNER_STEP_NUMBER: Record<InnerStep, number> = {
 };
 
 const EMPTY_FORM: PatientFormData = {
-  first_name: '',
-  last_name:  '',
-  email:      '',
-  phone:      '',
-  notes:      '',
+  first_name:   '',
+  last_name:    '',
+  email:        '',
+  phone:        '',
+  notes:        '',
+  date_of_birth: '',
 };
 
 export const PortalHome: React.FC = () => {
@@ -157,15 +159,15 @@ export const PortalHome: React.FC = () => {
     const all = portal?.practitioners ?? [];
 
     // ── DEV: log to confirm branch_id values are present ────────────────
-    if (process.env.NODE_ENV === 'development' && selectedBranch) {
+    if (import.meta.env.DEV && selectedBranch) {
       console.debug(
         '[Portal] Selected branch id:', selectedBranch.id,
         '\n[Portal] All practitioners:',
-        all.map((p) => ({ id: p.id, name: p.full_name, branch_id: p.branch_id })),
+        all.map((p: PortalPractitioner) => ({ id: p.id, name: p.full_name, branch_id: p.branch_id })),
       );
     }
 
-    return all.filter((p) => {
+    return all.filter((p: PortalPractitioner) => {
       if (p.id === null) return true;               // "Any Available" — always show
       return p.branch_id === selectedBranch?.id;    // strict number equality
     });
@@ -173,15 +175,15 @@ export const PortalHome: React.FC = () => {
 
   // ── Filter services for search ────────────────────────────────────────────
   const filteredCategories = (portal?.categories ?? [])
-    .map((cat) => ({
+    .map((cat: PortalCategory) => ({
       ...cat,
       services: cat.services.filter(
-        (s) =>
+        (s: PortalService) =>
           s.name.toLowerCase().includes(search.toLowerCase()) ||
           s.description.toLowerCase().includes(search.toLowerCase()),
       ),
     }))
-    .filter((cat) => cat.services.length > 0);
+    .filter((cat: PortalCategory) => cat.services.length > 0);
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) {
@@ -235,7 +237,6 @@ export const PortalHome: React.FC = () => {
           <BranchStep
             branches={portal.branches ?? []}
             selectedBranch={null}
-            clinicName={portal.clinic_name}
             onSelect={handleSelectBranch}
           />
         </div>
