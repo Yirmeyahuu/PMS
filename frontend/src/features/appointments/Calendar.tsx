@@ -17,7 +17,7 @@ import type { Appointment }           from '@/types';
 import { rescheduleAppointment }      from './appointment.api';
 import toast                          from 'react-hot-toast';
 
-type CalendarView = 'day' | 'week' | 'month';
+type CalendarView = 'day' | 'week' | 'month'; 
 
 interface CalendarProps {
   view:                   CalendarView;
@@ -35,14 +35,7 @@ const hexToRgba = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const isColorDark = (hex: string): boolean => {
-  const cleaned = hex.replace('#', '');
-  const r = parseInt(cleaned.substring(0, 2), 16);
-  const g = parseInt(cleaned.substring(2, 4), 16);
-  const b = parseInt(cleaned.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance < 0.5;
-};
+// isColorDark removed — was declared but never used
 
 type BlockColors =
   | { useHex: true;  hex: string; bgStyle: React.CSSProperties; textColor: string; subTextColor: string; label: string | null; }
@@ -191,8 +184,6 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const {
     appointments,
-    loading,
-    refetch,
     updateAppointmentInState,
     addAppointmentToState,
   } = useAppointments({
@@ -212,7 +203,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     setRescheduleTarget({ appointment, newDate, newHour, newMinutes });
   }, []);
 
-  const { dragState, startHold, cancelHold, onDragMove, onDropOnSlot, cancelDrag } =
+  const { dragState, startHold, cancelHold, onDragMove, onDropOnSlot } =
     useAppointmentDrag(handleRescheduleRequest);
 
   const confirmReschedule = async () => {
@@ -360,7 +351,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     setIsViewOpen(true);
   };
 
-  const handleMouseDown = (date: Date, slot: any) => {
+  const handleMouseDown = (_date: Date, slot: any) => {
     if (dragState.isDragging) return;
     isDraggingRef.current    = false;
     dragStartTimeRef.current = Date.now();
@@ -752,7 +743,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   // ── Global mouse-move / mouse-up on the calendar wrapper ─────────────────
   const calendarWrapperProps = {
     onMouseMove:  (e: React.MouseEvent) => onDragMove(e),
-    onMouseUp:    (e: React.MouseEvent) => {
+    onMouseUp:    (_e: React.MouseEvent) => {
       if (dragState.isHolding && !dragState.isDragging) cancelHold();
     },
     onMouseLeave: () => {
