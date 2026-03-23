@@ -83,3 +83,14 @@ export const getContactStats = async (): Promise<ContactStats> => {
   const response = await axiosInstance.get<ContactStats>('/contacts/stats/');
   return response.data;
 };
+
+/**
+ * Send email to contact
+ */
+export const sendContactEmail = async (contactId: number, message: string): Promise<{ success: boolean; message: string }> => {
+  const response = await axiosInstance.post<{ success: boolean; message: string }>(
+    `/contacts/${contactId}/send_email/`,
+    { message }
+  );
+  return response.data;
+};

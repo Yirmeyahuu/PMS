@@ -5,6 +5,7 @@ import { ContactFilters }    from './components/ContactFilters';
 import { AddContactModal }   from './components/AddContactModal';
 import { EditContactModal }  from './components/EditContactModal';
 import { ViewContactModal }  from './components/ViewContactModal';
+import { SendContactEmailModal } from './components/SendContactEmailModal';
 import { Users, Plus, Filter, Search, Loader2 } from 'lucide-react';
 import { useContacts } from './hooks/useContacts';
 import {
@@ -31,6 +32,7 @@ export const Contacts: React.FC = () => {
   const [isAddOpen,       setIsAddOpen]       = useState(false);
   const [isEditOpen,      setIsEditOpen]      = useState(false);
   const [isViewOpen,      setIsViewOpen]      = useState(false);
+  const [isEmailOpen,     setIsEmailOpen]     = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [currentFilters,  setCurrentFilters]  = useState<FilterOptions>({
     contact_type: '', is_active: null, is_preferred: null,
@@ -95,6 +97,11 @@ export const Contacts: React.FC = () => {
       is_active:    f.is_active    !== null ? f.is_active    : undefined,
       is_preferred: f.is_preferred !== null ? f.is_preferred : undefined,
     });
+  };
+
+  const handleSendEmail = (contact: Contact) => {
+    setSelectedContact(contact);
+    setIsEmailOpen(true);
   };
 
   /* ── Render ───────────────────────────────────────────── */
@@ -211,6 +218,15 @@ export const Contacts: React.FC = () => {
         onEdit={handleEdit}
         onTogglePreferred={handleTogglePreferred}
         onToggleActive={handleToggleActive}
+        onSendEmail={handleSendEmail}
+      />
+
+      <SendContactEmailModal
+        isOpen={isEmailOpen}
+        onClose={() => setIsEmailOpen(false)}
+        contact={selectedContact}
+        clinicName="Our Clinic"
+        clinicAddress=""
       />
 
       <ContactFilters

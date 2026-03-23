@@ -2,6 +2,7 @@ import React from 'react';
 import {
   X, Star, Phone, Mail, MapPin, Briefcase,
   Building2, Globe, Hash, Archive, CheckCircle, Edit,
+  Send,
 } from 'lucide-react';
 import type { Contact } from '@/types';
 
@@ -12,6 +13,7 @@ interface ViewContactModalProps {
   onEdit:   (contact: Contact) => void;
   onTogglePreferred?: (contact: Contact) => void;
   onToggleActive?:    (contact: Contact) => void;
+  onSendEmail?:        (contact: Contact) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -40,7 +42,7 @@ const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string |
 };
 
 export const ViewContactModal: React.FC<ViewContactModalProps> = ({
-  isOpen, onClose, contact, onEdit, onTogglePreferred, onToggleActive,
+  isOpen, onClose, contact, onEdit, onTogglePreferred, onToggleActive, onSendEmail,
 }) => {
   if (!isOpen || !contact) return null;
 
@@ -153,49 +155,63 @@ export const ViewContactModal: React.FC<ViewContactModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/80">
-            <div className="flex gap-2">
-              {onToggleActive && (
-                <button
-                  type="button"
-                  onClick={() => onToggleActive(contact)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                    contact.is_active
-                      ? 'border-gray-200 text-gray-500 hover:bg-gray-100'
-                      : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
-                  }`}
-                >
-                  {contact.is_active
-                    ? <><Archive     className="w-3.5 h-3.5" />Archive</>
-                    : <><CheckCircle className="w-3.5 h-3.5" />Restore</>
-                  }
-                </button>
-              )}
-              {onTogglePreferred && (
-                <button
-                  type="button"
-                  onClick={() => onTogglePreferred(contact)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                    contact.is_preferred
-                      ? 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
-                      : 'border-gray-200 text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  <Star className={`w-3.5 h-3.5 ${contact.is_preferred ? 'fill-yellow-500' : ''}`} />
-                  {contact.is_preferred ? 'Preferred' : 'Mark Preferred'}
-                </button>
-              )}
-            </div>
+          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/80">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Left side - Action buttons */}
+              <div className="flex flex-wrap gap-2">
+                {onToggleActive && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleActive(contact)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors min-w-[100px] ${
+                      contact.is_active
+                        ? 'border-gray-200 text-gray-500 hover:bg-gray-100'
+                        : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
+                    }`}
+                  >
+                    {contact.is_active
+                      ? <><Archive     className="w-3.5 h-3.5" />Archive</>
+                      : <><CheckCircle className="w-3.5 h-3.5" />Restore</>
+                    }
+                  </button>
+                )}
+                {onTogglePreferred && (
+                  <button
+                    type="button"
+                    onClick={() => onTogglePreferred(contact)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors min-w-[100px] ${
+                      contact.is_preferred
+                        ? 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${contact.is_preferred ? 'fill-yellow-500' : ''}`} />
+                    {contact.is_preferred ? 'Preferred' : 'Mark Pref'}
+                  </button>
+                )}
+                {onSendEmail && contact.email && (
+                  <button
+                    type="button"
+                    onClick={() => onSendEmail(contact)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors min-w-[100px]"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Email
+                  </button>
+                )}
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onEdit(contact)}   // ← just calls onEdit; Contacts.tsx closes view & opens edit
-              className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700
-                         text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
-            >
-              <Edit className="w-4 h-4" />
-              Edit Contact
-            </button>
+              {/* Right side - Edit button */}
+              <button
+                type="button"
+                onClick={() => onEdit(contact)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700
+                           text-white rounded-lg text-sm font-semibold transition-colors shadow-sm h-10"
+              >
+                <Edit className="w-4 h-4" />
+                Edit Contact
+              </button>
+            </div>
           </div>
         </div>
       </div>

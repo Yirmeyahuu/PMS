@@ -4,6 +4,7 @@ import {
   Building2, Phone, Mail, MapPin, Briefcase, UserPlus,
 } from 'lucide-react';
 import type { Contact, CreateContactData } from '@/types';
+import { PhLocationSelect } from '@/components/location/PhLocationSelect';
 
 interface EditContactModalProps {
   isOpen:   boolean;
@@ -136,9 +137,7 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
     if (!formData.first_name.trim()) e.first_name = 'First name is required';
     if (!formData.last_name.trim())  e.last_name  = 'Last name is required';
 
-    if (!formData.phone.trim()) {
-      e.phone = 'Phone number is required';
-    } else {
+    if (formData.phone.trim()) {
       const c = formData.phone.replace(/[\s\-]/g, '');
       if (
         !(c.startsWith('09')   && c.length === 11) &&
@@ -146,7 +145,10 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
       ) e.phone = 'Use 09XXXXXXXXX or +639XXXXXXXXX';
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+    const emailValue = formData.email ?? '';
+    if (!emailValue.trim()) {
+      e.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue))
       e.email = 'Invalid email format';
 
     if (!formData.address.trim())  e.address  = 'Address is required';
@@ -418,10 +420,10 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
 
                   {/* Phone */}
                   <div>
-                    <Label required>
+                    <Label>
                       <span className="flex items-center gap-1">
                         <Phone className="w-3 h-3 text-sky-400" />
-                        Phone Number
+                        Phone Number <span className="text-gray-400 font-normal">(optional)</span>
                       </span>
                     </Label>
                     <input
@@ -448,7 +450,7 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
 
                   {/* Email */}
                   <div>
-                    <Label>
+                    <Label required>
                       <span className="flex items-center gap-1">
                         <Mail className="w-3 h-3 text-sky-400" />
                         Email Address
@@ -485,29 +487,16 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
                     <FieldError msg={errors.address} />
                   </div>
 
-                  <div>
-                    <Label required>City / Municipality</Label>
-                    <input
-                      type="text"
-                      value={formData.city}
-                      onChange={e => set('city', e.target.value)}
-                      placeholder="Quezon City"
-                      className={inputCls(!!errors.city)}
-                    />
-                    <FieldError msg={errors.city} />
-                  </div>
-
-                  <div>
-                    <Label required>Province</Label>
-                    <input
-                      type="text"
-                      value={formData.province}
-                      onChange={e => set('province', e.target.value)}
-                      placeholder="Metro Manila"
-                      className={inputCls(!!errors.province)}
-                    />
-                    <FieldError msg={errors.province} />
-                  </div>
+                  {/* Use PhLocationSelect for Province and City */}
+                  <PhLocationSelect
+                    province={formData.province}
+                    city={formData.city}
+                    onProvinceChange={(value) => set('province', value)}
+                    onCityChange={(value) => set('city', value)}
+                    provinceError={errors.province}
+                    cityError={errors.city}
+                    required
+                  />
 
                   <div>
                     <Label>Postal Code</Label>
