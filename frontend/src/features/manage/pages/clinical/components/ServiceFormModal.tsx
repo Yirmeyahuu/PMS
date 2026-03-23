@@ -15,7 +15,6 @@ const EMPTY: ClinicServicePayload = {
   duration_minutes: 30,
   price:            '0.00',
   color_hex:        '#0D9488',
-  sort_order:       0,
   is_active:        true,
   show_in_portal:   true,
 };
@@ -55,7 +54,6 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         duration_minutes: editing.duration_minutes,
         price:            editing.price,
         color_hex:        editing.color_hex,
-        sort_order:       editing.sort_order,
         is_active:        editing.is_active,
         show_in_portal:   editing.show_in_portal,
       });
