@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   User, Stethoscope, Tag, FileText,
-  Building2, CalendarDays
+  Building2, CalendarDays, Clock, ArrowRight
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import type { Appointment } from '@/types';
 import { APPOINTMENT_STATUS_COLORS } from '@/types';
 import { format, parseISO } from 'date-fns';
+import { getUpcomingAppointments } from '../appointment.api';
 
 interface AppointmentHoverCardProps {
   appointment: Appointment;
@@ -68,6 +70,16 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
   }, [anchorRect]);
 
   const statusColors = APPOINTMENT_STATUS_COLORS[apt.status] ?? APPOINTMENT_STATUS_COLORS['SCHEDULED'];
+
+  // Fetch upcoming appointments for this patient
+  const { data: upcomingAppointments = [] } = useQuery({
+    queryKey: ['upcoming-appointments', apt.patient],
+    queryFn: () => getUpcomingAppointments(apt.patient, 5),
+    enabled: !!apt.patient,
+  });
+
+  // Filter out the current appointment from upcoming list
+  const otherUpcomingAppointments = upcomingAppointments.filter(a => a.id !== apt.id);
 
   const Row: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode }> = ({ icon, label, value }) => (
     <div className="flex items-start gap-2.5 py-1.5">
@@ -204,6 +216,71 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
             label="Branch"
             value={apt.location_name}
           />
+        )}
+
+        {/* Upcoming Appointments */}
+        {otherUpcomingAppointments.length > 0 && (
+          <div className="py-2">
+            <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <CalendarDays className="w-3.5 h-3.5" />
+              Upcoming Appointments
+            </div>
+            <div className="space-y-1.5">
+              {otherUpcomingAppointments.slice(0, 3).map(apt2 => (
+                <div key={apt2.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+                  <span className="text-sky-600 font-medium">
+                    {format(parseISO(apt2.date), 'MMM d')}
+                  </span>
+                  <span className="text-gray-400">
+                    {fmt12(apt2.start_time)}
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-gray-300" />
+                  <span className="text-gray-600 truncate">
+                    {apt2.service_name || apt2.appointment_type}
+                  </span>
+                </div>
+              ))}
+              {otherUpcomingAppointments.length > 3 && (
+                <p className="text-[10px] text-gray-400 pl-1">
+                  +{otherUpcomingAppointments.length - 3} more
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Created by & Modified by */}
+        {(apt.created_by_name || apt.updated_by_name) && (
+          <div className="py-2 border-t border-gray-100">
+            {apt.created_by_name && (
+              <Row
+                icon={<User className="w-3.5 h-3.5" />}
+                label="Created by"
+                value={
+                  <span className="text-gray-600">
+                    {apt.created_by_name}
+                    <span className="text-gray-400 text-[10px] ml-1">
+                      {apt.created_at && format(parseISO(apt.created_at), 'MMM d, yyyy h:mm a')}
+                    </span>
+                  </span>
+                }
+              />
+            )}
+            {apt.updated_by_name && (
+              <Row
+                icon={<User className="w-3.5 h-3.5" />}
+                label="Modified by"
+                value={
+                  <span className="text-gray-600">
+                    {apt.updated_by_name}
+                    <span className="text-gray-400 text-[10px] ml-1">
+                      {apt.updated_at && format(parseISO(apt.updated_at), 'MMM d, yyyy h:mm a')}
+                    </span>
+                  </span>
+                }
+              />
+            )}
+          </div>
         )}
 
       </div>

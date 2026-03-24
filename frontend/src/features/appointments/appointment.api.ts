@@ -85,6 +85,25 @@ export const getAppointments = async (
   return response.data;
 };
 
+// Get upcoming appointments for a patient (future dates only)
+export const getUpcomingAppointments = async (
+  patientId: number,
+  limit: number = 5
+): Promise<Appointment[]> => {
+  const today = new Date().toISOString().split('T')[0];
+  const params = new URLSearchParams({
+    patient: String(patientId),
+    date_from: today,
+    page_size: String(limit),
+    ordering: 'date,start_time',
+  });
+
+  const response = await axiosInstance.get<PaginatedResponse<Appointment>>(
+    `/appointments/?${params.toString()}`
+  );
+  return response.data.results;
+};
+
 export const getAppointment = async (id: number): Promise<Appointment> => {
   const response = await axiosInstance.get<Appointment>(`/appointments/${id}/`);
   return response.data;
@@ -214,6 +233,30 @@ export const checkRecurringAvailability = async (
 ): Promise<{ slots: RecurringAvailabilitySlot[] }> => {
   const response = await axiosInstance.post<{ slots: RecurringAvailabilitySlot[] }>(
     '/appointments/check_recurring_availability/',
+    params
+  );
+  return response.data;
+};
+
+// ── Create recurring appointments ───────────────────────────────────────────────
+export interface CreateRecurringAppointmentsParams {
+  service_id: number;
+  duration_minutes: number;
+  frequency: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  repetitions: number;
+  selected_days: number[];
+  start_date: string;
+  practitioner_id: number | null;
+  start_time: string;
+  patient_id: number;
+  clinic_id: number;
+}
+
+export const createRecurringAppointments = async (
+  params: CreateRecurringAppointmentsParams
+): Promise<{ created: number; appointments: Appointment[] }> => {
+  const response = await axiosInstance.post<{ created: number; appointments: Appointment[] }>(
+    '/appointments/create_recurring/',
     params
   );
   return response.data;

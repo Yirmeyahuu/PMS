@@ -19,6 +19,8 @@ import type { Invoice } from '@/types/billing';
 import { AppointmentEditForm }    from './AppointmentEditForm';
 import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
+import { createRecurringAppointments } from '../appointment.api';
+import toast from 'react-hot-toast';
 import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
 import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';
 import type { AppointmentEditPayload } from '../appointment.api';
@@ -1225,9 +1227,28 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
         isOpen={showRecurringModal}
         appointment={appointment}
         onClose={() => setShowRecurringModal(false)}
-        onSave={(data) => {
+        onSave={async (data) => {
           console.log('Saving recurring appointments:', data);
-          // TODO: Implement API call to create recurring appointments
+          try {
+            const result = await createRecurringAppointments({
+              service_id: data.service_id,
+              duration_minutes: data.duration_minutes,
+              frequency: data.frequency,
+              repetitions: data.repetitions,
+              selected_days: data.selected_days,
+              start_date: data.start_date,
+              practitioner_id: data.practitioner_id,
+              start_time: data.start_time,
+              patient_id: appointment!.patient,
+              clinic_id: appointment!.clinic,
+            });
+            console.log('Recurring appointments created:', result);
+            toast.success(`${result.created} recurring appointment(s) created!`);
+            setShowRecurringModal(false);
+          } catch (error: any) {
+            console.error('Failed to create recurring appointments:', error);
+            toast.error(error.response?.data?.error || 'Failed to create recurring appointments');
+          }
         }}
       />
     </>

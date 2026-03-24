@@ -16,6 +16,7 @@ from .serializers import (
     AppointmentPrintSerializer,
 )
 from apps.patients.models import PortalBooking
+from apps.clinics.models import Clinic
 from apps.appointments.email_service import (
     send_appointment_reminder_email,
     send_appointment_cancellation_email,
@@ -541,6 +542,166 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             })
         
         return Response({'slots': slots})
+
+    # ── Create recurring appointments ─────────────────────────────────────────────
+    @action(detail=False, methods=['post'], url_path='create_recurring')
+    def create_recurring(self, request):
+        """
+        POST /api/appointments/create_recurring/
+        Body: {
+            service_id: number,
+            duration_minutes: number,
+            frequency: "WEEKLY" | "MONTHLY" | "YEARLY",
+            repetitions: number,
+            selected_days: number[],  // 0=Monday, 6=Sunday
+            start_date: "2024-01-15",  // Start date for recurring
+            practitioner_id: number | null,
+            start_time: "09:00",  // HH:MM format
+            patient_id: number,
+            clinic_id: number
+        }
+        Returns: {
+            created: number,  // Number of appointments created
+            appointments: [Appointment, ...]
+        }
+        """
+        from datetime import time, timedelta, date
+        from apps.clinics.models import Practitioner
+        from apps.patients.models import Patient
+        from apps.clinics.services.models import Service
+        
+        service_id = request.data.get('service_id')
+        duration_minutes = request.data.get('duration_minutes', 60)
+        frequency = request.data.get('frequency', 'WEEKLY')
+        repetitions = request.data.get('repetitions', 4)
+        selected_days = request.data.get('selected_days', [])
+        start_date_str = request.data.get('start_date')
+        practitioner_id = request.data.get('practitioner_id')
+        start_time_str = request.data.get('start_time')
+        patient_id = request.data.get('patient_id')
+        clinic_id = request.data.get('clinic_id')
+        
+        # Validation
+        if not all([service_id, start_date_str, start_time_str, patient_id, clinic_id]):
+            return Response(
+                {'error': 'service_id, start_date, start_time, patient_id, and clinic_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse start date
+        try:
+            start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'error': 'Invalid date format. Use YYYY-MM-DD.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse start time
+        try:
+            start_time_obj = datetime.strptime(start_time_str, '%H:%M').time()
+        except ValueError:
+            return Response(
+                {'error': 'Invalid time format. Use HH:MM.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate end time
+        start_minutes = start_time_obj.hour * 60 + start_time_obj.minute
+        end_minutes = start_minutes + duration_minutes
+        end_time_obj = time(end_minutes // 60, end_minutes % 60)
+        
+        # Get related objects
+        try:
+            patient = Patient.objects.get(pk=patient_id)
+        except Patient.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            clinic = Clinic.objects.get(pk=clinic_id)
+        except Clinic.DoesNotExist:
+            return Response(
+                {'error': 'Clinic not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        practitioner = None
+        if practitioner_id:
+            try:
+                practitioner = Practitioner.objects.get(pk=practitioner_id)
+            except Practitioner.DoesNotExist:
+                pass
+        
+        service = None
+        if service_id:
+            try:
+                service = Service.objects.get(pk=service_id)
+            except Service.DoesNotExist:
+                pass
+        
+        # Generate dates based on frequency and selected days
+        generated_dates = []
+        current_date = start_date_obj
+        
+        # Map frontend day values (0=Monday, 6=Sunday) to Python weekday (0=Monday, 6=Sunday)
+        # They're the same, so we can use directly
+        
+        if frequency == 'WEEKLY':
+            # For weekly, find the next date that matches one of the selected days
+            # Start from start_date and find dates up to 52 weeks ahead
+            max_weeks = min(repetitions * 2, 52)  # Safety limit
+            for week in range(max_weeks):
+                for day_offset in range(7):
+                    check_date = start_date_obj + timedelta(weeks=week, days=day_offset)
+                    if check_date.weekday() in selected_days:
+                        if len(generated_dates) < repetitions:
+                            generated_dates.append(check_date)
+                if len(generated_dates) >= repetitions:
+                    break
+        elif frequency == 'MONTHLY':
+            # For monthly, find the same day of month for each selected day
+            from dateutil.relativedelta import relativedelta
+            for i in range(repetitions):
+                check_date = start_date_obj + relativedelta(months=i)
+                if check_date.weekday() in selected_days:
+                    generated_dates.append(check_date)
+        elif frequency == 'YEARLY':
+            # For yearly
+            for i in range(min(repetitions, 5)):  # Limit yearly to 5 years
+                check_date = start_date_obj.replace(year=start_date_obj.year + i)
+                if check_date.weekday() in selected_days:
+                    generated_dates.append(check_date)
+        
+        # Create appointments
+        created_appointments = []
+        for appt_date in generated_dates:
+            appointment = Appointment.objects.create(
+                clinic=clinic,
+                patient=patient,
+                practitioner=practitioner,
+                service=service,
+                appointment_type=service.name if service else 'INITIAL',
+                status='SCHEDULED',
+                date=appt_date,
+                start_time=start_time_obj,
+                end_time=end_time_obj,
+                duration_minutes=duration_minutes,
+                chief_complaint=service.name if service else '',
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            created_appointments.append(appointment)
+        
+        # Serialize the created appointments
+        serializer = AppointmentSerializer(created_appointments, many=True, context={'request': request})
+        
+        return Response({
+            'created': len(created_appointments),
+            'appointments': serializer.data
+        })
 
     # ── Practitioners list (existing) ─────────────────────────────────────────
     @action(detail=False, methods=['get'])
