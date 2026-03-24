@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+from django.template.loader import render_to_string
 from .models import ClinicalTemplate, ClinicalNote, ClinicalNoteAuditLog
 from .serializers import (
     ClinicalTemplateSerializer, ClinicalNoteSerializer, ClinicalNoteAuditLogSerializer
@@ -199,3 +202,215 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         if x_forwarded_for:
             return x_forwarded_for.split(',')[0]
         return self.request.META.get('REMOTE_ADDR')
+    
+    @action(detail=True, methods=['post'])
+    def email_note(self, request, pk=None):
+        """
+        Send clinical note to patient's email address.
+        
+        POST /api/clinical-notes/{id}/email_note/
+        """
+        note = self.get_object()
+        patient = note.patient
+        clinic = note.clinic
+        
+        # Validate patient has email
+        if not patient.email:
+            return Response(
+                {'detail': 'Patient has no email address'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Build the formatted note content for email
+        content = note.content
+        sections_html = ''
+        
+        if note.template and note.template.structure:
+            template_structure = note.template.structure
+            for section in template_structure.get('sections', []):
+                section_title = section.get('title', '')
+                section_fields = section.get('fields', [])
+                
+                fields_html = ''
+                for field in section_fields:
+                    field_id = field.get('id', '')
+                    field_label = field.get('label', '')
+                    field_value = content.get(field_id, '')
+                    
+                    if field_value:
+                        if isinstance(field_value, list):
+                            field_value = ', '.join(field_value)
+                        fields_html += f'<p><strong>{field_label}:</strong> {field_value}</p>'
+                
+                if fields_html:
+                    sections_html += f'''
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">{section_title}</h3>
+                        {fields_html}
+                    </div>
+                    '''
+        
+        # If no template structure, show raw content
+        if not sections_html and content:
+            for key, value in content.items():
+                if value:
+                    if isinstance(value, list):
+                        value = ', '.join(value)
+                    sections_html += f'<p><strong>{key}:</strong> {value}</p>'
+        
+        context = {
+            'patient_name': patient.get_full_name(),
+            'clinic_name': clinic.name,
+            'practitioner_name': note.practitioner.user.get_full_name() if note.practitioner and note.practitioner.user else 'Practitioner',
+            'date': note.date.strftime('%B %d, %Y') if note.date else '',
+            'template_name': note.template.name if note.template else 'Clinical Note',
+            'sections_html': sections_html,
+            'is_signed': note.is_signed,
+            'signed_at': note.signed_at.strftime('%B %d, %Y at %I:%M %p') if note.signed_at else None,
+        }
+        
+        try:
+            subject = f"Clinical Note - {context['date']} - {clinic.name}"
+            
+            # Render HTML content
+            html_content = f'''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
+                    .content {{ background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }}
+                    .footer {{ background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0;">Clinical Note</h2>
+                        <p style="margin: 5px 0 0 0;">{context['clinic_name']}</p>
+                    </div>
+                    <div class="content">
+                        <p><strong>Patient:</strong> {context['patient_name']}</p>
+                        <p><strong>Date:</strong> {context['date']}</p>
+                        <p><strong>Practitioner:</strong> {context['practitioner_name']}</p>
+                        <p><strong>Template:</strong> {context['template_name']}</p>
+                        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                        {context['sections_html']}
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated message from {context['clinic_name']}. Please do not reply to this email.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            '''
+            
+            # Send email
+            email = EmailMultiAlternatives(
+                subject=subject,
+                from_email=getattr(clinic, 'email', settings.DEFAULT_FROM_EMAIL),
+                to=[patient.email]
+            )
+            email.attach_alternative(html_content, 'text/html')
+            email.send(fail_silently=False)
+            
+            # Log the email action
+            ClinicalNoteAuditLog.objects.create(
+                clinical_note=note,
+                user=request.user,
+                action='EMAILED',
+                ip_address=self._get_client_ip(),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({'detail': f'Clinical note sent to {patient.email}'})
+            
+        except Exception as e:
+            return Response(
+                {'detail': f'Failed to send email: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'])
+    def print_note(self, request, pk=None):
+        """
+        Get printable version of clinical note.
+        
+        GET /api/clinical-notes/{id}/print_note/
+        """
+        note = self.get_object()
+        patient = note.patient
+        clinic = note.clinic
+        
+        # Build the formatted note content for printing
+        content = note.content
+        sections = []
+        
+        if note.template and note.template.structure:
+            template_structure = note.template.structure
+            for section in template_structure.get('sections', []):
+                section_title = section.get('title', '')
+                section_description = section.get('description', '')
+                section_fields = section.get('fields', [])
+                
+                fields = []
+                for field in section_fields:
+                    field_id = field.get('id', '')
+                    field_label = field.get('label', '')
+                    field_value = content.get(field_id, '')
+                    
+                    if field_value:
+                        if isinstance(field_value, list):
+                            field_value = ', '.join(field_value)
+                        fields.append({
+                            'label': field_label,
+                            'value': str(field_value)
+                        })
+                
+                if fields:
+                    sections.append({
+                        'title': section_title,
+                        'description': section_description,
+                        'fields': fields
+                    })
+        
+        # If no template structure, show raw content
+        if not sections and content:
+            raw_fields = []
+            for key, value in content.items():
+                if value:
+                    if isinstance(value, list):
+                        value = ', '.join(value)
+                    raw_fields.append({
+                        'label': key.replace('_', ' ').title(),
+                        'value': str(value)
+                    })
+            if raw_fields:
+                sections.append({
+                    'title': 'Clinical Note Content',
+                    'description': '',
+                    'fields': raw_fields
+                })
+        
+        response_data = {
+            'patient_name': patient.get_full_name(),
+            'patient_number': patient.patient_number,
+            'clinic_name': clinic.name,
+            'clinic_address': getattr(clinic, 'address', ''),
+            'clinic_phone': getattr(clinic, 'phone', ''),
+            'clinic_email': getattr(clinic, 'email', ''),
+            'practitioner_name': note.practitioner.user.get_full_name() if note.practitioner and note.practitioner.user else 'Practitioner',
+            'practitioner_title': getattr(note.practitioner.user, 'title', '') if note.practitioner and note.practitioner.user else '',
+            'date': note.date.isoformat() if note.date else None,
+            'template_name': note.template.name if note.template else 'Clinical Note',
+            'template_category': note.template.category if note.template else 'CLINICAL',
+            'note_type': note.note_type,
+            'is_signed': note.is_signed,
+            'signed_at': note.signed_at.isoformat() if note.signed_at else None,
+            'created_at': note.created_at.isoformat() if note.created_at else None,
+            'sections': sections,
+        }
+        
+        return Response(response_data)

@@ -5,13 +5,16 @@ import {
   ArrowLeft, User, MapPin, Phone, Heart, Calendar, Edit,
   Clock, CheckCircle, XCircle, AlertCircle, FileText,
   Activity, Loader2, ChevronDown, ChevronUp, Mail,
-  Archive, ArchiveRestore,
+  Archive, ArchiveRestore, Plus, FileCheck, Stethoscope,
 } from 'lucide-react';
 import { getPatient, updatePatient, archivePatient, restorePatient } from './patient.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
+import { getNotes, emailNote, getPrintNote } from '@/features/clinical-template/clinical-templates.api';
 import type { Patient, Appointment, CreatePatientData } from '@/types';
+import type { ClinicalNote } from '@/types/clinicalTemplate';
 import { PatientModal } from './components/PatientModal';
 import { AppointmentDetailModal } from './components/AppointmentDetailModal';
+import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
 import toast from 'react-hot-toast';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -158,6 +161,16 @@ export const PatientProfile: React.FC = () => {
   const [selectedAppointment,     setSelectedAppointment]     = useState<Appointment | null>(null);
   const [isAppointmentDetailOpen, setIsAppointmentDetailOpen] = useState(false);
 
+  // ── Create Clinical Note modal state ─────────────────────────────────────────
+  const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
+
+  // ── Tab state (History / Documents) ─────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<'history' | 'documents'>('history');
+  const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [emailingNoteId, setEmailingNoteId] = useState<number | null>(null);
+  const [printingNoteId, setPrintingNoteId] = useState<number | null>(null);
+
   // ── Archive state ──────────────────────────────────────────────────────────
   const [showArchiveConfirm,  setShowArchiveConfirm]  = useState(false);
   const [showRestoreConfirm,  setShowRestoreConfirm]  = useState(false);
@@ -198,10 +211,24 @@ export const PatientProfile: React.FC = () => {
     }
   }, [id]);
 
+  const fetchClinicalNotes = useCallback(async () => {
+    if (!id) return;
+    setLoadingNotes(true);
+    try {
+      const data = await getNotes({ patient: Number(id) });
+      setClinicalNotes(data);
+    } catch {
+      toast.error('Failed to load clinical notes');
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchPatient();
     fetchAppointments();
-  }, [fetchPatient, fetchAppointments]);
+    fetchClinicalNotes();
+  }, [fetchPatient, fetchAppointments, fetchClinicalNotes]);
 
   const handleSavePatient = async (data: CreatePatientData) => {
     if (!patient) return;
@@ -462,62 +489,261 @@ export const PatientProfile: React.FC = () => {
                 </SectionCard>
               </div>
 
-              {/* RIGHT: Appointment History */}
+              {/* RIGHT: Tabs (History / Documents) */}
               <div className="lg:col-span-2">
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  {/* Tab Header */}
                   <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-sky-600" />
-                        <h2 className="text-sm font-semibold text-gray-700">Appointment History</h2>
-                        <span className="text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
-                          {appointments.length} total
-                        </span>
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => setActiveTab('history')}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            activeTab === 'history'
+                              ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4" />
+                          History
+                          <span className="text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
+                            {appointments.length}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('documents')}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            activeTab === 'documents'
+                              ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                          Documents
+                          <span className="text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
+                            {clinicalNotes.length}
+                          </span>
+                        </button>
                       </div>
-                      <div className="flex items-center gap-1">
-                        {(['ALL', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as const).map((f) => (
-                          <button
-                            key={f}
-                            onClick={() => setAppointmentFilter(f)}
-                            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                              appointmentFilter === f
-                                ? 'bg-sky-600 text-white'
-                                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {f.charAt(0) + f.slice(1).toLowerCase()}
-                          </button>
-                        ))}
-                      </div>
+                      {activeTab === 'documents' && (
+                        <button
+                          onClick={() => setIsCreateNoteOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Create Note
+                        </button>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Click any appointment to view full details, clinical notes, and invoice
-                    </p>
                   </div>
 
+                  {/* Tab Content */}
                   <div className="p-4">
-                    {loadingAppointments ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-7 h-7 text-sky-400 animate-spin" />
-                      </div>
-                    ) : filteredAppointments.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-14 text-center">
-                        <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
-                          <Calendar className="w-7 h-7 text-gray-300" />
+                    {activeTab === 'history' ? (
+                      // History Tab - Appointments
+                      loadingAppointments ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-7 h-7 text-sky-400 animate-spin" />
                         </div>
-                        <p className="text-sm font-medium text-gray-500">No appointments found</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {appointmentFilter !== 'ALL'
-                            ? `No ${appointmentFilter.toLowerCase()} appointments`
-                            : 'This patient has no appointment history'}
-                        </p>
-                      </div>
+                      ) : filteredAppointments.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-14 text-center">
+                          <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                            <Calendar className="w-7 h-7 text-gray-300" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-500">No appointments found</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {appointmentFilter !== 'ALL'
+                              ? `No ${appointmentFilter.toLowerCase()} appointments`
+                              : 'This patient has no appointment history'}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Filters for History */}
+                          <div className="flex items-center gap-1 mb-4">
+                            {(['ALL', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as const).map((f) => (
+                              <button
+                                key={f}
+                                onClick={() => setAppointmentFilter(f)}
+                                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                                  appointmentFilter === f
+                                    ? 'bg-sky-600 text-white'
+                                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                {f.charAt(0) + f.slice(1).toLowerCase()}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="space-y-2">
+                            {filteredAppointments.map((appointment) => (
+                              <AppointmentRow key={appointment.id} appointment={appointment} onClick={handleAppointmentClick} />
+                            ))}
+                          </div>
+                        </>
+                      )
                     ) : (
-                      <div className="space-y-2">
-                        {filteredAppointments.map((appointment) => (
-                          <AppointmentRow key={appointment.id} appointment={appointment} onClick={handleAppointmentClick} />
-                        ))}
-                      </div>
+                      // Documents Tab - Clinical Notes
+                      loadingNotes ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-7 h-7 text-sky-400 animate-spin" />
+                        </div>
+                      ) : clinicalNotes.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-14 text-center">
+                          <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                            <FileText className="w-7 h-7 text-gray-300" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-500">No clinical notes found</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Click "Create Note" to add a clinical note for this patient
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {clinicalNotes.map((note) => (
+                            <div
+                              key={note.id}
+                              className="p-4 border border-gray-200 rounded-lg hover:border-sky-300 hover:bg-sky-50/40 transition-all"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {note.template_name || 'Clinical Note'}
+                                  </span>
+                                  {note.is_signed ? (
+                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">
+                                      <CheckCircle className="w-3 h-3" /> Signed
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                                      Draft
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {formatDate(note.date)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {note.date}
+                                  </span>
+                                  {note.practitioner_name && (
+                                    <span className="flex items-center gap-1">
+                                      <User className="w-3 h-3" />
+                                      {note.practitioner_name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      setEmailingNoteId(note.id);
+                                      try {
+                                        await emailNote(note.id);
+                                        toast.success('Clinical note sent to patient email');
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.detail || 'Failed to send email');
+                                      } finally {
+                                        setEmailingNoteId(null);
+                                      }
+                                    }}
+                                    disabled={emailingNoteId === note.id}
+                                    className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors disabled:opacity-50"
+                                    title="Send to Client Email"
+                                  >
+                                    {emailingNoteId === note.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Mail className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      setPrintingNoteId(note.id);
+                                      try {
+                                        const printData = await getPrintNote(note.id);
+                                        const printContent = `
+                                          <!DOCTYPE html>
+                                          <html>
+                                          <head>
+                                            <title>Clinical Note - ${printData.patient_name}</title>
+                                            <style>
+                                              body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+                                              .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+                                              .clinic { font-size: 18px; font-weight: bold; color: #1e40af; }
+                                              h1 { font-size: 24px; color: #333; margin: 10px 0; }
+                                              .info { margin-bottom: 20px; }
+                                              .info p { margin: 5px 0; }
+                                              .section { margin-bottom: 20px; }
+                                              .section h3 { background: #f3f4f6; padding: 10px; margin-bottom: 10px; border-left: 4px solid #1e40af; }
+                                              .field { margin-bottom: 10px; }
+                                              .field label { font-weight: bold; color: #666; }
+                                              .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
+                                              @media print { body { padding: 0; } }
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <div class="header">
+                                              <div class="clinic">${printData.clinic_name}</div>
+                                              <h1>Clinical Note</h1>
+                                            </div>
+                                            <div class="info">
+                                              <p><strong>Patient:</strong> ${printData.patient_name}</p>
+                                              <p><strong>Patient ID:</strong> ${printData.patient_number}</p>
+                                              <p><strong>Date:</strong> ${printData.date ? new Date(printData.date).toLocaleDateString() : 'N/A'}</p>
+                                              <p><strong>Practitioner:</strong> ${printData.practitioner_name}${printData.practitioner_title ? ` (${printData.practitioner_title})` : ''}</p>
+                                              <p><strong>Template:</strong> ${printData.template_name}</p>
+                                              ${printData.is_signed ? `<p><strong>Signed:</strong> ${printData.signed_at ? new Date(printData.signed_at).toLocaleString() : 'Yes'}</p>` : ''}
+                                            </div>
+                                            ${printData.sections.map(section => `
+                                              <div class="section">
+                                                <h3>${section.title}</h3>
+                                                ${section.fields.map(field => `
+                                                  <div class="field">
+                                                    <label>${field.label}:</label> ${field.value}
+                                                  </div>
+                                                `).join('')}
+                                              </div>
+                                            `).join('')}
+                                            <div class="footer">
+                                              <p>Generated on ${new Date().toLocaleString()}</p>
+                                            </div>
+                                          </body>
+                                          </html>
+                                        `;
+                                        const printWindow = window.open('', '_blank');
+                                        if (printWindow) {
+                                          printWindow.document.write(printContent);
+                                          printWindow.document.close();
+                                          printWindow.print();
+                                        }
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.detail || 'Failed to generate print view');
+                                      } finally {
+                                        setPrintingNoteId(null);
+                                      }
+                                    }}
+                                    disabled={printingNoteId === note.id}
+                                    className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors disabled:opacity-50"
+                                    title="Print Clinical Note"
+                                  >
+                                    {printingNoteId === note.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <FileText className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
@@ -550,6 +776,20 @@ export const PatientProfile: React.FC = () => {
         onClose={() => { setIsAppointmentDetailOpen(false); setSelectedAppointment(null); }}
         appointment={selectedAppointment}
       />
+
+      {/* Create Clinical Note Modal */}
+      {patient && (
+        <CreateClinicalNoteModal
+          isOpen={isCreateNoteOpen}
+          onClose={() => setIsCreateNoteOpen(false)}
+          patientId={patient.id}
+          patientName={patient.full_name}
+          onSuccess={() => {
+            // Refresh data if needed - the note will appear in appointment detail
+            fetchClinicalNotes();
+          }}
+        />
+      )}
 
       {/* Archive Confirm */}
       {showArchiveConfirm && (

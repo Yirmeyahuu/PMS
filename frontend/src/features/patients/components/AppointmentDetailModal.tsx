@@ -3,10 +3,12 @@ import {
   X, Clock, CheckCircle, XCircle, AlertCircle, Activity,
   Calendar, User, MapPin, FileText, Receipt,
   ChevronDown, ChevronUp, Loader2, Stethoscope,
-  ClipboardList, AlertTriangle,
+  ClipboardList, AlertTriangle, Mail, Printer,
 } from 'lucide-react';
 import type { Appointment, ClinicalNote } from '@/types';
 import { getAppointmentClinicalNotes, getAppointmentInvoice } from '@/features/appointments/appointment.api';
+import { emailNote, getPrintNote } from '@/features/clinical-template/clinical-templates.api';
+import toast from 'react-hot-toast';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -114,6 +116,89 @@ interface ClinicalNoteCardProps { note: ClinicalNote; }
 
 const ClinicalNoteCard: React.FC<ClinicalNoteCardProps> = ({ note }) => {
   const [expanded, setExpanded] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const handleEmail = async () => {
+    setEmailing(true);
+    try {
+      await emailNote(note.id);
+      toast.success('Clinical note sent to patient email');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to send email');
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      const printData = await getPrintNote(note.id);
+      // Open print window with formatted content
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Clinical Note - ${printData.patient_name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+            .clinic { font-size: 18px; font-weight: bold; color: #1e40af; }
+            h1 { font-size: 24px; color: #333; margin: 10px 0; }
+            .info { margin-bottom: 20px; }
+            .info p { margin: 5px 0; }
+            .section { margin-bottom: 20px; }
+            .section h3 { background: #f3f4f6; padding: 10px; margin-bottom: 10px; border-left: 4px solid #1e40af; }
+            .field { margin-bottom: 10px; }
+            .field label { font-weight: bold; color: #666; }
+            .field value { color: #333; }
+            .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="clinic">${printData.clinic_name}</div>
+            <h1>Clinical Note</h1>
+          </div>
+          <div class="info">
+            <p><strong>Patient:</strong> ${printData.patient_name}</p>
+            <p><strong>Patient ID:</strong> ${printData.patient_number}</p>
+            <p><strong>Date:</strong> ${printData.date ? new Date(printData.date).toLocaleDateString() : 'N/A'}</p>
+            <p><strong>Practitioner:</strong> ${printData.practitioner_name}${printData.practitioner_title ? ` (${printData.practitioner_title})` : ''}</p>
+            <p><strong>Template:</strong> ${printData.template_name}</p>
+            ${printData.is_signed ? `<p><strong>Signed:</strong> ${printData.signed_at ? new Date(printData.signed_at).toLocaleString() : 'Yes'}</p>` : ''}
+          </div>
+          ${printData.sections.map(section => `
+            <div class="section">
+              <h3>${section.title}</h3>
+              ${section.fields.map(field => `
+                <div class="field">
+                  <label>${field.label}:</label> ${field.value}
+                </div>
+              `).join('')}
+            </div>
+          `).join('')}
+          <div class="footer">
+            <p>Generated on ${new Date().toLocaleString()}</p>
+            <p>${printData.clinic_name} - ${printData.clinic_address || ''}</p>
+          </div>
+        </body>
+        </html>
+      `;
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.print();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to generate print version');
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined || value === '') return <span className="text-gray-400 italic">Not provided</span>;
@@ -177,6 +262,22 @@ const ClinicalNoteCard: React.FC<ClinicalNoteCardProps> = ({ note }) => {
           >
             {expanded ? 'Collapse' : 'View'}
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={handleEmail}
+            disabled={emailing}
+            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-sky-600 font-medium disabled:opacity-50"
+            title="Send to client email"
+          >
+            {emailing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-sky-600 font-medium disabled:opacity-50"
+            title="Print clinical note"
+          >
+            {printing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Printer className="w-3 h-3" />}
           </button>
         </div>
       </div>

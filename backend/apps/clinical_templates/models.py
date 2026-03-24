@@ -235,6 +235,7 @@ class ClinicalNoteAuditLog(TimeStampedModel):
         ('SIGNED', 'Note Signed'),
         ('VIEWED', 'Note Viewed'),
         ('DELETED', 'Note Deleted'),
+        ('EMAILED', 'Note Emailed'),
     ]
     
     clinical_note = models.ForeignKey(

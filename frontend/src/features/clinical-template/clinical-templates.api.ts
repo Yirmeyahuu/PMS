@@ -92,3 +92,41 @@ export const getNoteAuditLog = async (id: number) => {
   const response = await axiosInstance.get(`${BASE_URL}/notes/${id}/audit_log/`);
   return response.data;
 };
+
+// ─── Email & Print APIs ──────────────────────────────────────────
+
+export const emailNote = async (id: number): Promise<{ detail: string }> => {
+  const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/email_note/`);
+  return response.data;
+};
+
+export interface PrintNoteResponse {
+  patient_name: string;
+  patient_number: string;
+  clinic_name: string;
+  clinic_address: string;
+  clinic_phone: string;
+  clinic_email: string;
+  practitioner_name: string;
+  practitioner_title: string;
+  date: string | null;
+  template_name: string;
+  template_category: string;
+  note_type: string;
+  is_signed: boolean;
+  signed_at: string | null;
+  created_at: string | null;
+  sections: Array<{
+    title: string;
+    description: string;
+    fields: Array<{
+      label: string;
+      value: string;
+    }>;
+  }>;
+}
+
+export const getPrintNote = async (id: number): Promise<PrintNoteResponse> => {
+  const response = await axiosInstance.get(`${BASE_URL}/notes/${id}/print_note/`);
+  return response.data;
+};
