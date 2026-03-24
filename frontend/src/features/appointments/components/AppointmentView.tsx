@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
   Receipt, Plus, Printer, CheckCircle, AlertCircle,
-  RefreshCw, ChevronRight, ChevronDown, Building2, Edit3, Trash2,
+  RefreshCw, ChevronDown, Building2, Edit3, Trash2,
   Save, XCircle, Search, UserCircle, StickyNote, ClipboardList,
   ExternalLink, Repeat, List,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Appointment, Patient } from '@/types';
+import type { Appointment } from '@/types';
 import { getPatient } from '@/features/patients/patient.api';
 import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_TYPE_LABELS } from '@/types';
 import { billingApi } from '@/features/billing/billing.api';
