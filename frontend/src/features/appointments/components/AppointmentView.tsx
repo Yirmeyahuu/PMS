@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
   Receipt, Plus, Printer, CheckCircle, AlertCircle,
-  RefreshCw, ChevronRight, Building2, Edit3, Trash2,
-  Save, XCircle, Search,
+  RefreshCw, ChevronRight, ChevronDown, Building2, Edit3, Trash2,
+  Save, XCircle, Search, UserCircle, StickyNote, ClipboardList,
+  ExternalLink, Repeat, List,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Appointment } from '@/types';
+import type { Appointment, Patient } from '@/types';
+import { getPatient } from '@/features/patients/patient.api';
 import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_TYPE_LABELS } from '@/types';
 import { billingApi } from '@/features/billing/billing.api';
 import type { ClinicService } from '@/features/billing/billing.api';
@@ -15,6 +18,7 @@ import type { Invoice } from '@/types/billing';
 
 import { AppointmentEditForm }    from './AppointmentEditForm';
 import { CancelAppointmentModal } from './CancelAppointmentModal';
+import { AddRecurringAppointments } from './AddRecurringAppointments';
 import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
 import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';
 import type { AppointmentEditPayload } from '../appointment.api';
@@ -29,7 +33,7 @@ const INVOICE_STATUS_STYLES: Record<string, string> = {
   CANCELLED:      'bg-gray-100 text-gray-400 border-gray-200',
 };
 
-type Tab = 'details' | 'invoice';
+type Tab = 'client' | 'appointment' | 'status' | 'notes' | 'invoice';
 
 interface AppointmentViewProps {
   isOpen:      boolean;
@@ -592,8 +596,23 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   appointment: initialAppointment,
   onUpdated,
 }) => {
-  const [activeTab,       setActiveTab]       = useState<Tab>('details');
-  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [activeTab,             setActiveTab]             = useState<Tab>('client');
+  const [showCancelModal,       setShowCancelModal]       = useState(false);
+  const [showAppointmentDropdown, setShowAppointmentDropdown] = useState(false);
+  const [showRecurringModal,     setShowRecurringModal]     = useState(false);
+  const appointmentDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close appointment dropdown when clicking outside
+  useEffect(() => {
+    if (!showAppointmentDropdown) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (appointmentDropdownRef.current && !appointmentDropdownRef.current.contains(event.target as Node)) {
+        setShowAppointmentDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAppointmentDropdown]);
 
   const lastAppointmentIdRef = useRef<number | null>(null);
   const [appointment, setAppointment] = useState<Appointment | null>(initialAppointment);
@@ -619,11 +638,26 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   const { practitioners, loading: loadingPractitioners } = usePractitioners();
 
+  // ── Patient data ───────────────────────────────────────────────────────────────
+  const navigate = useNavigate();
+  const { data: patient, isLoading: loadingPatient } = useQuery({
+    queryKey: ['patient', appointment?.patient],
+    queryFn: () => getPatient(appointment!.patient),
+    enabled: !!appointment?.patient,
+  });
+
+  const handleViewFullProfile = () => {
+    if (patient) {
+      onClose();
+      navigate(`/clients/${patient.id}`);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) {
       cancelEdit();
       setShowCancelModal(false);
-      setActiveTab('details');
+      setActiveTab('client');
       lastAppointmentIdRef.current = null;
     }
   }, [isOpen, cancelEdit]);
@@ -681,7 +715,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}
@@ -714,29 +748,199 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
           </div>
 
           {/* ── Tabs ── */}
-          <div className="flex border-b border-gray-200 flex-shrink-0">
+          <div className="flex border-b border-gray-200 flex-shrink-0 overflow-visible relative">
             {([
-              { key: 'details', label: 'Details', icon: FileText },
+              { key: 'client', label: 'Client Information', icon: UserCircle },
+              { key: 'appointment', label: 'Appointment', icon: Calendar, isDropdown: true },
+              { key: 'status', label: 'Status', icon: ClipboardList },
+              { key: 'notes', label: 'Clinic Notes', icon: StickyNote },
               { key: 'invoice', label: 'Invoice', icon: Receipt },
-            ] as { key: Tab; label: string; icon: React.ElementType }[]).map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => { setActiveTab(tab.key); if (isEditing) cancelEdit(); }}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                  activeTab === tab.key
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
+            ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
+              <div key={tab.key} className="relative" ref={tab.isDropdown ? appointmentDropdownRef : null}>
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    if (tab.isDropdown) {
+                      setShowAppointmentDropdown(!showAppointmentDropdown);
+                    } else {
+                      setActiveTab(tab.key);
+                      if (isEditing) cancelEdit();
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+                    activeTab === tab.key
+                      ? 'border-sky-500 text-sky-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                  {tab.isDropdown && <ChevronDown className={`w-3 h-3 transition-transform ${showAppointmentDropdown ? 'rotate-180' : ''}`} />}
+                </button>
+                {/* Appointment Dropdown Menu */}
+                {tab.isDropdown && showAppointmentDropdown && (
+                  <div className="absolute left-0 top-full mt-1 w-66 bg-white border border-gray-200 rounded-xl shadow-lg z-9999 py-1">
+                    <button
+                      onClick={() => {
+                        setShowAppointmentDropdown(false);
+                        setActiveTab('appointment');
+                        if (isEditing) cancelEdit();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
+                    >
+                      <Calendar className="w-4 h-4 text-sky-500" />
+                      View Appointment Details
+                    </button>
+                    {!isTerminal && (
+                      <button
+                        onClick={() => {
+                          setShowAppointmentDropdown(false);
+                          startEdit();
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4 text-sky-500" />
+                        Edit Appointment
+                      </button>
+                    )}
+                    {!isTerminal && (
+                      <button
+                        onClick={() => {
+                          setShowAppointmentDropdown(false);
+                          setShowCancelModal(true);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Cancel Appointment
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowAppointmentDropdown(false);
+                        setShowRecurringModal(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
+                    >
+                      <Repeat className="w-4 h-4 text-sky-500" />
+                      Add Recurring Appointments
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAppointmentDropdown(false);
+                        onClose();
+                        navigate(`/clients/${appointment.patient}`);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
+                    >
+                      <List className="w-4 h-4 text-sky-500" />
+                      View Appointment List
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
           {/* ── Content ── */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            {activeTab === 'details' && (
+            {activeTab === 'client' && (
+              <div className="space-y-4">
+                {loadingPatient ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-5 h-5 text-sky-500 animate-spin mr-2" />
+                    <span className="text-sm text-gray-500">Loading patient information...</span>
+                  </div>
+                ) : patient ? (
+                  <>
+                    <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
+                        Client Personal Information
+                      </p>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Patient Name</p>
+                            <p className="font-semibold text-gray-800">{patient.full_name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Patient ID</p>
+                            <p className="font-semibold text-gray-800 font-mono">{patient.patient_number}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Date of Birth</p>
+                            <p className="font-semibold text-gray-800">
+                              {patient.date_of_birth ? (
+                                <>
+                                  {format(new Date(patient.date_of_birth), 'MMM d, yyyy')} ({patient.age} yrs)
+                                </>
+                              ) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Address</p>
+                            <p className="font-semibold text-gray-800">
+                              {patient.address ? `${patient.address}, ${patient.city}, ${patient.province}` : '—'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Phone</p>
+                            <p className="font-semibold text-gray-800">{patient.phone || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">Email</p>
+                            <p className="font-semibold text-gray-800">{patient.email || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-center py-4">
+                      <button
+                        onClick={handleViewFullProfile}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        View Full Profile
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
+                      Client Personal Information
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">Patient Name</p>
+                          <p className="font-semibold text-gray-800">{appointment.patient_name}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Appointment Tab ── */}
+            {activeTab === 'appointment' && (
               <div className="space-y-4">
 
                 {isCancelled && (
@@ -903,56 +1107,106 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       ))}
                     </div>
 
-                    <button
-                      onClick={() => setActiveTab('invoice')}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Receipt className="w-4 h-4 text-sky-600" />
-                        <span className="text-sm font-medium text-sky-700">View / Generate Invoice</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-sky-400" />
-                    </button>
                   </>
                 )}
               </div>
             )}
 
-            {activeTab === 'invoice' && (
-              <InvoiceTab appointment={appointment} />
-            )}
-          </div>
-
-          {/* ── Footer ── */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Close
-            </button>
-
-            {activeTab === 'details' && !isEditing && (
-              <div className="flex items-center gap-2">
-                {!isTerminal && (
-                  <button
-                    onClick={startEdit}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                )}
-                {!isTerminal && (
-                  <button
-                    onClick={() => setShowCancelModal(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Cancel Appointment
-                  </button>
+            {/* ── Status Tab ── */}
+            {activeTab === 'status' && (
+              <div className="space-y-4">
+                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
+                    Appointment Status
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Current Status</span>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
+                        {appointment.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Created By</span>
+                      <span className="text-sm font-medium text-gray-800">{appointment.created_by_name || 'Unknown'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Created At</span>
+                      <span className="text-sm font-medium text-gray-800">{format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a')}</span>
+                    </div>
+                    {appointment.updated_by_name && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Last Updated By</span>
+                          <span className="text-sm font-medium text-gray-800">{appointment.updated_by_name}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Updated At</span>
+                          <span className="text-sm font-medium text-gray-800">{format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a')}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {isCancelled && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-red-700">This appointment has been cancelled.</p>
+                    </div>
+                    {appointment.cancellation_reason && (
+                      <p className="text-xs text-red-600 pl-6">
+                        Reason: {appointment.cancellation_reason}
+                      </p>
+                    )}
+                    {appointment.cancelled_at && (
+                      <p className="text-xs text-red-500 pl-6">
+                        Cancelled on {format(new Date(appointment.cancelled_at), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
+            )}
+
+            {/* ── Clinic Notes Tab ── */}
+            {activeTab === 'notes' && (
+              <div className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">
+                    Clinic Notes
+                  </p>
+                  {appointment.chief_complaint ? (
+                    <div className="mb-4">
+                      <p className="text-xs text-amber-600 font-medium mb-1">Chief Complaint</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.chief_complaint}</p>
+                    </div>
+                  ) : null}
+                  {appointment.notes ? (
+                    <div className="mb-4">
+                      <p className="text-xs text-amber-600 font-medium mb-1">Internal Notes</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.notes}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No internal notes recorded.</p>
+                  )}
+                </div>
+                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
+                    Patient Notes
+                  </p>
+                  {appointment.patient_notes ? (
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.patient_notes}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No patient notes recorded.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Invoice Tab ── */}
+            {activeTab === 'invoice' && (
+              <InvoiceTab appointment={appointment} />
             )}
           </div>
         </div>
@@ -965,6 +1219,16 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
         cancelError={cancelError}
         onConfirm={handleCancelAppointment}
         onClose={() => setShowCancelModal(false)}
+      />
+
+      <AddRecurringAppointments
+        isOpen={showRecurringModal}
+        appointment={appointment}
+        onClose={() => setShowRecurringModal(false)}
+        onSave={(data) => {
+          console.log('Saving recurring appointments:', data);
+          // TODO: Implement API call to create recurring appointments
+        }}
       />
     </>
   );

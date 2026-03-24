@@ -436,6 +436,112 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         return Response({'slots': available})
 
+    # ── Check availability for recurring appointments ───────────────────────────
+    @action(detail=False, methods=['post'], url_path='check_recurring_availability')
+    def check_recurring_availability(self, request):
+        """
+        POST /api/appointments/check_recurring_availability/
+        Body: {
+            practitioner_id: number,
+            dates: ["2024-01-15", "2024-01-22", ...],  // List of dates to check
+            start_time: "09:00",  // Time to check (HH:MM format)
+            duration_minutes: 60
+        }
+        Returns: {
+            slots: [
+                { date: "2024-01-15", day_name: "Monday", time: "09:00", status: "AVAILABLE" | "BOOKED" },
+                ...
+            ]
+        }
+        """
+        from datetime import time, timedelta
+        
+        practitioner_id = request.data.get('practitioner_id')
+        dates = request.data.get('dates', [])  # List of date strings
+        start_time_str = request.data.get('start_time')
+        duration = request.data.get('duration_minutes', 60)
+        
+        if not dates:
+            return Response({'error': 'dates parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not start_time_str:
+            return Response({'error': 'start_time parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse start time
+        try:
+            start_time_obj = datetime.strptime(start_time_str, '%H:%M').time()
+        except ValueError:
+            return Response({'error': 'Invalid time format. Use HH:MM.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate end time
+        start_minutes = start_time_obj.hour * 60 + start_time_obj.minute
+        end_minutes = start_minutes + duration
+        end_time_obj = time(end_minutes // 60, end_minutes % 60)
+        
+        # Day names mapping
+        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        # Build the queryset filter
+        booked_qs = Appointment.objects.filter(
+            status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
+            is_deleted=False,
+        )
+        
+        # Filter by practitioner if provided (handle None, 0, and valid IDs)
+        if practitioner_id is not None:
+            try:
+                booked_qs = booked_qs.filter(practitioner_id=int(practitioner_id))
+            except (ValueError, TypeError):
+                pass  # If invalid, don't filter by practitioner
+        
+        slots = []
+        
+        for date_str in dates:
+            try:
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                continue
+            
+            weekday = target_date.weekday()
+            day_name = day_names[weekday]
+            
+            # Check if there's a conflicting appointment on this date/time
+            conflicting = booked_qs.filter(
+                date=target_date,
+            )
+            
+            logger.info(
+                f"Checking availability for date={date_str}, start_time={start_minutes}, end_time={end_minutes}, "
+                f"practitioner_id={practitioner_id}, found {conflicting.count()} appointments on that date"
+            )
+            
+            is_booked = False
+            for apt in conflicting:
+                # Check for time overlap
+                apt_start_min = apt.start_time.hour * 60 + apt.start_time.minute
+                apt_end_min = apt.end_time.hour * 60 + apt.end_time.minute
+                
+                logger.info(
+                    f"Existing appointment: id={apt.id}, start={apt_start_min}, end={apt_end_min}, "
+                    f"practitioner={apt.practitioner_id}"
+                )
+                
+                # Check if our time slot overlaps with existing appointment
+                # Two time slots overlap if: start1 < end2 AND end1 > start2
+                if start_minutes < apt_end_min and end_minutes > apt_start_min:
+                    logger.info(f"OVERLAP DETECTED! new: {start_minutes}-{end_minutes}, existing: {apt_start_min}-{apt_end_min}")
+                    is_booked = True
+                    break
+            
+            slots.append({
+                'date': date_str,
+                'day_name': day_name,
+                'time': start_time_str,
+                'status': 'BOOKED' if is_booked else 'AVAILABLE'
+            })
+        
+        return Response({'slots': slots})
+
     # ── Practitioners list (existing) ─────────────────────────────────────────
     @action(detail=False, methods=['get'])
     def practitioners(self, request):

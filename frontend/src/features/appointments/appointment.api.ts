@@ -193,3 +193,28 @@ export const updatePortalBookingStatus = async (
   );
   return response.data;
 };
+
+// ── Check recurring appointments availability ─────────────────────────────────
+export interface RecurringAvailabilitySlot {
+  date: string;
+  day_name: string;
+  time: string;
+  status: 'AVAILABLE' | 'BOOKED';
+}
+
+export interface CheckRecurringAvailabilityParams {
+  practitioner_id: number | null;
+  dates: string[];
+  start_time: string;
+  duration_minutes: number;
+}
+
+export const checkRecurringAvailability = async (
+  params: CheckRecurringAvailabilityParams
+): Promise<{ slots: RecurringAvailabilitySlot[] }> => {
+  const response = await axiosInstance.post<{ slots: RecurringAvailabilitySlot[] }>(
+    '/appointments/check_recurring_availability/',
+    params
+  );
+  return response.data;
+};
