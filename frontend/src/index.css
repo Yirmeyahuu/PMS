@@ -1,1 +1,150 @@
 @import "tailwindcss";
+
+/* Import Bricolage Grotesque and Geist from Google Fonts */
+/* Note: These are loaded via index.html */
+
+/* Font Families - Tailwind v4 theme configuration */
+@theme {
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Geist', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Font Variables */
+:root {
+  --font-primary: 'Bricolage Grotesque', sans-serif;
+  --font-secondary: 'Geist', sans-serif;
+}
+
+/* Apply fonts globally */
+html, body {
+  font-family: var(--font-secondary);
+}
+
+/* Headings use Bricolage Grotesque Bold */
+h1, h2, h3, h4, h5, h6,
+.text-display,
+.font-display {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+}
+
+/* Body text uses Geist */
+p, span, li, div,
+.text-body,
+.font-body {
+  font-family: 'Geist', sans-serif;
+}
+
+/* Custom Cursor Styles */
+:root {
+  /* Default cursor - Arrow.cur is the main pointer */
+  --cursor-default: url('/assets/cursor/Arrow.cur'), auto;
+  /* Pointer cursor - Hand.cur for buttons, links, etc. */
+  --cursor-pointer: url('/assets/cursor/Hand.cur'), pointer;
+  /* Grabbing cursor - SizeAll.cur for draggable/grabbing */
+  --cursor-grab: url('/assets/cursor/SizeAll.cur'), grab;
+  /* Text selection cursor - IBeam.cur for text */
+  --cursor-text: url('/assets/cursor/IBeam.cur'), text;
+  /* Resize cursors */
+  --cursor-ns: url('/assets/cursor/SizeNS.cur'), ns-resize;
+  --cursor-ew: url('/assets/cursor/SizeWE.cur'), ew-resize;
+  --cursor-nesw: url('/assets/cursor/SizeNESW.cur'), nesw-resize;
+  --cursor-nwse: url('/assets/cursor/SizeNWSE.cur'), nwse-resize;
+  /* Crosshair for special selection tools */
+  --cursor-crosshair: url('/assets/cursor/Crosshair.cur'), crosshair;
+  /* Not allowed cursor - No.cur */
+  --cursor-not-allowed: url('/assets/cursor/No.cur'), not-allowed;
+  /* Wait cursor */
+  --cursor-wait: url('/assets/cursor/UpArrow.cur'), wait;
+  /* Help cursor */
+  --cursor-help: url('/assets/cursor/NWPen.cur'), help;
+}
+
+/* Apply default custom cursor to the entire document */
+html, body {
+  cursor: var(--cursor-default) !important;
+}
+
+/* Apply Hand cursor to all interactive elements */
+a,
+button,
+input,
+select,
+textarea,
+[role="button"],
+[tabindex]:not([tabindex="-1"]),
+.clickable,
+.interactive {
+  cursor: var(--cursor-pointer) !important;
+}
+
+/* Text input cursor */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea {
+  cursor: var(--cursor-text) !important;
+}
+
+/* Elements that should use grab cursor */
+[data-cursor="grab"],
+.draggable,
+[draggable="true"],
+.grab {
+  cursor: var(--cursor-grab) !important;
+}
+
+/* Vertical resize */
+[data-cursor="ns"],
+.resize-vertical {
+  cursor: var(--cursor-ns) !important;
+}
+
+/* Horizontal resize */
+[data-cursor="ew"],
+.resize-horizontal {
+  cursor: var(--cursor-ew) !important;
+}
+
+/* Diagonal resize */
+[data-cursor="nesw"],
+.resize-diagonal {
+  cursor: var(--cursor-nesw) !important;
+}
+
+/* Crosshair for selection tools */
+[data-cursor="crosshair"],
+.crosshair {
+  cursor: var(--cursor-crosshair) !important;
+}
+
+/* Not allowed cursor */
+[data-cursor="not-allowed"],
+.not-allowed,
+[disabled] {
+  cursor: var(--cursor-not-allowed) !important;
+}
+
+/* Wait cursor for loading states */
+[data-cursor="wait"],
+.wait,
+[aria-busy="true"] {
+  cursor: var(--cursor-wait) !important;
+}
+
+/* Help cursor for help elements */
+[data-cursor="help"],
+.help,
+[aria-describedby] {
+  cursor: var(--cursor-help) !important;
+}
+
+/* NWSE diagonal resize */
+[data-cursor="nwse"],
+.resize-nwse {
+  cursor: var(--cursor-nwse) !important;
+}

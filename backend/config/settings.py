@@ -97,6 +97,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Cache Settings (for password reset verification codes)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
 # CORS Settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",

@@ -12,6 +12,7 @@ import { LandingPage }            from '@/features/landing/LandingPage';
 import { Login }                  from '@/features/auth/Login';
 import { AdminRegister }          from '@/features/auth/AdminRegister';
 import { RegisterSuccess }        from '@/features/auth/RegisterSuccess';
+import { ForgotPassword }         from '@/features/auth/ForgotPassword';
 import { PortalHome }             from '@/features/patient-portal/pages/PortalHome';
 import { BookAppointmentSuccess } from '@/features/patient-portal/pages/BookAppointmentSuccess';
 
@@ -114,6 +115,7 @@ function App() {
           <Route path="/login"            element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register"         element={<PublicRoute><AdminRegister /></PublicRoute>} />
           <Route path="/register/success" element={<PublicRoute><RegisterSuccess /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
           {/* ── Patient Portal ──────────────────────────────────────── */}
           <Route path="/portal/:token"         element={<PortalHome />} />

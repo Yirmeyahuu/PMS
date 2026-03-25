@@ -3,7 +3,10 @@ import type {
   LoginCredentials, 
   LoginResponse, 
   AdminRegisterData,
-  AdminRegisterResponse
+  AdminRegisterResponse,
+  ForgotPasswordResponse,
+  VerifyCodeResponse,
+  ResetPasswordResponse
 } from '@/types/auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
@@ -146,4 +149,45 @@ export const authService = {
       throw error;
     }
   },
+
+  /**
+   * Request password reset - send verification code to email
+   */
+  async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+    try {
+      const response = await authApi.post<ForgotPasswordResponse>('/auth/forgot-password/', { email });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { detail: 'Failed to send verification code' };
+    }
+  },
+
+  /**
+   * Verify the code entered by user
+   */
+  async verifyCode(email: string, code: string): Promise<VerifyCodeResponse> {
+    try {
+      const response = await authApi.post<VerifyCodeResponse>('/auth/verify-code/', { email, code });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || { detail: 'Code verification failed' };
+    }
+  },
+
+  /**
+   * Reset password using verified code
+   * Note: newPassword is not needed - backend will generate a new one
+   */
+  async resetPassword(email: string, code: string, _newPassword: string): Promise<ResetPasswordResponse> {
+    try {
+      const response = await authApi.post<ResetPasswordResponse>('/auth/reset-password-with-code/', {
+        email,
+        code
+      });
+      return response.data;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      throw err.response?.data || { detail: 'Password reset failed' };
+    }
+  }
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 
 // Plan interface
 interface Plan {
@@ -43,83 +43,89 @@ const PLAN: Readonly<Plan> = {
 
 export const Plans: React.FC = () => {
   return (
-    <section id="plans" className="py-20 sm:py-28 bg-gray-50">
+    <section id="plans" className="py-20 sm:py-28 bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white font-display">
             Simple, Transparent Pricing
           </h2>
-          <p className="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl text-gray-400 leading-relaxed font-body">
             One plan with everything you need. Try it free for {PLAN.trialDays} days, no credit card required.
           </p>
         </div>
 
-        {/* Single Plan Card - Centered */}
-        <div className="mt-20 max-w-2xl mx-auto">
-          <div className="relative bg-white rounded-3xl shadow-2xl ring-2 ring-sky-600 transform hover:scale-105 transition-transform duration-300">
+        {/* Horizontal Plan Card */}
+        <div className="mt-20 max-w-5xl mx-auto">
+          <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
             {/* Popular Badge */}
-            <div className="absolute -top-5 left-1/2 transform -translate-x-1/2">
-              <span className="bg-sky-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
+            <div className="absolute top-4 right-4 z-10">
+              <span className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg flex items-center font-body">
+                <Sparkles className="w-4 h-4 mr-2" />
                 {PLAN.trialDays}-Day Free Trial
               </span>
             </div>
 
-            <div className="p-10 sm:p-12">
-              {/* Plan Header */}
-              <div className="text-center">
-                <h3 className="text-3xl font-bold text-gray-900">
+            <div className="flex flex-col lg:flex-row">
+              {/* Left Side - Plan Info */}
+              <div className="lg:w-1/3 p-10 sm:p-12 flex flex-col justify-center border-b lg:border-b-0 lg:border-r border-gray-700">
+                <h3 className="text-3xl font-bold text-white font-display">
                   {PLAN.name}
                 </h3>
-                <p className="mt-3 text-base text-gray-600">{PLAN.description}</p>
+                <p className="mt-3 text-base text-gray-400 font-body">{PLAN.description}</p>
                 
                 <div className="mt-8">
-                  <span className="text-6xl font-bold text-gray-900">
+                  <span className="text-5xl font-bold text-white font-display">
                     {PLAN.currency}{PLAN.price.toLocaleString('en-PH')}
                   </span>
-                  <span className="text-xl text-gray-600 ml-3">
+                  <span className="text-lg text-gray-400 ml-2 font-body">
                     {PLAN.billing}
                   </span>
                 </div>
 
-                <p className="mt-3 text-base text-gray-500 font-medium">
+                <p className="mt-3 text-sm text-gray-500 font-medium font-body">
                   Billed monthly • Cancel anytime
+                </p>
+
+                {/* CTA Button */}
+                <Link
+                  to="/register"
+                  className="mt-8 block w-full py-4 px-6 text-center text-lg font-bold rounded-xl transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5 font-body"
+                  aria-label={`${PLAN.cta} - ${PLAN.trialDays} days free`}
+                >
+                  {PLAN.cta}
+                </Link>
+
+                <p className="mt-4 text-center text-sm text-gray-500 font-body">
+                  No credit card required for trial
                 </p>
               </div>
 
-              {/* CTA Button */}
-              <Link
-                to="/register"
-                className="mt-10 block w-full py-5 px-8 text-center text-lg font-bold rounded-xl transition-all bg-sky-600 text-white hover:bg-sky-700 shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5"
-                aria-label={`${PLAN.cta} - ${PLAN.trialDays} days free`}
-              >
-                {PLAN.cta}
-              </Link>
-
-              <p className="mt-4 text-center text-sm text-gray-500">
-                No credit card required for trial
-              </p>
-
-              {/* Features List */}
-              <ul className="mt-10 space-y-5" role="list">
-                {PLAN.features.map((feature, index) => (
-                  <li key={`feature-${index}`} className="flex items-start">
-                    <Check className="w-6 h-6 text-green-500 shrink-0 mt-1" aria-hidden="true" />
-                    <span className="ml-4 text-base text-gray-600">{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              {/* Right Side - Features List */}
+              <div className="lg:w-2/3 p-10 sm:p-12">
+                <h4 className="text-lg font-semibold text-white mb-6 font-display">What's Included:</h4>
+                <ul className="grid sm:grid-cols-2 gap-4" role="list">
+                  {PLAN.features.map((feature, index) => (
+                    <li key={`feature-${index}`} className="flex items-center">
+                      <div className="w-5 h-5 bg-cyan-600/20 rounded-full flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-cyan-400" />
+                      </div>
+                      <span className="ml-3 text-base text-gray-300 font-body">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Bottom Note */}
         <div className="mt-16 text-center">
-          <p className="text-base text-gray-600">
+          <p className="text-base text-gray-400 font-body">
             Questions about pricing?{' '}
             <a 
-              href="#contact" 
-              className="text-sky-600 font-semibold hover:text-sky-700 transition-colors"
+              href="mailto:support@mespms.com" 
+              className="text-cyan-400 font-semibold hover:text-cyan-300 transition-colors font-body"
             >
               Contact our support team
             </a>

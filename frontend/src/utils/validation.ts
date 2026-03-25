@@ -50,7 +50,8 @@ export const validateCompanyName = (name: string): boolean => {
 };
 
 export const sanitizeInput = (input: string): string => {
-  return input.trim().replace(/[<>]/g, '');
+  // Remove HTML tags but keep spaces (don't use trim() as it prevents typing spaces)
+  return input.replace(/[<>]/g, '');
 };
 
 export const formatPhoneNumber = (phone: string): string => {

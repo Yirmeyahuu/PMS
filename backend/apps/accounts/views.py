@@ -7,6 +7,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import authenticate
 from django.db import transaction
 from django.utils import timezone
+from django.core.cache import cache
 from .models import User, Role, Permission
 from .serializers import (
     UserSerializer, AdminRegistrationSerializer, UserRegistrationSerializer,
@@ -14,6 +15,7 @@ from .serializers import (
 )
 from .services.password_service import PasswordService
 from .services.email_service import EmailService
+from .utils.generators import generate_verification_code
 from apps.clinics.models import Clinic, Practitioner
 import logging
 
@@ -243,6 +245,175 @@ class AuthViewSet(viewsets.GenericViewSet):
                 {'detail': f'Password reset failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(detail=False, methods=['post'], url_path='forgot-password', permission_classes=[AllowAny])
+    def forgot_password(self, request):
+        """
+        Step 1: Request password reset - send verification code to email.
+        """
+        email = request.data.get('email')
+        
+        if not email:
+            return Response(
+                {'detail': 'Email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email__iexact=email, is_active=True)
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not
+            return Response(
+                {
+                    'message': 'If an account exists with this email, a verification code has been sent.',
+                    'code_sent': True
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        # Generate verification code
+        code = generate_verification_code(length=6)
+        
+        # Store code in cache with 10 minute expiry
+        cache_key = f'password_reset_{user.id}'
+        cache.set(cache_key, code, timeout=600)  # 10 minutes
+        
+        # Send email with verification code
+        email_sent = EmailService.send_verification_code_email(
+            user_email=user.email,
+            user_name=user.get_full_name(),
+            code=code
+        )
+        
+        if not email_sent:
+            logger.warning(f"Verification code email failed for {user.email}")
+            return Response(
+                {
+                    'detail': 'Failed to send verification code. Please try again.',
+                    'code_sent': False
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        logger.info(f"Password reset code sent to {user.email}")
+        return Response(
+            {
+                'message': 'If an account exists with this email, a verification code has been sent.',
+                'code_sent': True
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=['post'], url_path='verify-code', permission_classes=[AllowAny])
+    def verify_code(self, request):
+        """
+        Step 2: Verify the code entered by user.
+        """
+        email = request.data.get('email')
+        code = request.data.get('code')
+        
+        if not email or not code:
+            return Response(
+                {'detail': 'Email and code are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email__iexact=email, is_active=True)
+        except User.DoesNotExist:
+            return Response(
+                {'valid': False, 'message': 'Invalid verification code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check the code
+        cache_key = f'password_reset_{user.id}'
+        stored_code = cache.get(cache_key)
+        
+        if not stored_code:
+            return Response(
+                {'valid': False, 'message': 'Verification code has expired. Please request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if stored_code != code:
+            return Response(
+                {'valid': False, 'message': 'Invalid verification code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Code is valid - generate a temporary token for password reset
+        temp_token = f"{user.id}_{generate_verification_code(32)}"
+        cache.set(f'password_reset_token_{user.id}', temp_token, timeout=300)  # 5 minutes
+        
+        return Response(
+            {'valid': True, 'message': 'Code verified successfully'},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=False, methods=['post'], url_path='reset-password-with-code', permission_classes=[AllowAny])
+    def reset_password_with_code(self, request):
+        """
+        Step 3: Reset password using verified code.
+        After verification, generates a new password and sends it via email.
+        """
+        email = request.data.get('email')
+        code = request.data.get('code')
+        
+        if not email or not code:
+            return Response(
+                {'detail': 'Email and code are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email__iexact=email, is_active=True)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'Invalid request'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify the code again
+        cache_key = f'password_reset_{user.id}'
+        stored_code = cache.get(cache_key)
+        
+        if not stored_code or stored_code != code:
+            return Response(
+                {'detail': 'Invalid or expired verification code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate new password
+        new_password = PasswordService.generate_temporary_password()
+        
+        # Set new password
+        user.set_password(new_password)
+        user.password_changed = False
+        user.save(update_fields=['password', 'password_changed'])
+        
+        # Send email with new password
+        email_sent = EmailService.send_password_reset_email(
+            user_email=user.email,
+            user_name=user.get_full_name(),
+            new_password=new_password
+        )
+        
+        if not email_sent:
+            logger.warning(f"New password email failed for {user.email}")
+        
+        # Clear the cache
+        cache.delete(cache_key)
+        
+        logger.info(f"Password reset with code successful for {user.email}")
+        
+        return Response(
+            {
+                'message': 'Password reset successfully. Check your email for the new password.',
+                'password_reset': True
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 

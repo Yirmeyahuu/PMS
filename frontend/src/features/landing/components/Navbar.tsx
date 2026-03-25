@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import MESLogo from '@/assets/MESLogo.svg';
 
 export const Navbar: React.FC = () => {
@@ -32,9 +32,10 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white shadow-lg' : 'bg-white/95 backdrop-blur-sm'
-      }`}
+      className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+        isScrolled ? 'bg-white/70 backdrop-blur-md shadow-lg' : 'bg-white'
+      } rounded-2xl`}
+      style={{ width: 'calc(100% - 48px)', maxWidth: '1200px' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
@@ -43,17 +44,17 @@ export const Navbar: React.FC = () => {
             <img 
               src={MESLogo} 
               alt="MES Logo" 
-              className="h-12 w-auto"
+              className="h-11 w-auto"
             />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-10">
+          <div className="hidden md:flex items-center space-x-1">
             {navLinks.map((link) => (
               <button
                 key={link.id}
                 onClick={() => scrollToSection(link.id)}
-                className="text-base font-medium text-gray-700 hover:text-sky-600 transition-colors"
+                className="px-4 py-2 text-base font-medium text-gray-700 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all flex items-center font-body"
               >
                 {link.label}
               </button>
@@ -64,13 +65,13 @@ export const Navbar: React.FC = () => {
           <div className="hidden md:flex items-center space-x-4">
             <Link
               to="/login"
-              className="px-5 py-2.5 text-base font-medium text-gray-700 hover:text-sky-600 transition-colors"
+              className="px-5 py-2.5 text-base font-medium text-gray-700 hover:text-sky-600 transition-colors font-body"
             >
               Sign In
             </Link>
             <Link
               to="/register"
-              className="px-6 py-2.5 text-base font-semibold text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-all shadow-lg hover:shadow-xl"
+              className="px-6 py-2.5 text-base font-semibold text-white bg-gradient-to-r from-sky-600 to-blue-600 rounded-lg hover:from-sky-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-body"
             >
               Get Started
             </Link>
@@ -92,28 +93,29 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200 shadow-xl">
+        <div className="md:hidden bg-white border-t border-gray-200 shadow-xl rounded-b-md">
           <div className="px-4 py-6 space-y-4">
             {navLinks.map((link) => (
               <button
                 key={link.id}
                 onClick={() => scrollToSection(link.id)}
-                className="block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                className="block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-between font-body"
               >
                 {link.label}
+                <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
             ))}
             <div className="pt-4 space-y-3 border-t border-gray-200">
               <Link
                 to="/login"
-                className="block w-full px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-lg text-center transition-colors"
+                className="block w-full px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-lg text-center transition-colors font-body"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="block w-full px-4 py-3 text-base font-semibold text-white bg-sky-600 rounded-lg hover:bg-sky-700 text-center shadow-lg transition-all"
+                className="block w-full px-4 py-3 text-base font-semibold text-white bg-gradient-to-r from-sky-600 to-blue-600 rounded-lg hover:from-sky-700 hover:to-blue-700 text-center shadow-lg transition-all font-body"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Get Started

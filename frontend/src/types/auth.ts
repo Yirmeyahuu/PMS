@@ -59,6 +59,36 @@ export interface LoginResponse {
   needs_password_change?: boolean;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface VerifyCodeRequest {
+  email: string;
+  code: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  new_password: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  code_sent: boolean;
+}
+
+export interface VerifyCodeResponse {
+  valid: boolean;
+  message: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+  password_reset: boolean;
+}
+
 export interface AuthError {
   detail?:           string;
   email?:            string[];
