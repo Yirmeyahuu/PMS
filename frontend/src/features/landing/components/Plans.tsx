@@ -105,14 +105,23 @@ export const Plans: React.FC = () => {
               <div className="lg:w-2/3 p-10 sm:p-12">
                 <h4 className="text-lg font-semibold text-white mb-6 font-display">What's Included:</h4>
                 <ul className="grid sm:grid-cols-2 gap-4" role="list">
-                  {PLAN.features.map((feature, index) => (
-                    <li key={`feature-${index}`} className="flex items-center">
-                      <div className="w-5 h-5 bg-cyan-600/20 rounded-full flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 text-cyan-400" />
-                      </div>
-                      <span className="ml-3 text-base text-gray-300 font-body">{feature}</span>
-                    </li>
-                  ))}
+                  {PLAN.features.map((feature, index) => {
+                    const colorIndex = index % 4;
+                    const colorClasses = [
+                      'bg-cyan-600/20 text-cyan-400',
+                      'bg-purple-600/20 text-purple-400',
+                      'bg-green-600/20 text-green-400',
+                      'bg-blue-600/20 text-blue-400'
+                    ];
+                    return (
+                      <li key={`feature-${index}`} className="flex items-center">
+                        <div className={`w-5 h-5 ${colorClasses[colorIndex].split(' ')[0]} rounded-full flex items-center justify-center shrink-0`}>
+                          <Check className={`w-3 h-3 ${colorClasses[colorIndex].split(' ')[1]}`} />
+                        </div>
+                        <span className="ml-3 text-base text-gray-300 font-body">{feature}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>
