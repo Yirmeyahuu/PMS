@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   User, Stethoscope, Tag, FileText,
-  Building2, CalendarDays, Clock, ArrowRight
+  Building2, CalendarDays, ArrowRight
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type { Appointment } from '@/types';

@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, MapPin, Phone, Heart, Calendar, Edit,
   Clock, CheckCircle, XCircle, AlertCircle, FileText,
   Activity, Loader2, ChevronDown, ChevronUp, Mail,
-  Archive, ArchiveRestore, Plus, FileCheck, Stethoscope,
+  Archive, ArchiveRestore, Plus
 } from 'lucide-react';
 import { getPatient, updatePatient, archivePatient, restorePatient } from './patient.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
