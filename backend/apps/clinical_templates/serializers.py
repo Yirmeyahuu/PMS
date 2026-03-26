@@ -73,7 +73,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
     practitioner_name = serializers.CharField(source='practitioner.user.get_full_name', read_only=True)
     template_name = serializers.CharField(source='template.name', read_only=True)
-    content = serializers.JSONField(write_only=True)  # Accepts plain JSON, encrypts internally
+    content = serializers.JSONField(write_only=True, required=False, allow_null=True, default={})  # Accepts plain JSON, encrypts internally
     decrypted_content = serializers.SerializerMethodField()
     
     class Meta:
@@ -84,10 +84,40 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             'date', 'note_type', 'is_signed', 'signed_at', 'is_draft', 'last_autosave',
             'content', 'decrypted_content', 'created_at', 'updated_at'
         ]
+        extra_kwargs = {
+            'content': {'required': False, 'allow_null': True, 'default': {}},
+            'patient': {'required': True},
+            'practitioner': {'required': True},
+            'template': {'required': True},
+            'date': {'required': True},
+        }
         read_only_fields = [
             'id', 'signed_at', 'last_autosave', 'created_at', 'updated_at',
-            'template_version'
+            'template_version', 'is_signed'
         ]
+    
+    def validate(self, attrs):
+        """Auto-populate clinic and other fields before validation"""
+        request = self.context.get('request')
+        if request and request.user:
+            # Auto-set clinic from user
+            if not attrs.get('clinic') and hasattr(request.user, 'clinic'):
+                attrs['clinic'] = request.user.clinic
+            # Auto-set is_draft to True if not provided
+            if 'is_draft' not in attrs:
+                attrs['is_draft'] = True
+            # Auto-set note_type to 'CLINICAL' if not provided
+            if 'note_type' not in attrs:
+                attrs['note_type'] = 'CLINICAL'
+            # Auto-set template_version from template
+            if attrs.get('template') and not attrs.get('template_version'):
+                attrs['template_version'] = attrs['template'].version
+        
+        # Ensure content is not None - default to empty dict
+        if 'content' not in attrs or attrs.get('content') is None:
+            attrs['content'] = {}
+        
+        return super().validate(attrs)
     
     def get_decrypted_content(self, obj):
         """Return decrypted content (only if user has permission)"""
@@ -105,12 +135,27 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Create note with encrypted content"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         content = validated_data.pop('content', {})
+        
+        # Log for debugging
+        logger.info(f"Creating ClinicalNote with: patient={validated_data.get('patient')}, practitioner={validated_data.get('practitioner')}, template={validated_data.get('template')}, date={validated_data.get('date')}, clinic={validated_data.get('clinic')}")
         
         # Auto-populate fields
         request = self.context.get('request')
         if request and request.user:
-            validated_data['clinic'] = request.user.clinic
+            # Ensure clinic is set from user
+            if not validated_data.get('clinic') and hasattr(request.user, 'clinic'):
+                validated_data['clinic'] = request.user.clinic
+            # Set template_version from template
+            template = validated_data.get('template')
+            if template and not validated_data.get('template_version'):
+                validated_data['template_version'] = template.version
+        
+        # Log final validated data
+        logger.info(f"Final validated_data: clinic={validated_data.get('clinic')}, template_version={validated_data.get('template_version')}")
         
         # Create instance
         instance = ClinicalNote(**validated_data)

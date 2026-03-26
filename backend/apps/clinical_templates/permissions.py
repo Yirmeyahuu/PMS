@@ -25,12 +25,12 @@ class IsSameClinic(permissions.BasePermission):
 
 class IsPractitionerOrAdmin(permissions.BasePermission):
     """
-    Only practitioners or admins can create clinical notes.
+    Only practitioners, admins, or staff can create clinical notes.
     """
     
     def has_permission(self, request, view):
         return (request.user and 
-                (request.user.is_practitioner or request.user.is_admin))
+                (request.user.is_practitioner or request.user.is_admin or request.user.role == 'STAFF'))
 
 
 class CanEditClinicalNote(permissions.BasePermission):

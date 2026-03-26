@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Twitter, Linkedin } from 'lucide-react';
-import MESLogo from '@/assets/MESLogo.svg';
+import MESLogo from '@/assets/Malasakit-Logo.svg';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -34,11 +34,19 @@ export const Footer: React.FC = () => {
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center space-x-3">
-              <img 
-                src={MESLogo} 
-                alt="MES Logo" 
-                className="h-14 w-auto"
+              <img
+                src={MESLogo}
+                alt="MES Logo"
+                className="h-24 w-auto"
               />
+              <div className="flex flex-col justify-center leading-tight">
+                <span className="font-display text-5xl font-bold tracking-wide text-white">
+                  MALASAKIT
+                </span>
+                <span className="font-display text-3xl font-normal tracking-wide text-white">
+                  EMR Solutions
+                </span>
+              </div>
             </Link>
             <p className="mt-6 text-base text-gray-400 max-w-sm leading-relaxed font-body">
               Modern practice management software designed for healthcare professionals 

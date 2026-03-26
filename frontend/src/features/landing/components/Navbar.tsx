@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
-import MESLogo from '@/assets/MESLogo.svg';
+import MESLogo from '@/assets/Malasakit-Logo.svg';
 
 export const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -44,7 +44,7 @@ export const Navbar: React.FC = () => {
             <img 
               src={MESLogo} 
               alt="MES Logo" 
-              className="h-11 w-auto"
+              className="h-18 w-auto"
             />
           </Link>
 

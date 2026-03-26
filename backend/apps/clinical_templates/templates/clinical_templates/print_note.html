@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Note - {{ note.patient_name }}</title>
+    <style>
+        /* ── Reset & Base ─────────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        @page {
+            size: A4;
+            margin: 15mm 15mm 20mm 15mm;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #1f2937;
+            background: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .note-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* ── Header ───────────────────────────────────────────────────────── */
+        .note-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 24px;
+            border-bottom: 3px solid #0284c7;
+            margin-bottom: 24px;
+        }
+
+        .practitioner-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .practitioner-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+        }
+
+        .practitioner-details {
+            flex: 1;
+        }
+
+        .practitioner-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .practitioner-title {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .date-time {
+            font-size: 12px;
+            color: #6b7280;
+            text-align: right;
+        }
+
+        .date-time .time {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .clinic-info {
+            flex: 1;
+            text-align: right;
+        }
+
+        .clinic-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .clinic-address {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        /* ── Patient Info ─────────────────────────────────────────────────── */
+        .patient-info {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .patient-info h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .patient-row {
+            display: flex;
+            gap: 24px;
+        }
+
+        .patient-field {
+            flex: 1;
+        }
+
+        .patient-field label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+
+        .patient-field value {
+            font-size: 13px;
+            color: #111827;
+            font-weight: 500;
+        }
+
+        /* ── Note Metadata ───────────────────────────────────────────────── */
+        .note-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .note-meta .template-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0369a1;
+        }
+
+        .note-meta .note-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .note-status.signed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .note-status.draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* ── Sections ─────────────────────────────────────────────────────── */
+        .note-sections {
+            margin-bottom: 32px;
+        }
+
+        .section {
+            margin-bottom: 24px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f3f4f6;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 2px;
+        }
+
+        .section-description {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .section-content {
+            padding: 16px;
+        }
+
+        .field-row {
+            margin-bottom: 12px;
+        }
+
+        .field-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .field-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .field-value {
+            font-size: 13px;
+            color: #111827;
+            line-height: 1.6;
+        }
+
+        .field-value:empty::before {
+            content: '—';
+            color: #d1d5db;
+        }
+
+        /* ── Footer ───────────────────────────────────────────────────────── */
+        .note-footer {
+            border-top: 2px solid #e5e7eb;
+            padding-top: 16px;
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-info {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .footer-info strong {
+            color: #374151;
+        }
+
+        .footer-signature {
+            text-align: right;
+        }
+
+        .signature-line {
+            width: 200px;
+            border-bottom: 1px solid #9ca3af;
+            margin-bottom: 4px;
+        }
+
+        .signature-label {
+            font-size: 10px;
+            color: #9ca3af;
+        }
+
+        /* ── Print Styles ───────────────────────────────────────────────── */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .note-container {
+                padding: 0;
+            }
+            
+            .section, .patient-info, .note-meta {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="note-container">
+        <!-- Header -->
+        <div class="note-header">
+            <div class="practitioner-info">
+                {% if practitioner_avatar %}
+                    <img src="{{ practitioner_avatar }}" alt="Practitioner" class="practitioner-avatar" />
+                {% else %}
+                    <div class="practitioner-avatar" style="background: linear-gradient(135deg, #0284c7, #0369a1); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 700;">
+                        {{ practitioner_initials }}
+                    </div>
+                {% endif %}
+                <div class="practitioner-details">
+                    <div class="practitioner-name">{{ note.practitioner_name }}</div>
+                    {% if note.practitioner_title %}
+                        <div class="practitioner-title">{{ note.practitioner_title }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="clinic-info">
+                <div class="clinic-name">{{ note.clinic_name }}</div>
+                {% if note.clinic_address %}
+                    <div class="clinic-address">{{ note.clinic_address }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Date & Time -->
+        <div class="date-time" style="text-align: right; margin-bottom: 24px;">
+            <div class="date">{{ note.day_name }}, {{ note.month }} {{ note.day }}, {{ note.year }}</div>
+            <div class="time">{{ note.time }}</div>
+        </div>
+
+        <!-- Patient Info -->
+        <div class="patient-info">
+            <h3>Patient Information</h3>
+            <div class="patient-row">
+                <div class="patient-field">
+                    <label>Name</label>
+                    <value>{{ note.patient_name }}</value>
+                </div>
+                <div class="patient-field">
+                    <label>Patient Number</label>
+                    <value>{{ note.patient_number }}</value>
+                </div>
+                <div class="patient-field">
+                    <label>Date of Note</label>
+                    <value>{{ note.date }}</value>
+                </div>
+            </div>
+        </div>
+
+        <!-- Note Status -->
+        <div class="note-meta">
+            <span class="template-name">
+                {% if note.template_name %}
+                    {{ note.template_name }}
+                {% else %}
+                    Clinical Note
+                {% endif %}
+                {% if note.template_category %}
+                    ({{ note.template_category }})
+                {% endif %}
+            </span>
+            {% if note.is_signed %}
+                <span class="note-status signed">SIGNED</span>
+            {% else %}
+                <span class="note-status draft">DRAFT</span>
+            {% endif %}
+        </div>
+
+        <!-- Note Sections -->
+        <div class="note-sections">
+            {% for section in note.sections %}
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-title">{{ section.title }}</div>
+                        {% if section.description %}
+                            <div class="section-description">{{ section.description }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="section-content">
+                        {% for field in section.fields %}
+                            {% if field.value %}
+                                <div class="field-row">
+                                    <div class="field-label">{{ field.label }}</div>
+                                    <div class="field-value">{{ field.value }}</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Footer -->
+        <div class="note-footer">
+            <div class="footer-info">
+                <div><strong>Created:</strong> {{ note.created_at }}</div>
+                {% if note.is_signed and note.signed_at %}
+                    <div><strong>Signed:</strong> {{ note.signed_at }}</div>
+                {% endif %}
+            </div>
+            <div class="footer-signature">
+                <div class="signature-line"></div>
+                <div class="signature-label">Created by: {{ note.practitioner_name }}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

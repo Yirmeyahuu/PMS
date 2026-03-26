@@ -5,7 +5,7 @@ import { useSidebar } from '@/hooks/useSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 import { sidebarItems } from './sidebarItems';
-import MESLogo from '@/assets/MESLogo.svg';
+import MESLogo from '@/assets/Malasakit-Logo-Relicon.webp';
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();

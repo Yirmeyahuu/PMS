@@ -109,7 +109,14 @@ export interface PrintNoteResponse {
   clinic_email: string;
   practitioner_name: string;
   practitioner_title: string;
+  practitioner_avatar?: string;
+  practitioner_initials?: string;
   date: string | null;
+  day_name: string;
+  month: string;
+  day: string;
+  year: string;
+  time: string;
   template_name: string;
   template_category: string;
   note_type: string;
@@ -129,4 +136,14 @@ export interface PrintNoteResponse {
 export const getPrintNote = async (id: number): Promise<PrintNoteResponse> => {
   const response = await axiosInstance.get(`${BASE_URL}/notes/${id}/print_note/`);
   return response.data;
+};
+
+/**
+ * Open the clinical note in a new window for printing.
+ * This fetches the HTML directly from the backend and opens it.
+ */
+export const openPrintNote = (id: number) => {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+  const printUrl = `${API_URL}${BASE_URL}/notes/${id}/print_note_html/`;
+  window.open(printUrl, '_blank');
 };

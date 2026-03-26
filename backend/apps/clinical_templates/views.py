@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives
@@ -344,6 +345,20 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         patient = note.patient
         clinic = note.clinic
         
+        # Get practitioner user for avatar and profile
+        practitioner_user = None
+        practitioner_avatar = None
+        practitioner_initials = ''
+        if note.practitioner and note.practitioner.user:
+            practitioner_user = note.practitioner.user
+            # Get avatar URL from user model
+            if hasattr(practitioner_user, 'avatar') and practitioner_user.avatar:
+                practitioner_avatar = practitioner_user.avatar.url if hasattr(practitioner_user.avatar, 'url') else str(practitioner_user.avatar)
+            # Generate initials
+            first = getattr(practitioner_user, 'first_name', '') or ''
+            last = getattr(practitioner_user, 'last_name', '') or ''
+            practitioner_initials = f"{first[0] if first else ''}{last[0] if last else ''}".upper()
+        
         # Build the formatted note content for printing
         content = note.content
         sections = []
@@ -394,6 +409,30 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
                     'fields': raw_fields
                 })
         
+        # Format date/time for header
+        note_date = note.date if note.date else None
+        now = timezone.now()
+        
+        day_name = ''
+        month = ''
+        day = ''
+        year = ''
+        time_str = ''
+        
+        if note_date:
+            # Day name (Monday, Tuesday, etc.)
+            day_name = note_date.strftime('%A')
+            # Month name
+            month = note_date.strftime('%B')
+            # Day number
+            day = str(note_date.day)
+            # Year
+            year = str(note_date.year)
+        
+        # Use created_at for time or default to current time
+        note_time = note.created_at if note.created_at else now
+        time_str = note_time.strftime('%I:%M %p')
+        
         response_data = {
             'patient_name': patient.get_full_name(),
             'patient_number': patient.patient_number,
@@ -401,9 +440,16 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
             'clinic_address': getattr(clinic, 'address', ''),
             'clinic_phone': getattr(clinic, 'phone', ''),
             'clinic_email': getattr(clinic, 'email', ''),
-            'practitioner_name': note.practitioner.user.get_full_name() if note.practitioner and note.practitioner.user else 'Practitioner',
-            'practitioner_title': getattr(note.practitioner.user, 'title', '') if note.practitioner and note.practitioner.user else '',
+            'practitioner_name': practitioner_user.get_full_name() if practitioner_user else 'Practitioner',
+            'practitioner_title': getattr(practitioner_user, 'title', '') if practitioner_user else '',
+            'practitioner_avatar': practitioner_avatar,
+            'practitioner_initials': practitioner_initials,
             'date': note.date.isoformat() if note.date else None,
+            'day_name': day_name,
+            'month': month,
+            'day': day,
+            'year': year,
+            'time': time_str,
             'template_name': note.template.name if note.template else 'Clinical Note',
             'template_category': note.template.category if note.template else 'CLINICAL',
             'note_type': note.note_type,
@@ -414,3 +460,23 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         }
         
         return Response(response_data)
+    
+    @action(detail=True, methods=['get'])
+    def print_note_html(self, request, pk=None):
+        """
+        Get rendered HTML version of clinical note for printing.
+        
+        GET /api/clinical-notes/{id}/print_note_html/
+        """
+        # Call print_note to get the data
+        print_note_response = self.print_note(request, pk)
+        note_data = print_note_response.data
+        
+        # Render the template
+        html_content = render_to_string('clinical_templates/print_note.html', {
+            'note': note_data,
+            'practitioner_avatar': note_data.get('practitioner_avatar'),
+            'practitioner_initials': note_data.get('practitioner_initials', ''),
+        })
+        
+        return HttpResponse(html_content, content_type='text/html')

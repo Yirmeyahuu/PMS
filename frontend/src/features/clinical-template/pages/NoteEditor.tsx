@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { DynamicFormRenderer } from '../components/DynamicFormRenderer';
-import { Save, FileSignature, AlertCircle } from 'lucide-react';
+import { Save, FileSignature, AlertCircle, Printer } from 'lucide-react';
 import { useClinicalNote } from '../hooks/useClinicalNote';
 import { useAutoSave } from '../hooks/useAutoSave';
+import { openPrintNote } from '../clinical-templates.api';
 import toast from 'react-hot-toast';
 
 export const NoteEditor: React.FC = () => {
@@ -160,6 +161,18 @@ export const NoteEditor: React.FC = () => {
                   <FileSignature className="w-4 h-4" />
                   Signed
                 </div>
+              )}
+
+              {/* Print Button - only show for existing notes */}
+              {!isNewNote && note && (
+                <button
+                  onClick={() => openPrintNote(note.id)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  title="Print Clinical Note"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </button>
               )}
             </div>
           </div>
