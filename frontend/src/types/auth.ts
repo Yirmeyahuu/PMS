@@ -6,6 +6,7 @@ export interface User {
   role:                  'ADMIN' | 'PRACTITIONER' | 'STAFF';
   phone:                 string;
   avatar:                string | null;
+  avatar_url:            string | null;  // ← NEW: full URL for avatar
   is_active:             boolean;
   clinic:                number | null;
   created_at:            string;

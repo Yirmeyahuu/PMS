@@ -57,6 +57,7 @@ export interface ClinicProfileSetupPayload {
   philhealth_accreditation?: string;
   timezone?:                string;
   logo?:                    File | null;
+  remove_logo?:             boolean;
 }
 
 // ── Existing functions ────────────────────────────────────────────────────────
@@ -126,7 +127,9 @@ export const setupClinicProfile = async (
     if (val === undefined || val === null) return;
     if (key === 'logo' && val instanceof File) {
       form.append('logo', val);
-    } else if (key !== 'logo') {
+    } else if (key === 'remove_logo' && val === true) {
+      form.append('remove_logo', 'true');
+    } else if (key !== 'logo' && key !== 'remove_logo') {
       form.append(key, String(val));
     }
   });

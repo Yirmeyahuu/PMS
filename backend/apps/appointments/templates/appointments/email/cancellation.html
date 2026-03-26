@@ -31,7 +31,11 @@
   <div class="wrapper">
     <div class="header">
       <h1>Appointment Cancelled</h1>
+      {% if clinic_logo_url %}
+      <img src="{{ clinic_logo_url }}" alt="{{ clinic_name }} Logo" style="max-height:40px;max-width:160px;margin:8px 0 0;" />
+      {% else %}
       <p>{{ clinic_name }}</p>
+      {% endif %}
     </div>
     <div class="body">
       <p class="greeting">Dear {{ patient_first_name }},</p>

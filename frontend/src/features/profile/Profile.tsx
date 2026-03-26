@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout }      from '@/features/dashboard/components/DashboardLayout';
 import { ProfileHeader }        from './components/ProfileHeader';
 import { ProfileAvatarUpload }  from './components/ProfileAvatarUpload';
@@ -10,6 +10,7 @@ import { Loader2 }              from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const { user: authUser } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);  // Track edit mode state
 
   const {
     user,
@@ -20,8 +21,19 @@ export const Profile: React.FC = () => {
     saveProfile,
     saveAvatar,
     deleteAvatar,
+    clearPendingAvatar,
     doResetPassword,
   } = useProfile(authUser ?? null);
+
+  // Debug: Log edit mode changes
+  const handleEditingChange = (editing: boolean) => {
+    console.log('[Profile] Edit mode changed:', editing);
+    setIsEditing(editing);
+    if (!editing) {
+      console.log('[Profile] Canceling edit - clearing pending avatar');
+      clearPendingAvatar();
+    }
+  };
 
   if (!user) {
     return (
@@ -53,12 +65,12 @@ export const Profile: React.FC = () => {
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7
                                 flex flex-col items-center gap-5 sticky top-6">
                   <ProfileAvatarUpload
-                    avatarUrl={user.avatar}
-                    initials={initials}
+                    avatarUrl={user.avatar_url ?? user.avatar}
                     isUploading={isUploadingAvatar}
                     isRemoving={isRemovingAvatar}
                     onFileSelect={saveAvatar}
                     onRemove={deleteAvatar}
+                    disabled={!isEditing}  // Only allow avatar changes in edit mode
                   />
 
                   {/* Identity summary */}
@@ -112,6 +124,7 @@ export const Profile: React.FC = () => {
                   user={user}
                   isSaving={isSaving}
                   onSave={saveProfile}
+                  onEditingChange={handleEditingChange}
                 />
                 <ResetPasswordCard
                   userEmail={user.email}

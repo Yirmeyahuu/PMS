@@ -5,9 +5,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Note: Do NOT set default Content-Type here - let axios determine it automatically
+  // based on the request body (JSON vs FormData)
 });
 
 // ─── Helper: get token from any known storage location ────────────────────────

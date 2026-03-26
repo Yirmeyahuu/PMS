@@ -139,7 +139,7 @@ class AuthViewSet(viewsets.GenericViewSet):
         user.save(update_fields=['last_login'])
         
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'tokens': {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
@@ -177,7 +177,7 @@ class AuthViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+        return Response(UserSerializer(request.user, context={'request': request}).data, status=status.HTTP_200_OK)
     
     @action(
         detail=False,
@@ -657,6 +657,10 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'patch'])
     def me(self, request):
         """Get or update the currently authenticated user's own profile."""
+        logger.info(f"[UserViewSet.me] Request method: {request.method}, content_type: {request.content_type}")
+        logger.info(f"[UserViewSet.me] request.FILES keys: {list(request.FILES.keys())}")
+        logger.info(f"[UserViewSet.me] request.data keys: {list(request.data.keys())}")
+        
         if request.method == 'GET':
             return Response(self.get_serializer(request.user).data)
 
@@ -664,13 +668,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # ── Avatar removal via JSON: { "remove_avatar": true } ──────────
         if 'application/json' in content_type:
+            logger.info("[UserViewSet.me] Handling JSON request")
             if request.data.get('remove_avatar') is True:
                 # Delete the file from storage if it exists
                 if request.user.avatar:
                     try:
                         request.user.avatar.delete(save=False)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.error(f"[UserViewSet.me] Error deleting avatar: {e}")
                 request.user.avatar = None
                 request.user.save(update_fields=['avatar'])
                 return Response(self.get_serializer(request.user).data)
@@ -692,23 +697,58 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # ── Avatar upload via multipart/form-data ───────────────────────
         if 'multipart/form-data' in content_type or 'avatar' in request.FILES:
+            logger.info("[UserViewSet.me] Handling multipart/form-data request")
             avatar_file = request.FILES.get('avatar')
-            if not avatar_file:
-                return Response(
-                    {'detail': 'No image file provided.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            # Delete old avatar file from storage
-            if request.user.avatar:
-                try:
-                    request.user.avatar.delete(save=False)
-                except Exception:
-                    pass
+            logger.info(f"[UserViewSet.me] avatar_file: {avatar_file}")
+            
+            # Check if this is a combined update (avatar + other fields)
+            has_profile_fields = any(k in request.data for k in ['first_name', 'last_name', 'phone'])
+            logger.info(f"[UserViewSet.me] has_profile_fields: {has_profile_fields}")
+            
+            try:
+                # Delete old avatar file from storage
+                if request.user.avatar:
+                    logger.info(f"[UserViewSet.me] Deleting old avatar: {request.user.avatar.name}")
+                    try:
+                        request.user.avatar.delete(save=False)
+                    except Exception as e:
+                        logger.error(f"[UserViewSet.me] Error deleting old avatar: {e}")
+                
+                # Handle avatar file
+                if avatar_file:
+                    logger.info(f"[UserViewSet.me] Setting new avatar: {avatar_file.name}")
+                    request.user.avatar = avatar_file
+                
+                # Handle remove_avatar flag
+                remove_avatar_val = request.data.get('remove_avatar')
+                logger.info(f"[UserViewSet.me] remove_avatar value: {remove_avatar_val}")
+                if remove_avatar_val == 'true' or remove_avatar_val is True:
+                    if request.user.avatar:
+                        try:
+                            request.user.avatar.delete(save=False)
+                        except Exception as e:
+                            logger.error(f"[UserViewSet.me] Error deleting avatar (remove): {e}")
+                        request.user.avatar = None
+                
+                # Handle other profile fields
+                if has_profile_fields:
+                    first_name = request.data.get('first_name') or request.user.first_name
+                    last_name = request.data.get('last_name') or request.user.last_name
+                    phone = request.data.get('phone') if request.data.get('phone') else request.user.phone
+                    
+                    logger.info(f"[UserViewSet.me] Updating profile: first_name={first_name}, last_name={last_name}, phone={phone}")
+                    request.user.first_name = first_name
+                    request.user.last_name = last_name
+                    request.user.phone = phone
+                
+                request.user.save()
+                logger.info(f"[UserViewSet.me] Save successful. New avatar: {request.user.avatar}")
+                return Response(self.get_serializer(request.user).data)
+            except Exception as e:
+                logger.error(f"[UserViewSet.me] Error during save: {e}", exc_info=True)
+                return Response({'detail': f'Error saving profile: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            request.user.avatar = avatar_file
-            request.user.save(update_fields=['avatar'])
-            return Response(self.get_serializer(request.user).data)
-
+        logger.warning(f"[UserViewSet.me] Unsupported content type: {content_type}")
         return Response(
             {'detail': 'Unsupported content type.'},
             status=status.HTTP_400_BAD_REQUEST

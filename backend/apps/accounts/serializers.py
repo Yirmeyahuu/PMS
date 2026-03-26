@@ -7,6 +7,7 @@ class UserSerializer(serializers.ModelSerializer):
     password               = serializers.CharField(write_only=True, required=False, validators=[validate_password])
     needs_password_change  = serializers.BooleanField(read_only=True)
     clinic_branch_name     = serializers.SerializerMethodField()
+    avatar_url             = serializers.SerializerMethodField()
 
     # ── NEW: expose whether the admin has completed clinic setup ──────────────
     clinic_setup_complete  = serializers.SerializerMethodField()
@@ -15,11 +16,18 @@ class UserSerializer(serializers.ModelSerializer):
         model  = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'role', 'phone',
-            'avatar', 'is_active', 'clinic', 'clinic_branch', 'clinic_branch_name',
+            'avatar', 'avatar_url', 'is_active', 'clinic', 'clinic_branch', 'clinic_branch_name',
             'created_at', 'password', 'password_changed', 'needs_password_change',
             'clinic_setup_complete',   # ← NEW
         ]
         read_only_fields = ['id', 'created_at', 'password_changed']
+
+    def get_avatar_url(self, obj) -> str | None:
+        """Return the full URL for the avatar image."""
+        request = self.context.get('request')
+        if obj.avatar and request:
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
 
     def get_clinic_branch_name(self, obj) -> str | None:
         if obj.clinic_branch:

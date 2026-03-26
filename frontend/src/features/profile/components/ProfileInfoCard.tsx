@@ -7,9 +7,10 @@ import type { User as UserType } from '@/types/auth';
 import type { UpdateProfileData } from '../services/profile.api';
 
 interface ProfileInfoCardProps {
-  user:     UserType;
-  isSaving: boolean;
-  onSave:   (data: UpdateProfileData) => Promise<boolean>;
+  user:           UserType;
+  isSaving:       boolean;
+  onSave:         (data: UpdateProfileData) => Promise<boolean>;
+  onEditingChange?: (editing: boolean) => void;  // Callback when edit mode changes
 }
 
 interface FormState {
@@ -70,7 +71,7 @@ const Field: React.FC<{
 );
 
 export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
-  user, isSaving, onSave,
+  user, isSaving, onSave, onEditingChange,
 }) => {
   const [editing, setEditing] = useState(false);
   const [form,    setForm]    = useState<FormState>({
@@ -112,11 +113,13 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
 
   const handleSave = async () => {
     if (!validate()) return;
+    console.log('[ProfileInfoCard] handleSave called with form:', form);
     const ok = await onSave({
       first_name: form.first_name.trim(),
       last_name:  form.last_name.trim(),
       phone:      form.phone.trim(),
     });
+    console.log('[ProfileInfoCard] handleSave result:', ok);
     if (ok) setEditing(false);
   };
 
@@ -128,6 +131,7 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
     });
     setErrors({});
     setEditing(false);
+    onEditingChange?.(false);
   };
 
   return (
@@ -147,7 +151,10 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
 
         {!editing ? (
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setEditing(true);
+              onEditingChange?.(true);
+            }}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold
                        text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl
                        border border-sky-200 transition-colors"

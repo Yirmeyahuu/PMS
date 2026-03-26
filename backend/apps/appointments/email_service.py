@@ -7,6 +7,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_clinic_logo_url(clinic) -> str | None:
+    """Get the clinic logo URL for use in emails."""
+    if not clinic.logo:
+        return None
+    # If logo is a Cloudinary URL, return it directly
+    if hasattr(clinic.logo, 'url'):
+        try:
+            return clinic.logo.url
+        except Exception:
+            return None
+    return None
+
+
 def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
     """
     Send a reminder email to the patient for their upcoming appointment.
@@ -49,6 +62,7 @@ def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
         'clinic_phone':        getattr(clinic, 'phone', ''),
         'clinic_address':      getattr(clinic, 'address', ''),
         'clinic_email':        getattr(clinic, 'email', settings.DEFAULT_FROM_EMAIL),
+        'clinic_logo_url':     get_clinic_logo_url(clinic),
         'chief_complaint':     appointment.chief_complaint or '',
         'notes_for_patient':   appointment.patient_notes or '',
         'appointment_id':      appointment.id,
@@ -159,6 +173,7 @@ def send_appointment_cancellation_email(appointment, cancellation_reason: str) -
         'clinic_phone':         getattr(clinic, 'phone', ''),
         'clinic_address':       getattr(clinic, 'address', ''),
         'clinic_email':         getattr(clinic, 'email', settings.DEFAULT_FROM_EMAIL),
+        'clinic_logo_url':      get_clinic_logo_url(clinic),
         'cancellation_reason':  cancellation_reason,
         'cancelled_by_name':    cancelled_by_name,
         'cancelled_at':         appointment.cancelled_at.strftime('%A, %d %B %Y at %I:%M %p')

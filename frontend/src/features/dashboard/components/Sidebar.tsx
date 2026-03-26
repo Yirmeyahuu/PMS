@@ -178,15 +178,25 @@ export const Sidebar: React.FC = () => {
               >
                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
-                  transition-all duration-200 bg-white
+                  transition-all ring-2 ring-white duration-200 overflow-hidden
                   ${isProfileActive
                     ? 'ring-2 ring-white'
                     : 'group-hover:ring-2 group-hover:ring-white/60'
                   }
                 `}>
-                  <span className="text-sky-600 font-bold text-sm">
-                    {user?.first_name?.[0]}{user?.last_name?.[0]}
-                  </span>
+                  {user?.avatar_url ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img 
+                      src="/assets/default-avatar/default-profile.jpg" 
+                      alt="Default Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
 
                 {(isExpanded || isMobile) && (

@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import Clinic, Practitioner, Location
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ClinicBranchSerializer(serializers.ModelSerializer):
@@ -51,6 +54,7 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
     # ✅ email is required here — it's the clinic's business email,
     #    separate from the admin's personal email used at registration.
     email = serializers.EmailField(required=True)
+    remove_logo = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model  = Clinic
@@ -58,7 +62,7 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
             'name', 'email', 'phone', 'address',
             'city', 'province', 'postal_code',
             'website', 'tin', 'philhealth_accreditation',
-            'logo', 'timezone',
+            'logo', 'timezone', 'remove_logo',
         ]
 
     def validate_name(self, value):
@@ -90,6 +94,23 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             raise serializers.ValidationError("Province is required.")
         return value.strip()
+
+    def update(self, instance, validated_data):
+        """Handle logo removal when remove_logo is True."""
+        remove_logo = validated_data.pop('remove_logo', False)
+        if remove_logo and instance.logo:
+            # Delete the existing logo file
+            instance.logo.delete(save=True)
+        
+        # Check if name is being updated and sync to all branches
+        new_name = validated_data.get('name')
+        if new_name and new_name != instance.name:
+            # Update all branches of this clinic with the new name
+            branches = Clinic.objects.filter(parent_clinic=instance)
+            branches.update(name=new_name)
+            logger.info(f"Updated clinic name '{new_name}' to {branches.count()} branches")
+        
+        return super().update(instance, validated_data)
 
 
 

@@ -2,8 +2,6 @@ import { useState, useCallback } from 'react';
 import {
   getMyProfile,
   updateMyProfile,
-  uploadAvatar,
-  removeAvatar,
   resetPassword,
   type UpdateProfileData,
 } from '../services/profile.api';
@@ -17,6 +15,8 @@ export const useProfile = (initialUser: User | null) => {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRemovingAvatar,  setIsRemovingAvatar]  = useState(false);
   const [isResettingPw,     setIsResettingPw]     = useState(false);
+  const [pendingAvatar,     setPendingAvatar]    = useState<File | null>(null);  // Avatar to be saved with profile
+  const [avatarToRemove,    setAvatarToRemove]   = useState(false);  // Flag to remove avatar
 
   /* ── helper: persist user everywhere ── */
   const syncUser = useCallback((updated: User) => {
@@ -36,68 +36,74 @@ export const useProfile = (initialUser: User | null) => {
     }
   }, [syncUser]);
 
-  /* ── Update profile info ── */
+  /* ── Update profile info (includes avatar if pending) ── */
   const saveProfile = useCallback(async (data: UpdateProfileData) => {
     setIsSaving(true);
     try {
-      const updated = await updateMyProfile(data);
+      // Check if there's a pending avatar or avatar removal
+      let dataToSend = { ...data };
+      
+      if (pendingAvatar) {
+        dataToSend.avatar = pendingAvatar;
+      }
+      
+      if (avatarToRemove) {
+        dataToSend = { ...dataToSend, remove_avatar: true };
+      }
+      
+      const updated = await updateMyProfile(dataToSend);
+      
+      // Clear pending avatar state after successful save
+      setPendingAvatar(null);
+      setAvatarToRemove(false);
+      
       syncUser(updated);
       toast.success('Profile updated successfully');
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: unknown } };
       const msg =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data ?? {})?.[0] ||
-        'Failed to update profile';
-      console.error('saveProfile error:', err?.response?.data ?? err);
+        error?.response?.data instanceof Object
+          ? Object.values(error?.response?.data ?? {})?.[0]
+          : 'Failed to update profile';
+      console.error('saveProfile error:', error?.response?.data ?? err);
       toast.error(String(msg));
       return false;
     } finally {
       setIsSaving(false);
     }
-  }, [syncUser]);
+  }, [syncUser, pendingAvatar, avatarToRemove]);
 
-  /* ── Upload avatar ── */
+  /* ── Store avatar for later save ── */
   const saveAvatar = useCallback(async (file: File) => {
-    setIsUploadingAvatar(true);
-    try {
-      const updated = await uploadAvatar(file);
-      syncUser(updated);
-      toast.success('Profile photo updated');
-      return true;
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data ?? {})?.[0] ||
-        'Failed to upload photo';
-      console.error('saveAvatar error:', err?.response?.data ?? err);
-      toast.error(String(msg));
-      return false;
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  }, [syncUser]);
+    // Store the file to be saved when profile is saved
+    console.log('[useProfile] saveAvatar called with:', file.name, file.size);
+    setPendingAvatar(file);
+    return true;
+  }, []);
 
-  /* ── Remove avatar ── */
+  /* ── Store avatar removal for later save ── */
   const deleteAvatar = useCallback(async () => {
-    setIsRemovingAvatar(true);
-    try {
-      const updated = await removeAvatar();
-      syncUser(updated);
-      toast.success('Profile photo removed');
-      return true;
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        Object.values(err?.response?.data ?? {})?.[0] ||
-        'Failed to remove photo';
-      console.error('deleteAvatar error:', err?.response?.data ?? err);
-      toast.error(String(msg));
-      return false;
-    } finally {
-      setIsRemovingAvatar(false);
-    }
-  }, [syncUser]);
+    // Store the removal flag to be processed when profile is saved
+    setAvatarToRemove(true);
+    setPendingAvatar(null);  // Clear any pending upload
+    return true;
+  }, []);
+
+  /* ── Clear pending avatar changes (when cancel is clicked) ── */
+  const clearPendingAvatar = useCallback(() => {
+    setPendingAvatar(null);
+    setAvatarToRemove(false);
+  }, []);
+
+  /* ── Get pending avatar status for UI ── */
+  const getPendingAvatar = useCallback((): File | null => {
+    return pendingAvatar;
+  }, [pendingAvatar]);
+
+  const isAvatarPendingRemoval = useCallback((): boolean => {
+    return avatarToRemove;
+  }, [avatarToRemove]);
 
   /* ── Reset password ── */
   const doResetPassword = useCallback(async (): Promise<boolean> => {
@@ -125,9 +131,13 @@ export const useProfile = (initialUser: User | null) => {
       }, 2500);
 
       return true;
-    } catch (err: any) {
-      console.error('doResetPassword error:', err?.response?.data ?? err);
-      toast.error(err?.response?.data?.detail || 'Password reset failed');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: unknown } };
+      console.error('doResetPassword error:', error?.response?.data ?? err);
+      const msg = error?.response?.data instanceof Object
+        ? (error?.response?.data as { detail?: string })?.detail
+        : 'Password reset failed';
+      toast.error(msg || 'Password reset failed');
       return false;
     } finally {
       setIsResettingPw(false);
@@ -137,13 +147,14 @@ export const useProfile = (initialUser: User | null) => {
   return {
     user,
     isSaving,
-    isUploadingAvatar,
-    isRemovingAvatar,
+    isUploadingAvatar,  // Always false now (avatar handled in saveProfile)
+    isRemovingAvatar,   // Always false now (avatar handled in saveProfile)
     isResettingPw,
     refresh,
     saveProfile,
     saveAvatar,
     deleteAvatar,
+    clearPendingAvatar,  // Expose for cancel button
     doResetPassword,
   };
 };

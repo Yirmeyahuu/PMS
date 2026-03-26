@@ -5,6 +5,8 @@ export interface UpdateProfileData {
   first_name?: string;
   last_name?:  string;
   phone?:      string;
+  avatar?:    File;  // Optional avatar file for combined update
+  remove_avatar?: boolean;  // Flag to remove avatar
 }
 
 export interface ResetPasswordData {
@@ -22,8 +24,22 @@ export const getMyProfile = async (): Promise<User> => {
   return response.data;
 };
 
-/** Update profile fields (PATCH) — JSON only */
+/** Update profile fields (PATCH) — optionally with avatar */
 export const updateMyProfile = async (data: UpdateProfileData): Promise<User> => {
+  // If avatar is included or remove_avatar, use FormData
+  if (data.avatar || data.remove_avatar) {
+    console.log('[profile.api] updateMyProfile with avatar:', data.avatar?.name, 'remove:', data.remove_avatar);
+    const formData = new FormData();
+    if (data.first_name) formData.append('first_name', data.first_name);
+    if (data.last_name) formData.append('last_name', data.last_name);
+    if (data.phone) formData.append('phone', data.phone);
+    if (data.avatar) formData.append('avatar', data.avatar);
+    if (data.remove_avatar) formData.append('remove_avatar', 'true');
+    const response = await axiosInstance.patch<User>('/users/me/', formData);
+    return response.data;
+  }
+  // No avatar - use JSON
+  console.log('[profile.api] updateMyProfile JSON only');
   const response = await axiosInstance.patch<User>('/users/me/', data, {
     headers: { 'Content-Type': 'application/json' },
   });

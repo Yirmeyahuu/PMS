@@ -3,18 +3,19 @@ import { Camera, Loader2, Trash2 } from 'lucide-react';
 
 interface ProfileAvatarUploadProps {
   avatarUrl?:    string | null;
-  initials:      string;
+  initials?:     string;  // Optional - can be removed in future
   isUploading:   boolean;
   isRemoving?:   boolean;
   onFileSelect:  (file: File) => void;
   onRemove?:     () => void;
+  disabled?:     boolean;  // When true, avatar upload is disabled
 }
 
 const ACCEPTED = 'image/jpeg,image/png,image/webp';
 const MAX_MB   = 5;
 
 export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
-  avatarUrl, initials, isUploading, isRemoving = false, onFileSelect, onRemove,
+  avatarUrl, isUploading, isRemoving = false, onFileSelect, onRemove, disabled = false,
 }) => {
   const inputRef              = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -24,13 +25,17 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('[ProfileAvatarUpload] File selected:', file.name, file.size);
+
     setError(null);
 
     if (!file.type.startsWith('image/')) {
+      console.warn('[ProfileAvatarUpload] Invalid file type:', file.type);
       setError('Only image files are allowed.');
       return;
     }
     if (file.size > MAX_MB * 1024 * 1024) {
+      console.warn('[ProfileAvatarUpload] File too large:', file.size);
       setError(`Image exceeds the ${MAX_MB} MB limit. Please choose a smaller file.`);
       return;
     }
@@ -48,7 +53,10 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
 
   const src        = preview ?? avatarUrl ?? null;
   const hasPhoto   = !!src;
-  const isBusy     = isUploading || isRemoving;
+  const isBusy     = isUploading || isRemoving || disabled;
+
+  // Default avatar fallback
+  const DEFAULT_AVATAR = '/assets/default-avatar/default-profile.jpg';
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -61,7 +69,11 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
           {src ? (
             <img src={src} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-white font-bold text-4xl select-none">{initials}</span>
+            <img 
+              src={DEFAULT_AVATAR} 
+              alt="Default Avatar" 
+              className="w-full h-full object-cover"
+            />
           )}
 
           {/* Hover overlay — only when not busy */}

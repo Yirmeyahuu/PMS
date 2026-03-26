@@ -193,6 +193,9 @@ export const PracticeOption1: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-gray-900">Clinic Locations</h2>
               <p className="text-xs text-gray-500">Manage your clinic branches and locations</p>
+              {mainClinicName && (
+                <p className="text-xs text-sky-600 mt-0.5 font-medium">{mainClinicName}</p>
+              )}
             </div>
           </div>
           <button
