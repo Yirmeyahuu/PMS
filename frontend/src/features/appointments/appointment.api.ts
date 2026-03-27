@@ -3,6 +3,8 @@ import type {
   Appointment,
   CreateAppointmentData,
   PaginatedResponse,
+  BlockAppointment,
+  CreateBlockAppointmentData,
 } from '@/types';
 
 export interface AppointmentFilters {
@@ -299,4 +301,61 @@ export const createRecurringAppointments = async (
     params
   );
   return response.data;
+};
+
+// ── Block Appointments (Events) ─────────────────────────────────────────────────
+
+export interface BlockAppointmentFilters {
+  clinic_branch?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
+export const getBlockAppointments = async (
+  filters?: BlockAppointmentFilters
+): Promise<{ count: number; results: BlockAppointment[] }> => {
+  const params = new URLSearchParams();
+
+  if (filters?.clinic_branch) params.append('clinic_branch', String(filters.clinic_branch));
+  if (filters?.start_date) params.append('start_date', filters.start_date);
+  if (filters?.end_date) params.append('end_date', filters.end_date);
+
+  const response = await axiosInstance.get<{ count: number; results: BlockAppointment[] }>(
+    `/block-appointments/?${params.toString()}`
+  );
+  return response.data;
+};
+
+export const getBlockAppointmentsCalendar = async (
+  filters?: BlockAppointmentFilters
+): Promise<BlockAppointment[]> => {
+  const params = new URLSearchParams();
+
+  if (filters?.clinic_branch) params.append('clinic_branch', String(filters.clinic_branch));
+  if (filters?.start_date) params.append('start_date', filters.start_date);
+  if (filters?.end_date) params.append('end_date', filters.end_date);
+
+  const response = await axiosInstance.get<BlockAppointment[]>(
+    `/block-appointments/calendar/?${params.toString()}`
+  );
+  return response.data;
+};
+
+export const createBlockAppointment = async (
+  data: CreateBlockAppointmentData
+): Promise<BlockAppointment> => {
+  const response = await axiosInstance.post<BlockAppointment>('/block-appointments/', data);
+  return response.data;
+};
+
+export const updateBlockAppointment = async (
+  id: number,
+  data: Partial<CreateBlockAppointmentData>
+): Promise<BlockAppointment> => {
+  const response = await axiosInstance.patch<BlockAppointment>(`/block-appointments/${id}/`, data);
+  return response.data;
+};
+
+export const deleteBlockAppointment = async (id: number): Promise<void> => {
+  await axiosInstance.delete(`/block-appointments/${id}/`);
 };

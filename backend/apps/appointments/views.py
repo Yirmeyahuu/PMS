@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Q
 from datetime import datetime, timedelta
-from .models import Appointment, PractitionerSchedule, AppointmentReminder
+from .models import Appointment, PractitionerSchedule, AppointmentReminder, BlockAppointment
 from .serializers import (
     AppointmentSerializer,
     AppointmentEditSerializer,
@@ -14,6 +14,8 @@ from .serializers import (
     PractitionerScheduleSerializer,
     AppointmentReminderSerializer,
     AppointmentPrintSerializer,
+    BlockAppointmentSerializer,
+    BlockAppointmentCreateSerializer,
 )
 from apps.patients.models import PortalBooking
 from apps.clinics.models import Clinic
@@ -1074,3 +1076,112 @@ class AppointmentPrintViewSet(viewsets.ReadOnlyModelViewSet):
             'total':    total,
             'by_status': {row['status']: row['count'] for row in counts},
         })
+
+
+# ── Block Appointment ViewSet ────────────────────────────────────────────────────
+
+class BlockAppointmentViewSet(viewsets.ModelViewSet):
+    """
+    CRUD operations for Block Appointments (events that block time slots).
+    
+    - All authenticated users can view block appointments.
+    - Only Admins can create, update, or delete block appointments.
+    """
+
+    queryset = BlockAppointment.objects.filter(is_deleted=False).select_related(
+        'clinic', 'created_by'
+    )
+    serializer_class = BlockAppointmentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['clinic', 'date']
+    ordering_fields = ['date', 'start_time', 'created_at']
+    ordering = ['-date', '-start_time']
+
+    def get_queryset(self):
+        """Filter queryset to only show block appointments for the user's clinic"""
+        user = self.request.user
+
+        if not user.clinic:
+            return self.queryset.none()
+
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
+        queryset = self.queryset.filter(clinic_id__in=all_branch_ids)
+
+        # Filter by specific clinic branch
+        clinic_branch_param = self.request.query_params.get('clinic_branch')
+        if clinic_branch_param:
+            try:
+                branch_id = int(clinic_branch_param)
+                if branch_id in all_branch_ids:
+                    queryset = queryset.filter(clinic_id=branch_id)
+                else:
+                    return self.queryset.none()
+            except (ValueError, TypeError):
+                pass
+
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date') or \
+                     self.request.query_params.get('date_from')
+        end_date = self.request.query_params.get('end_date') or \
+                   self.request.query_params.get('date_to')
+
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
+        return queryset
+
+    def get_serializer_class(self):
+        """Use different serializers for create/update vs retrieve"""
+        if self.action in ['create', 'update', 'partial_update']:
+            return BlockAppointmentCreateSerializer
+        return BlockAppointmentSerializer
+
+    def check_admin_permission(self):
+        """Helper to check if user is admin"""
+        from rest_framework.exceptions import PermissionDenied
+        if not self.request.user.is_admin:
+            raise PermissionDenied({
+                'detail': 'Only administrators can perform this action.'
+            })
+
+    def create(self, request, *args, **kwargs):
+        """Create a new block appointment - Admin only"""
+        self.check_admin_permission()
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """Update a block appointment - Admin only"""
+        self.check_admin_permission()
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Partial update a block appointment - Admin only"""
+        self.check_admin_permission()
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a block appointment - Admin only"""
+        self.check_admin_permission()
+        return super().destroy(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        """Set created_by to the current user"""
+        serializer.save(created_by=self.request.user)
+
+    # ── Custom action: Get block appointments for calendar ───────────────────────
+    @action(detail=False, methods=['get'], url_path='calendar')
+    def calendar_events(self, request):
+        """
+        Get block appointments formatted for calendar display.
+        Query params: start_date, end_date, clinic_branch
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = BlockAppointmentSerializer(queryset, many=True)
+        return Response(serializer.data)

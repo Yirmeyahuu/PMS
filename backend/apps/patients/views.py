@@ -462,6 +462,7 @@ class PublicAvailableSlotsView(APIView):
         from datetime import time, date as date_type, timedelta, datetime
         from apps.appointments.models import Appointment
         from apps.appointments.models import PractitionerSchedule
+        from apps.appointments.models import BlockAppointment
 
         try:
             target_date = date_type.fromisoformat(date_str)
@@ -543,6 +544,17 @@ class PublicAvailableSlotsView(APIView):
             )
             booking_end = booking_start + booking_service_duration
             booked_ranges.append((booking_start, booking_end))
+
+        # Add block appointments to blocked ranges
+        block_qs = BlockAppointment.objects.filter(
+            clinic=portal_link.clinic,
+            date=target_date,
+        )
+
+        for block in block_qs:
+            block_start = time_to_minutes(block.start_time)
+            block_end   = time_to_minutes(block.end_time)
+            booked_ranges.append((block_start, block_end))
 
         available = []
         for slot_time in candidate_slots:

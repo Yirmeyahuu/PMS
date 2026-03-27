@@ -7,14 +7,21 @@ import {
 import { useAppointmentModal }   from './hooks/useAppointmentModal';
 import { useDragSelection }      from './hooks/useDragSelection';
 import { useAppointments }       from './hooks/useAppointments';
+import { useBlockAppointments }  from './hooks/useBlockAppointments';
+import { useBlockHover }         from './hooks/useBlockHover';
 import { useAppointmentDrag }    from './hooks/useAppointmentDrag';
+import { useBlockAppointmentDrag } from './hooks/useBlockAppointmentDrag';
 import { useAppointmentHover }   from './hooks/useAppointmentHover';
+import { useBlockConflictDetection } from './hooks/useBlockConflictDetection';
 import { AppointmentModal }      from './components/AppointmentModal';
 import { AppointmentView }       from './components/AppointmentView';
 import { AppointmentHoverCard }  from './components/AppointmentHoverCard';
+import { BlockHoverCard }        from './components/BlockHoverCard';
+import { ConflictModal }         from './components/ConflictModal';
 import { APPOINTMENT_STATUS_COLORS } from '@/types';
-import type { Appointment }           from '@/types';
+import type { Appointment, BlockAppointment } from '@/types';
 import { rescheduleAppointment }      from './appointment.api';
+import { updateBlockAppointment }     from './appointment.api';
 import toast                          from 'react-hot-toast';
 
 type CalendarView = 'day' | 'week' | 'month'; 
@@ -25,6 +32,9 @@ interface CalendarProps {
   onDateChange:           (date: Date) => void;
   selectedPractitionerId: number | null;
   selectedClinicBranchId: number | null;
+  refreshKey?: number; // Used to trigger refresh when events are created
+  onEventClick?: (event: BlockAppointment) => void; // Callback when admin clicks on a block event
+  onAppointmentsReady?: (appointments: Appointment[]) => void; // Callback to expose appointments to parent
 }
 
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -112,6 +122,9 @@ export const Calendar: React.FC<CalendarProps> = ({
   onDateChange,
   selectedPractitionerId,
   selectedClinicBranchId,
+  refreshKey,
+  onEventClick,
+  onAppointmentsReady,
 }) => {
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
 
@@ -128,14 +141,15 @@ export const Calendar: React.FC<CalendarProps> = ({
     hideHover,
   } = useAppointmentHover();
 
-  // ── Reschedule confirmation ───────────────────────────────────────────────
-  const [rescheduleTarget, setRescheduleTarget] = useState<{
-    appointment: Appointment;
-    newDate:     Date;
-    newHour:     number;
-    newMinutes:  number;
-  } | null>(null);
-  const [isRescheduling, setIsRescheduling] = useState(false);
+  // ── Block hover card ───────────────────────────────────────────────────────────
+  const {
+    blockHoverState,
+    onBlockMouseEnter,
+    onBlockMouseLeave,
+    onBlockPopoverEnter,
+    onBlockPopoverLeave,
+    hideBlockHover,
+  } = useBlockHover();
 
   const getDateRange = () => {
     if (view === 'day') {
@@ -210,6 +224,87 @@ export const Calendar: React.FC<CalendarProps> = ({
     clinicBranchId: selectedClinicBranchId,
   });
 
+  // ── Block Appointments (Events) ───────────────────────────────────────────────
+  const {
+    blockAppointments,
+    addBlockAppointmentToState,
+    updateBlockAppointmentInState,
+    removeBlockAppointmentFromState,
+    refetch: refetchBlockAppointments,
+  } = useBlockAppointments({
+    startDate,
+    endDate,
+    clinicBranchId: selectedClinicBranchId,
+  });
+
+  // ── Conflict detection for block appointments (must be after appointments is defined) ─────────────────────────────────
+  const { getFirstConflict } = useBlockConflictDetection(appointments);
+  const [rescheduleTarget, setRescheduleTarget] = useState<{
+    type: 'appointment' | 'block';
+    appointment?: Appointment;
+    block?: BlockAppointment;
+    newDate:     Date;
+    newHour:     number;
+    newMinutes:  number;
+  } | null>(null);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  // ── Conflict detection state ─────────────────────────────────────────────────
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictingAppointment, setConflictingAppointment] = useState<{
+    appointment: Appointment;
+    blockStartTime: string;
+    blockEndTime: string;
+  } | null>(null);
+  const [pendingBlockDrop, setPendingBlockDrop] = useState<{
+    block: BlockAppointment;
+    newDate: Date;
+    newHour: number;
+    newMinutes: number;
+  } | null>(null);
+
+  // Use refreshKey to trigger re-fetch when events are created
+  React.useEffect(() => {
+    console.log('[Calendar] refreshKey effect:', refreshKey);
+    if (refreshKey && refreshKey > 0) {
+      console.log('[Calendar] Calling refetchBlockAppointments');
+      refetchBlockAppointments();
+    }
+  }, [refreshKey, refetchBlockAppointments]);
+
+  // Expose appointments to parent via callback
+  React.useEffect(() => {
+    if (onAppointmentsReady && appointments.length > 0) {
+      onAppointmentsReady(appointments);
+    }
+  }, [appointments, onAppointmentsReady]);
+
+  // Helper to get block appointments for a specific date
+  const getBlockAppointmentsForDate = (date: Date): BlockAppointment[] => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    console.log('[Calendar] getBlockAppointmentsForDate:', { dateStr, blockAppointments });
+    if (!blockAppointments || !Array.isArray(blockAppointments)) {
+      console.log('[Calendar] No block appointments or not an array');
+      return [];
+    }
+    const filtered = blockAppointments.filter(apt => apt.date === dateStr);
+    console.log('[Calendar] Filtered block appointments:', filtered);
+    return filtered;
+  };
+
+  // Helper to get style for block appointment
+  const getBlockAppointmentStyle = (block: BlockAppointment) => {
+    const [sH, sM] = block.start_time.split(':').map(Number);
+    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+    const [eH, eM] = block.end_time.split(':').map(Number);
+    const endSlotIndex = (eH - 6) * 4 + Math.floor(eM / 15);
+    const durationSlots = Math.max(endSlotIndex - startSlotIndex, 1);
+    return {
+      top:    `${startSlotIndex * 1.25}rem`,
+      height: `${durationSlots * 1.25}rem`,
+    };
+  };
+
   // ── Drag-to-reschedule ────────────────────────────────────────────────────
   const handleRescheduleRequest = useCallback((
     appointment: Appointment,
@@ -217,35 +312,103 @@ export const Calendar: React.FC<CalendarProps> = ({
     newHour:     number,
     newMinutes:  number,
   ) => {
-    setRescheduleTarget({ appointment, newDate, newHour, newMinutes });
+    setRescheduleTarget({ type: 'appointment', appointment, newDate, newHour, newMinutes });
   }, []);
+
+  const handleBlockRescheduleRequest = useCallback((
+    block: BlockAppointment,
+    newDate:     Date,
+    newHour:     number,
+    newMinutes:  number,
+  ) => {
+    // Calculate the new end time based on original duration
+    const [startH, startM] = block.start_time.split(':').map(Number);
+    const [endH, endM] = block.end_time.split(':').map(Number);
+    const originalDuration = (endH * 60 + endM) - (startH * 60 + startM);
+    const newEndTotalMins = newHour * 60 + newMinutes + originalDuration;
+    const newEndH = Math.floor(newEndTotalMins / 60);
+    const newEndM = newEndTotalMins % 60;
+    
+    const newStartTime = `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+    const newEndTime = `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`;
+    const newDateStr = format(newDate, 'yyyy-MM-dd');
+    
+    // Check for conflicts with existing appointments
+    const conflict = getFirstConflict({
+      date: newDateStr,
+      start_time: newStartTime,
+      end_time: newEndTime,
+    });
+    
+    if (conflict) {
+      // Store pending block drop and show conflict modal
+      setPendingBlockDrop({ block, newDate, newHour, newMinutes });
+      setConflictingAppointment(conflict);
+      setShowConflictModal(true);
+    } else {
+      // No conflict, proceed with reschedule
+      setRescheduleTarget({ type: 'block', block, newDate, newHour, newMinutes });
+    }
+  }, [getFirstConflict]);
 
   const { dragState, startHold, cancelHold, onDragMove, onDropOnSlot } =
     useAppointmentDrag(handleRescheduleRequest);
 
+  const {
+    blockDragState,
+    startBlockHold,
+    cancelBlockHold,
+    onBlockDragMove,
+    onBlockDropOnSlot,
+  } = useBlockAppointmentDrag(handleBlockRescheduleRequest);
+
   const confirmReschedule = async () => {
     if (!rescheduleTarget) return;
-    const { appointment, newDate, newHour, newMinutes } = rescheduleTarget;
-
-    const durationMins = appointment.duration_minutes;
-    const endTotalMins = newHour * 60 + newMinutes + durationMins;
-    const endH         = Math.floor(endTotalMins / 60);
-    const endM         = endTotalMins % 60;
+    const { type, appointment, block, newDate, newHour, newMinutes } = rescheduleTarget;
 
     setIsRescheduling(true);
     try {
-      const updated = await rescheduleAppointment(appointment.id, {
-        date:       format(newDate, 'yyyy-MM-dd'),
-        start_time: `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`,
-        end_time:   `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
-      });
-      updateAppointmentInState(updated);
-      toast.success(
-        `Rescheduled to ${format(newDate, 'MMM d')} at ` +
-        `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to reschedule appointment.');
+      if (type === 'appointment' && appointment) {
+        const durationMins = appointment.duration_minutes;
+        const endTotalMins = newHour * 60 + newMinutes + durationMins;
+        const endH         = Math.floor(endTotalMins / 60);
+        const endM         = endTotalMins % 60;
+
+        const updated = await rescheduleAppointment(appointment.id, {
+          date:       format(newDate, 'yyyy-MM-dd'),
+          start_time: `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`,
+          end_time:   `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+        });
+        updateAppointmentInState(updated);
+        toast.success(
+          `Rescheduled to ${format(newDate, 'MMM d')} at ` +
+          `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
+        );
+      } else if (type === 'block' && block) {
+        // Calculate end time based on original duration
+        const [startH, startM] = block.start_time.split(':').map(Number);
+        const [endH, endM] = block.end_time.split(':').map(Number);
+        const originalDuration = (endH * 60 + endM) - (startH * 60 + startM);
+        const newEndTotalMins = newHour * 60 + newMinutes + originalDuration;
+        const newEndH = Math.floor(newEndTotalMins / 60);
+        const newEndM = newEndTotalMins % 60;
+
+        const updated = await updateBlockAppointment(block.id, {
+          date:       format(newDate, 'yyyy-MM-dd'),
+          start_time: `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`,
+          end_time:   `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`,
+        });
+        updateBlockAppointmentInState(updated);
+        toast.success(
+          `Event rescheduled to ${format(newDate, 'MMM d')} at ` +
+          `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
+        );
+      }
+    } catch (err: unknown) {
+      const errorMessage = err && typeof err === 'object' && 'response' in err 
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail 
+        : 'Failed to reschedule';
+      toast.error(errorMessage ?? 'Failed to reschedule.');
     } finally {
       setIsRescheduling(false);
       setRescheduleTarget(null);
@@ -363,21 +526,21 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const handleAppointmentClick = (apt: Appointment) => {
-    if (dragState.isDragging || dragState.isHolding) return;
+    if (dragState.isDragging || dragState.isHolding || blockDragState.isDragging || blockDragState.isHolding) return;
     hideHover();
     setSelectedAppointment(apt);
     setIsViewOpen(true);
   };
 
   const handleMouseDown = (_date: Date, slot: any) => {
-    if (dragState.isDragging) return;
+    if (dragState.isDragging || blockDragState.isDragging) return;
     isDraggingRef.current    = false;
     dragStartTimeRef.current = Date.now();
     startSelection(slot);
   };
 
   const handleMouseEnter = (slot: any) => {
-    if (dragState.isDragging) return;
+    if (dragState.isDragging || blockDragState.isDragging) return;
     if (selection.isSelecting) {
       const cur   = slot.hour * 4 + slot.quarter;
       const start = selection.startSlot
@@ -389,7 +552,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const handleMouseUp = (date: Date) => {
-    if (dragState.isDragging && dragState.draggedAppointment) return;
+    if ((dragState.isDragging && dragState.draggedAppointment) || (blockDragState.isDragging && blockDragState.draggedBlock)) return;
 
     if (selection.startSlot) {
       const duration  = getSelectionDuration();
@@ -414,11 +577,15 @@ export const Calendar: React.FC<CalendarProps> = ({
       onDropOnSlot(date, slot.hour, slot.minutes);
       return;
     }
+    if (blockDragState.isDragging) {
+      onBlockDropOnSlot(date, slot.hour, slot.minutes);
+      return;
+    }
     handleMouseUp(date);
   };
 
   const handleDoubleClick = (date: Date, slot: any) => {
-    if (dragState.isDragging || dragState.isHolding) return;
+    if (dragState.isDragging || dragState.isHolding || blockDragState.isDragging || blockDragState.isHolding) return;
     openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
   };
 
@@ -459,6 +626,34 @@ export const Calendar: React.FC<CalendarProps> = ({
       {dragState.isDragging && dragState.ghostPosition && dragState.draggedAppointment && (
         <DragGhost appointment={dragState.draggedAppointment} position={dragState.ghostPosition} />
       )}
+      {blockDragState.isHolding && blockDragState.ghostPosition && (
+        <HoldRing progress={blockDragState.holdProgress} position={blockDragState.ghostPosition} />
+      )}
+      {blockDragState.isDragging && blockDragState.ghostPosition && blockDragState.draggedBlock && (
+        <div
+          className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
+          style={{
+            left:      blockDragState.ghostPosition.x - 80,
+            top:       blockDragState.ghostPosition.y - 20,
+            width:     160,
+            transform: 'rotate(2deg)',
+          }}
+        >
+          <div className="bg-gray-800 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-gray-600">
+            <div className="truncate">{blockDragState.draggedBlock.event_name}</div>
+            <div className="text-gray-300 mt-0.5 truncate">
+              {blockDragState.draggedBlock.start_time} · {blockDragState.draggedBlock.end_time}
+            </div>
+            <div className="mt-1 flex items-center gap-1 text-gray-400">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Drop to reschedule
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -472,26 +667,58 @@ export const Calendar: React.FC<CalendarProps> = ({
     />
   );
 
+  // ── Block hover card overlay ───────────────────────────────────────────────────
+  const blockHoverCardOverlay = blockHoverState.visible && blockHoverState.block && blockHoverState.anchorRect && (
+    <BlockHoverCard
+      block={blockHoverState.block}
+      anchorRect={blockHoverState.anchorRect}
+      onEnter={onBlockPopoverEnter}
+      onLeave={onBlockPopoverLeave}
+    />
+  );
+
   // ── Reschedule confirmation modal ─────────────────────────────────────────
   const rescheduleModal = rescheduleTarget && (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm mx-4 p-6">
         <h3 className="text-base font-bold text-gray-900 mb-2">Confirm Reschedule</h3>
-        <p className="text-sm text-gray-600 mb-1">
-          <span className="font-semibold">{rescheduleTarget.appointment.patient_name}</span>
-        </p>
-        <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="font-medium text-gray-700">From:</span>
-            {rescheduleTarget.appointment.date} at {rescheduleTarget.appointment.start_time}
-          </div>
-          <div className="flex items-center gap-2 text-sky-600">
-            <span className="font-medium">To:</span>
-            {format(rescheduleTarget.newDate, 'yyyy-MM-dd')} at{' '}
-            {String(rescheduleTarget.newHour).padStart(2, '0')}:
-            {String(rescheduleTarget.newMinutes).padStart(2, '0')}
-          </div>
-        </div>
+        {rescheduleTarget.type === 'appointment' && rescheduleTarget.appointment ? (
+          <>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-semibold">{rescheduleTarget.appointment.patient_name}</span>
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+              <div className="flex items-center gap-2 text-gray-500">
+                <span className="font-medium text-gray-700">From:</span>
+                {rescheduleTarget.appointment.date} at {rescheduleTarget.appointment.start_time}
+              </div>
+              <div className="flex items-center gap-2 text-sky-600">
+                <span className="font-medium">To:</span>
+                {format(rescheduleTarget.newDate, 'yyyy-MM-dd')} at{' '}
+                {String(rescheduleTarget.newHour).padStart(2, '0')}:
+                {String(rescheduleTarget.newMinutes).padStart(2, '0')}
+              </div>
+            </div>
+          </>
+        ) : rescheduleTarget.type === 'block' && rescheduleTarget.block ? (
+          <>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-semibold">{rescheduleTarget.block.event_name}</span>
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+              <div className="flex items-center gap-2 text-gray-500">
+                <span className="font-medium text-gray-700">From:</span>
+                {rescheduleTarget.block.date} at {rescheduleTarget.block.start_time} - {rescheduleTarget.block.end_time}
+              </div>
+              <div className="flex items-center gap-2 text-sky-600">
+                <span className="font-medium">To:</span>
+                {format(rescheduleTarget.newDate, 'yyyy-MM-dd')} at{' '}
+                {String(rescheduleTarget.newHour).padStart(2, '0')}:
+                {String(rescheduleTarget.newMinutes).padStart(2, '0')}
+              </div>
+            </div>
+          </>
+        ) : null}
         <div className="flex gap-3">
           <button
             onClick={() => setRescheduleTarget(null)}
@@ -537,6 +764,46 @@ export const Calendar: React.FC<CalendarProps> = ({
         onUpdated={(updated) => {
           updateAppointmentInState(updated);
           setSelectedAppointment(updated);
+        }}
+      />
+      {/* Conflict Modal for block drag/reschedule */}
+      <ConflictModal
+        isOpen={showConflictModal}
+        conflictingAppointment={conflictingAppointment}
+        onBlockExisting={() => {
+          // Proceed with the block reschedule despite conflict
+          setShowConflictModal(false);
+          setConflictingAppointment(null);
+          // If there was a pending block drop, proceed with reschedule
+          if (pendingBlockDrop) {
+            setRescheduleTarget({
+              type: 'block',
+              block: pendingBlockDrop.block,
+              newDate: pendingBlockDrop.newDate,
+              newHour: pendingBlockDrop.newHour,
+              newMinutes: pendingBlockDrop.newMinutes,
+            });
+            setPendingBlockDrop(null);
+          }
+        }}
+        onRescheduleExisting={() => {
+          // Cancel block creation, prompt user to reschedule existing appointment
+          setShowConflictModal(false);
+          setConflictingAppointment(null);
+          setPendingBlockDrop(null);
+          // Show toast for rescheduling
+          if (conflictingAppointment) {
+            toast('Please drag the existing appointment to a new time before creating the block appointment.', {
+              icon: '📅',
+              duration: 5000,
+            });
+          }
+        }}
+        onCancel={() => {
+          // Cancel block creation
+          setShowConflictModal(false);
+          setConflictingAppointment(null);
+          setPendingBlockDrop(null);
         }}
       />
     </>
@@ -633,6 +900,124 @@ export const Calendar: React.FC<CalendarProps> = ({
             </div>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // Helper to check if there's a conflict between appointment and any block
+  const hasBlockConflict = useCallback((apt: Appointment, blocks: BlockAppointment[]): boolean => {
+    const timeToMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    const aptStart = timeToMinutes(apt.start_time);
+    const aptEnd = timeToMinutes(apt.end_time);
+
+    for (const block of blocks) {
+      if (block.date !== apt.date) continue;
+      const blockStart = timeToMinutes(block.start_time);
+      const blockEnd = timeToMinutes(block.end_time);
+      // Check for overlap
+      if (aptStart < blockEnd && aptEnd > blockStart) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  // Helper to format time in 12-hour format
+  const formatTime12Hour = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const h12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${h12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // ── Block Appointment Card — Day/Week ────────────────────────────────────────
+  const renderBlockTimelineCard = (block: BlockAppointment, compact = false) => {
+    const style = getBlockAppointmentStyle(block);
+
+    const isDragged = blockDragState.draggedBlock?.id === block.id;
+    const isHeld    = blockDragState.isHolding && blockDragState.draggedBlock?.id === block.id;
+
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!blockDragState.isDragging) {
+        onEventClick?.(block);
+      }
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      hideBlockHover();
+      startBlockHold(block, e);
+    };
+
+    const handleMouseUp = () => {
+      if (!blockDragState.isDragging) {
+        cancelBlockHold();
+      }
+    };
+
+    const handleMouseEnter = (e: React.MouseEvent) => {
+      if (!blockDragState.isDragging) {
+        onBlockMouseEnter(block, e);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (!blockDragState.isDragging) {
+        onBlockMouseLeave();
+      }
+    };
+
+    const containerStyle: React.CSSProperties = {
+      ...style,
+      position:     'absolute',
+      left:         '4px',
+      right:        '4px',
+      zIndex:      isDragged ? 5 : 10,
+      overflow:    'hidden',
+      borderRadius: '6px',
+      backgroundColor: isDragged ? 'rgba(31, 41, 55, 0.4)' : 'rgba(31, 41, 55, 0.8)',
+      cursor:       blockDragState.isDragging ? 'grabbing' : 'grab',
+      opacity:      isDragged ? 0.35 : 1,
+      transform:    isHeld ? 'scale(1.03)' : 'scale(1)',
+      transition:   'filter 0.15s, opacity 0.15s, transform 0.15s',
+    };
+
+    return (
+      <div
+        key={`block-${block.id}`}
+        style={containerStyle}
+        className="border border-gray-600 px-2 py-1 transition-all select-none hover:brightness-110"
+        title="Hold 2s to drag and reschedule"
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {isHeld && (
+          <div
+            className="absolute inset-0 rounded border-2 border-sky-400 animate-pulse pointer-events-none"
+            style={{ zIndex: 20 }}
+          />
+        )}
+        <div className="text-xs font-semibold text-white truncate">
+          {block.event_name}
+        </div>
+        {!compact && (
+          <div className="text-xs text-gray-300 truncate mt-0.5">
+            {formatTime12Hour(block.start_time)} - {formatTime12Hour(block.end_time)}
+          </div>
+        )}
+        {!compact && block.created_by_name && (
+          <div className="text-xs text-gray-400 truncate">
+            Created by {block.created_by_name}
+          </div>
+        )}
       </div>
     );
   };
@@ -734,6 +1119,9 @@ export const Calendar: React.FC<CalendarProps> = ({
     return (
       <div
         key={i}
+        data-slot-date={format(date, 'yyyy-MM-dd')}
+        data-slot-hour={slot.hour}
+        data-slot-minute={slot.minutes}
         onMouseDown={() => handleMouseDown(date, slot)}
         onMouseEnter={() => handleMouseEnter(slot)}
         onMouseUp={() => handleSlotMouseUp(date, slot)}
@@ -760,12 +1148,17 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // ── Global mouse-move / mouse-up on the calendar wrapper ─────────────────
   const calendarWrapperProps = {
-    onMouseMove:  (e: React.MouseEvent) => onDragMove(e),
+    onMouseMove:  (e: React.MouseEvent) => {
+      onDragMove(e);
+      onBlockDragMove(e);
+    },
     onMouseUp:    (_e: React.MouseEvent) => {
       if (dragState.isHolding && !dragState.isDragging) cancelHold();
+      if (blockDragState.isHolding && !blockDragState.isDragging) cancelBlockHold();
     },
     onMouseLeave: () => {
       if (dragState.isHolding && !dragState.isDragging) cancelHold();
+      if (blockDragState.isHolding && !blockDragState.isDragging) cancelBlockHold();
     },
   };
 
@@ -784,28 +1177,66 @@ export const Calendar: React.FC<CalendarProps> = ({
                   🗓 Hover a time slot and release to reschedule
                 </p>
               )}
+              {blockDragState.isDragging && (
+                <p className="text-xs text-emerald-600 font-medium mt-1 animate-pulse">
+                  🗓 Hover a time slot and release to reschedule event
+                </p>
+              )}
             </div>
           </div>
 
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="grid grid-cols-[80px_1fr]">
-              {/* Time column */}
-              <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
-                {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
-              </div>
-              {/* Day column */}
-              <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                {getAppointmentsForDate(currentDate).map(apt => renderTimelineCard(apt, false))}
-              </div>
-            </div>
+            {(() => {
+              const dayAppts = getAppointmentsForDate(currentDate);
+              const dayBlocks = getBlockAppointmentsForDate(currentDate);
+              const hasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
+              
+              if (hasConflict) {
+                // 2-column layout when there's a conflict
+                return (
+                  <div className="grid grid-cols-[80px_1fr_1fr]">
+                    {/* Time column */}
+                    <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
+                      {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                    </div>
+                    {/* Appointments column */}
+                    <div className="border-r border-gray-200 relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                      {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                      {dayAppts.map(apt => renderTimelineCard(apt, false))}
+                    </div>
+                    {/* Block appointments column */}
+                    <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                      {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                      {dayBlocks.map(block => renderBlockTimelineCard(block, false))}
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Default layout (no conflict)
+              return (
+                <div className="grid grid-cols-[80px_1fr]">
+                  {/* Time column */}
+                  <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
+                    {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                  </div>
+                  {/* Day column */}
+                  <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                    {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                    {dayAppts.map(apt => renderTimelineCard(apt, false))}
+                    {dayBlocks.map(block => renderBlockTimelineCard(block, false))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         {sharedModals}
         {dragOverlays}
         {rescheduleModal}
         {hoverCardOverlay}
+        {blockHoverCardOverlay}
       </div>
     );
   }
@@ -839,25 +1270,68 @@ export const Calendar: React.FC<CalendarProps> = ({
 
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="grid grid-cols-[80px_repeat(7,1fr)]">
-              {/* Time column */}
-              <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
-                {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
-              </div>
-              {/* Day columns */}
-              {weekDays.map(day => (
-                <div key={day.toISOString()} className="border-l border-gray-200 relative">
-                  {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
-                  {getAppointmentsForDate(day).map(apt => renderTimelineCard(apt, true))}
+            {(() => {
+              // Calculate grid columns based on each day's conflict status
+              const getGridColumns = () => {
+                const dayHasConflict = weekDays.map(day => {
+                  const dayAppts = getAppointmentsForDate(day);
+                  const dayBlocks = getBlockAppointmentsForDate(day);
+                  return dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
+                });
+                // Build grid template: time column + each day (1 or 2 columns)
+                const cols = ['80px', ...dayHasConflict.map(has => has ? '1fr 1fr' : '1fr')];
+                return cols.join(' ');
+              };
+
+              return (
+                <div className="grid" style={{ gridTemplateColumns: getGridColumns() }}>
+                  {/* Time column */}
+                  <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
+                    {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                  </div>
+                  {/* Day columns - each day handled independently */}
+                  {weekDays.map(day => {
+                    const dayAppts = getAppointmentsForDate(day);
+                    const dayBlocks = getBlockAppointmentsForDate(day);
+                    const dayHasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
+
+                    if (dayHasConflict) {
+                      // 2-column layout for this day
+                      return (
+                        <React.Fragment key={day.toISOString()}>
+                          {/* Appointments column */}
+                          <div className="border-l border-gray-200 relative">
+                            {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
+                            {dayAppts.map(apt => renderTimelineCard(apt, true))}
+                          </div>
+                          {/* Block appointments column */}
+                          <div className="border-l border-gray-200 relative bg-gray-25">
+                            {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
+                            {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
+                          </div>
+                        </React.Fragment>
+                      );
+                    }
+
+                    // Single column for this day
+                    return (
+                      <div key={day.toISOString()} className="border-l border-gray-200 relative">
+                        {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
+                        {dayAppts.map(apt => renderTimelineCard(apt, true))}
+                        {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         </div>
         {sharedModals}
         {dragOverlays}
         {rescheduleModal}
         {hoverCardOverlay}
+        {blockHoverCardOverlay}
       </div>
     );
   }
@@ -875,6 +1349,11 @@ export const Calendar: React.FC<CalendarProps> = ({
               🗓 Release on a date cell to reschedule (time will be set to original time)
             </div>
           )}
+          {blockDragState.isDragging && (
+            <div className="flex-shrink-0 bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-xs text-emerald-700 font-medium text-center animate-pulse">
+              🗓 Release on a date cell to reschedule event (time will be set to original time)
+            </div>
+          )}
 
           <div className="flex-shrink-0 grid grid-cols-7 border-b border-gray-200 bg-gray-50">
             {weekDayNames.map(d => (
@@ -889,8 +1368,9 @@ export const Calendar: React.FC<CalendarProps> = ({
               <div key={wi} className="grid grid-cols-7 border-b border-gray-200 last:border-b-0">
                 {week.map(day => {
                   const dayAppts     = getAppointmentsForDay(day);
-                  const count        = dayAppts.length;
-                  const isDropTarget = dragState.isDragging;
+                  const dayBlockAppts = getBlockAppointmentsForDate(day);
+                  const count        = dayAppts.length + dayBlockAppts.length;
+                  const isDropTarget = dragState.isDragging || blockDragState.isDragging;
 
                   return (
                     <div
@@ -899,6 +1379,11 @@ export const Calendar: React.FC<CalendarProps> = ({
                         if (dragState.isDragging && dragState.draggedAppointment) {
                           const [origH, origM] = dragState.draggedAppointment.start_time.split(':').map(Number);
                           onDropOnSlot(day, origH, origM);
+                          return;
+                        }
+                        if (blockDragState.isDragging && blockDragState.draggedBlock) {
+                          const [origH, origM] = blockDragState.draggedBlock.start_time.split(':').map(Number);
+                          onBlockDropOnSlot(day, origH, origM);
                           return;
                         }
                         onDateChange(day);
@@ -926,7 +1411,53 @@ export const Calendar: React.FC<CalendarProps> = ({
                         )}
                       </div>
                       <div className="space-y-1 mt-2 relative">
+                        {/* Regular appointments */}
                         {dayAppts.slice(0, 3).map(apt => renderMonthCard(apt))}
+                        {/* Block appointments */}
+                        {dayBlockAppts.slice(0, 2).map(block => {
+                          const handleBlockClick = (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            if (!blockDragState.isDragging) {
+                              onEventClick?.(block);
+                            }
+                          };
+                          const handleBlockMouseEnter = (e: React.MouseEvent) => {
+                            if (!blockDragState.isDragging) {
+                              onBlockMouseEnter(block, e);
+                            }
+                          };
+                          const handleBlockMouseLeave = () => {
+                            if (!blockDragState.isDragging) {
+                              onBlockMouseLeave();
+                            }
+                          };
+                          const handleBlockMouseDown = (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            hideBlockHover();
+                            startBlockHold(block, e);
+                          };
+                          return (
+                            <div
+                              key={block.id}
+                              onClick={handleBlockClick}
+                              onMouseEnter={handleBlockMouseEnter}
+                              onMouseLeave={handleBlockMouseLeave}
+                              onMouseDown={handleBlockMouseDown}
+                              className="bg-gray-800/80 text-white text-xs px-2 py-1 rounded truncate font-medium border border-gray-600 hover:brightness-110 cursor-pointer transition-all"
+                              title="Hold 2s to drag and reschedule"
+                            >
+                              <div className="font-semibold">{block.event_name}</div>
+                              <div className="text-gray-300">
+                                {formatTime12Hour(block.start_time)} - {formatTime12Hour(block.end_time)}
+                              </div>
+                              {block.created_by_name && (
+                                <div className="text-gray-400">
+                                  Created by {block.created_by_name}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {count > 3 && (
                           <div className="text-xs text-gray-500 font-medium px-2">+{count - 3} more</div>
                         )}
@@ -942,6 +1473,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         {dragOverlays}
         {rescheduleModal}
         {hoverCardOverlay}
+        {blockHoverCardOverlay}
       </div>
     );
   }

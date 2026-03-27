@@ -82,6 +82,33 @@ export interface AppointmentReminder {
   error_message: string;
 }
 
+// ── Block Appointment (Event) ───────────────────────────────────────────────────
+
+export interface BlockAppointment {
+  id: number;
+  clinic: number;
+  clinic_name: string | null;
+  event_name: string;
+  event_type: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  notes: string;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateBlockAppointmentData {
+  clinic: number;
+  event_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  notes?: string;
+}
+
 export const APPOINTMENT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   SCHEDULED:   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200'   },
   CONFIRMED:   { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200'  },

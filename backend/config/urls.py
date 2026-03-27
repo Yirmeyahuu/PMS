@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import AuthViewSet, UserViewSet, RoleViewSet, PermissionViewSet
 from apps.clinics.views import ClinicViewSet, PractitionerViewSet, LocationViewSet
-from apps.appointments.views import AppointmentViewSet, PractitionerScheduleViewSet, AppointmentReminderViewSet
+from apps.appointments.views import AppointmentViewSet, PractitionerScheduleViewSet, AppointmentReminderViewSet, BlockAppointmentViewSet
 from apps.records.views import ClinicalNoteViewSet, NoteTemplateViewSet, OutcomeMeasureViewSet, AttachmentViewSet
 from apps.billing.views import (
     InvoiceViewSet, InvoiceItemViewSet, PaymentViewSet,
@@ -39,6 +39,7 @@ router.register(r'contacts', ContactViewSet, basename='contacts')
 router.register(r'appointments',           AppointmentViewSet,          basename='appointments')
 router.register(r'practitioner-schedules', PractitionerScheduleViewSet, basename='practitioner-schedules')
 router.register(r'appointment-reminders',  AppointmentReminderViewSet,  basename='appointment-reminders')
+router.register(r'block-appointments',      BlockAppointmentViewSet,      basename='block-appointments')
 
 # Records
 router.register(r'clinical-notes',   ClinicalNoteViewSet,   basename='clinical-notes')

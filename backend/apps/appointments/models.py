@@ -219,3 +219,70 @@ class AppointmentReminder(TimeStampedModel):
     
     def __str__(self):
         return f"Reminder for {self.appointment} - {self.get_reminder_type_display()}"
+
+
+# ── Block Appointment (Events) ─────────────────────────────────────────────────
+
+class BlockAppointment(TimeStampedModel, SoftDeleteModel):
+    """
+    Block Appointments are special events that block time slots in the clinic schedule.
+    Examples: Staff Meeting, Clinic Holiday, Team Training, Maintenance Schedule.
+    Only Admins can create/edit/delete these events, but all users can view them.
+    """
+
+    EVENT_TYPE_CHOICES = [
+        ('BLOCK', 'Blocked Schedule'),
+    ]
+
+    clinic = models.ForeignKey(
+        'clinics.Clinic',
+        on_delete=models.CASCADE,
+        related_name='block_appointments',
+        help_text='Clinic/branch this block event belongs to'
+    )
+
+    event_name = models.CharField(
+        max_length=200,
+        help_text='Name/title of the blocked event (e.g., Staff Meeting)'
+    )
+
+    event_type = models.CharField(
+        max_length=20,
+        choices=EVENT_TYPE_CHOICES,
+        default='BLOCK',
+        editable=False
+    )
+
+    date = models.DateField(help_text='Date of the blocked event')
+
+    start_time = models.TimeField(help_text='Start time of the blocked period')
+
+    end_time = models.TimeField(help_text='End time of the blocked period')
+
+    notes = models.TextField(
+        blank=True,
+        help_text='Optional notes about the blocked event'
+    )
+
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='block_appointments_created'
+    )
+
+    class Meta:
+        db_table = 'block_appointments'
+        ordering = ['-date', '-start_time']
+        indexes = [
+            models.Index(fields=['clinic', 'date']),
+            models.Index(fields=['date']),
+        ]
+
+    def __str__(self):
+        return f"{self.event_name} - {self.date} {self.start_time} to {self.end_time}"
+
+    def clean(self):
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValidationError('End time must be after start time')

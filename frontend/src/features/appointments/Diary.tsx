@@ -3,9 +3,15 @@ import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout
 import { ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { Calendar } from './Calendar';
 import { ArrivalsList } from './components/ArrivalsList';
+import { AddEventModal } from './components/AddEventModal';
+import { AddDragEventModal } from './components/AddDragEventModal';
+import { EventViewModal } from './components/EventViewModal';
+import { DraggableEventButton } from './components/DraggableEventButton';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
+import { useAuthStore } from '@/store/auth.store';
+import type { BlockAppointment, Appointment } from '@/types';
 
 type CalendarView = 'day' | 'week' | 'month';
 
@@ -77,6 +83,63 @@ export const Diary: React.FC = () => {
 
   const selectedPractitionerName = practitioners.find(p => p.id === selectedPractitioner)?.name;
   const selectedBranchName = branches.find(b => b.id === selectedClinicBranch)?.name;
+
+  // ── Add Event Modal State ───────────────────────────────────────────────────
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [showDragEventModal, setShowDragEventModal] = useState(false);
+  const [dragEventData, setDragEventData] = useState<{
+    initialDate?: Date;
+    initialStartTime?: string;
+    initialEndTime?: string;
+  }>({});
+  const [eventRefreshKey, setEventRefreshKey] = useState(0);
+  
+  // Appointments from Calendar for conflict detection
+  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>([]);
+
+  // Event View Modal State
+  const [showEventViewModal, setShowEventViewModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<BlockAppointment | null>(null);
+
+  const handleEventClick = (event: BlockAppointment) => {
+    setSelectedEvent(event);
+    setShowEventViewModal(true);
+  };
+
+  const handleEventUpdated = (updatedEvent: BlockAppointment) => {
+    // Increment the refresh key to trigger Calendar to refetch block appointments
+    setEventRefreshKey(prev => prev + 1);
+  };
+
+  const handleEventDeleted = (eventId: number) => {
+    // Increment the refresh key to trigger Calendar to refetch block appointments
+    setEventRefreshKey(prev => prev + 1);
+  };
+
+  const handleEventCreated = (_event: BlockAppointment) => {
+    // Increment the refresh key to trigger Calendar to refetch block appointments
+    console.log('[Diary] handleEventCreated called with event:', _event);
+    setEventRefreshKey(prev => prev + 1);
+  };
+
+  // Handle drag event drop on calendar
+  const handleDragEventDrop = (date: Date, hour: number, minute: number) => {
+    const startTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    // Default 1 hour duration
+    const endHour = hour + 1;
+    const endTime = `${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    
+    setDragEventData({
+      initialDate: date,
+      initialStartTime: startTime,
+      initialEndTime: endTime,
+    });
+    setShowDragEventModal(true);
+  };
+
+  // Check if current user is admin
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <DashboardLayout>
@@ -352,6 +415,11 @@ export const Diary: React.FC = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* Add Event Button - Admin Only - Draggable */}
+                {isAdmin && (
+                  <DraggableEventButton onDragEnd={handleDragEventDrop} onClick={() => setShowAddEventModal(true)} />
+                )}
               </div>
             </div>
 
@@ -363,8 +431,48 @@ export const Diary: React.FC = () => {
                 onDateChange={handleDateChange}
                 selectedPractitionerId={selectedPractitioner}
                 selectedClinicBranchId={selectedClinicBranch}
+                refreshKey={eventRefreshKey}
+                onEventClick={isAdmin ? handleEventClick : undefined}
+                onAppointmentsReady={setCalendarAppointments}
               />
             </div>
+
+            {/* Add Event Modal */}
+            <AddEventModal
+              isOpen={showAddEventModal}
+              onClose={() => setShowAddEventModal(false)}
+              onCreated={handleEventCreated}
+              selectedClinicBranchId={selectedClinicBranch}
+              appointments={calendarAppointments}
+            />
+            {/* Add Drag Event Modal (for drag-and-drop) */}
+            {showDragEventModal && dragEventData.initialDate && (
+              <AddDragEventModal
+                isOpen={showDragEventModal}
+                onClose={() => {
+                  setShowDragEventModal(false);
+                  setDragEventData({});
+                }}
+                onCreated={handleEventCreated}
+                selectedClinicBranchId={selectedClinicBranch}
+                initialDate={dragEventData.initialDate}
+                initialStartTime={dragEventData.initialStartTime}
+                initialEndTime={dragEventData.initialEndTime}
+                appointments={calendarAppointments}
+              />
+            )}
+
+            {/* Event View Modal (for admin to view/edit/delete events) */}
+            <EventViewModal
+              isOpen={showEventViewModal}
+              onClose={() => {
+                setShowEventViewModal(false);
+                setSelectedEvent(null);
+              }}
+              event={selectedEvent}
+              onUpdated={handleEventUpdated}
+              onDeleted={handleEventDeleted}
+            />
           </div>
         </div>
       </div>

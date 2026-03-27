@@ -1,6 +1,6 @@
 from apps.clinics import models
 from rest_framework import serializers
-from .models import Appointment, PractitionerSchedule, AppointmentReminder
+from .models import Appointment, PractitionerSchedule, AppointmentReminder, BlockAppointment
 from apps.clinics.services.models import Service
 
 
@@ -260,3 +260,71 @@ class AppointmentPrintSerializer(serializers.ModelSerializer):
             return f"{mins}min"
         hours, remainder = divmod(mins, 60)
         return f"{hours}h {remainder}min" if remainder else f"{hours}h"
+
+
+# ── Block Appointment Serializer ─────────────────────────────────────────────────
+
+class BlockAppointmentSerializer(serializers.ModelSerializer):
+    """Serializer for Block Appointments (events that block time slots)"""
+    created_by_name = serializers.CharField(
+        source='created_by.get_full_name',
+        read_only=True,
+        allow_null=True
+    )
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = BlockAppointment
+        fields = [
+            'id',
+            'clinic',
+            'clinic_name',
+            'event_name',
+            'event_type',
+            'date',
+            'start_time',
+            'end_time',
+            'notes',
+            'created_by',
+            'created_by_name',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'event_type', 'created_by_name', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        if start_time and end_time and end_time <= start_time:
+            raise serializers.ValidationError({
+                'end_time': 'End time must be after start time'
+            })
+
+        return data
+
+
+class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating Block Appointments - used in POST/PUT requests"""
+
+    class Meta:
+        model = BlockAppointment
+        fields = [
+            'clinic',
+            'event_name',
+            'date',
+            'start_time',
+            'end_time',
+            'notes',
+        ]
+
+    def validate(self, data):
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        if start_time and end_time and end_time <= start_time:
+            raise serializers.ValidationError({
+                'end_time': 'End time must be after start time'
+            })
+
+        return data
