@@ -272,6 +272,8 @@ class BlockAppointmentSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     clinic_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
+    clinic_branch_id = serializers.IntegerField(source='clinic.id', read_only=True, allow_null=True)
+    clinic_branch_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
 
     class Meta:
         model = BlockAppointment
@@ -279,6 +281,8 @@ class BlockAppointmentSerializer(serializers.ModelSerializer):
             'id',
             'clinic',
             'clinic_name',
+            'clinic_branch_id',
+            'clinic_branch_name',
             'event_name',
             'event_type',
             'date',

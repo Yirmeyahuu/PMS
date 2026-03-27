@@ -88,6 +88,8 @@ export interface BlockAppointment {
   id: number;
   clinic: number;
   clinic_name: string | null;
+  clinic_branch_id: number | null; // The branch this block belongs to
+  clinic_branch_name: string | null; // Display name of the branch
   event_name: string;
   event_type: string;
   date: string;

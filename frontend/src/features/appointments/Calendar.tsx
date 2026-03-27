@@ -225,6 +225,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   });
 
   // ── Block Appointments (Events) ───────────────────────────────────────────────
+  // Fetch ALL block appointments regardless of selected branch so they're visible to all branches
   const {
     blockAppointments,
     addBlockAppointmentToState,
@@ -234,7 +235,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   } = useBlockAppointments({
     startDate,
     endDate,
-    clinicBranchId: selectedClinicBranchId,
+    clinicBranchId: null, // Always fetch all block appointments - they're visible to all branches
   });
 
   // ── Conflict detection for block appointments (must be after appointments is defined) ─────────────────────────────────
