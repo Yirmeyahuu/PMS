@@ -108,9 +108,9 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         'patient', 'practitioner__user', 'appointment', 'template', 'clinic'
     )
     serializer_class = ClinicalNoteSerializer
-    permission_classes = [IsAuthenticated, IsPractitionerOrAdmin]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['patient', 'practitioner', 'date', 'is_draft', 'is_signed', 'template']
+    filterset_fields = ['patient', 'practitioner', 'date', 'is_draft', 'is_signed', 'template', 'appointment']
     search_fields = ['patient__first_name', 'patient__last_name']
     ordering_fields = ['date', 'created_at']
     
@@ -121,15 +121,40 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def get_queryset(self):
-        """Filter notes by user's clinic"""
+        """Filter notes by user's clinic (including branches)"""
         user = self.request.user
-        queryset = self.queryset.filter(clinic=user.clinic)
+        print(f'[ClinicalNoteViewSet] User: {user}, clinic: {user.clinic}, is_practitioner: {user.is_practitioner}, is_admin: {user.is_admin}')
+        
+        # Get all clinics the user has access to (main clinic and all its branches)
+        if user.clinic:
+            # Get the main clinic (if user.clinic is a branch, get its parent)
+            main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
+            # Include main clinic and all its branches
+            from django.db.models import Q
+            queryset = self.queryset.filter(
+                Q(clinic=main_clinic) | Q(clinic__parent_clinic=main_clinic)
+            )
+            print(f'[ClinicalNoteViewSet] After clinic/branch filter: {queryset.count()}')
+        else:
+            queryset = self.queryset.none()
         
         # Practitioners see only their own notes
         if user.is_practitioner and not user.is_admin:
             queryset = queryset.filter(practitioner__user=user)
+            print(f'[ClinicalNoteViewSet] After practitioner filter: {queryset.count()}')
         
+        # If filtering by patient, log that too
+        patient_filter = self.request.query_params.get('patient')
+        if patient_filter:
+            print(f'[ClinicalNoteViewSet] Patient filter: {patient_filter}')
+        
+        print(f'[ClinicalNoteViewSet] Final queryset count: {queryset.count()}')
         return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """Override create to log what's being saved"""
+        print(f'[ClinicalNoteViewSet] CREATE request data: {request.data}')
+        return super().create(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'])
     def sign(self, request, pk=None):
@@ -160,6 +185,113 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
                 {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+    
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        """
+        Archive a clinical note (soft delete).
+        
+        POST /api/clinical-notes/{id}/archive/
+        """
+        note = self.get_object()
+        
+        # Check permissions - only admin, or the note's practitioner can archive
+        if not (request.user.is_admin or note.practitioner.user == request.user):
+            return Response(
+                {'detail': 'You do not have permission to archive this note'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        note.is_deleted = True
+        note.save(update_fields=['is_deleted'])
+        
+        # Log archiving
+        ClinicalNoteAuditLog.objects.create(
+            clinical_note=note,
+            user=request.user,
+            action='DELETED',
+            ip_address=self._get_client_ip(),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        return Response({'detail': 'Clinical note archived successfully'})
+    
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        """
+        Restore an archived (soft-deleted) clinical note.
+        
+        POST /api/clinical-notes/{id}/restore/
+        """
+        # Get the archived note directly (not through get_object which filters is_deleted=False)
+        try:
+            note = ClinicalNote.objects.get(pk=pk, is_deleted=True)
+        except ClinicalNote.DoesNotExist:
+            return Response(
+                {'detail': 'Archived note not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permissions
+        if not (request.user.is_admin or request.user.is_superuser):
+            return Response(
+                {'detail': 'You do not have permission to restore this note'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check for duplicate: if there's already an active note for the same appointment
+        existing_note = ClinicalNote.objects.filter(
+            patient=note.patient,
+            appointment=note.appointment,
+            is_deleted=False
+        ).exclude(pk=note.pk).first()
+        
+        if existing_note:
+            return Response(
+                {'detail': 'Cannot restore: A clinical note already exists for this session'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        note.is_deleted = False
+        note.save(update_fields=['is_deleted'])
+        
+        # Log restoration
+        ClinicalNoteAuditLog.objects.create(
+            clinical_note=note,
+            user=request.user,
+            action='RESTORED',
+            ip_address=self._get_client_ip(),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        return Response({'detail': 'Clinical note restored successfully'})
+    
+    @action(detail=False, methods=['get'])
+    def archived(self, request):
+        """
+        Get archived (soft-deleted) clinical notes for a patient.
+        
+        GET /api/clinical-notes/archived/?patient={patient_id}
+        """
+        from apps.clinical_templates.models import ClinicalNote
+        
+        patient_id = request.query_params.get('patient')
+        if not patient_id:
+            return Response(
+                {'detail': 'patient parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Query directly from ClinicalNote to include archived (deleted) notes
+        notes = ClinicalNote.objects.filter(
+            is_deleted=True,
+            patient_id=patient_id
+        ).select_related(
+            'patient', 'practitioner__user', 'appointment', 'template', 'clinic'
+        )
+        
+        serializer = self.get_serializer(notes, many=True)
+        return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
     def autosave(self, request, pk=None):

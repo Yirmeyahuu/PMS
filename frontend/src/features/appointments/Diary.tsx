@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { Calendar } from './Calendar';
+import { ArrivalsList } from './components/ArrivalsList';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
@@ -165,10 +166,8 @@ export const Diary: React.FC = () => {
 
             {/* Arrivals Section */}
             <div className="p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Arrivals</h3>
-              <div className="text-center text-gray-400 text-sm py-8">
-                No arrivals today
-              </div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Today's Arrivals</h3>
+              <ArrivalsList selectedDate={currentDate} />
             </div>
           </div>
 

@@ -7,6 +7,7 @@ from apps.clinics.services.models import Service
 class AppointmentSerializer(serializers.ModelSerializer):
     patient_name      = serializers.CharField(source='patient.get_full_name', read_only=True)
     practitioner_name = serializers.CharField(source='practitioner.user.get_full_name', read_only=True, allow_null=True)
+    practitioner_avatar = serializers.SerializerMethodField()
     location_name     = serializers.CharField(source='location.name', read_only=True, allow_null=True)
     created_by_name   = serializers.CharField(source='created_by.get_full_name', read_only=True, allow_null=True)
     updated_by_name   = serializers.CharField(source='updated_by.get_full_name', read_only=True, allow_null=True)
@@ -18,15 +19,19 @@ class AppointmentSerializer(serializers.ModelSerializer):
     # ── Expose the branch_id consistently ────────────────────────────────────
     branch_id = serializers.SerializerMethodField()
 
+    # Include arrival_status and arrival_time in the response
+    arrival_status = serializers.CharField(read_only=True)
+    arrival_time = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model  = Appointment
         fields = [
             'id', 'clinic', 'branch_id', 'patient', 'patient_name',
-            'practitioner', 'practitioner_name',
+            'practitioner', 'practitioner_name', 'practitioner_avatar',
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
             'appointment_type',
-            'status',
+            'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
             'reminder_sent', 'reminder_sent_at',
@@ -36,11 +41,42 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'branch_id', 'patient_name', 'practitioner_name', 'location_name',
+            'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name',
             'created_at', 'updated_at',
         ]
+
+    def get_practitioner_avatar(self, obj) -> str | None:
+        """Get practitioner avatar URL from user model with full absolute URL."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"[AppointmentSerializer] get_practitioner_avatar called for appointment {obj.id}")
+        logger.info(f"[AppointmentSerializer] practitioner: {obj.practitioner}")
+        
+        if obj.practitioner and obj.practitioner.user:
+            user = obj.practitioner.user
+            logger.info(f"[AppointmentSerializer] user: {user.email}, avatar field: {user.avatar}")
+            
+            # Check for avatar field
+            avatar = getattr(user, 'avatar', None)
+            if avatar:
+                logger.info(f"[AppointmentSerializer] avatar found: {avatar}")
+                request = self.context.get('request')
+                if request:
+                    # Build absolute URL like UserSerializer does
+                    if hasattr(avatar, 'url'):
+                        avatar_url = request.build_absolute_uri(avatar.url)
+                        logger.info(f"[AppointmentSerializer] built URL: {avatar_url}")
+                        return avatar_url
+                    # If it's already a string (URL)
+                    return str(avatar)
+            else:
+                logger.info(f"[AppointmentSerializer] No avatar field on user")
+        else:
+            logger.info(f"[AppointmentSerializer] No practitioner or practitioner.user")
+        return None
 
     def get_branch_id(self, obj) -> int | None:
         """
@@ -93,7 +129,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
 # ── NEW: Restricted edit serializer ──────────────────────────────────────────
 class AppointmentEditSerializer(serializers.ModelSerializer):
     """
-    Allows editing only the 4 permitted fields.
+    Allows editing only the 5 permitted fields.
     updated_by is set in the view, not from the request body.
     """
     practitioner_name = serializers.SerializerMethodField(read_only=True)
@@ -109,6 +145,7 @@ class AppointmentEditSerializer(serializers.ModelSerializer):
             'chief_complaint',
             'notes',
             'patient_notes',
+            'arrival_status',
             'updated_by',
             'updated_by_name',
             'updated_at',

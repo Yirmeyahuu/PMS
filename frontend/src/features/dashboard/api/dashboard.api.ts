@@ -1,4 +1,5 @@
 import axiosInstance from '@/lib/axios';
+import type { Appointment } from '@/types';
 
 export interface DashboardMetricsResponse {
   today_appointments: number;
@@ -105,4 +106,14 @@ export const getUncompletedNotes = async (): Promise<UncompletedNote[]> => {
     '/clinical-notes/?is_signed=false'
   );
   return response.data.results;
+};
+
+/**
+ * Get today's arrivals (appointments with arrival_status='ARRIVED')
+ */
+export const getTodayArrivals = async (): Promise<Appointment[]> => {
+  const response = await axiosInstance.get<Appointment[]>(
+    '/appointments/today-arrivals/'
+  );
+  return response.data;
 };

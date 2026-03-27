@@ -68,7 +68,12 @@ export interface ClinicalNote {
   patient_name: string;
   practitioner: number;
   practitioner_name: string;
+  practitioner_avatar: string | null;
   appointment: number | null;
+  appointment_date?: string | null;
+  appointment_time?: string | null;
+  appointment_service?: string | null;
+  appointment_practitioner?: string | null;
   clinic: number;
   template: number | null;
   template_name: string | null;
@@ -86,8 +91,8 @@ export interface ClinicalNote {
 
 export interface CreateClinicalNoteData {
   patient: number;
-  practitioner: number;
-  appointment?: number | null;
+  practitioner?: number;
+  appointment: number;
   template: number;
   date: string;
   content: Record<string, any>;

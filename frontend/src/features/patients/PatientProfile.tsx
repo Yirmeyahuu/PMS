@@ -4,17 +4,19 @@ import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout
 import {
   ArrowLeft, User, MapPin, Phone, Heart, Calendar, Edit,
   Clock, CheckCircle, XCircle, AlertCircle, FileText,
-  Activity, Loader2, ChevronDown, ChevronUp, Mail,
-  Archive, ArchiveRestore, Plus
+  Activity, Loader2, ChevronDown, ChevronUp, Mail, Archive, ArchiveRestore, Plus, Square, CheckSquare
 } from 'lucide-react';
 import { getPatient, updatePatient, archivePatient, restorePatient } from './patient.api';
-import { getAppointments } from '@/features/appointments/appointment.api';
+import { getAppointments, bulkCancelAppointments } from '@/features/appointments/appointment.api';
 import { getNotes, emailNote, getPrintNote } from '@/features/clinical-template/clinical-templates.api';
 import type { Patient, Appointment, CreatePatientData } from '@/types';
 import type { ClinicalNote } from '@/types/clinicalTemplate';
 import { PatientModal } from './components/PatientModal';
 import { AppointmentDetailModal } from './components/AppointmentDetailModal';
 import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
+import { ViewClinicalNoteModal } from '@/features/clinical-template/components/ViewClinicalNoteModal';
+import { EditClinicalNoteModal } from '@/features/clinical-template/components/EditClinicalNoteModal';
+import { CancelAppointmentModal } from '@/features/appointments/components/CancelAppointmentModal';
 import toast from 'react-hot-toast';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -79,22 +81,52 @@ const SectionCard: React.FC<SectionCardProps> = ({ title, icon, children, defaul
 };
 
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
-interface PatientStatsProps { appointments: Appointment[]; }
-const PatientStats: React.FC<PatientStatsProps> = ({ appointments }) => {
-  const total     = appointments.length;
-  const completed = appointments.filter((a) => a.status === 'COMPLETED').length;
+interface PatientStatsProps { appointments: Appointment[]; clinicalNotes: ClinicalNote[]; }
+const PatientStats: React.FC<PatientStatsProps> = ({ appointments, clinicalNotes }) => {
+  // Get set of appointment IDs that have clinical notes
+  const appointmentIdsWithNotes = new Set(
+    clinicalNotes
+      .filter(note => note.appointment !== null)
+      .map(note => note.appointment)
+  );
+
+  // Calculate days difference helper
+  const getDaysUntilAppointment = (appointmentDate: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const apptDate = new Date(appointmentDate);
+    apptDate.setHours(0, 0, 0, 0);
+    return Math.floor((apptDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Completed: appointments where clinical note has been created
+  const completed = appointments.filter((a) => appointmentIdsWithNotes.has(a.id)).length;
+  // Cancelled: appointments with CANCELLED status
   const cancelled = appointments.filter((a) => a.status === 'CANCELLED').length;
-  const upcoming  = appointments.filter((a) => ['SCHEDULED', 'CONFIRMED'].includes(a.status) && new Date(a.date) >= new Date()).length;
-  const noShow    = appointments.filter((a) => a.status === 'NO_SHOW').length;
+  // No Show: appointments where practitioner marked as "Did Not Arrived" (arrival_status = 'DNA')
+  const noShow = appointments.filter((a) => a.arrival_status === 'DNA').length;
+  // Upcoming: 1+ day before the scheduled appointment
+  const upcoming = appointments.filter((a) => getDaysUntilAppointment(a.date) >= 1).length;
+  // Unfinished Notes: appointments that have passed but no clinical note created
+  const unfinishedNotes = appointments.filter((a) => {
+    const daysUntil = getDaysUntilAppointment(a.date);
+    const hasNote = appointmentIdsWithNotes.has(a.id);
+    const notCancelled = a.status !== 'CANCELLED' && a.arrival_status !== 'DNA';
+    return daysUntil < 1 && !hasNote && notCancelled;
+  }).length;
+  // Total: all appointments
+  const total = appointments.length;
+
   const stats = [
-    { label: 'Total',     value: total,     color: 'text-gray-900',  bg: 'bg-white',    border: 'border-gray-200' },
-    { label: 'Completed', value: completed, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
-    { label: 'Upcoming',  value: upcoming,  color: 'text-sky-700',   bg: 'bg-sky-50',   border: 'border-sky-200' },
-    { label: 'Cancelled', value: cancelled, color: 'text-red-600',   bg: 'bg-red-50',   border: 'border-red-200' },
-    { label: 'No Show',   value: noShow,    color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
+    { label: 'Total',          value: total,          color: 'text-gray-900',  bg: 'bg-white',    border: 'border-gray-200' },
+    { label: 'Completed',     value: completed,     color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+    { label: 'Upcoming',       value: upcoming,       color: 'text-sky-700',   bg: 'bg-sky-50',   border: 'border-sky-200' },
+    { label: 'Unfinished',     value: unfinishedNotes, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+    { label: 'Cancelled',     value: cancelled,     color: 'text-red-600',   bg: 'bg-red-50',   border: 'border-red-200' },
+    { label: 'No Show',       value: noShow,        color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
       {stats.map((s) => (
         <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-4 text-center`}>
           <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -106,14 +138,82 @@ const PatientStats: React.FC<PatientStatsProps> = ({ appointments }) => {
 };
 
 // ─── Appointment Row ──────────────────────────────────────────────────────────
-interface AppointmentRowProps { appointment: Appointment; onClick: (a: Appointment) => void; }
-const AppointmentRow: React.FC<AppointmentRowProps> = ({ appointment, onClick }) => {
-  const statusConfig = APPOINTMENT_STATUS_CONFIG[appointment.status] || APPOINTMENT_STATUS_CONFIG['SCHEDULED'];
+interface AppointmentRowProps { 
+  appointment: Appointment; 
+  onClick: (a: Appointment) => void; 
+  clinicalNoteAppointmentIds: Set<number>;
+  isSelected?: boolean;
+  onSelect?: (id: number) => void;
+  selectable?: boolean;
+}
+
+// Helper function to get simplified status (aligned with PatientStats)
+const getSimplifiedStatus = (appointment: Appointment, hasClinicalNote: boolean): { label: string; color: string; icon: React.ReactNode } | null => {
+  // Cancelled: status = 'CANCELLED'
+  if (appointment.status === 'CANCELLED') {
+    return { label: 'Cancelled', color: 'bg-red-50 text-red-700', icon: <XCircle className="w-3 h-3" /> };
+  }
+  // No Show: arrival_status = 'DNA'
+  if (appointment.arrival_status === 'DNA') {
+    return { label: 'No Show', color: 'bg-gray-100 text-gray-600', icon: <AlertCircle className="w-3 h-3" /> };
+  }
+  // Completed: has clinical note
+  if (hasClinicalNote) {
+    return { label: 'Completed', color: 'bg-green-50 text-green-700', icon: <CheckCircle className="w-3 h-3" /> };
+  }
+  // Upcoming: 1+ day before the scheduled appointment (tomorrow or later)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const appointmentDate = new Date(appointment.date);
+  appointmentDate.setHours(0, 0, 0, 0);
+  const daysDiff = Math.floor((appointmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysDiff >= 1) {
+    return { label: 'Upcoming', color: 'bg-blue-50 text-blue-700', icon: <Clock className="w-3 h-3" /> };
+  }
+  // Unfinished Notes: today or past appointments without clinical note
+  return { label: 'Unfinished', color: 'bg-orange-50 text-orange-700', icon: <FileText className="w-3 h-3" /> };
+};
+
+const AppointmentRow: React.FC<AppointmentRowProps> = ({ 
+  appointment, 
+  onClick, 
+  clinicalNoteAppointmentIds,
+  isSelected = false,
+  onSelect,
+  selectable = false,
+}) => {
+  const hasClinicalNote = clinicalNoteAppointmentIds.has(appointment.id);
+  const statusConfig = getSimplifiedStatus(appointment, hasClinicalNote);
+  const canCancel = appointment.status !== 'CANCELLED';
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelect && canCancel) {
+      onSelect(appointment.id);
+    }
+  };
+
   return (
-    <button
-      onClick={() => onClick(appointment)}
-      className="w-full text-left flex items-center gap-4 px-4 py-3 rounded-lg border border-gray-200 hover:border-sky-300 hover:bg-sky-50/40 transition-all group"
-    >
+    <div className="relative">
+      {selectable && canCancel && (
+        <div 
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10"
+          onClick={handleCheckboxClick}
+        >
+          {isSelected ? (
+            <CheckSquare className="w-5 h-5 text-sky-600 cursor-pointer" />
+          ) : (
+            <Square className="w-5 h-5 text-gray-400 cursor-pointer hover:text-sky-500" />
+          )}
+        </div>
+      )}
+      <button
+        onClick={() => onClick(appointment)}
+        className={`w-full text-left flex items-center gap-4 px-4 py-3 rounded-lg border border-gray-200 hover:border-sky-300 hover:bg-sky-50/40 transition-all group ${
+          selectable ? (canCancel ? (isSelected ? 'bg-sky-50 border-sky-300' : 'bg-white') : 'bg-gray-50 opacity-60') : ''
+        }`}
+        style={selectable ? { paddingLeft: canCancel ? '2.5rem' : '1rem' } : undefined}
+      >
       <div className="flex-shrink-0 w-11 text-center">
         <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">
           {new Date(appointment.date).toLocaleDateString('en-US', { month: 'short' })}
@@ -127,9 +227,11 @@ const AppointmentRow: React.FC<AppointmentRowProps> = ({ appointment, onClick })
           <p className="text-sm font-semibold text-gray-900 truncate">
             {APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
           </p>
-          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${statusConfig.color}`}>
-            {statusConfig.icon}{statusConfig.label}
-          </span>
+          {statusConfig && (
+            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${statusConfig.color}`}>
+              {statusConfig.icon}{statusConfig.label}
+            </span>
+          )}
         </div>
         <p className="text-xs text-gray-500 mt-0.5 truncate">
           {appointment.start_time && (
@@ -142,7 +244,8 @@ const AppointmentRow: React.FC<AppointmentRowProps> = ({ appointment, onClick })
         )}
       </div>
       <span className="flex-shrink-0 text-xs text-gray-300 group-hover:text-sky-500 transition-colors font-medium">View →</span>
-    </button>
+      </button>
+    </div>
   );
 };
 
@@ -157,17 +260,28 @@ export const PatientProfile: React.FC = () => {
   const [loadingPatient,          setLoadingPatient]          = useState(true);
   const [loadingAppointments,     setLoadingAppointments]     = useState(true);
   const [isEditModalOpen,         setIsEditModalOpen]         = useState(false);
-  const [appointmentFilter,       setAppointmentFilter]       = useState<'ALL'|'UPCOMING'|'COMPLETED'|'CANCELLED'>('ALL');
+  const [appointmentFilter,       setAppointmentFilter]       = useState<'ALL'|'UPCOMING'|'COMPLETED'|'CANCELLED'|'UNFINISHED'>('ALL');
   const [selectedAppointment,     setSelectedAppointment]     = useState<Appointment | null>(null);
   const [isAppointmentDetailOpen, setIsAppointmentDetailOpen] = useState(false);
 
   // ── Create Clinical Note modal state ─────────────────────────────────────────
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
+  // ── View Clinical Note modal state ─────────────────────────────────────────
+  const [viewingNoteId, setViewingNoteId] = useState<number | null>(null);
+  // ── Edit Clinical Note modal state ─────────────────────────────────────────
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
 
   // ── Tab state (History / Documents) ─────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'history' | 'documents'>('history');
   const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
+
+  // Create set of appointment IDs with clinical notes
+  const appointmentIdsWithNotes = React.useMemo(() => new Set(
+    clinicalNotes
+      .filter(note => note.appointment !== null)
+      .map(note => note.appointment as number)
+  ), [clinicalNotes]);
   const [emailingNoteId, setEmailingNoteId] = useState<number | null>(null);
   const [printingNoteId, setPrintingNoteId] = useState<number | null>(null);
 
@@ -175,6 +289,69 @@ export const PatientProfile: React.FC = () => {
   const [showArchiveConfirm,  setShowArchiveConfirm]  = useState(false);
   const [showRestoreConfirm,  setShowRestoreConfirm]  = useState(false);
   const [archiveLoading,      setArchiveLoading]      = useState(false);
+
+  // ── Bulk cancel state ─────────────────────────────────────────────────────────
+  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<Set<number>>(new Set());
+  const [isBulkCancelModalOpen, setIsBulkCancelModalOpen] = useState(false);
+  const [isBulkCancelling, setIsBulkCancelling] = useState(false);
+  const [bulkCancelError, setBulkCancelError] = useState<string | null>(null);
+
+  // Helper to check if appointment can be cancelled (not already cancelled)
+  const canCancelAppointment = (apt: Appointment) => apt.status !== 'CANCELLED';
+
+  // Handle select all / deselect all
+  const handleSelectAll = () => {
+    const cancellableAppointments = filteredAppointments.filter(canCancelAppointment);
+    if (selectedAppointmentIds.size === cancellableAppointments.length) {
+      // Deselect all
+      setSelectedAppointmentIds(new Set());
+    } else {
+      // Select all cancellable
+      setSelectedAppointmentIds(new Set(cancellableAppointments.map(a => a.id)));
+    }
+  };
+
+  // Handle individual checkbox
+  const handleToggleSelect = (appointmentId: number) => {
+    const newSelected = new Set(selectedAppointmentIds);
+    if (newSelected.has(appointmentId)) {
+      newSelected.delete(appointmentId);
+    } else {
+      newSelected.add(appointmentId);
+    }
+    setSelectedAppointmentIds(newSelected);
+  };
+
+  // Handle bulk cancel
+  const handleBulkCancel = async (reason: string) => {
+    setIsBulkCancelling(true);
+    setBulkCancelError(null);
+    try {
+      const result = await bulkCancelAppointments({
+        appointment_ids: Array.from(selectedAppointmentIds),
+        cancellation_reason: reason,
+      });
+      
+      if (result.cancelled_count > 0) {
+        toast.success(`Successfully cancelled ${result.cancelled_count} appointment(s)`);
+      }
+      if (result.failed_count > 0) {
+        toast.error(`${result.failed_count} appointment(s) could not be cancelled`);
+      }
+      
+      // Clear selection and refresh appointments
+      setSelectedAppointmentIds(new Set());
+      setIsBulkCancelModalOpen(false);
+      fetchAppointments();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      const errorMsg = err.response?.data?.detail || 'Failed to cancel appointments';
+      setBulkCancelError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsBulkCancelling(false);
+    }
+  };
 
   const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
@@ -201,7 +378,7 @@ export const PatientProfile: React.FC = () => {
     try {
       const data = await getAppointments({ patient: Number(id), page_size: 100 });
       const sorted = [...(data.results ?? [])].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
       setAppointments(sorted);
     } catch {
@@ -214,10 +391,27 @@ export const PatientProfile: React.FC = () => {
   const fetchClinicalNotes = useCallback(async () => {
     if (!id) return;
     setLoadingNotes(true);
+    console.log('[PatientProfile] Fetching clinical notes for patient:', id);
     try {
+      console.log('[PatientProfile] Calling getNotes API with patient filter...');
       const data = await getNotes({ patient: Number(id) });
+      console.log('[PatientProfile] getNotes response:', data);
+      console.log('[PatientProfile] Number of notes returned:', data?.length ?? 0);
+      
+      // Debug: check if any notes have appointment IDs
+      if (data && data.length > 0) {
+        console.log('[PatientProfile] Note details:', data.map(n => ({
+          id: n.id,
+          patient: n.patient,
+          appointment: n.appointment,
+          date: n.date,
+          template: n.template,
+        })));
+      }
+      
       setClinicalNotes(data);
-    } catch {
+    } catch (err: unknown) {
+      console.error('[PatientProfile] Error fetching notes:', err);
       toast.error('Failed to load clinical notes');
     } finally {
       setLoadingNotes(false);
@@ -273,11 +467,27 @@ export const PatientProfile: React.FC = () => {
     }
   };
 
+  // Helper function for filtering appointments based on simplified status
+  const getDaysUntilAppointment = (appointmentDate: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const apptDate = new Date(appointmentDate);
+    apptDate.setHours(0, 0, 0, 0);
+    return Math.floor((apptDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
   const filteredAppointments = appointments.filter((a) => {
-    const isUpcoming = ['SCHEDULED','CONFIRMED','CHECKED_IN','IN_PROGRESS'].includes(a.status) && new Date(a.date) >= new Date();
+    // Check if has clinical note
+    const hasNote = appointmentIdsWithNotes.has(a.id);
+    const daysUntil = getDaysUntilAppointment(a.date);
+    const isUpcoming = daysUntil >= 1;
+    const notCancelled = a.status !== 'CANCELLED' && a.arrival_status !== 'DNA';
+    const isUnfinished = daysUntil < 1 && !hasNote && notCancelled;
+    
     if (appointmentFilter === 'UPCOMING')  return isUpcoming;
-    if (appointmentFilter === 'COMPLETED') return a.status === 'COMPLETED';
-    if (appointmentFilter === 'CANCELLED') return a.status === 'CANCELLED' || a.status === 'NO_SHOW';
+    if (appointmentFilter === 'COMPLETED') return hasNote;
+    if (appointmentFilter === 'CANCELLED') return a.status === 'CANCELLED' || a.arrival_status === 'DNA';
+    if (appointmentFilter === 'UNFINISHED') return isUnfinished;
     return true;
   });
 
@@ -427,7 +637,7 @@ export const PatientProfile: React.FC = () => {
             </div>
 
             {/* ── Session Stats ── */}
-            <PatientStats appointments={appointments} />
+            <PatientStats appointments={appointments} clinicalNotes={clinicalNotes} />
 
             {/* ── Main 2-col layout ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -505,7 +715,7 @@ export const PatientProfile: React.FC = () => {
                           }`}
                         >
                           <Calendar className="w-4 h-4" />
-                          History
+                          Appointment List
                           <span className="text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full">
                             {appointments.length}
                           </span>
@@ -540,7 +750,7 @@ export const PatientProfile: React.FC = () => {
                   {/* Tab Content */}
                   <div className="p-4">
                     {activeTab === 'history' ? (
-                      // History Tab - Appointments
+                      // Appointment List Tab - Appointments
                       loadingAppointments ? (
                         <div className="flex items-center justify-center py-12">
                           <Loader2 className="w-7 h-7 text-sky-400 animate-spin" />
@@ -559,25 +769,73 @@ export const PatientProfile: React.FC = () => {
                         </div>
                       ) : (
                         <>
-                          {/* Filters for History */}
-                          <div className="flex items-center gap-1 mb-4">
-                            {(['ALL', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as const).map((f) => (
-                              <button
-                                key={f}
-                                onClick={() => setAppointmentFilter(f)}
-                                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                                  appointmentFilter === f
-                                    ? 'bg-sky-600 text-white'
-                                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                                }`}
-                              >
-                                {f.charAt(0) + f.slice(1).toLowerCase()}
-                              </button>
-                            ))}
+                          {/* Filters + Bulk Actions */}
+                          <div className="flex items-center justify-between gap-2 mb-4">
+                            <div className="flex items-center gap-1">
+                              {(['ALL', 'UPCOMING', 'COMPLETED', 'UNFINISHED', 'CANCELLED'] as const).map((f) => (
+                                <button
+                                  key={f}
+                                  onClick={() => setAppointmentFilter(f)}
+                                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                                    appointmentFilter === f
+                                      ? 'bg-sky-600 text-white'
+                                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {f.charAt(0) + f.slice(1).toLowerCase()}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {/* Bulk Cancel Controls */}
+                            {(() => {
+                              const cancellableAppointments = filteredAppointments.filter(a => a.status !== 'CANCELLED');
+                              const selectedCount = selectedAppointmentIds.size;
+                              const allSelected = cancellableAppointments.length > 0 && 
+                                selectedCount === cancellableAppointments.length;
+                              
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {cancellableAppointments.length > 0 && (
+                                    <>
+                                      <button
+                                        onClick={handleSelectAll}
+                                        className="flex items-center gap-1.5 text-xs px-2 py-1.5 text-gray-600 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors"
+                                      >
+                                        {allSelected ? (
+                                          <><CheckSquare className="w-4 h-4" /> Deselect All</>
+                                        ) : (
+                                          <><Square className="w-4 h-4" /> Select All</>
+                                        )}
+                                      </button>
+                                      
+                                      {selectedCount > 0 && (
+                                        <button
+                                          onClick={() => setIsBulkCancelModalOpen(true)}
+                                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                                        >
+                                          <XCircle className="w-3.5 h-3.5" />
+                                          Cancel ({selectedCount})
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
+                          
                           <div className="space-y-2">
                             {filteredAppointments.map((appointment) => (
-                              <AppointmentRow key={appointment.id} appointment={appointment} onClick={handleAppointmentClick} />
+                              <AppointmentRow 
+                                key={appointment.id} 
+                                appointment={appointment} 
+                                onClick={handleAppointmentClick} 
+                                clinicalNoteAppointmentIds={appointmentIdsWithNotes}
+                                isSelected={selectedAppointmentIds.has(appointment.id)}
+                                onSelect={handleToggleSelect}
+                                selectable={appointment.status !== 'CANCELLED'}
+                              />
                             ))}
                           </div>
                         </>
@@ -603,20 +861,17 @@ export const PatientProfile: React.FC = () => {
                           {clinicalNotes.map((note) => (
                             <div
                               key={note.id}
-                              className="p-4 border border-gray-200 rounded-lg hover:border-sky-300 hover:bg-sky-50/40 transition-all"
+                              onClick={() => setViewingNoteId(note.id)}
+                              className="p-4 border border-gray-200 rounded-lg hover:border-sky-300 hover:bg-sky-50/40 transition-all cursor-pointer"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-semibold text-gray-900">
                                     {note.template_name || 'Clinical Note'}
                                   </span>
-                                  {note.is_signed ? (
+                                  {note.is_signed && (
                                     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">
                                       <CheckCircle className="w-3 h-3" /> Signed
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-                                      Draft
                                     </span>
                                   )}
                                 </div>
@@ -738,6 +993,16 @@ export const PatientProfile: React.FC = () => {
                                       <FileText className="w-4 h-4" />
                                     )}
                                   </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingNoteId(note.id);
+                                    }}
+                                    className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                    title="Edit Clinical Note"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -781,12 +1046,41 @@ export const PatientProfile: React.FC = () => {
       {patient && (
         <CreateClinicalNoteModal
           isOpen={isCreateNoteOpen}
-          onClose={() => setIsCreateNoteOpen(false)}
+          onClose={() => {
+            setIsCreateNoteOpen(false);
+            fetchClinicalNotes(); // Refresh notes after creation
+          }}
           patientId={patient.id}
           patientName={patient.full_name}
           onSuccess={() => {
             // Refresh data if needed - the note will appear in appointment detail
             fetchClinicalNotes();
+          }}
+        />
+      )}
+
+      {/* View Clinical Note Modal */}
+      {viewingNoteId && (
+        <ViewClinicalNoteModal
+          isOpen={!!viewingNoteId}
+          onClose={() => setViewingNoteId(null)}
+          noteId={viewingNoteId}
+          onEdit={(noteId) => {
+            setViewingNoteId(null);
+            setEditingNoteId(noteId);
+          }}
+        />
+      )}
+
+      {/* Edit Clinical Note Modal */}
+      {editingNoteId && (
+        <EditClinicalNoteModal
+          isOpen={!!editingNoteId}
+          onClose={() => setEditingNoteId(null)}
+          noteId={editingNoteId}
+          onSuccess={() => {
+            setEditingNoteId(null);
+            // Refresh clinical notes if needed
           }}
         />
       )}
@@ -820,6 +1114,17 @@ export const PatientProfile: React.FC = () => {
           onCancel={() => setShowRestoreConfirm(false)}
         />
       )}
+
+      {/* Bulk Cancel Modal */}
+      <CancelAppointmentModal
+        isOpen={isBulkCancelModalOpen}
+        appointment={null}
+        isCancelling={isBulkCancelling}
+        cancelError={bulkCancelError}
+        onConfirm={handleBulkCancel}
+        onClose={() => setIsBulkCancelModalOpen(false)}
+        selectedCount={selectedAppointmentIds.size}
+      />
     </DashboardLayout>
   );
 };

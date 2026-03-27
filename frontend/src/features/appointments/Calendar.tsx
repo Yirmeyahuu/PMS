@@ -154,6 +154,23 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const getBlockColors = (apt: Appointment): BlockColors => {
+    // Check if appointment has arrived - use purple color
+    if (apt.arrival_status === 'ARRIVED') {
+      const purpleHex = '#8B5CF6';
+      return {
+        useHex: true,
+        hex:    purpleHex,
+        bgStyle: {
+          backgroundColor: hexToRgba(purpleHex, 0.15),
+          borderColor:     purpleHex,
+          borderLeftWidth: '3px',
+          borderLeftColor: purpleHex,
+        },
+        textColor:    purpleHex,
+        subTextColor: purpleHex,
+        label: apt.service_name ?? apt.chief_complaint ?? null,
+      };
+    }
     if (apt.service_color) {
       return {
         useHex: true,
@@ -313,7 +330,8 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const getAppointmentsForDate = (date: Date): Appointment[] => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return appointments.filter(apt => apt.date === dateStr);
+    // Filter out cancelled appointments - they should not appear in the calendar
+    return appointments.filter(apt => apt.date === dateStr && apt.status !== 'CANCELLED');
   };
 
   const getAppointmentsForDay = (date: Date): Appointment[] =>

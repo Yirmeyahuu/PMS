@@ -73,7 +73,7 @@ export const createNote = async (data: CreateClinicalNoteData): Promise<Clinical
   return response.data;
 };
 
-export const updateNote = async (id: number, data: Partial<{ content: Record<string, any> }>): Promise<ClinicalNote> => {
+export const updateNote = async (id: number, data: Partial<{ content: Record<string, any>; date?: string; appointment?: number }>): Promise<ClinicalNote> => {
   const response = await axiosInstance.patch(`${BASE_URL}/notes/${id}/`, data);
   return response.data;
 };
@@ -98,6 +98,26 @@ export const getNoteAuditLog = async (id: number) => {
 export const emailNote = async (id: number): Promise<{ detail: string }> => {
   const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/email_note/`);
   return response.data;
+};
+
+export const archiveNote = async (id: number): Promise<{ detail: string }> => {
+  const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/archive/`);
+  return response.data;
+};
+
+export const restoreNote = async (id: number): Promise<{ detail: string }> => {
+  const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/restore/`);
+  return response.data;
+};
+
+export const deleteNotePermanently = async (id: number): Promise<{ detail: string }> => {
+  const response = await axiosInstance.delete(`${BASE_URL}/notes/${id}/`);
+  return response.data;
+};
+
+export const getArchivedNotes = async (patientId: number): Promise<ClinicalNote[]> => {
+  const response = await axiosInstance.get(`${BASE_URL}/notes/archived/?patient=${patientId}`);
+  return response.data.results ?? response.data;
 };
 
 export interface PrintNoteResponse {

@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, AlertTriangle, XCircle, RefreshCw,
-  Mail, Calendar, Clock, User,
+  Mail, Calendar, Clock, User, Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Appointment } from '@/types';
 
 interface CancelAppointmentModalProps {
   isOpen:       boolean;
-  appointment:  Appointment | null;
+  appointment:  Appointment | null;  // null when in bulk mode
   isCancelling: boolean;
   cancelError:  string | null;
   onConfirm:    (reason: string) => void;
   onClose:      () => void;
+  selectedCount?: number;  // For bulk mode - number of appointments selected
 }
 
 const MIN_REASON_LENGTH = 5;
@@ -25,6 +26,7 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   cancelError,
   onConfirm,
   onClose,
+  selectedCount = 0,
 }) => {
   const [reason,  setReason]  = useState('');
   const [touched, setTouched] = useState(false);
@@ -37,7 +39,12 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen || !appointment) return null;
+  if (!isOpen) return null;
+
+  const isBulkMode = appointment === null && selectedCount > 0;
+  
+  // If in single appointment mode but no appointment provided, return null
+  if (!isBulkMode && !appointment) return null;
 
   const reasonTooShort = reason.trim().length < MIN_REASON_LENGTH;
   const showError      = touched && reasonTooShort;
@@ -56,8 +63,12 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
     }
   };
 
-  const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
-  const formattedTime = `${appointment.start_time} – ${appointment.end_time}`;
+  const formattedDate = isBulkMode 
+    ? `${selectedCount} appointments selected` 
+    : format(new Date(appointment!.date), 'EEEE, MMMM d, yyyy');
+  const formattedTime = isBulkMode 
+    ? 'Multiple time slots' 
+    : `${appointment!.start_time} – ${appointment!.end_time}`;
 
   return (
     <>
@@ -80,8 +91,14 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
                 <XCircle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Cancel Appointment</h3>
-                <p className="text-xs text-gray-500">{appointment.patient_name}</p>
+                <h3 className="text-sm font-bold text-gray-900">
+                  {isBulkMode ? 'Cancel Appointments' : 'Cancel Appointment'}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {isBulkMode 
+                    ? `${selectedCount} appointment(s) selected` 
+                    : appointment!.patient_name}
+                </p>
               </div>
             </div>
             <button
@@ -110,9 +127,11 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                 <span>
-                  {appointment.practitioner_name
-                    ? `with ${appointment.practitioner_name}`
-                    : 'Unassigned practitioner'}
+                  {isBulkMode 
+                    ? 'Multiple practitioners' 
+                    : (appointment!.practitioner_name
+                      ? `with ${appointment!.practitioner_name}`
+                      : 'Unassigned practitioner')}
                 </span>
               </div>
             </div>

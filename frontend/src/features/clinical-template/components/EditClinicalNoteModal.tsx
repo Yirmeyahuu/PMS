@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, FileText, Loader2, Save, Calendar, ClipboardList, Eye } from 'lucide-react';
-import { getActiveTemplates, createNote } from '../clinical-templates.api';
+import { getActiveTemplates, getNote, updateNote } from '../clinical-templates.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from './DynamicFormRenderer';
-import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
+import type { ClinicalTemplate, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
 
-interface CreateClinicalNoteModalProps {
+interface EditClinicalNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  patientId: number;
-  patientName: string;
-  appointmentId?: number;
+  noteId: number;
   onSuccess?: () => void;
-  existingNotes?: { appointment: number }[]; // Array of appointments that already have notes
 }
 
 // Helper to format time
@@ -48,65 +45,72 @@ const formatFullDate = (dateStr: string): string => {
   });
 };
 
-export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = ({
+export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
   isOpen,
   onClose,
-  patientId,
-  patientName,
-  appointmentId: initialAppointmentId,
+  noteId,
   onSuccess,
-  existingNotes = [],
 }) => {
-  const [step, setStep] = useState<'template' | 'form'>('template');
-  const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
-  const [selectedAppointment, setSelectedAppointment] = useState<number | null>(initialAppointmentId || null);
+  const [selectedAppointment, setSelectedAppointment] = useState<number | null>(null);
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [patientName, setPatientName] = useState<string>('');
 
-  // Fetch templates and appointments on mount
+  // Fetch note data and templates on mount
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch both templates and patient's appointments in parallel
-      // Get all appointments for the patient (not just completed)
+      // First fetch the note to get patient info
+      const noteData = await getNote(noteId);
+      console.log('[EditClinicalNoteModal] API response - note:', noteData);
+      
+      // Set patient info
+      setPatientName(noteData.patient_name);
+      setNoteDate(noteData.date);
+      setSelectedAppointment(noteData.appointment);
+
+      // Fetch templates and appointments in parallel
       const [templatesData, appointmentsData] = await Promise.all([
         getActiveTemplates(),
-        getAppointments({ patient: patientId, page_size: 100 }),
+        getAppointments({ patient: noteData.patient, page_size: 100 }),
       ]);
       
-      console.log('[CreateClinicalNoteModal] API response - templates:', templatesData);
-      console.log('[CreateClinicalNoteModal] API response - appointments:', appointmentsData);
-      console.log('[CreateClinicalNoteModal] API response - appointments results:', appointmentsData.results);
+      console.log('[EditClinicalNoteModal] API response - templates:', templatesData);
+      console.log('[EditClinicalNoteModal] API response - appointments:', appointmentsData);
       
-      setTemplates(templatesData);
       // Sort appointments by date (newest first)
       const sortedAppointments = (appointmentsData.results || []).sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
-      console.log('[CreateClinicalNoteModal] sorted appointments:', sortedAppointments);
       setAppointments(sortedAppointments);
+
+      // If note has template, set it and load content
+      if (noteData.template) {
+        const templateData = await import('../clinical-templates.api').then(m => m.getTemplate(noteData.template!));
+        setSelectedTemplate(templateData);
+        
+        // Set content from note
+        if (noteData.decrypted_content) {
+          setContent(noteData.decrypted_content);
+        }
+      }
     } catch {
-      toast.error('Failed to load data');
+      toast.error('Failed to load note data');
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [noteId]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && noteId) {
       fetchData();
-      // Reset state
-      setStep('template');
-      setSelectedTemplate(null);
-      setSelectedAppointment(initialAppointmentId || null);
-      setContent({});
     }
-  }, [isOpen, fetchData, initialAppointmentId]);
+  }, [isOpen, noteId, fetchData]);
 
   // Handle appointment selection - auto-set date from appointment
   const handleAppointmentSelect = (appointmentId: number) => {
@@ -118,29 +122,32 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
     }
   };
 
-  const handleTemplateSelect = (template: ClinicalTemplate) => {
+  // Placeholder for template change (not used in edit mode)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleTemplateSelect = (template: ClinicalTemplate) => {
     setSelectedTemplate(template);
-    // Initialize content with default values from template structure
-    const initialContent: Record<string, unknown> = {};
+    // Initialize content with default values from template structure (only for new fields)
+    const newContent = { ...content };
     if (template.structure?.sections) {
       (template.structure.sections as TemplateSection[]).forEach((section: TemplateSection) => {
         if (section.fields) {
           (section.fields as TemplateField[]).forEach((field: TemplateField) => {
-            if (field.type === 'checkbox') {
-              initialContent[field.id] = false;
-            } else if (field.type === 'checkbox_group') {
-              initialContent[field.id] = [];
-            } else if (field.type === 'tags') {
-              initialContent[field.id] = [];
-            } else {
-              initialContent[field.id] = '';
+            if (!(field.id in newContent)) {
+              if (field.type === 'checkbox') {
+                newContent[field.id] = false;
+              } else if (field.type === 'checkbox_group') {
+                newContent[field.id] = [];
+              } else if (field.type === 'tags') {
+                newContent[field.id] = [];
+              } else {
+                newContent[field.id] = '';
+              }
             }
           });
         }
       });
     }
-    setContent(initialContent);
-    setStep('form');
+    setContent(newContent);
   };
 
   const handleSave = async () => {
@@ -156,45 +163,29 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
 
     setSaving(true);
     try {
-      // Get practitioner from selected appointment
-      const practitionerId = selectedAppointmentDetails?.practitioner;
-      
-      console.log('[CreateClinicalNoteModal] Saving note with:', {
-        patient: patientId,
-        practitioner: practitionerId,
-        template: selectedTemplate.id,
+      console.log('[EditClinicalNoteModal] Updating note with:', {
+        noteId,
         date: noteDate,
         appointment: selectedAppointment,
         content: content,
       });
 
-      // Build note data - only include practitioner if it's a valid ID
-      const noteData: CreateClinicalNoteData = {
-        patient: patientId,
-        template: selectedTemplate.id,
+      await updateNote(noteId, {
         date: noteDate,
-        content,
         appointment: selectedAppointment,
-      };
+        content,
+      });
 
-      // Only add practitioner if we have a valid ID
-      if (practitionerId) {
-        noteData.practitioner = practitionerId;
-      }
-
-      console.log('[CreateClinicalNoteModal] Full noteData to send:', JSON.stringify(noteData, null, 2));
-
-      await createNote(noteData);
-      console.log('[CreateClinicalNoteModal] Note created successfully!');
-      toast.success('Clinical note created successfully');
-      console.log('[CreateClinicalNoteModal] Calling onSuccess callback...');
+      console.log('[EditClinicalNoteModal] Note updated successfully!');
+      toast.success('Clinical note updated successfully');
+      console.log('[EditClinicalNoteModal] Calling onSuccess callback...');
       onSuccess?.();
-      console.log('[CreateClinicalNoteModal] Closing modal...');
+      console.log('[EditClinicalNoteModal] Closing modal...');
       onClose();
     } catch (err: unknown) {
-      console.error('Create note error:', err);
+      console.error('Update note error:', err);
       
-      let message = 'Failed to create note';
+      let message = 'Failed to update note';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const response = (err as { response?: { data?: { detail?: string } } }).response;
         if (response?.data) {
@@ -219,10 +210,6 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   // Get selected appointment details for preview
   const selectedAppointmentDetails = useMemo(() => {
     const details = appointments.find(a => a.id === selectedAppointment);
-    console.log('[CreateClinicalNoteModal] selectedAppointment:', selectedAppointment);
-    console.log('[CreateClinicalNoteModal] appointments:', appointments);
-    console.log('[CreateClinicalNoteModal] selectedAppointmentDetails:', details);
-    console.log('[CreateClinicalNoteModal] practitioner_avatar:', details?.practitioner_avatar);
     return details;
   }, [appointments, selectedAppointment]);
 
@@ -234,10 +221,6 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
     const currentTime = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
     const practitionerName = selectedAppointmentDetails?.practitioner_name || 'Not assigned';
     const practitionerAvatar = selectedAppointmentDetails?.practitioner_avatar || null;
-
-    console.log('[CreateClinicalNoteModal renderPreview] practitionerAvatar:', practitionerAvatar);
-    console.log('[CreateClinicalNoteModal renderPreview] practitionerName:', practitionerName);
-    console.log('[CreateClinicalNoteModal renderPreview] selectedAppointmentDetails:', selectedAppointmentDetails);
 
     // Generate initials for avatar fallback
     const getInitials = (name: string) => {
@@ -387,23 +370,21 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Create Clinical Note</h2>
+            <h2 className="text-lg font-bold text-gray-900">Edit Clinical Note</h2>
             <p className="text-sm text-gray-500">Patient: {patientName}</p>
           </div>
           <div className="flex items-center gap-2">
-            {step === 'form' && (
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  showPreview 
-                    ? 'bg-sky-100 text-sky-700 border border-sky-300' 
-                    : 'bg-gray-100 text-gray-700 border border-gray-300'
-                }`}
-              >
-                <Eye className="w-4 h-4" />
-                {showPreview ? 'Hide Preview' : 'Show Preview'}
-              </button>
-            )}
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                showPreview 
+                  ? 'bg-sky-100 text-sky-700 border border-sky-300' 
+                  : 'bg-gray-100 text-gray-700 border border-gray-300'
+              }`}
+            >
+              <Eye className="w-4 h-4" />
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </button>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -419,49 +400,8 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
             </div>
-          ) : step === 'template' ? (
-            // Step 1: Template Selection
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-sky-600" />
-                <h3 className="text-sm font-semibold text-gray-700">Select a Template</h3>
-              </div>
-              
-              {templates.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No active templates available. Please contact your administrator.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {templates.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleTemplateSelect(template)}
-                      className="flex flex-col items-start p-4 border border-gray-200 rounded-xl hover:border-sky-500 hover:bg-sky-50 transition-all text-left group"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg font-semibold text-gray-900 group-hover:text-sky-700">
-                          {template.name}
-                        </span>
-                        {template.category && (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                            {template.category}
-                          </span>
-                        )}
-                      </div>
-                      {template.description && (
-                        <p className="text-sm text-gray-500 line-clamp-2">{template.description}</p>
-                      )}
-                      <div className="text-xs text-gray-400 mt-2">
-                        v{template.version} · {template.structure?.sections?.length ?? 0} sections
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           ) : (
-            // Step 2: Form Editor with Two Columns
+            // Form Editor with Two Columns
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
               {/* Left Column - Input Form */}
               <div className="space-y-6 overflow-y-auto pr-2">
@@ -495,22 +435,13 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white"
                       >
                         <option value="">Select a session...</option>
-                        {appointments.map((appt) => {
-                          const hasNote = existingNotes.some(note => note.appointment === appt.id);
-                          return (
-                            <option 
-                              key={appt.id} 
-                              value={appt.id}
-                              disabled={hasNote}
-                              title={hasNote ? 'This session has already a Clinical Note.' : undefined}
-                            >
-                              {formatDate(appt.date)} — {formatTime(appt.start_time)}
-                              {appt.practitioner_name ? ` — ${appt.practitioner_name}` : ''}
-                              {appt.service_name ? ` — ${appt.service_name}` : ''}
-                              {hasNote ? ' (Note exists)' : ''}
-                            </option>
-                          );
-                        })}
+                        {appointments.map((appt) => (
+                          <option key={appt.id} value={appt.id}>
+                            {formatDate(appt.date)} — {formatTime(appt.start_time)}
+                            {appt.practitioner_name ? ` — ${appt.practitioner_name}` : ''}
+                            {appt.service_name ? ` — ${appt.service_name}` : ''}
+                          </option>
+                        ))}
                       </select>
                     )}
                     <p className="text-xs text-gray-400 mt-1">
@@ -530,12 +461,6 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                       (v{selectedTemplate?.version})
                     </span>
                   </div>
-                  <button
-                    onClick={() => setStep('template')}
-                    className="text-xs text-sky-600 hover:text-sky-700"
-                  >
-                    Change template
-                  </button>
                 </div>
 
                 {/* Dynamic Form */}
@@ -566,20 +491,18 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
           >
             Cancel
           </button>
-          {step === 'form' && (
-            <button
-              onClick={handleSave}
-              disabled={saving || !selectedAppointment}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Save Note
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            disabled={saving || !selectedAppointment}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            Save Changes
+          </button>
         </div>
       </div>
     </div>

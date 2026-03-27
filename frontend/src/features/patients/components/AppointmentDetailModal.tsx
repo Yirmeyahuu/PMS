@@ -2,13 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Clock, CheckCircle, XCircle, AlertCircle, Activity,
   Calendar, User, MapPin, FileText, Receipt,
-  ChevronDown, ChevronUp, Loader2, Stethoscope,
-  ClipboardList, AlertTriangle, Mail, Printer,
+  ChevronDown, ChevronUp, Loader2,
+  ClipboardList,
 } from 'lucide-react';
-import type { Appointment, ClinicalNote } from '@/types';
-import { getAppointmentClinicalNotes, getAppointmentInvoice } from '@/features/appointments/appointment.api';
-import { emailNote, getPrintNote } from '@/features/clinical-template/clinical-templates.api';
-import toast from 'react-hot-toast';
+import type { Appointment } from '@/types';
+import { getAppointmentInvoice } from '@/features/appointments/appointment.api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -106,221 +104,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
       </button>
       {open && <div className="p-4">{children}</div>}
-    </div>
-  );
-};
-
-// ─── ClinicalNoteCard ─────────────────────────────────────────────────────────
-
-interface ClinicalNoteCardProps { note: ClinicalNote; }
-
-const ClinicalNoteCard: React.FC<ClinicalNoteCardProps> = ({ note }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [emailing, setEmailing] = useState(false);
-  const [printing, setPrinting] = useState(false);
-
-  const handleEmail = async () => {
-    setEmailing(true);
-    try {
-      await emailNote(note.id);
-      toast.success('Clinical note sent to patient email');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to send email');
-    } finally {
-      setEmailing(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    setPrinting(true);
-    try {
-      const printData = await getPrintNote(note.id);
-      // Open print window with formatted content
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Clinical Note - ${printData.patient_name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
-            .clinic { font-size: 18px; font-weight: bold; color: #1e40af; }
-            h1 { font-size: 24px; color: #333; margin: 10px 0; }
-            .info { margin-bottom: 20px; }
-            .info p { margin: 5px 0; }
-            .section { margin-bottom: 20px; }
-            .section h3 { background: #f3f4f6; padding: 10px; margin-bottom: 10px; border-left: 4px solid #1e40af; }
-            .field { margin-bottom: 10px; }
-            .field label { font-weight: bold; color: #666; }
-            .field value { color: #333; }
-            .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="clinic">${printData.clinic_name}</div>
-            <h1>Clinical Note</h1>
-          </div>
-          <div class="info">
-            <p><strong>Patient:</strong> ${printData.patient_name}</p>
-            <p><strong>Patient ID:</strong> ${printData.patient_number}</p>
-            <p><strong>Date:</strong> ${printData.date ? new Date(printData.date).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Practitioner:</strong> ${printData.practitioner_name}${printData.practitioner_title ? ` (${printData.practitioner_title})` : ''}</p>
-            <p><strong>Template:</strong> ${printData.template_name}</p>
-            ${printData.is_signed ? `<p><strong>Signed:</strong> ${printData.signed_at ? new Date(printData.signed_at).toLocaleString() : 'Yes'}</p>` : ''}
-          </div>
-          ${printData.sections.map(section => `
-            <div class="section">
-              <h3>${section.title}</h3>
-              ${section.fields.map(field => `
-                <div class="field">
-                  <label>${field.label}:</label> ${field.value}
-                </div>
-              `).join('')}
-            </div>
-          `).join('')}
-          <div class="footer">
-            <p>Generated on ${new Date().toLocaleString()}</p>
-            <p>${printData.clinic_name} - ${printData.clinic_address || ''}</p>
-          </div>
-        </body>
-        </html>
-      `;
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.print();
-      }
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to generate print version');
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const renderFieldValue = (value: any): React.ReactNode => {
-    if (value === null || value === undefined || value === '') return <span className="text-gray-400 italic">Not provided</span>;
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (Array.isArray(value)) {
-      if (value.length === 0) return <span className="text-gray-400 italic">None</span>;
-      return (
-        <div className="flex flex-wrap gap-1">
-          {value.map((item, idx) => (
-            <span key={idx} className="inline-flex px-2 py-0.5 bg-sky-50 text-sky-700 text-xs rounded-full">{String(item)}</span>
-          ))}
-        </div>
-      );
-    }
-    if (typeof value === 'object') {
-      return (
-        <div className="space-y-1">
-          {Object.entries(value).map(([k, v]) => (
-            <div key={k} className="flex gap-2">
-              <span className="text-xs text-gray-500 flex-shrink-0">{k}:</span>
-              <span className="text-xs text-gray-800">{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return String(value);
-  };
-
-  const content = note.decrypted_content;
-
-  return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-sky-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center">
-            <FileText className="w-4 h-4 text-sky-600" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-800">{note.template_name || 'Clinical Note'}</p>
-            <p className="text-xs text-gray-500">By {note.practitioner_name} · {formatDate(note.date)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {note.is_signed ? (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-green-50 text-green-700 rounded-full font-medium border border-green-200">
-              <CheckCircle className="w-3 h-3" /> Signed
-            </span>
-          ) : note.is_draft ? (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-medium border border-amber-200">
-              <Clock className="w-3 h-3" /> Draft
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium">
-              <FileText className="w-3 h-3" /> Saved
-            </span>
-          )}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium"
-          >
-            {expanded ? 'Collapse' : 'View'}
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={handleEmail}
-            disabled={emailing}
-            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-sky-600 font-medium disabled:opacity-50"
-            title="Send to client email"
-          >
-            {emailing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={printing}
-            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-sky-600 font-medium disabled:opacity-50"
-            title="Print clinical note"
-          >
-            {printing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Printer className="w-3 h-3" />}
-          </button>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="p-4">
-          {content && Object.keys(content).length > 0 ? (
-            <div className="space-y-4">
-              {Object.entries(content).map(([sectionKey, sectionValue]) => {
-                if (typeof sectionValue === 'object' && sectionValue !== null && !Array.isArray(sectionValue)) {
-                  return (
-                    <div key={sectionKey}>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 pb-1 border-b border-gray-100">
-                        {sectionKey.replace(/_/g, ' ')}
-                      </h4>
-                      <div className="grid grid-cols-1 gap-2">
-                        {Object.entries(sectionValue as Record<string, any>).map(([fieldKey, fieldValue]) => (
-                          <div key={fieldKey}>
-                            <span className="text-xs text-gray-500 capitalize">{fieldKey.replace(/_/g, ' ')}</span>
-                            <div className="text-sm text-gray-800">{renderFieldValue(fieldValue)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={sectionKey}>
-                    <span className="text-xs text-gray-500 capitalize">{sectionKey.replace(/_/g, ' ')}</span>
-                    <div className="text-sm text-gray-800">{renderFieldValue(sectionValue)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 italic text-center py-4">No content available for this note</p>
-          )}
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
-            <span>Note type: {note.note_type || 'General'}</span>
-            {note.signed_at && <span>Signed: {formatDateTime(note.signed_at)}</span>}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -425,21 +208,9 @@ interface AppointmentDetailModalProps {
 export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
   isOpen, onClose, appointment,
 }) => {
-  const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loadingNotes, setLoadingNotes] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'notes' | 'invoice'>('details');
-
-  const fetchClinicalNotes = useCallback(async () => {
-    if (!appointment) return;
-    setLoadingNotes(true);
-    try {
-      const data = await getAppointmentClinicalNotes(appointment.id);
-      setClinicalNotes(data?.results ?? data ?? []);
-    } catch { setClinicalNotes([]); }
-    finally { setLoadingNotes(false); }
-  }, [appointment]);
+  const [activeTab, setActiveTab] = useState<'details' | 'invoice'>('details');
 
   const fetchInvoices = useCallback(async () => {
     if (!appointment) return;
@@ -454,10 +225,9 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
   useEffect(() => {
     if (isOpen && appointment) {
       setActiveTab('details');
-      fetchClinicalNotes();
       fetchInvoices();
     }
-  }, [isOpen, appointment, fetchClinicalNotes, fetchInvoices]);
+  }, [isOpen, appointment, fetchInvoices]);
 
   if (!isOpen || !appointment) return null;
 
@@ -465,14 +235,13 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
   const appointmentTypeLabel = APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type;
 
   const tabs = [
-    { id: 'details' as const,  label: 'Details',        icon: <ClipboardList className="w-3.5 h-3.5" /> },
-    { id: 'notes' as const,    label: 'Clinical Notes', icon: <Stethoscope className="w-3.5 h-3.5" />, count: clinicalNotes.length },
+    { id: 'details' as const,  label: 'Appointment Details', icon: <ClipboardList className="w-3.5 h-3.5" /> },
     { id: 'invoice' as const,  label: 'Invoice',        icon: <Receipt className="w-3.5 h-3.5" />,     count: invoices.length },
   ];
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity" onClick={onClose} />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
@@ -575,12 +344,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                         <p className="text-sm font-medium text-gray-900">{value}</p>
                       </div>
                     ))}
-                    <div>
-                      <p className="text-xs text-gray-500">Status</p>
-                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${statusConfig.bgColor} ${statusConfig.color}`}>
-                        {statusConfig.icon} {statusConfig.label}
-                      </span>
-                    </div>
                     {appointment.practitioner_name && (
                       <div>
                         <p className="text-xs text-gray-500">Practitioner</p>
@@ -595,12 +358,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                     )}
                   </div>
                 </CollapsibleSection>
-
-                {appointment.chief_complaint && (
-                  <CollapsibleSection title="Chief Complaint" icon={<AlertTriangle className="w-4 h-4" />}>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.chief_complaint}</p>
-                  </CollapsibleSection>
-                )}
 
                 {appointment.notes && (
                   <CollapsibleSection title="Session Notes" icon={<FileText className="w-4 h-4" />}>
@@ -637,27 +394,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                   <span>Created: {formatDateTime(appointment.created_at)}</span>
                   <span>Updated: {formatDateTime(appointment.updated_at)}</span>
                 </div>
-              </div>
-            )}
-
-            {/* Clinical Notes Tab */}
-            {activeTab === 'notes' && (
-              <div className="space-y-3">
-                {loadingNotes ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 className="w-7 h-7 text-sky-500 animate-spin" />
-                  </div>
-                ) : clinicalNotes.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
-                      <Stethoscope className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-500">No clinical notes</p>
-                    <p className="text-xs text-gray-400 mt-1">No clinical notes were recorded for this appointment</p>
-                  </div>
-                ) : (
-                  clinicalNotes.map((note) => <ClinicalNoteCard key={note.id} note={note} />)
-                )}
               </div>
             )}
 

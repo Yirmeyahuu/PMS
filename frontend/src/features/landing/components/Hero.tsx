@@ -66,7 +66,7 @@ export const Hero: React.FC = () => {
           <div className="relative rounded-2xl overflow-hidden shadow-2xl">
             <img
               src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&q=80"
-              alt="Clinic Management Dashboard"
+              alt=""
               className="w-full h-auto object-cover"
               loading="eager"
             />

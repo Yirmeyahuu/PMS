@@ -20,7 +20,6 @@ from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet
 
 
 router = DefaultRouter()
-
 # Accounts
 router.register(r'auth',        AuthViewSet,       basename='auth')
 router.register(r'users',       UserViewSet,       basename='users')

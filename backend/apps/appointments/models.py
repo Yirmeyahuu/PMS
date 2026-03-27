@@ -14,7 +14,30 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
         ('COMPLETED',   'Completed'),
         ('CANCELLED',   'Cancelled'),
         ('NO_SHOW',     'No Show'),
+        ('ARRIVED',     'Arrived'),
+        ('DNA',         'Did Not Arrive'),
     ]
+
+    # ── Arrival status for tracking practitioner arrival ────────────────────────
+    ARRIVAL_STATUS_CHOICES = [
+        ('NO_STATUS', 'No Status'),
+        ('ARRIVED',   'Arrived'),
+        ('DNA',       'Did Not Arrive'),
+    ]
+
+    arrival_status = models.CharField(
+        max_length=20,
+        choices=ARRIVAL_STATUS_CHOICES,
+        default='NO_STATUS',
+        blank=True,
+        help_text='Tracks whether the practitioner has arrived for the appointment'
+    )
+
+    arrival_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when the practitioner marked arrival'
+    )
 
     # ── Keep for legacy / fallback but no longer the primary type mechanism ──
     APPOINTMENT_TYPE_CHOICES = [

@@ -1,11 +1,12 @@
 export interface Appointment {
   id:         number;
   clinic:     number;
-  branch_id:  number | null;   // ← ADD: canonical branch, derived server-side
+  branch_id:  number | null;
   patient:    number;
   patient_name: string;
   practitioner:      number | null;
   practitioner_name: string | null;
+  practitioner_avatar: string | null;
   location:      number | null;
   location_name: string | null;
 
@@ -16,7 +17,9 @@ export interface Appointment {
 
   appointment_type: string;
 
-  status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'ARRIVED' | 'DNA';
+  arrival_status: 'NO_STATUS' | 'ARRIVED' | 'DNA';
+  arrival_time: string | null;
   date:             string;
   start_time:       string;
   end_time:         string;

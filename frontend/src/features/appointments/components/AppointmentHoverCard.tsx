@@ -71,6 +71,11 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
 
   const statusColors = APPOINTMENT_STATUS_COLORS[apt.status] ?? APPOINTMENT_STATUS_COLORS['SCHEDULED'];
 
+  // ── Override color when practitioner has arrived ──────────────────────────────
+  const isArrived = apt.arrival_status === 'ARRIVED';
+  const cardBackground = isArrived ? '#8B5CF6' : (apt.service_color ?? null);  // Purple for arrived
+  const cardTextColor = isArrived ? '#fff' : undefined;
+
   // Fetch upcoming appointments for this patient
   const { data: upcomingAppointments = [] } = useQuery({
     queryKey: ['upcoming-appointments', apt.patient],
@@ -101,16 +106,16 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
     >
       {/* ── Colour header strip ── */}
       <div
-        className={`px-4 py-3 ${!apt.service_color ? statusColors.bg : ''}`}
-        style={apt.service_color ? { backgroundColor: apt.service_color } : undefined}
+        className={`px-4 py-3 ${!cardBackground ? statusColors.bg : ''}`}
+        style={cardBackground ? { backgroundColor: cardBackground } : undefined}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p
               className="text-sm font-bold leading-tight truncate"
-              style={apt.service_color ? { color: '#fff' } : undefined}
+              style={cardBackground ? { color: cardTextColor } : undefined}
             >
-              <span className={!apt.service_color ? statusColors.text : ''}>
+              <span className={!cardBackground ? statusColors.text : ''}>
                 {apt.patient_name}
               </span>
             </p>

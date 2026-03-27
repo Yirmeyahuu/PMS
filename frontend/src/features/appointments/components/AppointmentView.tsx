@@ -19,6 +19,7 @@ import type { Invoice } from '@/types/billing';
 import { AppointmentEditForm }    from './AppointmentEditForm';
 import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
+import { ClinicalNotesTab } from './ClinicalNotesTab';
 import { createRecurringAppointments } from '../appointment.api';
 import toast from 'react-hot-toast';
 import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
@@ -35,7 +36,7 @@ const INVOICE_STATUS_STYLES: Record<string, string> = {
   CANCELLED:      'bg-gray-100 text-gray-400 border-gray-200',
 };
 
-type Tab = 'client' | 'appointment' | 'status' | 'notes' | 'invoice';
+type Tab = 'client' | 'appointment' | 'status' | 'notes' | 'clinical_notes' | 'invoice';
 
 interface AppointmentViewProps {
   isOpen:      boolean;
@@ -604,6 +605,9 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const [showRecurringModal,     setShowRecurringModal]     = useState(false);
   const appointmentDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Query client for invalidation
+  const queryClient = useQueryClient();
+
   // Close appointment dropdown when clicking outside
   useEffect(() => {
     if (!showAppointmentDropdown) return;
@@ -756,6 +760,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
               { key: 'appointment', label: 'Appointment', icon: Calendar, isDropdown: true },
               { key: 'status', label: 'Status', icon: ClipboardList },
               { key: 'notes', label: 'Clinic Notes', icon: StickyNote },
+              { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
               { key: 'invoice', label: 'Invoice', icon: Receipt },
             ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
               <div key={tab.key} className="relative" ref={tab.isDropdown ? appointmentDropdownRef : null}>
@@ -1128,6 +1133,31 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                         {appointment.status.replace('_', ' ')}
                       </span>
                     </div>
+                    {/* Arrival Status Dropdown */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Arrival Status</span>
+                      <select
+                        value={appointment.arrival_status || 'NO_STATUS'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value as 'NO_STATUS' | 'ARRIVED' | 'DNA';
+                          try {
+                            const { editAppointment } = await import('@/features/appointments/appointment.api');
+                            const updated = await editAppointment(appointment.id, { arrival_status: newStatus });
+                            setAppointment(updated);
+                            onUpdated?.(updated);
+                            // Invalidate today's arrivals to refresh the list in real-time
+                            queryClient.invalidateQueries({ queryKey: ['today-arrivals'] });
+                          } catch (err) {
+                            console.error('Failed to update arrival status:', err);
+                          }
+                        }}
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      >
+                        <option value="NO_STATUS">No Status</option>
+                        <option value="ARRIVED">Arrived</option>
+                        <option value="DNA">Did Not Arrive (DNA)</option>
+                      </select>
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Created By</span>
                       <span className="text-sm font-medium text-gray-800">{appointment.created_by_name || 'Unknown'}</span>
@@ -1209,6 +1239,11 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
             {/* ── Invoice Tab ── */}
             {activeTab === 'invoice' && (
               <InvoiceTab appointment={appointment} />
+            )}
+
+            {/* ── Clinical Notes Tab ── */}
+            {activeTab === 'clinical_notes' && (
+              <ClinicalNotesTab appointmentId={appointment.id} />
             )}
           </div>
         </div>

@@ -25,6 +25,17 @@ class AppointmentFilter(django_filters.FilterSet):
             ('COMPLETED',   'Completed'),
             ('CANCELLED',   'Cancelled'),
             ('NO_SHOW',     'No Show'),
+            ('ARRIVED',     'Arrived'),
+            ('DNA',         'Did Not Arrive'),
+        ]
+    )
+
+    # Arrival status
+    arrival_status = django_filters.MultipleChoiceFilter(
+        choices=[
+            ('NO_STATUS', 'No Status'),
+            ('ARRIVED',   'Arrived'),
+            ('DNA',       'Did Not Arrive'),
         ]
     )
 
@@ -41,6 +52,6 @@ class AppointmentFilter(django_filters.FilterSet):
         model   = Appointment
         fields  = [
             'date', 'date_from', 'date_to',
-            'clinic', 'practitioner', 'status',
+            'clinic', 'practitioner', 'status', 'arrival_status',
             'patient_name',
         ]

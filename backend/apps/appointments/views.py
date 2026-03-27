@@ -115,19 +115,35 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             )
 
         # ── service added to editable fields ────────────────────────────────
-        allowed_fields = {'practitioner', 'service', 'chief_complaint', 'notes', 'patient_notes'}
+        allowed_fields = {'practitioner', 'service', 'chief_complaint', 'notes', 'patient_notes', 'arrival_status'}
         filtered_data  = {k: v for k, v in request.data.items() if k in allowed_fields}
 
         if not filtered_data:
             return Response(
                 {'detail': 'No editable fields provided. '
-                           'Allowed: practitioner, service, chief_complaint, notes, patient_notes'},
+                           'Allowed: practitioner, service, chief_complaint, notes, patient_notes, arrival_status'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Handle arrival_status change - set arrival_time when status is 'ARRIVED'
+        new_arrival_status = filtered_data.get('arrival_status')
+        if new_arrival_status == 'ARRIVED' and appointment.arrival_status != 'ARRIVED':
+            # Setting arrival to ARRIVED - capture the timestamp
+            appointment.arrival_time = timezone.now()
+        elif new_arrival_status and new_arrival_status != 'ARRIVED':
+            # Changing away from ARRIVED - clear the timestamp
+            appointment.arrival_time = None
+
         serializer = AppointmentEditSerializer(appointment, data=filtered_data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save(updated_by=request.user)
+        
+        # Save appointment with updated arrival_time if set
+        if new_arrival_status == 'ARRIVED' and appointment.arrival_status != 'ARRIVED':
+            serializer.save(updated_by=request.user)
+            appointment.arrival_time = timezone.now()
+            appointment.save(update_fields=['arrival_time', 'updated_at'])
+        else:
+            serializer.save(updated_by=request.user)
 
         full_serializer = AppointmentSerializer(appointment, context={'request': request})
         return Response(full_serializer.data, status=status.HTTP_200_OK)
@@ -203,6 +219,108 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             response_data['email_warning'] = email_warning
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+    # ── BULK CANCEL: Cancel multiple appointments ────────────────────────────────
+    @action(detail=False, methods=['post'], url_path='bulk_cancel')
+    def bulk_cancel(self, request):
+        """
+        POST /api/appointments/bulk_cancel/
+        Body: { "appointment_ids": [1, 2, 3], "cancellation_reason": "..." }
+
+        Cancels multiple appointments at once with the same reason.
+        Sends cancellation emails to each patient (non-blocking).
+        """
+        appointment_ids = request.data.get('appointment_ids', [])
+        reason = request.data.get('cancellation_reason', '').strip()
+
+        if not appointment_ids:
+            return Response(
+                {'detail': 'appointment_ids is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not reason:
+            return Response(
+                {'detail': 'cancellation_reason is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(reason) < 5:
+            return Response(
+                {'detail': 'cancellation_reason must be at least 5 characters.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get all appointments that can be cancelled (not already cancelled)
+        appointments = self.queryset.filter(
+            id__in=appointment_ids,
+        ).select_related('patient', 'practitioner__user')
+
+        cancelled_count = 0
+        failed_count = 0
+        results = []
+
+        for apt in appointments:
+            if apt.status == 'CANCELLED':
+                results.append({
+                    'appointment_id': apt.id,
+                    'success': False,
+                    'error': 'Already cancelled',
+                })
+                failed_count += 1
+                continue
+
+            # Apply cancellation
+            apt.status = 'CANCELLED'
+            apt.cancelled_by = request.user
+            apt.cancellation_reason = reason
+            apt.cancelled_at = timezone.now()
+            apt.updated_by = request.user
+            apt.save(update_fields=[
+                'status', 'cancelled_by', 'cancellation_reason',
+                'cancelled_at', 'updated_by', 'updated_at',
+            ])
+
+            logger.info(
+                "Appointment #%s CANCELLED by %s (bulk). Reason: %s",
+                apt.id, request.user.email, reason,
+            )
+
+            # Send cancellation email (non-blocking)
+            email_sent = False
+            patient_email = getattr(apt.patient, 'email', None)
+            if patient_email:
+                ok, err = send_appointment_cancellation_email(apt, reason)
+                email_sent = ok
+                if not ok:
+                    logger.warning(
+                        "Cancellation email failed for appointment #%s: %s",
+                        apt.id, err,
+                    )
+
+            results.append({
+                'appointment_id': apt.id,
+                'success': True,
+                'email_sent': email_sent,
+            })
+            cancelled_count += 1
+
+        # Handle IDs that weren't found
+        found_ids = {r['appointment_id'] for r in results}
+        for apt_id in appointment_ids:
+            if apt_id not in found_ids:
+                results.append({
+                    'appointment_id': apt_id,
+                    'success': False,
+                    'error': 'Appointment not found or access denied',
+                })
+                failed_count += 1
+
+        return Response({
+            'cancelled_count': cancelled_count,
+            'failed_count': failed_count,
+            'results': results,
+        }, status=status.HTTP_200_OK)
 
     # ── Portal bookings (existing) ────────────────────────────────────────────
     @action(detail=False, methods=['get'])
@@ -845,6 +963,40 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             summary = {'sms': raw}
 
         return Response({'target_date': str(target_date), 'channel': channel, **summary})
+
+    # ── Today's Arrivals ─────────────────────────────────────────────────────────
+    @action(detail=False, methods=['get'], url_path='today-arrivals')
+    def today_arrivals(self, request):
+        """
+        GET /api/appointments/today-arrivals/
+        Returns appointments with arrival_status='ARRIVED' for today.
+        """
+        user = request.user
+        if not user.clinic:
+            return Response([])
+
+        main_clinic    = user.clinic.main_clinic
+        all_branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+
+        # Get today's date
+        today = timezone.now().date()
+
+        # Query appointments with ARRIVED status for today
+        appointments = Appointment.objects.filter(
+            clinic_id__in=all_branch_ids,
+            is_deleted=False,
+            patient__is_archived=False,
+            date=today,
+            arrival_status='ARRIVED',
+        ).select_related(
+            'patient', 'practitioner__user', 'clinic', 'service'
+        ).order_by('start_time')
+
+        # Serialize the data
+        serializer = AppointmentSerializer(appointments, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 # ── Other ViewSets (unchanged) ────────────────────────────────────────────────

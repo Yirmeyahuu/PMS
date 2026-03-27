@@ -138,12 +138,10 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='clinical_notes_v2'
     )
-    appointment = models.OneToOneField(
+    appointment = models.ForeignKey(
         'appointments.Appointment',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='clinical_note_v2'
+        on_delete=models.CASCADE,  # Delete notes if appointment is deleted
+        related_name='clinical_notes_v2'
     )
     clinic = models.ForeignKey(
         'clinics.Clinic',
@@ -194,6 +192,7 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
             models.Index(fields=['practitioner', 'date']),
             models.Index(fields=['clinic', 'date']),
             models.Index(fields=['is_draft', 'is_signed']),
+            models.Index(fields=['appointment']),
         ]
     
     def __str__(self):

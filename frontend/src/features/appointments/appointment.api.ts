@@ -28,6 +28,7 @@ export interface AppointmentEditPayload {
   chief_complaint?: string;
   notes?:           string;
   patient_notes?:   string;
+  arrival_status?:  'NO_STATUS' | 'ARRIVED' | 'DNA';  // ← NEW
 }
 
 export interface AppointmentCancelPayload {
@@ -37,6 +38,23 @@ export interface AppointmentCancelPayload {
 export interface AppointmentCancelResponse extends Appointment {
   email_sent:     boolean;
   email_warning?: string;
+}
+
+// ── Bulk cancel appointments ─────────────────────────────────────────────────────
+export interface BulkCancelPayload {
+  appointment_ids: number[];
+  cancellation_reason: string;
+}
+
+export interface BulkCancelResult {
+  cancelled_count: number;
+  failed_count: number;
+  results: Array<{
+    appointment_id: number;
+    success: boolean;
+    email_sent?: boolean;
+    error?: string;
+  }>;
 }
 
 export interface PortalBookingDiaryItem {
@@ -135,6 +153,16 @@ export const editAppointment = async (
   return response.data;
 };
 
+/**
+ * Get today's arrivals (appointments with arrival_status='ARRIVED' for today)
+ */
+export const getTodayArrivals = async (): Promise<Appointment[]> => {
+  const response = await axiosInstance.get<Appointment[]>(
+    '/appointments/today-arrivals/'
+  );
+  return response.data;
+};
+
 export interface RescheduleAppointmentPayload {
   date:       string;   // yyyy-MM-dd
   start_time: string;   // HH:mm
@@ -158,6 +186,17 @@ export const cancelAppointment = async (
 ): Promise<AppointmentCancelResponse> => {
   const response = await axiosInstance.post<AppointmentCancelResponse>(
     `/appointments/${id}/cancel/`,
+    data
+  );
+  return response.data;
+};
+
+// Bulk cancel multiple appointments
+export const bulkCancelAppointments = async (
+  data: BulkCancelPayload
+): Promise<BulkCancelResult> => {
+  const response = await axiosInstance.post<BulkCancelResult>(
+    '/appointments/bulk_cancel/',
     data
   );
   return response.data;

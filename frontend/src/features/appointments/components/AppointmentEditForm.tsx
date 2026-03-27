@@ -40,6 +40,7 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
   const [chiefComplaint, setChiefComplaint] = useState(appointment.chief_complaint || '');
   const [notes,          setNotes]          = useState(appointment.notes || '');
   const [patientNotes,   setPatientNotes]   = useState(appointment.patient_notes || '');
+  const [arrivalStatus,  setArrivalStatus]  = useState<'NO_STATUS' | 'ARRIVED' | 'DNA'>(appointment.arrival_status || 'NO_STATUS');
 
   // Reset when a different appointment is opened
   useEffect(() => {
@@ -48,6 +49,7 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
     setChiefComplaint(appointment.chief_complaint || '');
     setNotes(appointment.notes || '');
     setPatientNotes(appointment.patient_notes || '');
+    setArrivalStatus(appointment.arrival_status || 'NO_STATUS');
   }, [appointment.id]);
 
   const selectedService = services.find(s => s.id === Number(service));
@@ -71,6 +73,9 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
     }
     if (patientNotes !== (appointment.patient_notes || '')) {
       payload.patient_notes = patientNotes;
+    }
+    if (arrivalStatus !== (appointment.arrival_status || 'NO_STATUS')) {
+      payload.arrival_status = arrivalStatus;
     }
 
     if (Object.keys(payload).length === 0) {
@@ -210,6 +215,23 @@ export const AppointmentEditForm: React.FC<AppointmentEditFormProps> = ({
           className={`${inputBase} resize-none`}
           placeholder="Notes visible to the patient…"
         />
+      </div>
+
+      {/* ── Arrival Status (Admin/Staff only) ── */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+          Arrival Status
+          <span className="ml-2 text-xs font-normal text-gray-400">(Mark practitioner arrival)</span>
+        </label>
+        <select
+          value={arrivalStatus}
+          onChange={e => { setArrivalStatus(e.target.value as 'NO_STATUS' | 'ARRIVED' | 'DNA'); onMarkDirty(); }}
+          className={inputBase}
+        >
+          <option value="NO_STATUS">No Status</option>
+          <option value="ARRIVED">Arrived</option>
+          <option value="DNA">Did Not Arrive (DNA)</option>
+        </select>
       </div>
 
       {/* ── Actions ── */}
