@@ -21,6 +21,7 @@ export const Diary: React.FC = () => {
   const [selectedPractitioner, setSelectedPractitioner] = useState<number | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [calendarReadyDate, setCalendarReadyDate] = useState<Date | null>(null);
 
   // Fetch clinic branches
   const { branches, loading: loadingBranches } = useClinicBranches();
@@ -230,7 +231,7 @@ export const Diary: React.FC = () => {
             {/* Arrivals Section */}
             <div className="p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Today's Arrivals</h3>
-              <ArrivalsList selectedDate={currentDate} />
+              <ArrivalsList calendarReadyDate={calendarReadyDate} />
             </div>
           </div>
 
@@ -434,6 +435,7 @@ export const Diary: React.FC = () => {
                 refreshKey={eventRefreshKey}
                 onEventClick={isAdmin ? handleEventClick : undefined}
                 onAppointmentsReady={setCalendarAppointments}
+                onCalendarReady={setCalendarReadyDate}
               />
             </div>
 

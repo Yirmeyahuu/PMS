@@ -4,8 +4,17 @@ import { format } from 'date-fns';
 import { getTodayArrivals } from '../appointment.api';
 import type { Appointment } from '@/types';
 
+// Get current date in Philippine timezone (UTC+8)
+// We use a fixed offset since the browser is already in Manila time
+const getPhilippineToday = (): Date => {
+  // The browser's local time is already Philippine time (UTC+8)
+  // So we just use the browser's local date
+  return new Date();
+};
+
 interface ArrivalsListProps {
-  selectedDate: Date;
+  selectedDate?: Date;
+  calendarReadyDate: Date | null;
 }
 
 const fmtArrivalTime = (arrivalTime: string | null): string => {
@@ -13,17 +22,73 @@ const fmtArrivalTime = (arrivalTime: string | null): string => {
   return format(new Date(arrivalTime), 'h:mm a');
 };
 
-export const ArrivalsList: React.FC<ArrivalsListProps> = ({ selectedDate }) => {
-  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+export const ArrivalsList: React.FC<ArrivalsListProps> = ({ calendarReadyDate }) => {
+  // Don't fetch until calendar is ready with the current date
+  const isCalendarReady = calendarReadyDate !== null;
   
   const { data: arrivals = [], isLoading } = useQuery({
     queryKey: ['today-arrivals'],
     queryFn: async () => {
+      // Fetch all today's arrivals (backend filters by today's date in Philippine timezone)
       const allArrivals = await getTodayArrivals();
-      return allArrivals.filter((apt: Appointment) => apt.date === selectedDateStr);
+      
+      // The browser's local time is already Philippine time (UTC+8)
+      const today = new Date();
+      const todayStr = format(today, 'yyyy-MM-dd');
+      
+      console.log('[ArrivalsList] Fetched arrivals:', allArrivals.length);
+      console.log('[ArrivalsList] Today (PH):', todayStr);
+      
+      // Filter arrivals based on both appointment date and arrival_time
+      // Only show appointments where:
+      // 1. arrival_status = 'ARRIVED'
+      // 2. appointment date is today
+      // 3. arrival_time is today (after midnight)
+      const filteredArrivals = allArrivals.filter((apt: Appointment) => {
+        console.log('[ArrivalsList] Appointment date:', apt.date, 'arrival_status:', apt.arrival_status, 'arrival_time:', apt.arrival_time);
+        
+        // Only show if arrival_status is 'ARRIVED'
+        if (apt.arrival_status !== 'ARRIVED') {
+          return false;
+        }
+        
+        // Check if appointment date is today (this is the key check!)
+        if (apt.date !== todayStr) {
+          return false;
+        }
+        
+        // If there's an arrival_time, also check if it's after midnight of current date
+        // (this handles cases where patient arrives after midnight of the appointment day)
+        if (apt.arrival_time) {
+          const arrivalDateTime = new Date(apt.arrival_time);
+          const midnightToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+          
+          // Show if arrival_time is today (after midnight)
+          return arrivalDateTime >= midnightToday;
+        }
+        
+        // Fallback: show if appointment date matches today
+        return apt.date === todayStr;
+      });
+      
+      console.log('[ArrivalsList] Filtered arrivals:', filteredArrivals.length);
+      return filteredArrivals;
     },
+    enabled: isCalendarReady, // Only fetch when calendar is ready
     refetchInterval: 30000,
   });
+
+  // Don't show anything until calendar is ready
+  if (!isCalendarReady) {
+    return (
+      <div className="text-center text-gray-400 text-sm py-4">
+        Loading arrivals...
+      </div>
+    );
+  }
+
+  // Get today's date in Philippine timezone
+  const today = getPhilippineToday();
 
   // Limit to 3 arrivals, rest are scrollable
   const displayArrivals = arrivals.slice(0, 3);
@@ -42,13 +107,18 @@ export const ArrivalsList: React.FC<ArrivalsListProps> = ({ selectedDate }) => {
   if (arrivals.length === 0) {
     return (
       <div className="text-center text-gray-400 text-sm py-4">
-        No arrivals for {format(selectedDate, 'MMM d')}
+        No arrivals for {format(today, 'MMM d')}
       </div>
     );
   }
 
   return (
-    <div className={`space-y-2 ${hasMore ? 'max-h-48 overflow-y-auto' : ''}`}>
+    <div>
+      {/* Current date display */}
+      <div className="text-xs text-gray-500 mb-3">
+        {format(today, 'EEEE, MMMM d, yyyy')}
+      </div>
+      <div className={`space-y-2 ${hasMore ? 'max-h-48 overflow-y-auto' : ''}`}>
       {displayArrivals.map((appointment) => (
         <div
           key={appointment.id}
@@ -79,6 +149,7 @@ export const ArrivalsList: React.FC<ArrivalsListProps> = ({ selectedDate }) => {
           +{arrivals.length - 3} more arrivals
         </p>
       )}
+      </div>
     </div>
   );
 };

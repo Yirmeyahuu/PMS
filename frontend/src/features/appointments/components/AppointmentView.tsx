@@ -1146,9 +1146,15 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                             setAppointment(updated);
                             onUpdated?.(updated);
                             // Invalidate today's arrivals to refresh the list in real-time
+                            // Use exact key matching to ensure proper invalidation
                             queryClient.invalidateQueries({ queryKey: ['today-arrivals'] });
+                            
+                            // Show success notification
+                            const statusLabel = newStatus === 'ARRIVED' ? 'Arrived' : newStatus === 'DNA' ? 'Did Not Arrive' : 'No Status';
+                            toast.success(`Appointment status successfully changed to ${statusLabel}`);
                           } catch (err) {
                             console.error('Failed to update arrival status:', err);
+                            toast.error('Failed to update arrival status');
                           }
                         }}
                         className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"

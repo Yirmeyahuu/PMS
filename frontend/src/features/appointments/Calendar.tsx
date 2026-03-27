@@ -35,6 +35,7 @@ interface CalendarProps {
   refreshKey?: number; // Used to trigger refresh when events are created
   onEventClick?: (event: BlockAppointment) => void; // Callback when admin clicks on a block event
   onAppointmentsReady?: (appointments: Appointment[]) => void; // Callback to expose appointments to parent
+  onCalendarReady?: (date: Date) => void; // Callback when calendar has loaded with current date
 }
 
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -125,6 +126,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   refreshKey,
   onEventClick,
   onAppointmentsReady,
+  onCalendarReady,
 }) => {
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
 
@@ -279,6 +281,15 @@ export const Calendar: React.FC<CalendarProps> = ({
       onAppointmentsReady(appointments);
     }
   }, [appointments, onAppointmentsReady]);
+
+  // Notify parent when calendar has loaded with the current date
+  const calendarReadyCalled = React.useRef(false);
+  React.useEffect(() => {
+    if (!calendarReadyCalled.current && onCalendarReady) {
+      calendarReadyCalled.current = true;
+      onCalendarReady(currentDate);
+    }
+  }, [currentDate, onCalendarReady]);
 
   // Helper to get block appointments for a specific date
   const getBlockAppointmentsForDate = (date: Date): BlockAppointment[] => {

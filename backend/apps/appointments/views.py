@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Q
 from datetime import datetime, timedelta
+import pytz
 from .models import Appointment, PractitionerSchedule, AppointmentReminder, BlockAppointment
 from .serializers import (
     AppointmentSerializer,
@@ -972,6 +973,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         """
         GET /api/appointments/today-arrivals/
         Returns appointments with arrival_status='ARRIVED' for today.
+        Uses Philippine timezone (UTC+8) to determine today's date.
         """
         user = request.user
         if not user.clinic:
@@ -982,8 +984,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             main_clinic.get_all_branches().values_list('id', flat=True)
         )
 
-        # Get today's date
-        today = timezone.now().date()
+        # Get today's date in Philippine timezone (UTC+8)
+        # This ensures consistency with the frontend's Philippine date
+        import pytz
+        ph_tz = pytz.timezone('Asia/Manila')
+        today = datetime.now(ph_tz).date()
 
         # Query appointments with ARRIVED status for today
         appointments = Appointment.objects.filter(
