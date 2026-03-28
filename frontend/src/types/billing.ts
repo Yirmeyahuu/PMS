@@ -11,7 +11,7 @@ export type BatchStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export type PaymentMethod =
   | 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER'
-  | 'GCASH' | 'PAYMAYA' | 'CHECK';
+  | 'GCASH';
 
 // ── Print Appointments ────────────────────────────────────────────────────────
 
@@ -168,6 +168,7 @@ export interface Invoice {
   terms_conditions:    string;
 
   items:               InvoiceItem[];
+  payments?:            Payment[];
   created_at:          string;
   updated_at:          string;
 }

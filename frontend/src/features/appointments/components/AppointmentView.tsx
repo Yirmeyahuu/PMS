@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
-  Receipt, Plus, Printer, CheckCircle, AlertCircle,
+  Receipt, Plus, Printer, AlertCircle,
   RefreshCw, ChevronDown, Building2, Edit3, Trash2,
   Save, XCircle, Search, UserCircle, StickyNote, ClipboardList,
   ExternalLink, Repeat, List,
@@ -185,6 +185,7 @@ const ServicePicker: React.FC<{
 // ── Invoice Tab ───────────────────────────────────────────────────────────────
 const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const [isEditing,   setIsEditing]   = useState(false);
   const [editItems,   setEditItems]   = useState<EditableItem[]>([]);
@@ -221,6 +222,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] });
+      qc.invalidateQueries({ queryKey: ['appointment-invoice-exists', appointment.id] });
     },
     onError: (error: any) => {
       console.error('❌ Invoice creation error:', error?.response?.data);
@@ -309,22 +311,15 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
     return (
       <div className="space-y-4">
         <AppointmentSummary appointment={appointment} />
-        <div className="flex flex-col items-center justify-center py-8 space-y-4">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
-            <Receipt className="w-8 h-8 text-gray-400" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-gray-700">No invoice yet</p>
-            <p className="text-xs text-gray-400 mt-1">Generate an invoice for this appointment</p>
-          </div>
+        <div className="flex flex-col items-center justify-center py-8">
           {fetchError && (fetchError as any)?.response?.status !== 404 && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full mb-4">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>Failed to check existing invoice. Please try refreshing.</span>
             </div>
           )}
           {createMutation.isError && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full">
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 w-full mb-4">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
                 {(() => {
@@ -339,45 +334,8 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
               </span>
             </div>
           )}
-          {clinicServices.length > 0 && (
-            <div className="w-full border border-gray-200 rounded-xl overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Select Services to Include</p>
-              </div>
-              <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
-                {clinicServices.map(svc => {
-                  const isSelected = editItems.some(i => i.service_id === svc.id);
-                  return (
-                    <button key={svc.id}
-                      onClick={() => {
-                        if (isSelected) setEditItems(prev => prev.filter(i => i.service_id !== svc.id));
-                        else setEditItems(prev => [...prev, { description: svc.name, quantity: 1, unit_price: parseFloat(svc.price), service_id: svc.id, _key: crypto.randomUUID() }]);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors ${isSelected ? 'bg-sky-50' : 'hover:bg-gray-50'}`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-sky-600 border-sky-600' : 'border-gray-300'}`}>
-                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{svc.name}</p>
-                          {svc.duration_minutes > 0 && <p className="text-xs text-gray-400">{svc.duration_minutes} min</p>}
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">₱{parseFloat(svc.price).toLocaleString()}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {editItems.length > 0 && (
-                <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{editItems.length} service{editItems.length > 1 ? 's' : ''} selected</span>
-                  <span className="text-sm font-bold text-gray-900">₱{editItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-          )}
-          <button onClick={() => createMutation.mutate(editItems.length > 0 ? editItems : undefined)}
+          <button 
+            onClick={() => navigate(`/billing/generate-invoice/${appointment.id}`)}
             disabled={createMutation.isPending}
             className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium">
             {createMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -509,6 +467,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
         <div className="flex items-center gap-2">
           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_STATUS_STYLES[invoice.status] ?? ''}`}>{invoice.status_display}</span>
           {canEdit && <button onClick={startEditing} className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"><Edit3 className="w-3.5 h-3.5" />Edit</button>}
+          <button onClick={() => navigate(`/clients/${appointment.patient}`)} className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"><FileText className="w-3.5 h-3.5" />View Full Invoice</button>
           <button onClick={() => billingApi.print(invoice.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"><Printer className="w-3.5 h-3.5" />Print</button>
           <button onClick={() => refetch()} className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"><RefreshCw className="w-3.5 h-3.5" /></button>
         </div>
@@ -580,14 +539,6 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
         </div>
       )}
-      {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-        <div className="flex justify-end pt-1">
-          <button onClick={async () => { await billingApi.updateStatus(invoice.id, 'PAID'); qc.invalidateQueries({ queryKey: ['appointment-invoice', appointment.id] }); }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />Mark as Paid
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -607,6 +558,22 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   // Query client for invalidation
   const queryClient = useQueryClient();
+
+  // Query to check if invoice exists for this appointment
+  const { data: hasInvoice } = useQuery({
+    queryKey: ['appointment-invoice-exists', initialAppointment?.id],
+    queryFn: async () => {
+      if (!initialAppointment?.id) return false;
+      try {
+        const invoice = await billingApi.getByAppointment(initialAppointment.id);
+        return !!invoice;
+      } catch {
+        return false;
+      }
+    },
+    enabled: !!initialAppointment,
+    initialData: false,
+  });
 
   // Close appointment dropdown when clicking outside
   useEffect(() => {
@@ -761,7 +728,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
               { key: 'status', label: 'Status', icon: ClipboardList },
               { key: 'notes', label: 'Clinic Notes', icon: StickyNote },
               { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
-              { key: 'invoice', label: 'Invoice', icon: Receipt },
+              { key: 'invoice', label: hasInvoice ? 'View Invoice' : 'Generate Invoice', icon: Receipt },
             ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
               <div key={tab.key} className="relative" ref={tab.isDropdown ? appointmentDropdownRef : null}>
                 <button

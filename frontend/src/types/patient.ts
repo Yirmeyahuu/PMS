@@ -32,6 +32,10 @@ export interface Patient {
   archived_at?:     string | null;
   archived_by?:     number | null;
   archived_by_name?: string | null;
+  // Notification Settings
+  send_email_notifications: boolean;
+  allow_push_notifications: boolean;
+  data_sharing_preferences: Record<string, any>;
 }
 
 export interface IntakeForm {
@@ -74,4 +78,8 @@ export interface CreatePatientData {
   medical_conditions?: string;
   allergies?: string;
   medications?: string;
+  // Notification Settings
+  send_email_notifications?: boolean;
+  allow_push_notifications?: boolean;
+  data_sharing_preferences?: Record<string, unknown>;
 }

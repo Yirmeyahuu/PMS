@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout
 import {
   ArrowLeft, User, MapPin, Phone, Heart, Calendar, Edit,
   Clock, CheckCircle, XCircle, AlertCircle, FileText,
-  Activity, Loader2, ChevronDown, ChevronUp, Mail, Archive, ArchiveRestore, Plus, Square, CheckSquare
+  Activity, Loader2, ChevronDown, ChevronUp, Mail, Archive, ArchiveRestore, Plus, Square, CheckSquare, Settings
 } from 'lucide-react';
 import { getPatient, updatePatient, archivePatient, restorePatient } from './patient.api';
 import { getAppointments, bulkCancelAppointments } from '@/features/appointments/appointment.api';
@@ -61,7 +61,7 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) => (
 
 // ─── SectionCard ─────────────────────────────────────────────────────────────
 interface SectionCardProps { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; }
-const SectionCard: React.FC<SectionCardProps> = ({ title, icon, children, defaultOpen = true }) => {
+const SectionCard: React.FC<SectionCardProps> = ({ title, icon, children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -296,6 +296,24 @@ export const PatientProfile: React.FC = () => {
   const [isBulkCancelling, setIsBulkCancelling] = useState(false);
   const [bulkCancelError, setBulkCancelError] = useState<string | null>(null);
 
+  // ── Settings state ───────────────────────────────────────────────────────────
+  const [settings, setSettings] = useState({
+    send_email_notifications: true,
+    allow_push_notifications: false,
+    data_sharing_preferences: {},
+  });
+  const [originalSettings, setOriginalSettings] = useState({
+    send_email_notifications: true,
+    allow_push_notifications: false,
+    data_sharing_preferences: {},
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Check if settings have changed
+  const hasSettingsChanged = JSON.stringify(settings) !== JSON.stringify(originalSettings);
+
+  // Initialize settings from patient data
+
   // Helper to check if appointment can be cancelled (not already cancelled)
   const canCancelAppointment = (apt: Appointment) => apt.status !== 'CANCELLED';
 
@@ -364,6 +382,18 @@ export const PatientProfile: React.FC = () => {
     try {
       const data = await getPatient(Number(id));
       setPatient(data);
+      // Initialize settings from patient data
+      setSettings({
+        send_email_notifications: data.send_email_notifications ?? true,
+        allow_push_notifications: data.allow_push_notifications ?? false,
+        data_sharing_preferences: data.data_sharing_preferences ?? {},
+      });
+      // Store original settings for comparison
+      setOriginalSettings({
+        send_email_notifications: data.send_email_notifications ?? true,
+        allow_push_notifications: data.allow_push_notifications ?? false,
+        data_sharing_preferences: data.data_sharing_preferences ?? {},
+      });
     } catch {
       toast.error('Failed to load patient details');
       navigate('/clients');
@@ -371,6 +401,28 @@ export const PatientProfile: React.FC = () => {
       setLoadingPatient(false);
     }
   }, [id, navigate]);
+
+  // Save settings handler
+  const handleSaveSettings = async () => {
+    if (!patient) return;
+    setIsSavingSettings(true);
+    try {
+      await updatePatient(patient.id, {
+        send_email_notifications: settings.send_email_notifications,
+        allow_push_notifications: settings.allow_push_notifications,
+        data_sharing_preferences: settings.data_sharing_preferences,
+      } as Partial<CreatePatientData>);
+      toast.success('Settings saved successfully');
+      // Update original settings after successful save
+      setOriginalSettings({ ...settings });
+      fetchPatient();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      toast.error(err.response?.data?.detail || 'Failed to save settings');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const fetchAppointments = useCallback(async () => {
     if (!id) return;
@@ -644,7 +696,7 @@ export const PatientProfile: React.FC = () => {
 
               {/* LEFT: Patient Details */}
               <div className="lg:col-span-1 space-y-3">
-                <SectionCard title="Personal Information" icon={<User className="w-4 h-4" />}>
+                <SectionCard title="Personal Information" icon={<User className="w-4 h-4" />} defaultOpen={false}>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <InfoRow label="First Name"    value={patient.first_name} />
                     <InfoRow label="Last Name"     value={patient.last_name} />
@@ -655,7 +707,7 @@ export const PatientProfile: React.FC = () => {
                   </div>
                 </SectionCard>
 
-                <SectionCard title="Contact Information" icon={<MapPin className="w-4 h-4" />}>
+                <SectionCard title="Contact Information" icon={<MapPin className="w-4 h-4" />} defaultOpen={false}>
                   <div className="space-y-3">
                     <InfoRow label="Phone"   value={patient.phone} />
                     <InfoRow label="Email"   value={patient.email} />
@@ -668,7 +720,7 @@ export const PatientProfile: React.FC = () => {
                   </div>
                 </SectionCard>
 
-                <SectionCard title="Emergency Contact" icon={<Phone className="w-4 h-4" />}>
+                <SectionCard title="Emergency Contact" icon={<Phone className="w-4 h-4" />} defaultOpen={false}>
                   <div className="space-y-3">
                     <InfoRow label="Name"         value={patient.emergency_contact_name} />
                     <InfoRow label="Phone"        value={patient.emergency_contact_phone} />
@@ -694,6 +746,77 @@ export const PatientProfile: React.FC = () => {
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Current Medications</p>
                       <p className="text-sm text-gray-900 whitespace-pre-wrap">{patient.medications || '—'}</p>
+                    </div>
+                  </div>
+                </SectionCard>
+
+                {/* ── Settings Section ── */}
+                <SectionCard title="Settings" icon={<Settings className="w-4 h-4" />} defaultOpen={false}>
+                  <div className="space-y-4">
+                    {/* Email Notifications */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">Send email notifications automatically?</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Enable to receive automatic email reminders for appointments.</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={settings.send_email_notifications}
+                          onChange={(e) => setSettings({ ...settings, send_email_notifications: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                      </label>
+                    </div>
+
+                    {/* Push Notifications (Placeholder) */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">Allow push notifications</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Receive push notifications for updates and reminders (coming soon).</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={settings.allow_push_notifications}
+                          onChange={(e) => setSettings({ ...settings, allow_push_notifications: e.target.checked })}
+                          disabled
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-100 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-300 peer-checked:peer-disabled:bg-gray-200"></div>
+                      </label>
+                    </div>
+
+                    {/* Data Sharing Preferences (Placeholder) */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">Data sharing preferences</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Control how your data is shared with third parties (coming soon).</p>
+                      </div>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        Coming Soon
+                      </span>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="pt-2 border-t border-gray-100">
+                      <button
+                        onClick={handleSaveSettings}
+                        disabled={isSavingSettings || !hasSettingsChanged}
+                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          hasSettingsChanged
+                            ? 'text-white bg-sky-600 hover:bg-sky-700'
+                            : 'text-gray-500 bg-gray-100 cursor-not-allowed'
+                        } ${isSavingSettings ? 'opacity-50' : ''}`}
+                      >
+                        {isSavingSettings ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        Save Changes
+                      </button>
                     </div>
                   </div>
                 </SectionCard>
@@ -1040,6 +1163,7 @@ export const PatientProfile: React.FC = () => {
         isOpen={isAppointmentDetailOpen}
         onClose={() => { setIsAppointmentDetailOpen(false); setSelectedAppointment(null); }}
         appointment={selectedAppointment}
+        patientEmail={patient?.email}
       />
 
       {/* Create Clinical Note Modal */}

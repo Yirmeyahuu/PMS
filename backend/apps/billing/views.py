@@ -27,6 +27,7 @@ from .serializers import (
     PaymentSerializer,
     ServiceSerializer,
 )
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -423,6 +424,319 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         }
 
         return TemplateResponse(request, 'billing/invoice_print.html', context)
+
+    # ── Download invoice as PDF ───────────────────────────────────────────────
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='download-pdf',
+        url_name='download-pdf',
+        authentication_classes=[QueryParamJWTAuthentication],
+    )
+    def download_pdf(self, request, pk=None):
+        """
+        GET /api/invoices/{id}/download-pdf/ — Downloads the invoice as a PDF file.
+        This endpoint is used by the frontend to fetch the PDF for email attachment.
+        Falls back to HTML if PDF generation fails.
+        """
+        from django.http import HttpResponse
+        from django.template.loader import render_to_string
+
+        invoice = self.get_object()
+
+        try:
+            # Try to generate PDF using WeasyPrint
+            try:
+                from weasyprint import HTML
+                
+                # Force recalculate totals from items to ensure accuracy
+                invoice.update_totals()
+                invoice = Invoice.objects.get(pk=invoice.pk)
+                items    = list(invoice.items.all().order_by('id'))
+                payments = invoice.payments.all().order_by('-payment_date')
+
+                print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
+                clinic_display_name = print_settings.clinic_name or invoice.clinic.name
+
+                date_format = print_settings.date_format or '%B %d, %Y'
+                template_date_format = 'F j, Y'
+
+                has_discounts = any(item.discount_percent > 0 for item in items)
+                has_taxes     = any(item.tax_percent > 0 for item in items)
+                currency      = print_settings.currency_symbol or '₱'
+
+                computed_subtotal    = sum(
+                    Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items
+                )
+                computed_items_total = sum(Decimal(str(item.total)) for item in items)
+                discount_amount      = Decimal(str(invoice.discount_amount or 0))
+                tax_amount           = Decimal(str(invoice.tax_amount or 0))
+                amount_paid          = Decimal(str(invoice.amount_paid or 0))
+                computed_total       = computed_items_total - discount_amount + tax_amount
+                computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
+
+                context = {
+                    'invoice':              invoice,
+                    'items':                items,
+                    'payments':             payments,
+                    'settings':             print_settings,
+                    'clinic_display_name':  clinic_display_name,
+                    'date_format':          template_date_format,
+                    'has_discounts':        has_discounts,
+                    'has_taxes':            has_taxes,
+                    'currency':             currency,
+                    'computed_subtotal':    f'{computed_subtotal:,.2f}',
+                    'computed_total':       f'{computed_total:,.2f}',
+                    'computed_balance_due': f'{computed_balance_due:,.2f}',
+                }
+
+                html_string = render_to_string('billing/invoice_print.html', context)
+                pdf_file = BytesIO()
+                html = HTML(string=html_string)
+                html.write_pdf(pdf_file)
+                pdf_file.seek(0)
+
+                response = HttpResponse(pdf_file.getvalue(), content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="Invoice_{invoice.invoice_number}.pdf"'
+                logger.info(f"Generated PDF for invoice #{invoice.invoice_number}")
+                return response
+                
+            except Exception as pdf_err:
+                # Fall back to HTML
+                logger.warning(f"PDF generation failed for invoice #{invoice.invoice_number}, falling back to HTML: {pdf_err}")
+                
+                # Build context for HTML
+                invoice.update_totals()
+                invoice = Invoice.objects.get(pk=invoice.pk)
+                items    = list(invoice.items.all().order_by('id'))
+                payments = invoice.payments.all().order_by('-payment_date')
+
+                print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
+                clinic_display_name = print_settings.clinic_name or invoice.clinic.name
+                template_date_format = 'F j, Y'
+                has_discounts = any(item.discount_percent > 0 for item in items)
+                has_taxes     = any(item.tax_percent > 0 for item in items)
+                currency      = print_settings.currency_symbol or '₱'
+                computed_subtotal    = sum(Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items)
+                computed_items_total = sum(Decimal(str(item.total)) for item in items)
+                discount_amount      = Decimal(str(invoice.discount_amount or 0))
+                tax_amount           = Decimal(str(invoice.tax_amount or 0))
+                amount_paid          = Decimal(str(invoice.amount_paid or 0))
+                computed_total       = computed_items_total - discount_amount + tax_amount
+                computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
+                context = {
+                    'invoice':              invoice,
+                    'items':                items,
+                    'payments':             payments,
+                    'settings':             print_settings,
+                    'clinic_display_name':  clinic_display_name,
+                    'date_format':          template_date_format,
+                    'has_discounts':        has_discounts,
+                    'has_taxes':            has_taxes,
+                    'currency':             currency,
+                    'computed_subtotal':    f'{computed_subtotal:,.2f}',
+                    'computed_total':       f'{computed_total:,.2f}',
+                    'computed_balance_due': f'{computed_balance_due:,.2f}',
+                }
+                html_string = render_to_string('billing/invoice_print.html', context)
+                response = HttpResponse(html_string, content_type='text/html')
+                return response
+                
+        except Exception as exc:
+            logger.exception(f"Failed to generate output for invoice {invoice.invoice_number}: {exc}")
+            return Response(
+                {'detail': f'Failed to generate invoice: {str(exc)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # ── Send invoice via email ─────────────────────────────────────────────────
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='send-email',
+        url_name='send-email',
+    )
+    def send_email(self, request, pk=None):
+        """POST /api/invoices/{id}/send-email/ — Send invoice PDF via email."""
+        from django.core.mail import EmailMessage
+        from django.conf import settings
+        from io import BytesIO
+
+        invoice = self.get_object()
+
+        # Handle both JSON and multipart/form-data requests
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # Multipart request - use request.POST for text fields
+            to_email = request.POST.get('to_email')
+            subject = request.POST.get('subject', f'Invoice #{invoice.invoice_number}')
+            body = request.POST.get('body', f'Please find attached invoice #{invoice.invoice_number}.')
+            html_content = request.POST.get('html_content')
+        else:
+            # JSON request
+            to_email = request.data.get('to_email')
+            subject = request.data.get('subject', f'Invoice #{invoice.invoice_number}')
+            body = request.data.get('body', f'Please find attached invoice #{invoice.invoice_number}.')
+            html_content = None
+
+        if not to_email:
+            return Response(
+                {'detail': 'to_email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            pdf_content = None
+            pdf_error = None
+            
+            # Check if HTML content was sent from frontend - convert to PDF using WeasyPrint
+            if html_content:
+                try:
+                    from weasyprint import HTML
+                    
+                    logger.info(f"Converting HTML to PDF for invoice #{invoice.invoice_number}")
+                    logger.info(f"HTML content length: {len(html_content)} characters")
+                    logger.info(f"HTML content first 200 chars: {html_content[:200]}")
+                    
+                    # Convert HTML to PDF
+                    pdf_file = BytesIO()
+                    html = HTML(string=html_content)
+                    html.write_pdf(pdf_file)
+                    pdf_file.seek(0)
+                    pdf_content = pdf_file.getvalue()
+                    
+                    logger.info(f"Successfully converted HTML to PDF, size: {len(pdf_content)} bytes")
+                    logger.info(f"PDF header: {pdf_content[:20]}")
+                    
+                except Exception as pdf_err:
+                    pdf_error = str(pdf_err)
+                    logger.error(f"Failed to convert HTML to PDF: {pdf_error}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    pdf_content = None
+            # Check if a PDF file was uploaded from frontend
+            elif 'attachment' in request.FILES:
+                pdf_file_obj = request.FILES['attachment']
+                pdf_content = pdf_file_obj.read()
+                logger.info(f"Using uploaded PDF for invoice #{invoice.invoice_number}, size: {len(pdf_content)} bytes, filename: {pdf_file_obj.name}")
+                logger.info(f"PDF content first 20 bytes: {pdf_content[:20]}")
+            else:
+                # Generate PDF from scratch using WeasyPrint
+                try:
+                    from django.template.loader import render_to_string
+                    from weasyprint import HTML
+
+                    # Build the invoice print context
+                    invoice.update_totals()
+                    invoice = Invoice.objects.get(pk=invoice.pk)
+
+                    items    = list(invoice.items.all().order_by('id'))
+                    payments = invoice.payments.all().order_by('-payment_date')
+
+                    print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
+                    clinic_display_name = print_settings.clinic_name or invoice.clinic.name
+
+                    date_format = print_settings.date_format or '%B %d, %Y'
+                    template_date_format = 'F j, Y'
+
+                    has_discounts = any(item.discount_percent > 0 for item in items)
+                    has_taxes     = any(item.tax_percent > 0 for item in items)
+                    currency      = print_settings.currency_symbol or '₱'
+
+                    computed_subtotal    = sum(
+                        Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items
+                    )
+                    computed_items_total = sum(Decimal(str(item.total)) for item in items)
+                    discount_amount      = Decimal(str(invoice.discount_amount or 0))
+                    tax_amount           = Decimal(str(invoice.tax_amount or 0))
+                    amount_paid          = Decimal(str(invoice.amount_paid or 0))
+                    computed_total       = computed_items_total - discount_amount + tax_amount
+                    computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
+
+                    context = {
+                        'invoice':              invoice,
+                        'items':                items,
+                        'payments':             payments,
+                        'settings':             print_settings,
+                        'clinic_display_name':  clinic_display_name,
+                        'date_format':          template_date_format,
+                        'has_discounts':        has_discounts,
+                        'has_taxes':            has_taxes,
+                        'currency':             currency,
+                        'computed_subtotal':    f'{computed_subtotal:,.2f}',
+                        'computed_total':       f'{computed_total:,.2f}',
+                        'computed_balance_due': f'{computed_balance_due:,.2f}',
+                    }
+
+                    # Render HTML and convert to PDF
+                    html_string = render_to_string('billing/invoice_print.html', context)
+                    pdf_file = BytesIO()
+                    html = HTML(string=html_string)
+                    html.write_pdf(pdf_file)
+                    pdf_file.seek(0)
+                    pdf_content = pdf_file.getvalue()
+                    
+                    logger.info(f"Generated PDF for invoice #{invoice.invoice_number}, size: {len(pdf_content)} bytes")
+                except Exception as pdf_err:
+                    pdf_error = str(pdf_err)
+                    logger.error(f"Failed to generate PDF: {pdf_error}")
+                    pdf_content = None
+
+            # Create email
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=from_email,
+                to=[to_email],
+            )
+            
+            # Attach PDF if available and valid
+            if pdf_content and len(pdf_content) > 0:
+                logger.info(f"Attempting to attach PDF, pdf_content length: {len(pdf_content)}")
+                # Verify it's a valid PDF (starts with %PDF)
+                if pdf_content[:4] == b'%PDF':
+                    email.attach(
+                        filename=f'Invoice_{invoice.invoice_number}.pdf',
+                        content=pdf_content,
+                        mimetype='application/pdf'
+                    )
+                    logger.info(f"Attached PDF to email for invoice #{invoice.invoice_number}")
+                else:
+                    logger.error(f"PDF content is invalid (not starting with %PDF) for invoice #{invoice.invoice_number}, got: {pdf_content[:20]}")
+                    # Fallback: attach as HTML
+                    if html_content:
+                        email.attach(
+                            filename=f'Invoice_{invoice.invoice_number}.html',
+                            content=html_content.encode('utf-8') if isinstance(html_content, str) else html_content,
+                            mimetype='text/html'
+                        )
+            else:
+                # No PDF - send email without attachment or with HTML fallback
+                logger.warning(f"No PDF generated for invoice #{invoice.invoice_number}, pdf_error: {pdf_error}")
+                if html_content:
+                    email.attach(
+                        filename=f'Invoice_{invoice.invoice_number}.html',
+                        content=html_content.encode('utf-8') if isinstance(html_content, str) else html_content,
+                        mimetype='text/html'
+                    )
+            
+            email.send(fail_silently=False)
+
+            logger.info(f"Invoice #{invoice.invoice_number} sent to {to_email}")
+
+            return Response({
+                'detail': 'Invoice sent successfully',
+                'sent_to': to_email,
+                'has_attachment': pdf_content is not None and len(pdf_content) > 0
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Failed to send invoice #{invoice.invoice_number}: {str(e)}")
+            return Response(
+                {'detail': f'Failed to send email: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     # ── Stats ─────────────────────────────────────────────────────────────────
     @action(detail=False, methods=['get'], url_path='stats', url_name='stats')

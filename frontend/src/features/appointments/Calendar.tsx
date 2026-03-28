@@ -170,6 +170,23 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const getBlockColors = (apt: Appointment): BlockColors => {
+    // Check if appointment has an invoice - use orange color
+    if (apt.has_invoice) {
+      const orangeHex = '#f97316';
+      return {
+        useHex: true,
+        hex:    orangeHex,
+        bgStyle: {
+          backgroundColor: hexToRgba(orangeHex, 0.15),
+          borderColor:     orangeHex,
+          borderLeftWidth: '3px',
+          borderLeftColor: orangeHex,
+        },
+        textColor:    orangeHex,
+        subTextColor: orangeHex,
+        label: apt.service_name ?? apt.chief_complaint ?? null,
+      };
+    }
     // Check if appointment has arrived - use purple color
     if (apt.arrival_status === 'ARRIVED') {
       const purpleHex = '#8B5CF6';

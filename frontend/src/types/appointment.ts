@@ -29,6 +29,7 @@ export interface Appointment {
   patient_notes:    string;
   reminder_sent:    boolean;
   reminder_sent_at: string | null;
+  has_invoice:      boolean; // Whether this appointment has an invoice
 
   created_by:      number | null;
   created_by_name: string | null;

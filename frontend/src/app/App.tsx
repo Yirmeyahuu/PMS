@@ -28,6 +28,7 @@ import { Profile }        from '@/features/profile/Profile';
 import { PatientProfile } from '@/features/patients/PatientProfile';
 import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
 import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
+import { GenerateNewInvoice } from '@/features/billing/generateNewInvoice';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 
 // ── NEW: Clinic Setup ─────────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ function App() {
 
           <Route path="/clinical-notes"         element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
           <Route path="/clinical-notes/:noteId" element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
+
+          <Route path="/billing/generate-invoice/:appointmentId" element={<ProtectedRoute><GenerateNewInvoice /></ProtectedRoute>} />
 
           <Route path="/manage" element={<ClinicMemberRoute><Manage /></ClinicMemberRoute>} />
           <Route path="/setup"  element={<ClinicMemberRoute><Setup /></ClinicMemberRoute>} />

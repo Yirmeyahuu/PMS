@@ -47,7 +47,22 @@ class Patient(TimeStampedModel, SoftDeleteModel):
     avatar         = models.ImageField(upload_to='patient_avatars/', null=True, blank=True)
     is_active      = models.BooleanField(default=True)
 
-    # ── Archive fields ────────────────────────────────────────────────────────
+    # Notification Settings
+    send_email_notifications = models.BooleanField(
+        default=True,
+        help_text='Send email notifications automatically for appointment reminders.',
+    )
+    allow_push_notifications = models.BooleanField(
+        default=False,
+        help_text='Allow push notifications for updates and reminders.',
+    )
+    data_sharing_preferences = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Patient preferences for data sharing with third parties.',
+    )
+
+    # Archive fields
     is_archived = models.BooleanField(
         default=False,
         db_index=True,
@@ -150,7 +165,7 @@ class IntakeForm(TimeStampedModel):
         return f"Intake Form - {self.patient.get_full_name()} - {self.created_at.date()}"
 
 
-# ─── Patient Portal Models ────────────────────────────────────────────────────
+# Patient Portal Models
 
 def generate_portal_token():
     return get_random_string(32)

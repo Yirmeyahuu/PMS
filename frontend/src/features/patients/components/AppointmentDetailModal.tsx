@@ -3,10 +3,11 @@ import {
   X, Clock, CheckCircle, XCircle, AlertCircle, Activity,
   Calendar, User, MapPin, FileText, Receipt,
   ChevronDown, ChevronUp, Loader2,
-  ClipboardList,
+  ClipboardList, Printer, Mail,
 } from 'lucide-react';
 import type { Appointment } from '@/types';
 import { getAppointmentInvoice } from '@/features/appointments/appointment.api';
+import { SendInvoiceEmailModal } from './SendInvoiceEmailModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,15 +20,6 @@ interface Invoice {
   balance: string | number;
   due_date: string | null;
   issued_date: string;
-  items?: InvoiceItem[];
-}
-
-interface InvoiceItem {
-  id: number;
-  description: string;
-  quantity: number;
-  unit_price: string | number;
-  total: string | number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,11 +36,6 @@ const formatDateTime = (dateString: string) => {
   });
 };
 
-const formatCurrency = (amount: string | number) => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(num || 0);
-};
-
 const APPOINTMENT_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
   SCHEDULED:   { label: 'Scheduled',   color: 'text-blue-700',   bgColor: 'bg-blue-50',   icon: <Clock className="w-3.5 h-3.5" /> },
   CONFIRMED:   { label: 'Confirmed',   color: 'text-sky-700',    bgColor: 'bg-sky-50',    icon: <CheckCircle className="w-3.5 h-3.5" /> },
@@ -62,15 +49,6 @@ const APPOINTMENT_STATUS_CONFIG: Record<string, { label: string; color: string; 
 const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
   INITIAL: 'Initial Consultation', FOLLOW_UP: 'Follow-up',
   THERAPY: 'Therapy Session', ASSESSMENT: 'Assessment',
-};
-
-const INVOICE_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  DRAFT:     { label: 'Draft',      color: 'text-gray-600',   bgColor: 'bg-gray-100' },
-  SENT:      { label: 'Sent',       color: 'text-sky-700',    bgColor: 'bg-sky-50' },
-  PAID:      { label: 'Paid',       color: 'text-green-700',  bgColor: 'bg-green-50' },
-  PARTIAL:   { label: 'Partial',    color: 'text-yellow-700', bgColor: 'bg-yellow-50' },
-  OVERDUE:   { label: 'Overdue',    color: 'text-red-700',    bgColor: 'bg-red-50' },
-  CANCELLED: { label: 'Cancelled',  color: 'text-gray-500',   bgColor: 'bg-gray-50' },
 };
 
 // ─── CollapsibleSection ───────────────────────────────────────────────────────
@@ -108,109 +86,24 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   );
 };
 
-// ─── InvoiceCard ──────────────────────────────────────────────────────────────
-
-interface InvoiceCardProps { invoice: Invoice; }
-
-const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice }) => {
-  const [expanded, setExpanded] = useState(false);
-  const statusConfig = INVOICE_STATUS_CONFIG[invoice.status?.toUpperCase()] || INVOICE_STATUS_CONFIG['DRAFT'];
-
-  return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-sky-50 border border-sky-200 rounded-lg flex items-center justify-center">
-            <Receipt className="w-4 h-4 text-sky-600" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-800">Invoice #{invoice.invoice_number}</p>
-            <p className="text-xs text-gray-500">
-              Issued: {formatDate(invoice.issued_date)}
-              {invoice.due_date && ` · Due: ${formatDate(invoice.due_date)}`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex text-xs px-2 py-0.5 rounded-full font-medium border ${statusConfig.bgColor} ${statusConfig.color}`}>
-            {statusConfig.label}
-          </span>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium"
-          >
-            {expanded ? 'Collapse' : 'View'}
-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-500 mb-0.5">Total</p>
-              <p className="text-sm font-bold text-gray-900">{formatCurrency(invoice.total_amount)}</p>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-500 mb-0.5">Paid</p>
-              <p className="text-sm font-bold text-green-700">{formatCurrency(invoice.paid_amount)}</p>
-            </div>
-            <div className={`rounded-lg p-3 text-center border ${parseFloat(String(invoice.balance)) > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
-              <p className="text-xs text-gray-500 mb-0.5">Balance</p>
-              <p className={`text-sm font-bold ${parseFloat(String(invoice.balance)) > 0 ? 'text-red-600' : 'text-gray-600'}`}>
-                {formatCurrency(invoice.balance)}
-              </p>
-            </div>
-          </div>
-
-          {invoice.items && invoice.items.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Line Items</h4>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Description</th>
-                      <th className="px-3 py-2 text-center font-semibold text-gray-600">Qty</th>
-                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Unit Price</th>
-                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {invoice.items.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-800">{item.description}</td>
-                        <td className="px-3 py-2 text-center text-gray-600">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-gray-600">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-gray-800">{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
 interface AppointmentDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
+  patientEmail?: string;
 }
 
 export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
-  isOpen, onClose, appointment,
+  isOpen, onClose, appointment, patientEmail,
 }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'invoice'>('details');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState(false);
 
   const fetchInvoices = useCallback(async () => {
     if (!appointment) return;
@@ -228,6 +121,42 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
       fetchInvoices();
     }
   }, [isOpen, appointment, fetchInvoices]);
+
+  // Fetch PDF client-side when Invoice tab is active
+  useEffect(() => {
+    const fetchPdf = async () => {
+      if (activeTab !== 'invoice' || invoices.length === 0) {
+        setPdfUrl(null);
+        return;
+      }
+
+      setLoadingPdf(true);
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${token}`
+        );
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        }
+      } catch (error) {
+        console.error('Failed to fetch PDF:', error);
+      } finally {
+        setLoadingPdf(false);
+      }
+    };
+
+    fetchPdf();
+
+    // Cleanup blob URL on unmount or when pdfUrl changes
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [activeTab, invoices]);
 
   if (!isOpen || !appointment) return null;
 
@@ -404,16 +333,79 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                   <div className="flex items-center justify-center py-16">
                     <Loader2 className="w-7 h-7 text-sky-500 animate-spin" />
                   </div>
-                ) : invoices.length === 0 ? (
+                ) : !appointment.has_invoice ? (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
                     <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
                       <Receipt className="w-7 h-7 text-gray-300" />
                     </div>
-                    <p className="text-sm font-medium text-gray-500">No invoice found</p>
-                    <p className="text-xs text-gray-400 mt-1">No invoice has been generated for this appointment</p>
+                    <p className="text-sm font-medium text-gray-500">No Invoice generated yet</p>
+                    <p className="text-xs text-gray-400 mt-1">An invoice will appear here once generated</p>
+                  </div>
+                ) : invoices.length > 0 ? (
+                  /* Display PDF preview inline with action buttons */
+                  <div className="flex flex-col gap-4">
+                    {/* Action Buttons */}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          // Open print in new tab
+                          const printUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${localStorage.getItem('access_token') || ''}`;
+                          window.open(printUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Print
+                      </button>
+                      <button
+                        onClick={() => setShowEmailModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Send Email
+                      </button>
+                    </div>
+                    {/* PDF Preview Container */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                      {loadingPdf ? (
+                        <div className="w-full h-[500px] flex items-center justify-center">
+                          <div className="text-center">
+                            <Loader2 className="w-8 h-8 text-sky-500 animate-spin mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">Loading PDF...</p>
+                          </div>
+                        </div>
+                      ) : pdfUrl ? (
+                        <iframe
+                          src={pdfUrl}
+                          className="w-full h-[500px]"
+                          title={`Invoice ${invoices[0].invoice_number}`}
+                        />
+                      ) : (
+                        <div className="w-full h-[500px] flex items-center justify-center">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Unable to load PDF</p>
+                            <button
+                              onClick={() => {
+                                const printUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${localStorage.getItem('access_token') || ''}`;
+                                window.open(printUrl, '_blank', 'noopener,noreferrer');
+                              }}
+                              className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
+                            >
+                              Open in new tab
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  invoices.map((invoice) => <InvoiceCard key={invoice.id} invoice={invoice} />)
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                      <Receipt className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-500">No Invoice found</p>
+                    <p className="text-xs text-gray-400 mt-1">No invoice has been generated for this appointment</p>
+                  </div>
                 )}
               </div>
             )}
@@ -430,6 +422,20 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Send Email Modal */}
+      {showEmailModal && invoices.length > 0 && (
+        <SendInvoiceEmailModal
+          isOpen={showEmailModal}
+          onClose={() => { setShowEmailModal(false); }}
+          invoiceId={invoices[0].id}
+          invoiceNumber={invoices[0].invoice_number}
+          patientName={appointment.patient_name}
+          patientEmail={patientEmail || ''}
+          appointmentDate={formatDate(appointment.date)}
+          appointmentType={APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
+        />
+      )}
     </>
   );
 };

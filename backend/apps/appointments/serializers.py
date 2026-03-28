@@ -23,6 +23,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
     arrival_status = serializers.CharField(read_only=True)
     arrival_time = serializers.DateTimeField(read_only=True)
 
+    # ── Has invoice ───────────────────────────────────────────────────────────
+    has_invoice = serializers.SerializerMethodField()
+
     class Meta:
         model  = Appointment
         fields = [
@@ -34,7 +37,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
-            'reminder_sent', 'reminder_sent_at',
+            'reminder_sent', 'reminder_sent_at', 'has_invoice',
             'created_by', 'created_by_name',
             'updated_by', 'updated_by_name',
             'cancelled_by', 'cancellation_reason', 'cancelled_at',
@@ -43,9 +46,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
-            'created_by_name', 'updated_by_name',
+            'created_by_name', 'updated_by_name', 'has_invoice',
             'created_at', 'updated_at',
         ]
+
+    def get_has_invoice(self, obj) -> bool:
+        """Check if this appointment has a non-deleted invoice."""
+        return obj.billing_invoices.filter(is_deleted=False).exists()
 
     def get_practitioner_avatar(self, obj) -> str | None:
         """Get practitioner avatar URL from user model with full absolute URL."""
