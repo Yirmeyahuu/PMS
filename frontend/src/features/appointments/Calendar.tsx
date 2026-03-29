@@ -236,6 +236,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     appointments,
     updateAppointmentInState,
     addAppointmentToState,
+    refetch,
   } = useAppointments({
     startDate,
     endDate,
@@ -409,6 +410,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           end_time:   `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
         });
         updateAppointmentInState(updated);
+        refetch(); // Refresh appointments to ensure all views update
         toast.success(
           `Rescheduled to ${format(newDate, 'MMM d')} at ` +
           `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`

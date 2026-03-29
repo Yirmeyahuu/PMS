@@ -17,7 +17,7 @@ type CalendarView = 'day' | 'week' | 'month';
 
 export const Diary: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarView>('month');
+  const [view, setView] = useState<CalendarView>('week');
   const [selectedPractitioner, setSelectedPractitioner] = useState<number | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
