@@ -7,8 +7,11 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Clock, X, Coffee } from 'lucide-react';
 import { fetchAvailableSlots } from '../portal.api';
-import type { PortalService, PortalPractitioner } from '../types/portal';
+import type { PortalService, PortalPractitioner, PortalAvailability } from '../types/portal';
 
+const DAY_MAP: Record<number, string> = {
+  0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat',
+};
 
 interface PortalAvailabilityCalendarProps {
   token:        string;
@@ -38,6 +41,37 @@ const isLunchSlot = (slot: string): boolean => {
 const isWithinClinicHours = (slot: string): boolean => {
   const [h] = slot.split(':').map(Number);
   return h >= 6 && h < 21;
+};
+
+/** Check if a date is within practitioner's duty days */
+const isWithinDutyDays = (date: Date, availability: PortalAvailability | undefined): boolean => {
+  if (!availability?.duty_days?.length) return true;
+  const dayName = DAY_MAP[date.getDay()];
+  return availability.duty_days.includes(dayName as any);
+};
+
+/** Check if a slot is within practitioner's duty hours */
+const isWithinDutyHours = (slot: string, availability: PortalAvailability | undefined): boolean => {
+  if (!availability) return true;
+  const [h, m] = slot.split(':').map(Number);
+  const slotMins = h * 60 + m;
+  const [startH, startM] = availability.duty_start_time.split(':').map(Number);
+  const [endH, endM] = availability.duty_end_time.split(':').map(Number);
+  const startMins = startH * 60 + startM;
+  const endMins = endH * 60 + endM;
+  return slotMins >= startMins && slotMins < endMins;
+};
+
+/** Check if a slot is within practitioner's lunch break */
+const isWithinLunchBreak = (slot: string, availability: PortalAvailability | undefined): boolean => {
+  if (!availability) return isLunchSlot(slot);
+  const [h, m] = slot.split(':').map(Number);
+  const slotMins = h * 60 + m;
+  const [lunchStartH, lunchStartM] = availability.lunch_start_time.split(':').map(Number);
+  const [lunchEndH, lunchEndM] = availability.lunch_end_time.split(':').map(Number);
+  const lunchStartMins = lunchStartH * 60 + lunchStartM;
+  const lunchEndMins = lunchEndH * 60 + lunchEndM;
+  return slotMins >= lunchStartMins && slotMins < lunchEndMins;
 };
 
 export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProps> = ({
@@ -82,12 +116,16 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
   const handleDateClick = (date: Date) => {
     const str = format(date, 'yyyy-MM-dd');
     if (str < todayStr || !isSameMonth(date, calMonth)) return;
+    if (!isWithinDutyDays(date, practitioner?.availability)) return;
     setSelectedDate(str);
   };
 
   // ── Filter + split slots into morning / afternoon ─────────────────────────
+  const practitionerAvailability = practitioner?.availability;
   const visibleSlots = availableSlots.filter(
-    s => isWithinClinicHours(s) && !isLunchSlot(s)
+    s => isWithinClinicHours(s)
+      && !isWithinLunchBreak(s, practitionerAvailability)
+      && isWithinDutyHours(s, practitionerAvailability)
   );
 
   const morningSlots   = visibleSlots.filter(s => {
@@ -101,6 +139,15 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
 
   // Were any slots removed because they fell in lunch / outside hours?
   const hiddenCount = availableSlots.length - visibleSlots.length;
+
+  // Check if a date is unavailable due to duty days
+  const isDateUnavailable = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (dateStr < todayStr) return true;
+    if (!isSameMonth(date, calMonth)) return true;
+    if (!isWithinDutyDays(date, practitionerAvailability)) return true;
+    return false;
+  };
 
   const weekDayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -121,7 +168,10 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
         {/* Clinic hours badge */}
         <div className="hidden sm:flex items-center gap-1 text-[10px] text-teal-600 font-medium bg-teal-100 rounded-full px-2 py-0.5 mr-2 whitespace-nowrap">
           <Clock className="w-2.5 h-2.5" />
-          6 AM – 9 PM
+          {practitionerAvailability
+            ? `${fmt12(practitionerAvailability.duty_start_time)} – ${fmt12(practitionerAvailability.duty_end_time)}`
+            : '6 AM – 9 PM'
+          }
         </div>
         <button
           onClick={onClose}
@@ -177,12 +227,12 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
                   <button
                     key={di}
                     onClick={() => handleDateClick(date)}
-                    disabled={disabled}
+                    disabled={isDateUnavailable(date)}
                     className={`
                       h-8 w-full flex items-center justify-center
                       text-xs font-medium rounded-md transition-all
-                      ${disabled
-                        ? 'text-gray-300 cursor-not-allowed'
+                      ${isDateUnavailable(date)
+                        ? 'text-gray-300 cursor-not-allowed bg-gray-50'
                         : isSelected
                           ? 'bg-gray-800 text-white shadow-sm'
                           : isToday
@@ -258,7 +308,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
             )}
 
             {/* ── Lunch break banner ── */}
-            {!loadingSlots && visibleSlots.length > 0 && (
+            {!loadingSlots && visibleSlots.length > 0 && practitionerAvailability && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <Coffee className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                 <div>
@@ -266,7 +316,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
                     Lunch Break
                   </p>
                   <p className="text-[10px] text-amber-600">
-                    12:00 PM – 1:00 PM · No appointments available
+                    {fmt12(practitionerAvailability.lunch_start_time)} – {fmt12(practitionerAvailability.lunch_end_time)} · No appointments available
                   </p>
                 </div>
               </div>

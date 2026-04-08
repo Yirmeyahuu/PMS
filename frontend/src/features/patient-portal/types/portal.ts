@@ -1,3 +1,13 @@
+import type { DutyDay } from '@/features/clinics/clinic.api';
+
+export interface PortalAvailability {
+  duty_days: DutyDay[];
+  duty_start_time: string;
+  duty_end_time: string;
+  lunch_start_time: string;
+  lunch_end_time: string;
+}
+
 export interface PortalBranch {
   id:            number;
   name:          string;
@@ -20,6 +30,7 @@ export interface PortalPractitioner {
   bio:            string;
   avatar_url:     string | null;
   branch_id?:     number | null;
+  availability?:  PortalAvailability;
 }
 
 export interface PortalService {

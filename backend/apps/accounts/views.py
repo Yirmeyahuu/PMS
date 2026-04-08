@@ -517,17 +517,27 @@ class UserViewSet(viewsets.ModelViewSet):
                 practitioner_created = False
                 if role == 'PRACTITIONER':
                     if not Practitioner.objects.filter(user=user).exists():
+                        # Extract availability fields from request data
+                        availability_data = {
+                            'duty_days': request.data.get('duty_days', ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
+                            'duty_start_time': request.data.get('duty_start_time', '08:00'),
+                            'duty_end_time': request.data.get('duty_end_time', '17:00'),
+                            'lunch_start_time': request.data.get('lunch_start_time', '12:00'),
+                            'lunch_end_time': request.data.get('lunch_end_time', '13:00'),
+                            'discipline': request.data.get('discipline', 'OCCUPATIONAL_THERAPY'),
+                        }
                         Practitioner.objects.create(
                             user=user,
                             clinic=request.user.clinic,
-                            license_number='',
-                            specialization='',
-                            consultation_fee=0,
-                            is_accepting_patients=True
+                            license_number=request.data.get('license_number', ''),
+                            specialization=request.data.get('specialization', ''),
+                            consultation_fee=request.data.get('consultation_fee', 0),
+                            is_accepting_patients=True,
+                            **availability_data
                         )
                         practitioner_created = True
                         logger.info(f"Practitioner profile created for: {user.email}")
-                
+
                 company_name = request.user.clinic.name if request.user.clinic else 'Your Organization'
                 email_sent   = EmailService.send_welcome_email(
                     user_email=user.email,
@@ -604,8 +614,15 @@ class UserViewSet(viewsets.ModelViewSet):
                     'clinic':                 instance.clinic or request.user.clinic,
                     'license_number':         '',
                     'specialization':         '',
+                    'discipline':             request.data.get('discipline', 'OCCUPATIONAL_THERAPY'),
                     'consultation_fee':       0,
                     'is_accepting_patients':  True,
+                    # Availability fields
+                    'duty_days':             request.data.get('duty_days', ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
+                    'duty_start_time':       request.data.get('duty_start_time', '08:00'),
+                    'duty_end_time':         request.data.get('duty_end_time', '17:00'),
+                    'lunch_start_time':      request.data.get('lunch_start_time', '12:00'),
+                    'lunch_end_time':        request.data.get('lunch_end_time', '13:00'),
                 },
             )
             if practitioner_created:
@@ -618,7 +635,7 @@ class UserViewSet(viewsets.ModelViewSet):
             # Role downgraded from PRACTITIONER — soft-delete or deactivate profile
             Practitioner.objects.filter(user=instance).update(is_deleted=True)
             logger.info(
-                "Practitioner profile deactivated on role change for: %s by %s",
+                "Staff account deactivated on role change for: %s by %s",
                 instance.email, request.user.email,
             )
 

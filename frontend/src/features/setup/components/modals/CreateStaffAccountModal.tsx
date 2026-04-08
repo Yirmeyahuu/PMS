@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, AlertCircle, Building2, RefreshCw } from 'lucide-react';
-import type { CreateStaffData, StaffFormErrors, StaffMember } from '../../types/staff.types';
+import { X, UserPlus, AlertCircle, Building2, RefreshCw, Clock, CalendarDays } from 'lucide-react';
+import type { CreateStaffData, StaffFormErrors, StaffMember, DutyDay } from '../../types/staff.types';
 import { TITLE_OPTIONS, DISCIPLINE_OPTIONS, GENDER_OPTIONS } from '../../types/staff.types';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
+
+const DUTY_DAY_OPTIONS: { value: DutyDay; label: string }[] = [
+  { value: 'Mon', label: 'Mon' },
+  { value: 'Tue', label: 'Tue' },
+  { value: 'Wed', label: 'Wed' },
+  { value: 'Thu', label: 'Thu' },
+  { value: 'Fri', label: 'Fri' },
+  { value: 'Sat', label: 'Sat' },
+  { value: 'Sun', label: 'Sun' },
+];
 
 interface CreateStaffAccountModalProps {
   isOpen:        boolean;
@@ -26,6 +36,12 @@ const EMPTY_FORM: CreateStaffData = {
   gender:        'Male',
   role:          'STAFF',
   clinic_branch: null,
+  // Availability defaults
+  duty_days:       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+  duty_start_time:  '08:00',
+  duty_end_time:    '17:00',
+  lunch_start_time: '12:00',
+  lunch_end_time:   '13:00',
 };
 
 /* ── Reusable field helpers ─────────────────────────────── */
@@ -66,8 +82,14 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
   const { branches, loading: loadingBranches } = useClinicBranches();
 
   useEffect(() => {
+    console.log('[CreateStaffModal] useEffect triggered', { editingStaff, isOpen });
     if (editingStaff) {
-      setFormData({
+      console.log('[CreateStaffModal] Editing existing staff:', editingStaff);
+      console.log('[CreateStaffModal] Staff availability:', editingStaff.availability);
+      console.log('[CreateStaffModal] Staff discipline:', editingStaff.discipline);
+      console.log('[CreateStaffModal] Staff position:', editingStaff.position);
+      
+      const newFormData = {
         first_name:    editingStaff.first_name,
         last_name:     editingStaff.last_name,
         middle_name:   editingStaff.middle_name   ?? '',
@@ -82,14 +104,24 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
         gender:        editingStaff.gender         ?? 'Male',
         role:          editingStaff.role,
         clinic_branch: editingStaff.clinic_branch  ?? null,
-      });
+        // Availability - fields are at root level from API response
+        duty_days:       editingStaff.duty_days       ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        duty_start_time: editingStaff.duty_start_time ?? '08:00',
+        duty_end_time:   editingStaff.duty_end_time   ?? '17:00',
+        lunch_start_time: editingStaff.lunch_start_time ?? '12:00',
+        lunch_end_time:   editingStaff.lunch_end_time   ?? '13:00',
+      };
+      console.log('[CreateStaffModal] Setting form data to:', newFormData);
+      setFormData(newFormData);
     } else {
+      console.log('[CreateStaffModal] Creating new staff, using EMPTY_FORM');
       setFormData(EMPTY_FORM);
     }
     setErrors({});
   }, [editingStaff, isOpen]);
 
   const validateForm = (): boolean => {
+    console.log('[CreateStaffModal] validateForm called, role:', formData.role);
     const e: StaffFormErrors = {};
     if (!formData.first_name.trim()) e.first_name = 'First name is required';
     if (!formData.last_name.trim())  e.last_name  = 'Last name is required';
@@ -108,19 +140,51 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
     }
     if (formData.date_of_birth && new Date(formData.date_of_birth) > new Date())
       e.date_of_birth = 'Date of birth cannot be in the future';
+
+    // Availability validation (for PRACTITIONER)
+    if (formData.role === 'PRACTITIONER') {
+      console.log('[CreateStaffModal] Validating PRACTITIONER availability:', {
+        duty_days: formData.duty_days,
+        duty_start_time: formData.duty_start_time,
+        duty_end_time: formData.duty_end_time,
+        lunch_start_time: formData.lunch_start_time,
+        lunch_end_time: formData.lunch_end_time,
+      });
+      if (!formData.duty_days || formData.duty_days.length === 0)
+        e.duty_days = 'At least one duty day is required';
+      if (!formData.duty_start_time) e.duty_start_time = 'Required';
+      if (!formData.duty_end_time) e.duty_end_time = 'Required';
+      if (!formData.lunch_start_time) e.lunch_start_time = 'Required';
+      if (!formData.lunch_end_time) e.lunch_end_time = 'Required';
+    }
+
+    console.log('[CreateStaffModal] Validation errors:', e);
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    console.log('[CreateStaffModal] handleSubmit called');
+    console.log('[CreateStaffModal] Current formData:', formData);
+    console.log('[CreateStaffModal] Role:', formData.role);
+    
+    if (!validateForm()) {
+      console.log('[CreateStaffModal] Validation failed, errors:', errors);
+      return;
+    }
+    
+    console.log('[CreateStaffModal] Validation passed, submitting...');
     setLoading(true);
     setErrors({});
     try {
+      console.log('[CreateStaffModal] Calling onSubmit with:', formData);
       await onSubmit(formData);
+      console.log('[CreateStaffModal] onSubmit completed successfully');
       handleClose();
     } catch (err: any) {
+      console.error('[CreateStaffModal] Submit error:', err);
+      console.error('[CreateStaffModal] Error response:', err?.response?.data);
       setErrors({ general: err.message || 'Failed to save. Please try again.' });
     } finally {
       setLoading(false);
@@ -359,6 +423,94 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                       ))}
                     </div>
                   </div>
+
+                  {/* ── Availability Section (only for PRACTITIONER) ── */}
+                  {formData.role === 'PRACTITIONER' && (
+                    <div className="md:col-span-2 border-t border-gray-200 pt-5">
+                      <SectionTitle color="text-emerald-600">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          Practitioner Availability
+                        </span>
+                      </SectionTitle>
+
+                      {/* Duty Days */}
+                      <div className="mb-4">
+                        <Label required>Duty Days</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {DUTY_DAY_OPTIONS.map(day => (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => {
+                                const current = formData.duty_days ?? [];
+                                const newDays = current.includes(day.value)
+                                  ? current.filter(d => d !== day.value)
+                                  : [...current, day.value];
+                                set('duty_days', newDays);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                                (formData.duty_days ?? []).includes(day.value)
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                        {errors.duty_days && <FieldError msg={errors.duty_days} />}
+                      </div>
+
+                      {/* Duty Hours */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <Label required>Duty Start Time</Label>
+                          <input
+                            type="time"
+                            value={formData.duty_start_time ?? '08:00'}
+                            onChange={e => set('duty_start_time', e.target.value)}
+                            className={inputCls(!!errors.duty_start_time)}
+                          />
+                          <FieldError msg={errors.duty_start_time} />
+                        </div>
+                        <div>
+                          <Label required>Duty End Time</Label>
+                          <input
+                            type="time"
+                            value={formData.duty_end_time ?? '17:00'}
+                            onChange={e => set('duty_end_time', e.target.value)}
+                            className={inputCls(!!errors.duty_end_time)}
+                          />
+                          <FieldError msg={errors.duty_end_time} />
+                        </div>
+                      </div>
+
+                      {/* Lunch Break */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label required>Lunch Start</Label>
+                          <input
+                            type="time"
+                            value={formData.lunch_start_time ?? '12:00'}
+                            onChange={e => set('lunch_start_time', e.target.value)}
+                            className={inputCls(!!errors.lunch_start_time)}
+                          />
+                          <FieldError msg={errors.lunch_start_time} />
+                        </div>
+                        <div>
+                          <Label required>Lunch End</Label>
+                          <input
+                            type="time"
+                            value={formData.lunch_end_time ?? '13:00'}
+                            onChange={e => set('lunch_end_time', e.target.value)}
+                            className={inputCls(!!errors.lunch_end_time)}
+                          />
+                          <FieldError msg={errors.lunch_end_time} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Clinic Branch */}
                   <div className="md:col-span-2">

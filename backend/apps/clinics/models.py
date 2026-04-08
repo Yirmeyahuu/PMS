@@ -138,6 +138,14 @@ class Practitioner(TimeStampedModel, SoftDeleteModel):
 
     license_number           = models.CharField(max_length=100)
     specialization           = models.CharField(max_length=200)
+    discipline                = models.CharField(max_length=50, choices=[
+        ('OCCUPATIONAL_THERAPY', 'Occupational Therapy'),
+        ('SPEECH_LANGUAGE_PATHOLOGIST', 'Speech Language Pathologist'),
+        ('PHYSICAL_THERAPY', 'Physical Therapy'),
+        ('OSTEOPATHY', 'Osteopathy'),
+        ('DENTISTRY', 'Dentistry'),
+        ('MD_GENERAL_PRACTITIONER', 'MD: General Practitioner'),
+    ], default='OCCUPATIONAL_THERAPY')
     prc_license              = models.CharField(max_length=100, blank=True, verbose_name='PRC License')
     philhealth_accreditation = models.CharField(max_length=100, blank=True)
 
@@ -145,12 +153,55 @@ class Practitioner(TimeStampedModel, SoftDeleteModel):
     bio                  = models.TextField(blank=True)
     is_accepting_patients = models.BooleanField(default=True)
 
+    # ── Practitioner Availability ──────────────────────────────────────────────
+    DUTY_DAY_CHOICES = [
+        ('Mon', 'Monday'),
+        ('Tue', 'Tuesday'),
+        ('Wed', 'Wednesday'),
+        ('Thu', 'Thursday'),
+        ('Fri', 'Friday'),
+        ('Sat', 'Saturday'),
+        ('Sun', 'Sunday'),
+    ]
+
+    duty_days = models.JSONField(
+        default=list,
+        help_text='List of duty days, e.g. ["Mon", "Tue", "Wed"]'
+    )
+    duty_start_time = models.TimeField(
+        default='08:00',
+        help_text='Duty start time'
+    )
+    duty_end_time = models.TimeField(
+        default='17:00',
+        help_text='Duty end time'
+    )
+    lunch_start_time = models.TimeField(
+        default='12:00',
+        help_text='Lunch break start time'
+    )
+    lunch_end_time = models.TimeField(
+        default='13:00',
+        help_text='Lunch break end time'
+    )
+
     class Meta:
         db_table = 'practitioners'
         ordering = ['user__last_name', 'user__first_name']
 
     def __str__(self):
         return f"Dr. {self.user.get_full_name()}"
+
+    @property
+    def availability(self):
+        """Return availability as a dict for API responses."""
+        return {
+            'duty_days': self.duty_days or ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            'duty_start_time': self.duty_start_time.strftime('%H:%M') if self.duty_start_time else '08:00',
+            'duty_end_time': self.duty_end_time.strftime('%H:%M') if self.duty_end_time else '17:00',
+            'lunch_start_time': self.lunch_start_time.strftime('%H:%M') if self.lunch_start_time else '12:00',
+            'lunch_end_time': self.lunch_end_time.strftime('%H:%M') if self.lunch_end_time else '13:00',
+        }
 
 
 class Location(TimeStampedModel, SoftDeleteModel):

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
 import { Calendar } from './Calendar';
@@ -426,6 +426,23 @@ export const Diary: React.FC = () => {
 
             {/* Calendar */}
             <div className="flex-1 overflow-hidden p-4 bg-gray-50">
+              {(() => {
+                const selectedPrac = selectedPractitioner 
+                  ? practitioners.find(p => p.id === selectedPractitioner) 
+                  : undefined;
+                console.log('[Diary] 🔍 Calendar Rendering - Availability Debug:', {
+                  selectedPractitionerId: selectedPractitioner,
+                  practitionersCount: practitioners.length,
+                  selectedPractitionerObject: selectedPrac,
+                  hasAvailability: !!selectedPrac?.availability,
+                  availabilityData: selectedPrac?.availability,
+                  dutyDays: selectedPrac?.availability?.duty_days,
+                  dutyHours: selectedPrac?.availability 
+                    ? `${selectedPrac.availability.duty_start_time} - ${selectedPrac.availability.duty_end_time}`
+                    : 'N/A',
+                });
+                return null;
+              })()}
               <Calendar
                 view={view}
                 currentDate={currentDate}
@@ -436,6 +453,11 @@ export const Diary: React.FC = () => {
                 onEventClick={isAdmin ? handleEventClick : undefined}
                 onAppointmentsReady={setCalendarAppointments}
                 onCalendarReady={setCalendarReadyDate}
+                practitionerAvailability={
+                  selectedPractitioner
+                    ? practitioners.find(p => p.id === selectedPractitioner)?.availability
+                    : undefined
+                }
               />
             </div>
 

@@ -29,6 +29,19 @@ export const usePractitioners = (params?: UsePractitionersParams): UsePractition
     
     try {
       const response = await getPractitioners(params?.clinicBranchId);
+      console.log('[usePractitioners] 🔍 Raw API response:', response);
+      console.log('[usePractitioners] 🔍 Practitioners count:', response.practitioners?.length);
+      if (response.practitioners?.[0]) {
+        console.log('[usePractitioners] 🔍 First practitioner full data:', response.practitioners[0]);
+        console.log('[usePractitioners] 🔍 First practitioner availability:', response.practitioners[0].availability);
+      }
+      // Log all practitioners' availability status
+      response.practitioners?.forEach((prac, idx) => {
+        console.log(`[usePractitioners] 🔍 Practitioner ${idx + 1} (${prac.name}):`, {
+          hasAvailability: !!prac.availability,
+          availability: prac.availability,
+        });
+      });
       setPractitioners(response.practitioners);
     } catch (err: any) {
       console.error('Failed to fetch practitioners:', err);

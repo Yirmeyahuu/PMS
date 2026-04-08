@@ -463,6 +463,7 @@ class PublicAvailableSlotsView(APIView):
         from apps.appointments.models import Appointment
         from apps.appointments.models import PractitionerSchedule
         from apps.appointments.models import BlockAppointment
+        from apps.clinics.models import Practitioner
 
         try:
             target_date = date_type.fromisoformat(date_str)
@@ -475,6 +476,55 @@ class PublicAvailableSlotsView(APIView):
         duration     = service.duration_minutes
         CLINIC_START = 6 * 60
         CLINIC_END   = 21 * 60
+
+        # ── Practitioner availability ──────────────────────────────────────────
+        practitioner_availability = None
+        if practitioner_id:
+            try:
+                practitioner = Practitioner.objects.select_related('user').get(
+                    id=practitioner_id,
+                    is_deleted=False,
+                    user__is_active=True,
+                )
+                practitioner_availability = practitioner.availability
+            except Practitioner.DoesNotExist:
+                pass
+
+        # Map weekday (0=Mon) to duty day string
+        WEEKDAY_MAP = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        target_weekday = WEEKDAY_MAP[target_date.weekday()]
+
+        # If practitioner has availability configured, use it; otherwise fall back to clinic hours
+        if practitioner_availability and practitioner_availability.get('duty_days'):
+            duty_days = practitioner_availability.get('duty_days', [])
+            if target_weekday not in duty_days:
+                return Response({'date': date_str, 'slots': []})
+
+            duty_start = practitioner_availability.get('duty_start_time', '08:00')
+            duty_end = practitioner_availability.get('duty_end_time', '17:00')
+            lunch_start = practitioner_availability.get('lunch_start_time', '12:00')
+            lunch_end = practitioner_availability.get('lunch_end_time', '13:00')
+
+            # Parse duty hours to minutes
+            duty_start_parts = duty_start.split(':')
+            duty_end_parts = duty_end.split(':')
+            lunch_start_parts = lunch_start.split(':')
+            lunch_end_parts = lunch_end.split(':')
+
+            duty_start_min = int(duty_start_parts[0]) * 60 + int(duty_start_parts[1])
+            duty_end_min = int(duty_end_parts[0]) * 60 + int(duty_end_parts[1])
+            lunch_start_min = int(lunch_start_parts[0]) * 60 + int(lunch_start_parts[1])
+            lunch_end_min = int(lunch_end_parts[0]) * 60 + int(lunch_end_parts[1])
+
+            PRACTITIONER_START = duty_start_min
+            PRACTITIONER_END = duty_end_min
+            LUNCH_START = lunch_start_min
+            LUNCH_END = lunch_end_min
+        else:
+            PRACTITIONER_START = CLINIC_START
+            PRACTITIONER_END = CLINIC_END
+            LUNCH_START = 12 * 60  # 12:00
+            LUNCH_END = 13 * 60    # 13:00
 
         def time_to_minutes(t):
             return t.hour * 60 + t.minute
@@ -493,20 +543,20 @@ class PublicAvailableSlotsView(APIView):
             )
             if schedules.exists():
                 for sched in schedules:
-                    start_min = max(time_to_minutes(sched.start_time), CLINIC_START)
-                    end_min   = min(time_to_minutes(sched.end_time),   CLINIC_END)
+                    start_min = max(time_to_minutes(sched.start_time), PRACTITIONER_START)
+                    end_min   = min(time_to_minutes(sched.end_time),   PRACTITIONER_END)
                     m = start_min
                     while m + 15 <= end_min:
                         candidate_slots.append(minutes_to_time(m))
                         m += 15
             else:
-                m = CLINIC_START
-                while m + 15 <= CLINIC_END:
+                m = PRACTITIONER_START
+                while m + 15 <= PRACTITIONER_END:
                     candidate_slots.append(minutes_to_time(m))
                     m += 15
         else:
-            m = CLINIC_START
-            while m + 15 <= CLINIC_END:
+            m = PRACTITIONER_START
+            while m + 15 <= PRACTITIONER_END:
                 candidate_slots.append(minutes_to_time(m))
                 m += 15
 

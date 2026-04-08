@@ -117,11 +117,48 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
 class PractitionerSerializer(serializers.ModelSerializer):
     user_name  = serializers.CharField(source='user.get_full_name', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    availability = serializers.SerializerMethodField()
 
     class Meta:
         model  = Practitioner
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_availability(self, obj):
+        return obj.availability
+
+    def validate_duty_days(self, value):
+        valid_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        if not isinstance(value, list):
+            raise serializers.ValidationError("duty_days must be a list.")
+        for day in value:
+            if day not in valid_days:
+                raise serializers.ValidationError(f"Invalid day: {day}. Must be one of {valid_days}")
+        return value
+
+    def validate(self, attrs):
+        duty_start = attrs.get('duty_start_time') or (self.instance.duty_start_time if self.instance else None)
+        duty_end = attrs.get('duty_end_time') or (self.instance.duty_end_time if self.instance else None)
+        lunch_start = attrs.get('lunch_start_time') or (self.instance.lunch_start_time if self.instance else None)
+        lunch_end = attrs.get('lunch_end_time') or (self.instance.lunch_end_time if self.instance else None)
+
+        if duty_start and duty_end:
+            if duty_start >= duty_end:
+                raise serializers.ValidationError({
+                    'duty_end_time': 'Duty end time must be after duty start time.'
+                })
+
+        if lunch_start and lunch_end and duty_start and duty_end:
+            if lunch_start >= lunch_end:
+                raise serializers.ValidationError({
+                    'lunch_end_time': 'Lunch end time must be after lunch start time.'
+                })
+            if not (duty_start <= lunch_start and lunch_end <= duty_end):
+                raise serializers.ValidationError({
+                    'lunch_start_time': 'Lunch must be within duty hours.'
+                })
+
+        return attrs
 
 
 class LocationSerializer(serializers.ModelSerializer):

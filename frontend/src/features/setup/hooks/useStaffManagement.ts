@@ -57,11 +57,16 @@ export const useStaffManagement = () => {
 
   const handleUpdateStaff = async (id: number, data: Partial<CreateStaffData>) => {
     try {
+      console.log('[useStaffManagement] handleUpdateStaff called', { id, data });
       const updated = await updateStaff(id, data);
+      console.log('[useStaffManagement] Updated staff received:', updated);
+      console.log('[useStaffManagement] Updated availability:', updated.availability);
       setStaff((prev) => prev.map((s) => (s.id === id ? updated : s)));
       toast.success('Staff member updated successfully!');
       return updated;
     } catch (err: any) {
+      console.error('[useStaffManagement] Update error:', err);
+      console.error('[useStaffManagement] Error response:', err?.response?.data);
       const message = err.response?.data?.detail || 'Failed to update staff member';
       toast.error(message);
       throw err;

@@ -1,3 +1,5 @@
+import type { DutyDay, PractitionerAvailability } from '@/features/clinics/clinic.api';
+
 export type TitleType = 'Mr' | 'Ms' | 'Mrs' | 'Miss' | 'Dr' | 'Prof' | 'Assoc Prof';
 
 export type DisciplineType = 
@@ -34,6 +36,9 @@ export interface StaffMember {
   date_of_birth?: string;
   gender?: GenderType;
   address?: string;
+
+  // Availability (for PRACTITIONER role)
+  availability?: PractitionerAvailability;
 }
 
 export interface CreateStaffData {
@@ -51,6 +56,13 @@ export interface CreateStaffData {
   gender?: GenderType;
   address?: string;
   clinic_branch?: number | null;
+
+  // Availability (for PRACTITIONER role)
+  duty_days?: DutyDay[];
+  duty_start_time?: string;
+  duty_end_time?: string;
+  lunch_start_time?: string;
+  lunch_end_time?: string;
 }
 
 export interface StaffFormErrors {
@@ -64,6 +76,11 @@ export interface StaffFormErrors {
   date_of_birth?: string;
   clinic_branch?: string;
   general?: string;
+  duty_days?: string;
+  duty_start_time?: string;
+  duty_end_time?: string;
+  lunch_start_time?: string;
+  lunch_end_time?: string;
 }
 
 // Title options for dropdown

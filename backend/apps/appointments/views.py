@@ -867,6 +867,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 'clinic_branch_id':   p.user.clinic_branch_id,
                 'clinic_branch_name': p.user.clinic_branch.name
                                       if p.user.clinic_branch else None,
+                'availability':       p.availability,
             }
             for p in base_qs
         ]

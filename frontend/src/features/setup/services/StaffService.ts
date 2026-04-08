@@ -22,7 +22,10 @@ export const getStaffMember = async (id: number): Promise<StaffMember> => {
  * Password is auto-generated and sent via email
  */
 export const createStaff = async (data: CreateStaffData): Promise<StaffMember> => {
+  console.log('[StaffService] createStaff called', { data });
+  console.log('[StaffService] Data being sent:', JSON.stringify(data, null, 2));
   const response = await axiosInstance.post<StaffMember>('/users/', data);
+  console.log('[StaffService] Response received:', response.data);
   return response.data;
 };
 
@@ -33,7 +36,11 @@ export const updateStaff = async (
   id: number,
   data: Partial<CreateStaffData>
 ): Promise<StaffMember> => {
+  console.log('[StaffService] updateStaff called', { id, data });
+  console.log('[StaffService] Data being sent:', JSON.stringify(data, null, 2));
   const response = await axiosInstance.patch<StaffMember>(`/users/${id}/`, data);
+  console.log('[StaffService] Response received:', response.data);
+  console.log('[StaffService] Response availability:', response.data?.availability);
   return response.data;
 };
 

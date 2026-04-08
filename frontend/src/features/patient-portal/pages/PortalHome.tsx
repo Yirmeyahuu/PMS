@@ -307,6 +307,7 @@ export const PortalHome: React.FC = () => {
               token={token}
               selectedPractitioner={selectedPractitioner}
               onDateTimeConfirm={handleInlineDateTimeConfirm}
+              selectedBranch={selectedBranch}
             />
           )}
 

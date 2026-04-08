@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   format, startOfWeek, addDays,
   startOfMonth, endOfMonth, endOfWeek,
@@ -23,8 +23,77 @@ import type { Appointment, BlockAppointment } from '@/types';
 import { rescheduleAppointment }      from './appointment.api';
 import { updateBlockAppointment }     from './appointment.api';
 import toast                          from 'react-hot-toast';
+import type { PractitionerAvailability, DutyDay } from '@/features/clinics/clinic.api';
 
-type CalendarView = 'day' | 'week' | 'month'; 
+type CalendarView = 'day' | 'week' | 'month';
+
+const DAY_MAP: Record<number, DutyDay> = {
+  0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat',
+};
+
+const timeToMinutes = (time: string): number => {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const isWithinRange = (time: string, start: string, end: string): boolean => {
+  const t = timeToMinutes(time);
+  return t >= timeToMinutes(start) && t < timeToMinutes(end);
+};
+
+const isSlotAvailable = (
+  hour: number,
+  minutes: number,
+  availability: PractitionerAvailability | undefined,
+  selectedDate: Date,
+): { available: boolean; reason: 'outside_duty_hours' | 'lunch' | 'unavailable_day' | null } => {
+  const slotTime = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const slotMins = hour * 60 + minutes;
+
+  if (!availability) return { available: true, reason: null };
+
+  const dayOfWeek = DAY_MAP[selectedDate.getDay()];
+  if (!availability.duty_days.includes(dayOfWeek)) {
+    return { available: false, reason: 'unavailable_day' };
+  }
+
+  const dutyStart = timeToMinutes(availability.duty_start_time);
+  const dutyEnd = timeToMinutes(availability.duty_end_time);
+  if (slotMins < dutyStart || slotMins >= dutyEnd) {
+    return { available: false, reason: 'outside_duty_hours' };
+  }
+
+  const lunchStart = timeToMinutes(availability.lunch_start_time);
+  const lunchEnd = timeToMinutes(availability.lunch_end_time);
+  if (slotMins >= lunchStart && slotMins < lunchEnd) {
+    return { available: false, reason: 'lunch' };
+  }
+
+  return { available: true, reason: null };
+};
+
+const isLunchSlot = (
+  hour: number,
+  minutes: number,
+  availability: PractitionerAvailability | undefined,
+): boolean => {
+  if (!availability) {
+    const slotMins = hour * 60 + minutes;
+    return slotMins >= 720 && slotMins < 780;
+  }
+  const slotMins = hour * 60 + minutes;
+  const lunchStart = timeToMinutes(availability.lunch_start_time);
+  const lunchEnd = timeToMinutes(availability.lunch_end_time);
+  return slotMins >= lunchStart && slotMins < lunchEnd;
+};
+
+const formatTime12Hour = (time: string): string => {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  const h12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  const period = hours >= 12 ? 'PM' : 'AM';
+  return `${h12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}; 
 
 interface CalendarProps {
   view:                   CalendarView;
@@ -32,10 +101,11 @@ interface CalendarProps {
   onDateChange:           (date: Date) => void;
   selectedPractitionerId: number | null;
   selectedClinicBranchId: number | null;
-  refreshKey?: number; // Used to trigger refresh when events are created
-  onEventClick?: (event: BlockAppointment) => void; // Callback when admin clicks on a block event
-  onAppointmentsReady?: (appointments: Appointment[]) => void; // Callback to expose appointments to parent
-  onCalendarReady?: (date: Date) => void; // Callback when calendar has loaded with current date
+  refreshKey?: number;
+  onEventClick?: (event: BlockAppointment) => void;
+  onAppointmentsReady?: (appointments: Appointment[]) => void;
+  onCalendarReady?: (date: Date) => void;
+  practitionerAvailability?: PractitionerAvailability;
 }
 
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -127,7 +197,59 @@ export const Calendar: React.FC<CalendarProps> = ({
   onEventClick,
   onAppointmentsReady,
   onCalendarReady,
+  practitionerAvailability,
 }) => {
+  // ── DEBUG: Log when practitionerAvailability changes ──
+  React.useEffect(() => {
+    console.log('[Calendar] 📊 Practitioner Availability Changed:', {
+      hasAvailability: !!practitionerAvailability,
+      practitionerId: selectedPractitionerId,
+      availability: practitionerAvailability,
+      dutyDays: practitionerAvailability?.duty_days,
+      dutyHours: practitionerAvailability 
+        ? `${practitionerAvailability.duty_start_time} - ${practitionerAvailability.duty_end_time}`
+        : 'N/A',
+      lunchHours: practitionerAvailability 
+        ? `${practitionerAvailability.lunch_start_time} - ${practitionerAvailability.lunch_end_time}`
+        : 'N/A',
+    });
+  }, [practitionerAvailability, selectedPractitionerId]);
+
+  // ── AVAILABILITY HELPER FUNCTIONS ──────────────────────────────────────────
+  // Check if a given date is a duty day
+  const isDutyDay = useCallback((date: Date): boolean => {
+    if (!practitionerAvailability) return true; // No availability set = all days available
+    const dayOfWeek = DAY_MAP[date.getDay()];
+    return practitionerAvailability.duty_days.includes(dayOfWeek);
+  }, [practitionerAvailability]);
+
+  // Check if a given time (HH:MM format or hour+minutes) is within duty hours
+  const isDutyHour = useCallback((hour: number, minutes: number): boolean => {
+    if (!practitionerAvailability) return true; // No availability set = all hours available
+    const slotMins = hour * 60 + minutes;
+    const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
+    const dutyEnd = timeToMinutes(practitionerAvailability.duty_end_time);
+    return slotMins >= dutyStart && slotMins < dutyEnd;
+  }, [practitionerAvailability]);
+
+  // Check if slot is during lunch break
+  const isLunchBreak = useCallback((hour: number, minutes: number): boolean => {
+    if (!practitionerAvailability) {
+      // Default lunch: 12:00 - 13:00
+      const slotMins = hour * 60 + minutes;
+      return slotMins >= 720 && slotMins < 780;
+    }
+    const slotMins = hour * 60 + minutes;
+    const lunchStart = timeToMinutes(practitionerAvailability.lunch_start_time);
+    const lunchEnd = timeToMinutes(practitionerAvailability.lunch_end_time);
+    return slotMins >= lunchStart && slotMins < lunchEnd;
+  }, [practitionerAvailability]);
+
+  // Combined check: is the slot available (duty day + duty hour + not lunch)
+  const isSlotFullyAvailable = useCallback((date: Date, hour: number, minutes: number): boolean => {
+    return isDutyDay(date) && isDutyHour(hour, minutes) && !isLunchBreak(hour, minutes);
+  }, [isDutyDay, isDutyHour, isLunchBreak]);
+
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -323,15 +445,35 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   // Helper to get style for block appointment
-  const getBlockAppointmentStyle = (block: BlockAppointment) => {
+  // Calculate block appointment position based on current view
+  // For Day view with filtered slots, offset is based on duty_start_time
+  // For Week view, offset is always 6 AM (all hours shown)
+  // Uses h-6 (1.5rem) per 15-minute slot for Nookal-style grid
+  const getBlockAppointmentStyle = (block: BlockAppointment, forDayView = false) => {
     const [sH, sM] = block.start_time.split(':').map(Number);
-    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
     const [eH, eM] = block.end_time.split(':').map(Number);
-    const endSlotIndex = (eH - 6) * 4 + Math.floor(eM / 15);
+    
+    let startSlotIndex: number;
+    let endSlotIndex: number;
+    
+    if (forDayView && practitionerAvailability) {
+      // Day view with filtered slots: offset based on duty_start_time
+      const dutyStartMins = timeToMinutes(practitionerAvailability.duty_start_time);
+      const blockStartMins = sH * 60 + sM;
+      const blockEndMins = eH * 60 + eM;
+      startSlotIndex = Math.floor((blockStartMins - dutyStartMins) / 15);
+      endSlotIndex = Math.floor((blockEndMins - dutyStartMins) / 15);
+    } else {
+      // Week view or no availability: offset from 6 AM (original behavior)
+      startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+      endSlotIndex = (eH - 6) * 4 + Math.floor(eM / 15);
+    }
+    
     const durationSlots = Math.max(endSlotIndex - startSlotIndex, 1);
+    // h-6 = 1.5rem per slot
     return {
-      top:    `${startSlotIndex * 1.25}rem`,
-      height: `${durationSlots * 1.25}rem`,
+      top:    `${startSlotIndex * 1.5}rem`,
+      height: `${durationSlots * 1.5}rem`,
     };
   };
 
@@ -461,66 +603,63 @@ export const Calendar: React.FC<CalendarProps> = ({
   const isDraggingRef    = useRef(false);
   const dragStartTimeRef = useRef<number>(0);
 
-  const generateTimeSlots = () => {
+  const generateTimeSlots = useCallback((availability?: PractitionerAvailability) => {
     const slots = [];
 
-    for (let hour = 6; hour <= 11; hour++) {
+    // Extract availability parameters or use defaults
+    const dutyStartHour = availability ? parseInt(availability.duty_start_time.split(':')[0]) : 6;
+    const dutyEndHour = availability ? parseInt(availability.duty_end_time.split(':')[0]) : 20;
+    const lunchStartHour = availability ? parseInt(availability.lunch_start_time.split(':')[0]) : 12;
+    const lunchEndHour = availability ? parseInt(availability.lunch_end_time.split(':')[0]) : 13;
+
+    // Helper to calculate total minutes and check if it's lunch time
+    const slotMins = (h: number, q: number) => h * 60 + q * 15;
+    const lunchStart = availability 
+      ? timeToMinutes(availability.lunch_start_time) 
+      : lunchStartHour * 60;
+    const lunchEnd = availability 
+      ? timeToMinutes(availability.lunch_end_time) 
+      : lunchEndHour * 60;
+
+    // Generate slots from 6 AM to 8 PM
+    for (let hour = 6; hour <= 20; hour++) {
       for (let quarter = 0; quarter < 4; quarter++) {
         const minutes = quarter * 15;
+        const totalMins = slotMins(hour, quarter);
+        const isLunch = totalMins >= lunchStart && totalMins < lunchEnd;
+        
         const h12     = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
         const period  = hour >= 12 ? 'PM' : 'AM';
+        
         slots.push({
           hour,
           quarter,
           minutes,
           label:        quarter === 0 ? `${h12} ${period}` : '',
           time:         `${hour}:${minutes.toString().padStart(2, '0')}`,
-          isLunchBreak: false,
-        });
-      }
-    }
-
-    for (let quarter = 0; quarter < 4; quarter++) {
-      const minutes = quarter * 15;
-      slots.push({
-        hour:         12,
-        quarter,
-        minutes,
-        label:        quarter === 0 ? '12 PM' : '',
-        time:         `12:${minutes.toString().padStart(2, '0')}`,
-        isLunchBreak: true,
-      });
-    }
-
-    slots.push({
-      hour:         13,
-      quarter:      0,
-      minutes:      0,
-      label:        '1 PM',
-      time:         '13:00',
-      isLunchBreak: true,
-    });
-
-    for (let hour = 13; hour <= 20; hour++) {
-      const startQuarter = hour === 13 ? 1 : 0;
-      for (let quarter = startQuarter; quarter < 4; quarter++) {
-        const minutes = quarter * 15;
-        const h12     = hour > 12 ? hour - 12 : hour;
-        slots.push({
-          hour,
-          quarter,
-          minutes,
-          label:        quarter === 0 ? `${h12} PM` : '',
-          time:         `${hour}:${minutes.toString().padStart(2, '0')}`,
-          isLunchBreak: false,
+          isLunchBreak: isLunch,
         });
       }
     }
 
     return slots;
-  };
+  }, []);
 
-  const timeSlots = generateTimeSlots();
+  const timeSlots = useMemo(() => generateTimeSlots(practitionerAvailability), [generateTimeSlots, practitionerAvailability]);
+
+  // ── FILTERED TIME SLOTS FOR DAY VIEW ──────────────────────────────────────
+  // Only show duty hours in Day view (completely hide non-duty hours)
+  const dayViewTimeSlots = useMemo(() => {
+    if (!practitionerAvailability) return timeSlots; // No filtering if no availability set
+    
+    const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
+    const dutyEnd = timeToMinutes(practitionerAvailability.duty_end_time);
+    
+    return timeSlots.filter(slot => {
+      const slotMins = slot.hour * 60 + slot.minutes;
+      return slotMins >= dutyStart && slotMins < dutyEnd;
+    });
+  }, [timeSlots, practitionerAvailability]);
 
   const getAppointmentsForDate = (date: Date): Appointment[] => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -531,25 +670,44 @@ export const Calendar: React.FC<CalendarProps> = ({
   const getAppointmentsForDay = (date: Date): Appointment[] =>
     getAppointmentsForDate(date);
 
-  const getAppointmentStyle = (apt: Appointment) => {
-    const [sH, sM]       = apt.start_time.split(':').map(Number);
-    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
-    const durationSlots  = Math.max(apt.duration_minutes / 15, 1);
+  // Calculate appointment position based on current view
+  // For Day view with filtered slots, offset is based on duty_start_time
+  // For Week view, offset is always 6 AM (all hours shown)
+  // Uses h-6 (1.5rem) per 15-minute slot for Nookal-style grid
+  const getAppointmentStyle = (apt: Appointment, forDayView = false) => {
+    const [sH, sM] = apt.start_time.split(':').map(Number);
+    const durationSlots = Math.max(apt.duration_minutes / 15, 1);
+    
+    let startSlotIndex: number;
+    if (forDayView && practitionerAvailability) {
+      // Day view with filtered slots: offset based on duty_start_time
+      const dutyStartMins = timeToMinutes(practitionerAvailability.duty_start_time);
+      // Calculate position relative to duty start time
+      const aptStartMins = sH * 60 + sM;
+      const slotsFromDutyStart = Math.floor((aptStartMins - dutyStartMins) / 15);
+      startSlotIndex = slotsFromDutyStart;
+    } else {
+      // Week view or no availability: offset from 6 AM (original behavior)
+      startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+    }
+    
+    // h-6 = 1.5rem per slot
     return {
-      top:    `${startSlotIndex * 1.25}rem`,
-      height: `${durationSlots * 1.25}rem`,
+      top:    `${startSlotIndex * 1.5}rem`,
+      height: `${durationSlots * 1.5}rem`,
     };
   };
 
   // ── Time column label ─────────────────────────────────────────────────────
+  // Time label with consistent h-6 height for 15-min grid alignment
   const renderTimeLabel = (slot: typeof timeSlots[0], i: number) => {
     const isLunch = slot.isLunchBreak;
     return (
       <div
         key={i}
-        className={`h-5 px-3 text-xs font-medium text-right flex items-center justify-end
-          ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-          ${isLunch ? 'bg-amber-50 text-amber-400' : 'bg-gray-50 text-gray-500'}`}
+        className={`h-6 px-3 text-xs font-medium text-right flex items-center justify-end
+          ${slot.quarter === 0 ? 'border-t border-gray-300' : 'border-t border-gray-100'}
+          ${isLunch ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-50 text-gray-500'}`}
       >
         {slot.label}
       </div>
@@ -841,8 +999,10 @@ export const Calendar: React.FC<CalendarProps> = ({
   );
 
   // ── Appointment Card — Day/Week ───────────────────────────────────────────
-  const renderTimelineCard = (apt: Appointment, compact = false) => {
-    const style     = getAppointmentStyle(apt);
+  // compact = true for week view (smaller cards)
+  // forDayView = true when rendering in Day view (filtered slots)
+  const renderTimelineCard = (apt: Appointment, compact = false, forDayView = false) => {
+    const style     = getAppointmentStyle(apt, forDayView);
     const col       = getBlockColors(apt);
     const isDragged = dragState.draggedAppointment?.id === apt.id;
     const isHeld    = dragState.isHolding && dragState.draggedAppointment?.id === apt.id;
@@ -956,18 +1116,11 @@ export const Calendar: React.FC<CalendarProps> = ({
     return false;
   }, []);
 
-  // Helper to format time in 12-hour format
-  const formatTime12Hour = (time: string): string => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':').map(Number);
-    const h12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    const period = hours >= 12 ? 'PM' : 'AM';
-    return `${h12}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
   // ── Block Appointment Card — Day/Week ────────────────────────────────────────
-  const renderBlockTimelineCard = (block: BlockAppointment, compact = false) => {
-    const style = getBlockAppointmentStyle(block);
+  // compact = true for week view (smaller cards)
+  // forDayView = true when rendering in Day view (filtered slots)
+  const renderBlockTimelineCard = (block: BlockAppointment, compact = false, forDayView = false) => {
+    const style = getBlockAppointmentStyle(block, forDayView);
 
     const isDragged = blockDragState.draggedBlock?.id === block.id;
     const isHeld    = blockDragState.isHolding && blockDragState.draggedBlock?.id === block.id;
@@ -1109,43 +1262,79 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   // ── Shared time-slot renderer (drop target) ───────────────────────────────
-  const renderTimeSlot = (slot: typeof timeSlots[0], date: Date, i: number) => {
+  // ── Nookal-style time slot renderer with 15-min intervals ───────────────────
+  const renderTimeSlot = (slot: typeof timeSlots[0], date: Date, i: number, forWeekView = false) => {
     const isSelected   = isSlotSelected(slot);
     const isDropTarget = dragState.isDragging;
-    const isLunch      = slot.isLunchBreak;
+    const isLunch      = isLunchBreak(slot.hour, slot.minutes);
+    
+    // Check availability using our helper functions
+    const dayAvailable = isDutyDay(date);
+    const hourAvailable = isDutyHour(slot.hour, slot.minutes);
+    const isAvailable = dayAvailable && hourAvailable && !isLunch;
 
-    if (isLunch) {
-      const isFirstLunchSlot = slot.hour === 12 && slot.quarter === 0;
+    // Lunch break rendering (only on duty days within duty hours)
+    // Uses yellow/amber background to distinguish from regular slots
+    if (isLunch && dayAvailable && hourAvailable) {
+      const isFirstLunchSlot = slot.quarter === 0 && slot.hour === parseInt((practitionerAvailability?.lunch_start_time || '12:00').split(':')[0]);
+      const lunchStart = practitionerAvailability?.lunch_start_time || '12:00';
+      const lunchEnd = practitionerAvailability?.lunch_end_time || '13:00';
       return (
         <div
           key={i}
-          className={`h-5 relative select-none bg-amber-50 cursor-not-allowed
-            ${slot.quarter === 0 ? 'border-t-2 border-amber-300' : 'border-t border-amber-200'}`}
-          style={{ pointerEvents: 'none' }}
+          data-slot-date={format(date, 'yyyy-MM-dd')}
+          data-slot-hour={slot.hour}
+          data-slot-minute={slot.minutes}
+          onMouseDown={() => handleMouseDown(date, slot)}
+          onMouseEnter={() => handleMouseEnter(slot)}
+          onMouseUp={() => handleSlotMouseUp(date, slot)}
+          onDoubleClick={() => handleDoubleClick(date, slot)}
+          className={`h-6 relative select-none bg-yellow-100 cursor-pointer border-r border-gray-200
+            ${slot.quarter === 0 ? 'border-t border-yellow-300' : 'border-t border-yellow-200'}`}
         >
           {isFirstLunchSlot && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="flex items-center gap-1.5 bg-amber-100 border border-amber-300 rounded-full px-3 py-0.5 shadow-sm">
+              <div className="flex items-center gap-1.5 bg-yellow-100 border border-yellow-300 rounded-full px-3 py-0.5 shadow-sm">
                 <span style={{ fontSize: 11 }}>🍽</span>
-                <span className="font-semibold text-amber-700 whitespace-nowrap" style={{ fontSize: 10 }}>
-                  LUNCH BREAK &nbsp;·&nbsp; 12:00 PM – 1:00 PM
+                <span className="font-semibold text-yellow-700 whitespace-nowrap" style={{ fontSize: 10 }}>
+                  LUNCH &nbsp;·&nbsp; {formatTime12Hour(lunchStart)} – {formatTime12Hour(lunchEnd)}
                 </span>
               </div>
             </div>
           )}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-20"
-            style={{
-              backgroundImage: `repeating-linear-gradient(
-                45deg,
-                #f59e0b 0px, #f59e0b 2px,
-                transparent 2px, transparent 8px
-              )`,
-            }}
-          />
         </div>
       );
     }
+
+    // Determine background class based on availability
+    // COLOR RULES (Nookal-style):
+    // - AVAILABLE (Duty Hours) → bg-white
+    // - NOT AVAILABLE → bg-purple-300 (non-duty hours/days)
+    let slotBgClass = '';
+    let slotTitle = 'Double-click or drag to add';
+
+    if (!isAvailable) {
+      // Non-duty hours or non-duty day = PURPLE (Nookal-style)
+      slotBgClass = 'bg-purple-300';
+      if (!dayAvailable) {
+        slotTitle = 'Non-duty day (click to add anyway)';
+      } else if (!hourAvailable) {
+        slotTitle = 'Outside duty hours (click to add anyway)';
+      }
+    } else if (isSelected) {
+      slotBgClass = 'bg-sky-200 hover:bg-sky-300';
+    } else if (isDropTarget) {
+      slotBgClass = 'bg-white hover:bg-emerald-100';
+    } else {
+      // Available slot = PURE WHITE
+      slotBgClass = 'bg-white hover:bg-sky-50';
+    }
+
+    // Border styling for clear 15-minute grid
+    // Hour boundaries get thicker borders for visual clarity
+    const borderClass = slot.quarter === 0 
+      ? 'border-t border-gray-300' 
+      : 'border-t border-gray-100';
 
     return (
       <div
@@ -1157,15 +1346,10 @@ export const Calendar: React.FC<CalendarProps> = ({
         onMouseEnter={() => handleMouseEnter(slot)}
         onMouseUp={() => handleSlotMouseUp(date, slot)}
         onDoubleClick={() => handleDoubleClick(date, slot)}
-        className={`h-5 transition-colors cursor-pointer relative select-none
-          ${slot.quarter === 0 ? 'border-t-2 border-gray-300' : 'border-t border-gray-100'}
-          ${isSelected
-            ? 'bg-sky-200 hover:bg-sky-300'
-            : isDropTarget
-              ? 'hover:bg-emerald-100'
-              : 'hover:bg-sky-50'
-          }`}
-        title={isDropTarget ? `Drop here: ${slot.time}` : 'Double-click or drag to add'}
+        className={`h-6 transition-colors relative select-none cursor-pointer border-r border-gray-200
+          ${borderClass}
+          ${slotBgClass}`}
+        title={slotTitle}
       >
         {isSelected && (
           <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
@@ -1195,6 +1379,37 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // ── DAY VIEW ──────────────────────────────────────────────────────────────
   if (view === 'day') {
+    const dayOfWeek = DAY_MAP[currentDate.getDay()];
+    const isDayAvailable = !practitionerAvailability || practitionerAvailability.duty_days.includes(dayOfWeek);
+
+    if (!isDayAvailable) {
+      return (
+        <div {...calendarWrapperProps} className="h-full flex flex-col">
+          <div className="flex flex-col h-full bg-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+            <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-500">
+                  {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">Practitioner not available on this day</p>
+              </div>
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center text-gray-400">
+                <div className="text-6xl mb-4">📅</div>
+                <p className="text-lg font-medium">Unavailable</p>
+                <p className="text-sm mt-1">This day is not in the practitioner's duty schedule</p>
+              </div>
+            </div>
+          </div>
+          {sharedModals}
+          {dragOverlays}
+          {hoverCardOverlay}
+          {blockHoverCardOverlay}
+        </div>
+      );
+    }
+
     return (
       <div {...calendarWrapperProps} className="h-full flex flex-col">
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1223,23 +1438,26 @@ export const Calendar: React.FC<CalendarProps> = ({
               const dayBlocks = getBlockAppointmentsForDate(currentDate);
               const hasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
               
+              // Use filtered slots for Day view (only duty hours)
+              const slotsToRender = dayViewTimeSlots;
+              
               if (hasConflict) {
                 // 2-column layout when there's a conflict
                 return (
                   <div className="grid grid-cols-[80px_1fr_1fr]">
                     {/* Time column */}
                     <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
-                      {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                      {slotsToRender.map((slot, i) => renderTimeLabel(slot, i))}
                     </div>
                     {/* Appointments column */}
                     <div className="border-r border-gray-200 relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                      {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {dayAppts.map(apt => renderTimelineCard(apt, false))}
+                      {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                      {dayAppts.map(apt => renderTimelineCard(apt, false, true))}
                     </div>
                     {/* Block appointments column */}
                     <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                      {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {dayBlocks.map(block => renderBlockTimelineCard(block, false))}
+                      {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                      {dayBlocks.map(block => renderBlockTimelineCard(block, false, true))}
                     </div>
                   </div>
                 );
@@ -1250,13 +1468,13 @@ export const Calendar: React.FC<CalendarProps> = ({
                 <div className="grid grid-cols-[80px_1fr]">
                   {/* Time column */}
                   <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
-                    {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                    {slotsToRender.map((slot, i) => renderTimeLabel(slot, i))}
                   </div>
                   {/* Day column */}
                   <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                    {timeSlots.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                    {dayAppts.map(apt => renderTimelineCard(apt, false))}
-                    {dayBlocks.map(block => renderBlockTimelineCard(block, false))}
+                    {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
+                    {dayAppts.map(apt => renderTimelineCard(apt, false, true))}
+                    {dayBlocks.map(block => renderBlockTimelineCard(block, false, true))}
                   </div>
                 </div>
               );
@@ -1280,17 +1498,26 @@ export const Calendar: React.FC<CalendarProps> = ({
       <div {...calendarWrapperProps} className="h-full flex flex-col">
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
 
-          {/* Sticky day-header row */}
+          {/* Sticky day-header row - Nookal-style with purple for non-duty days */}
           <div className="flex-shrink-0 grid grid-cols-[80px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
             <div className="p-4" />
-            {weekDays.map(day => (
-              <div key={day.toISOString()} className="p-4 text-center border-l border-gray-200">
-                <div className="text-xs font-medium text-gray-500 uppercase">{format(day, 'EEE')}</div>
-                <div className={`text-sm font-semibold mt-1 ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs' : 'text-gray-700'}`}>
-                  {format(day, 'd')}
+            {weekDays.map(day => {
+              const isAvailableDay = isDutyDay(day);
+              return (
+                <div 
+                  key={day.toISOString()} 
+                  className={`p-4 text-center border-l border-gray-200 ${!isAvailableDay ? 'bg-purple-200' : 'bg-white'}`}
+                >
+                  <div className={`text-xs font-medium uppercase ${!isAvailableDay ? 'text-purple-600' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
+                  <div className={`text-sm font-semibold mt-1 ${!isAvailableDay ? 'text-purple-600' : ''} ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs' : 'text-gray-700'}`}>
+                    {format(day, 'd')}
+                  </div>
+                  {!isAvailableDay && (
+                    <div className="text-xs text-purple-500 mt-1">Non-duty</div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {dragState.isDragging && (
@@ -1336,7 +1563,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                             {dayAppts.map(apt => renderTimelineCard(apt, true))}
                           </div>
                           {/* Block appointments column */}
-                          <div className="border-l border-gray-200 relative bg-gray-25">
+                          <div className="border-l border-gray-200 relative">
                             {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
                             {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
                           </div>
@@ -1403,10 +1630,27 @@ export const Calendar: React.FC<CalendarProps> = ({
                   const count        = dayAppts.length + dayBlockAppts.length;
                   const isDropTarget = dragState.isDragging || blockDragState.isDragging;
 
+                  // Use our helper function to check if this is a duty day
+                  const isAvailableDay = isDutyDay(day);
+
+                  // Determine background color based on availability
+                  // Nookal-style: Duty days = WHITE, Non-duty days = PURPLE
+                  let dayBgClass = '';
+                  if (!isAvailableDay) {
+                    dayBgClass = 'bg-purple-200'; // Non-duty day = PURPLE
+                  } else if (!isSameMonth(day, currentDate)) {
+                    dayBgClass = 'bg-gray-50'; // Different month
+                  } else if (isSameDay(day, new Date())) {
+                    dayBgClass = 'bg-sky-50'; // Today
+                  } else {
+                    dayBgClass = 'bg-white'; // Available duty day = WHITE
+                  }
+
                   return (
                     <div
                       key={day.toISOString()}
                       onClick={() => {
+                        // ALL days are clickable (no disabled state)
                         if (dragState.isDragging && dragState.draggedAppointment) {
                           const [origH, origM] = dragState.draggedAppointment.start_time.split(':').map(Number);
                           onDropOnSlot(day, origH, origM);
@@ -1419,10 +1663,9 @@ export const Calendar: React.FC<CalendarProps> = ({
                         }
                         onDateChange(day);
                       }}
-                      className={`min-h-[120px] p-2 border-r border-gray-200 last:border-r-0 transition-colors cursor-pointer relative
-                        ${!isSameMonth(day, currentDate) ? 'bg-gray-50' : ''}
-                        ${isSameDay(day, new Date()) ? 'bg-sky-50' : ''}
-                        ${isDropTarget ? 'hover:bg-emerald-50 hover:border-emerald-300' : 'hover:bg-sky-50'}
+                      className={`min-h-[120px] p-2 border-r border-gray-200 last:border-r-0 transition-colors relative cursor-pointer
+                        ${dayBgClass}
+                        ${isDropTarget ? 'hover:bg-emerald-50 hover:border-emerald-300' : 'hover:brightness-95'}
                       `}
                     >
                       {isDropTarget && (
@@ -1430,7 +1673,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                       )}
                       <div className="flex items-center justify-between mb-1">
                         <div className={`text-sm font-medium
-                          ${!isSameMonth(day, currentDate) ? 'text-gray-400' : 'text-gray-700'}
+                          ${!isSameMonth(day, currentDate) ? 'text-gray-400' : !isAvailableDay ? 'text-purple-600' : 'text-gray-700'}
                           ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold' : ''}`}
                         >
                           {format(day, 'd')}
@@ -1441,6 +1684,9 @@ export const Calendar: React.FC<CalendarProps> = ({
                           </div>
                         )}
                       </div>
+                      {!isAvailableDay && (
+                        <div className="text-xs text-purple-600 mb-1">Non-duty day</div>
+                      )}
                       <div className="space-y-1 mt-2 relative">
                         {/* Regular appointments */}
                         {dayAppts.slice(0, 3).map(apt => renderMonthCard(apt))}

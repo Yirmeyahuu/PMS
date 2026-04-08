@@ -86,6 +86,7 @@ class PortalPractitionerSerializer(serializers.Serializer):
     bio            = serializers.SerializerMethodField()
     avatar_url     = serializers.SerializerMethodField()
     branch_id      = serializers.SerializerMethodField()   # ← critical field
+    availability    = serializers.SerializerMethodField() # ← NEW
 
     def get_id(self, obj):
         return obj.id
@@ -131,6 +132,10 @@ class PortalPractitionerSerializer(serializers.Serializer):
             return branch_id
         # Fallback: use the practitioner's own clinic FK
         return obj.clinic_id
+
+    def get_availability(self, obj):
+        """Return practitioner availability for booking restrictions."""
+        return obj.availability
 
 
 class PortalClinicServiceSerializer(serializers.ModelSerializer):

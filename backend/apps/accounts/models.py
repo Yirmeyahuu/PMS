@@ -42,6 +42,9 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     # Password change tracking
     password_changed = models.BooleanField(default=False)
     
+    # Staff position/title (e.g., "Clinic Desk", "Office Manager")
+    position = models.CharField(max_length=200, blank=True)
+    
     # Clinic association (main clinic)
     clinic = models.ForeignKey(
         'clinics.Clinic',

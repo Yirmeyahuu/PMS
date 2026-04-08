@@ -3,6 +3,16 @@ import { axiosInstance } from '../../lib/axios';
 import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/types/clinic';
 
 // ── Existing: Practitioner types ──────────────────────────────────────────────
+export type DutyDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+
+export interface PractitionerAvailability {
+  duty_days: DutyDay[];
+  duty_start_time: string; // e.g., "08:00"
+  duty_end_time: string;   // e.g., "17:00"
+  lunch_start_time: string; // e.g., "12:00"
+  lunch_end_time: string;   // e.g., "13:00"
+}
+
 export interface Practitioner {
   id:                 number;
   name:               string;
@@ -12,6 +22,7 @@ export interface Practitioner {
   clinic_name:        string | null;
   clinic_branch_id:   number | null;
   clinic_branch_name: string | null;
+  availability?:      PractitionerAvailability;
 }
 
 export interface PractitionersResponse {
