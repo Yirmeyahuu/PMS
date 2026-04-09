@@ -133,12 +133,19 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
         if (section.fields) {
           (section.fields as TemplateField[]).forEach((field: TemplateField) => {
             if (!(field.id in newContent)) {
+              // Skip non-input field types
+              if (field.type === 'section_header' || field.type === 'heading') return;
+              
               if (field.type === 'checkbox') {
                 newContent[field.id] = false;
               } else if (field.type === 'checkbox_group') {
                 newContent[field.id] = [];
               } else if (field.type === 'tags') {
                 newContent[field.id] = [];
+              } else if (field.type === 'scale' || field.type === 'number') {
+                newContent[field.id] = field.defaultValue ?? '';
+              } else if (field.type === 'chart') {
+                newContent[field.id] = null;
               } else {
                 newContent[field.id] = '';
               }
@@ -315,6 +322,31 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
                 </div>
                 <div className="p-4">
                   {section.fields && (section.fields as TemplateField[]).map((field: TemplateField, fieldIndex: number) => {
+                    // Skip non-data field types
+                    if (field.type === 'section_header') return null;
+                    
+                    // Render heading as styled heading
+                    if (field.type === 'heading') {
+                      return (
+                        <div key={field.id || fieldIndex} className="mb-3 last:mb-0 pt-2">
+                          <h5 className="text-base font-semibold text-gray-800">{field.label}</h5>
+                          {field.helpText && <p className="text-xs text-gray-500 mt-0.5">{field.helpText}</p>}
+                        </div>
+                      );
+                    }
+
+                    // Render chart placeholder
+                    if (field.type === 'chart') {
+                      return (
+                        <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
+                          <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
+                          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+                            {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const value = content[field.id];
                     const displayValue = () => {
                       if (value === undefined || value === '' || value === null) {
@@ -325,6 +357,9 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
                       }
                       if (Array.isArray(value)) {
                         return value.length > 0 ? value.join(', ') : <span className="text-gray-400 italic">Not filled</span>;
+                      }
+                      if (field.type === 'scale') {
+                        return `${value} / ${field.max || 10}`;
                       }
                       return String(value);
                     };

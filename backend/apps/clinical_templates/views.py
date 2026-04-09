@@ -22,8 +22,8 @@ class ClinicalTemplateViewSet(viewsets.ModelViewSet):
     CRUD operations for clinical templates.
     
     Permissions:
-    - Admin: Full CRUD
-    - Other users: Read-only
+    - All authenticated users: Create, Read, Update
+    - Admin: Delete
     
     Security: Scoped to user's clinic
     """
@@ -32,7 +32,7 @@ class ClinicalTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = ClinicalTemplateSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly, IsSameClinic]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category', 'is_active', 'is_archived']
+    filterset_fields = ['category', 'discipline', 'is_active', 'is_archived']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at', 'version']
     
@@ -339,132 +339,90 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def email_note(self, request, pk=None):
         """
-        Send clinical note to patient's email address.
-        
+        Send clinical note via email with optional PDF attachment.
+
         POST /api/clinical-notes/{id}/email_note/
+        Accepts multipart/form-data OR JSON.
+        Fields: to (comma-sep emails), subject, body, attachment (PDF file).
         """
         note = self.get_object()
         patient = note.patient
         clinic = note.clinic
-        
-        # Validate patient has email
-        if not patient.email:
+
+        # Parse fields from multipart or JSON
+        is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+        if is_multipart:
+            to_raw = request.POST.get('to', '')
+            subject = request.POST.get('subject', '')
+            body = request.POST.get('body', '')
+        else:
+            to_raw = request.data.get('to', '')
+            subject = request.data.get('subject', '')
+            body = request.data.get('body', '')
+
+        # Parse recipient list — fallback to patient email
+        if to_raw:
+            recipients = [e.strip() for e in to_raw.replace(';', ',').split(',') if e.strip()]
+        else:
+            recipients = [patient.email] if patient.email else []
+
+        if not recipients:
             return Response(
-                {'detail': 'Patient has no email address'},
+                {'detail': 'No recipient email address provided and patient has no email on file.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Build the formatted note content for email
-        content = note.content
-        sections_html = ''
-        
-        if note.template and note.template.structure:
-            template_structure = note.template.structure
-            for section in template_structure.get('sections', []):
-                section_title = section.get('title', '')
-                section_fields = section.get('fields', [])
-                
-                fields_html = ''
-                for field in section_fields:
-                    field_id = field.get('id', '')
-                    field_label = field.get('label', '')
-                    field_value = content.get(field_id, '')
-                    
-                    if field_value:
-                        if isinstance(field_value, list):
-                            field_value = ', '.join(field_value)
-                        fields_html += f'<p><strong>{field_label}:</strong> {field_value}</p>'
-                
-                if fields_html:
-                    sections_html += f'''
-                    <div style="margin-bottom: 20px;">
-                        <h3 style="color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">{section_title}</h3>
-                        {fields_html}
-                    </div>
-                    '''
-        
-        # If no template structure, show raw content
-        if not sections_html and content:
-            for key, value in content.items():
-                if value:
-                    if isinstance(value, list):
-                        value = ', '.join(value)
-                    sections_html += f'<p><strong>{key}:</strong> {value}</p>'
-        
-        context = {
-            'patient_name': patient.get_full_name(),
-            'clinic_name': clinic.name,
-            'practitioner_name': note.practitioner.user.get_full_name() if note.practitioner and note.practitioner.user else 'Practitioner',
-            'date': note.date.strftime('%B %d, %Y') if note.date else '',
-            'template_name': note.template.name if note.template else 'Clinical Note',
-            'sections_html': sections_html,
-            'is_signed': note.is_signed,
-            'signed_at': note.signed_at.strftime('%B %d, %Y at %I:%M %p') if note.signed_at else None,
-        }
-        
-        try:
-            subject = f"Clinical Note - {context['date']} - {clinic.name}"
-            
-            # Render HTML content
-            html_content = f'''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
-                    .content {{ background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }}
-                    .footer {{ background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2 style="margin: 0;">Clinical Note</h2>
-                        <p style="margin: 5px 0 0 0;">{context['clinic_name']}</p>
-                    </div>
-                    <div class="content">
-                        <p><strong>Patient:</strong> {context['patient_name']}</p>
-                        <p><strong>Date:</strong> {context['date']}</p>
-                        <p><strong>Practitioner:</strong> {context['practitioner_name']}</p>
-                        <p><strong>Template:</strong> {context['template_name']}</p>
-                        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                        {context['sections_html']}
-                    </div>
-                    <div class="footer">
-                        <p>This is an automated message from {context['clinic_name']}. Please do not reply to this email.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            '''
-            
-            # Send email
-            email = EmailMultiAlternatives(
-                subject=subject,
-                from_email=getattr(clinic, 'email', settings.DEFAULT_FROM_EMAIL),
-                to=[patient.email]
+
+        # Default subject/body if blank
+        note_date_str = note.date.strftime('%B %d, %Y') if note.date else ''
+        if not subject:
+            subject = f"Clinical Note – {note_date_str} – {clinic.name}"
+        if not body:
+            body = (
+                f"Dear {patient.get_full_name()},\n\n"
+                f"Please find attached your clinical note from your recent appointment on {note_date_str}.\n\n"
+                f"Best regards,\n{clinic.name}"
             )
-            email.attach_alternative(html_content, 'text/html')
-            email.send(fail_silently=False)
-            
-            # Log the email action
-            ClinicalNoteAuditLog.objects.create(
-                clinical_note=note,
-                user=request.user,
-                action='EMAILED',
-                ip_address=self._get_client_ip(),
-                user_agent=request.META.get('HTTP_USER_AGENT', '')
-            )
-            
-            return Response({'detail': f'Clinical note sent to {patient.email}'})
-            
-        except Exception as e:
-            return Response(
-                {'detail': f'Failed to send email: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+
+        # Read attachment bytes now (before the thread, so the file handle stays valid)
+        attachment_bytes = None
+        patient_slug = patient.get_full_name().replace(' ', '-').lower()
+        if is_multipart and 'attachment' in request.FILES:
+            attachment_bytes = request.FILES['attachment'].read()
+
+        # Audit log immediately (before background thread)
+        ClinicalNoteAuditLog.objects.create(
+            clinical_note=note,
+            user=request.user,
+            action='EMAILED',
+            ip_address=self._get_client_ip(),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+
+        # Send email in a background thread so the HTTP response returns immediately
+        import threading
+        from django.core.mail import EmailMessage
+
+        def _send():
+            try:
+                email_msg = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email=getattr(clinic, 'email', None) or settings.DEFAULT_FROM_EMAIL,
+                    to=recipients,
+                )
+                if attachment_bytes:
+                    email_msg.attach(
+                        f"clinical-note-{patient_slug}.pdf",
+                        attachment_bytes,
+                        'application/pdf',
+                    )
+                email_msg.send(fail_silently=True)
+            except Exception:
+                pass
+
+        threading.Thread(target=_send, daemon=True).start()
+
+        return Response({'detail': f"Clinical note sent to {', '.join(recipients)}"})
     
     @action(detail=True, methods=['get'])
     def print_note(self, request, pk=None):
@@ -485,7 +443,8 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
             practitioner_user = note.practitioner.user
             # Get avatar URL from user model
             if hasattr(practitioner_user, 'avatar') and practitioner_user.avatar:
-                practitioner_avatar = practitioner_user.avatar.url if hasattr(practitioner_user.avatar, 'url') else str(practitioner_user.avatar)
+                raw_url = practitioner_user.avatar.url if hasattr(practitioner_user.avatar, 'url') else str(practitioner_user.avatar)
+                practitioner_avatar = request.build_absolute_uri(raw_url)
             # Generate initials
             first = getattr(practitioner_user, 'first_name', '') or ''
             last = getattr(practitioner_user, 'last_name', '') or ''
@@ -568,6 +527,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         response_data = {
             'patient_name': patient.get_full_name(),
             'patient_number': patient.patient_number,
+            'patient_email': getattr(patient, 'email', '') or '',
             'clinic_name': clinic.name,
             'clinic_address': getattr(clinic, 'address', ''),
             'clinic_phone': getattr(clinic, 'phone', ''),

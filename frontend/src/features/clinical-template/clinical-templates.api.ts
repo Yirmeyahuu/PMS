@@ -123,6 +123,7 @@ export const getArchivedNotes = async (patientId: number): Promise<ClinicalNote[
 export interface PrintNoteResponse {
   patient_name: string;
   patient_number: string;
+  patient_email: string;
   clinic_name: string;
   clinic_address: string;
   clinic_phone: string;
@@ -158,10 +159,21 @@ export const getPrintNote = async (id: number): Promise<PrintNoteResponse> => {
   return response.data;
 };
 
-/**
- * Open the clinical note in a new window for printing.
- * This fetches the HTML directly from the backend and opens it.
- */
+export const sendClinicalNoteEmail = async (
+  id: number,
+  payload: { to: string; subject: string; body: string; attachment?: File }
+): Promise<{ detail: string }> => {
+  const formData = new FormData();
+  formData.append('to', payload.to);
+  formData.append('subject', payload.subject);
+  formData.append('body', payload.body);
+  if (payload.attachment) formData.append('attachment', payload.attachment);
+  const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/email_note/`, formData, {
+    timeout: 90000,
+  });
+  return response.data;
+};
+
 export const openPrintNote = (id: number) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
   const printUrl = `${API_URL}${BASE_URL}/notes/${id}/print_note_html/`;

@@ -46,17 +46,21 @@ export const TemplateList: React.FC<TemplateListProps> = ({
   onCreateVersion,
 }) => {
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [disciplineFilter, setDisciplineFilter] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  // Get unique disciplines from templates
+  const uniqueDisciplines = Array.from(new Set(templates.map((t) => t.discipline).filter(Boolean)));
 
   const filtered = templates.filter((t) => {
     const matchesSearch =
       t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !categoryFilter || t.category === categoryFilter;
+      t.description?.toLowerCase().includes(search.toLowerCase()) ||
+      t.discipline?.toLowerCase().includes(search.toLowerCase());
+    const matchesDiscipline = !disciplineFilter || t.discipline === disciplineFilter;
     const matchesArchived = showArchived || !t.is_archived;
-    return matchesSearch && matchesCategory && matchesArchived;
+    return matchesSearch && matchesDiscipline && matchesArchived;
   });
 
   const sectionCount = (t: ClinicalTemplate) => t.structure?.sections?.length || 0;
@@ -88,13 +92,13 @@ export const TemplateList: React.FC<TemplateListProps> = ({
           />
         </div>
         <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          value={disciplineFilter}
+          onChange={(e) => setDisciplineFilter(e.target.value)}
           className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
         >
-          <option value="">All Categories</option>
-          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+          <option value="">All Disciplines</option>
+          {uniqueDisciplines.map((d) => (
+            <option key={d} value={d}>{d}</option>
           ))}
         </select>
         <button
@@ -142,11 +146,11 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-gray-900 text-sm">{template.name}</span>
                   <span className="text-xs text-gray-400 font-mono">v{template.version}</span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[template.category]}`}
-                  >
-                    {CATEGORY_LABELS[template.category]}
-                  </span>
+                  {template.discipline && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-sky-100 text-sky-700">
+                      {template.discipline}
+                    </span>
+                  )}
                   {template.is_archived && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
                       Archived

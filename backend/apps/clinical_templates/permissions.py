@@ -3,15 +3,24 @@ from rest_framework import permissions
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
-    Admin can create/edit/delete templates.
-    All authenticated users can read templates.
+    All authenticated users can create and read templates.
+    Only admins can delete templates.
     """
     
     def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return request.user and request.user.is_authenticated
+        if not (request.user and request.user.is_authenticated):
+            return False
         
-        return request.user and request.user.is_admin
+        # Allow read and create for all authenticated users
+        if request.method in permissions.SAFE_METHODS or request.method == 'POST':
+            return True
+        
+        # Allow update for all authenticated users
+        if request.method in ('PUT', 'PATCH'):
+            return True
+        
+        # Only admins can delete
+        return request.user.is_admin
 
 
 class IsSameClinic(permissions.BasePermission):

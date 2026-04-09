@@ -19,9 +19,9 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ sections, temp
   const hasSections = sections.length > 0 && sections.some((s) => s.fields.length > 0);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-white">
       {/* Preview Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <Eye className="w-4 h-4 text-gray-500" />
           <span className="text-sm font-semibold text-gray-700">Live Preview</span>
@@ -39,15 +39,13 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ sections, temp
       </div>
 
       {/* Preview Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-6">
         {!hasSections ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-              <Eye className="w-10 h-10 text-gray-300" />
-            </div>
-            <p className="text-base font-semibold text-gray-400">LIVE PREVIEW</p>
-            <p className="text-sm text-gray-300 mt-1">
-              Add sections and fields to see a preview
+            <Eye className="w-10 h-10 text-gray-200 mb-3" />
+            <p className="text-sm font-medium text-gray-400">Live Preview</p>
+            <p className="text-xs text-gray-300 mt-1">
+              Add fields to see a preview
             </p>
           </div>
         ) : (
@@ -63,7 +61,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ sections, temp
 
       {/* Preview Footer */}
       {hasSections && (
-        <div className="flex-shrink-0 px-4 py-2 bg-white border-t border-gray-200">
+        <div className="flex-shrink-0 px-4 py-2 border-t border-gray-200">
           <p className="text-xs text-gray-400 text-center">
             This is an interactive preview. Changes here are not saved.
           </p>

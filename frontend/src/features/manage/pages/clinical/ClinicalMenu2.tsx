@@ -108,8 +108,8 @@ export const ClinicalMenu2: React.FC = () => {
             border: 'border-amber-200',
           },
           {
-            label: 'Categories',
-            value: new Set(templates.map((t) => t.category)).size,
+            label: 'Disciplines',
+            value: new Set(templates.map((t) => t.discipline).filter(Boolean)).size,
             color: 'text-sky-700',
             bg: 'bg-sky-50',
             border: 'border-sky-200',
@@ -146,4 +146,4 @@ export const ClinicalMenu2: React.FC = () => {
       />
     </div>
   );
-};
+}; 

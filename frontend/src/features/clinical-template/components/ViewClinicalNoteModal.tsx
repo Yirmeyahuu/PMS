@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { X, FileText, Loader2, Printer, Mail, CheckCircle, Pencil } from 'lucide-react';
-import { getNote, emailNote, getPrintNote } from '../clinical-templates.api';
+import { getNote, getPrintNote } from '../clinical-templates.api';
 import type { ClinicalNote, ClinicalTemplate, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
+import { ClinicalNoteTemplate } from './ClinicalNoteTemplate';
+import { SendClinicalNoteModal } from './SendClinicalNoteModal';
 import toast from 'react-hot-toast';
 
 interface ViewClinicalNoteModalProps {
@@ -53,7 +56,7 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
   const [note, setNote] = useState<ClinicalNote | null>(null);
   const [template, setTemplate] = useState<ClinicalTemplate | null>(null);
   const [loading, setLoading] = useState(false);
-  const [emailing, setEmailing] = useState(false);
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
@@ -82,77 +85,55 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
     }
   };
 
-  const handleEmail = async () => {
-    setEmailing(true);
-    try {
-      await emailNote(noteId);
-      toast.success('Clinical note sent to patient email');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to send email');
-    } finally {
-      setEmailing(false);
-    }
-  };
-
   const handlePrint = async () => {
     setPrinting(true);
     try {
       const printData = await getPrintNote(noteId);
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Clinical Note - ${printData.patient_name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
-            .clinic { font-size: 18px; font-weight: bold; color: #1e40af; }
-            h1 { font-size: 24px; color: #333; margin: 10px 0; }
-            .info { margin-bottom: 20px; }
-            .info p { margin: 5px 0; }
-            .section { margin-bottom: 20px; }
-            .section h3 { background: #f3f4f6; padding: 10px; margin-bottom: 10px; border-left: 4px solid #1e40af; }
-            .field { margin-bottom: 10px; }
-            .field label { font-weight: bold; color: #666; }
-            .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="clinic">${printData.clinic_name}</div>
-            <h1>Clinical Note</h1>
-          </div>
-          <div class="info">
-            <p><strong>Patient:</strong> ${printData.patient_name}</p>
-            <p><strong>Patient ID:</strong> ${printData.patient_number}</p>
-            <p><strong>Date:</strong> ${printData.date ? new Date(printData.date).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Practitioner:</strong> ${printData.practitioner_name}${printData.practitioner_title ? ` (${printData.practitioner_title})` : ''}</p>
-            <p><strong>Template:</strong> ${printData.template_name}</p>
-            ${printData.is_signed ? `<p><strong>Signed:</strong> ${printData.signed_at ? new Date(printData.signed_at).toLocaleString() : 'Yes'}</p>` : ''}
-          </div>
-          ${printData.sections.map(section => `
-            <div class="section">
-              <h3>${section.title}</h3>
-              ${section.fields.map(field => `
-                <div class="field">
-                  <label>${field.label}:</label> ${field.value}
-                </div>
-              `).join('')}
-            </div>
-          `).join('')}
-          <div class="footer">
-            <p>Generated on ${new Date().toLocaleString()}</p>
-          </div>
-        </body>
-        </html>
-      `;
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.print();
+
+      // Render ClinicalNoteTemplate offscreen
+      const A4_W = 794;
+      const container = document.createElement('div');
+      container.style.cssText = `position:fixed;left:-9999px;top:0;width:${A4_W}px;background:white;z-index:-1;overflow:hidden;`;
+      document.body.appendChild(container);
+
+      const root = createRoot(container);
+      await new Promise<void>((resolve) => {
+        root.render(<ClinicalNoteTemplate data={printData} />);
+        setTimeout(resolve, 500);
+      });
+
+      // Collect all CSS rules from existing stylesheets
+      const cssRules: string[] = [];
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          if (sheet.cssRules) {
+            cssRules.push(Array.from(sheet.cssRules).map((r) => r.cssText).join('\n'));
+          }
+        } catch {
+          if (sheet.href) cssRules.push(`@import url("${sheet.href}");`);
+        }
       }
+      const linkTags = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+        .map((link) => `<link rel="stylesheet" href="${(link as HTMLLinkElement).href}" />`)
+        .join('\n');
+
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (printWindow) {
+        printWindow.document.write(`<!DOCTYPE html><html><head>
+          <meta charset="UTF-8" />
+          ${linkTags}
+          <style>${cssRules.join('\n')}</style>
+          <style>
+            @page { size: A4 portrait; margin: 0; }
+            html, body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          </style>
+        </head><body>${container.innerHTML}</body></html>`);
+        printWindow.document.close();
+        setTimeout(() => printWindow.print(), 600);
+      }
+
+      root.unmount();
+      document.body.removeChild(container);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to generate print view');
     } finally {
@@ -199,16 +180,11 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
               </button>
             )}
             <button
-              onClick={handleEmail}
-              disabled={emailing}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              title="Send to Client Email"
+              onClick={() => setSendEmailOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Send Clinical Note via Email"
             >
-              {emailing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Mail className="w-4 h-4" />
-              )}
+              <Mail className="w-4 h-4" />
               Send Email
             </button>
             <button
@@ -315,6 +291,31 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
                       </div>
                       <div className="p-4">
                         {section.fields && (section.fields as TemplateField[]).map((field: TemplateField, fieldIndex: number) => {
+                          // Skip non-data field types in view mode
+                          if (field.type === 'section_header') return null;
+                          
+                          // Render heading as a styled heading
+                          if (field.type === 'heading') {
+                            return (
+                              <div key={field.id || fieldIndex} className="mb-3 last:mb-0 pt-2">
+                                <h5 className="text-base font-semibold text-gray-800">{field.label}</h5>
+                                {field.helpText && <p className="text-xs text-gray-500 mt-0.5">{field.helpText}</p>}
+                              </div>
+                            );
+                          }
+
+                          // Render chart as a placeholder
+                          if (field.type === 'chart') {
+                            return (
+                              <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
+                                <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
+                                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+                                  {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
+                                </div>
+                              </div>
+                            );
+                          }
+
                           const value = note.decrypted_content?.[field.id];
                           const displayValue = () => {
                             if (value === undefined || value === '' || value === null) {
@@ -325,6 +326,10 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
                             }
                             if (Array.isArray(value)) {
                               return value.length > 0 ? value.join(', ') : <span className="text-gray-400 italic">Not filled</span>;
+                            }
+                            // Scale: show numeric value
+                            if (field.type === 'scale') {
+                              return `${value} / ${field.max || 10}`;
                             }
                             return String(value);
                           };
@@ -371,6 +376,13 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
           </button>
         </div>
       </div>
+
+      <SendClinicalNoteModal
+        isOpen={sendEmailOpen}
+        onClose={() => setSendEmailOpen(false)}
+        noteId={noteId}
+        patientName={note?.patient_name ?? ''}
+      />
     </div>
   );
 };

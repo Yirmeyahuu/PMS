@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TemplateSection, TemplateField } from '@/types/clinicalTemplate';
+import type { TemplateSection, TemplateField, ChartType } from '@/types/clinicalTemplate';
 import {
   TextInput,
   TextArea,
@@ -33,14 +33,14 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   const sortedSections = [...sections].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {sortedSections.map((section) => (
-        <div key={section.id} className="bg-white rounded-xl border border-gray-200 p-6">
+        <div key={section.id}>
           {/* Section Header */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-700">{section.title}</h3>
             {section.description && (
-              <p className="text-sm text-gray-600 mt-1">{section.description}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{section.description}</p>
             )}
           </div>
 
@@ -89,6 +89,17 @@ const FieldRenderer: React.FC<FieldRendererProps> = ({
   };
 
   switch (field.type) {
+    case 'section_header':
+      return null; // Section headers rendered at section level
+
+    case 'heading':
+      return (
+        <div className="pt-2">
+          <h4 className="text-base font-semibold text-gray-800">{field.label}</h4>
+          {field.helpText && <p className="text-xs text-gray-500 mt-0.5">{field.helpText}</p>}
+        </div>
+      );
+
     case 'text':
       return <TextInput {...commonProps} />;
 
@@ -100,6 +111,24 @@ const FieldRenderer: React.FC<FieldRendererProps> = ({
 
     case 'date':
       return <DateInput {...commonProps} />;
+
+    case 'datetime':
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <input
+            type="datetime-local"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+          {field.helpText && <p className="text-xs text-gray-400 mt-1 italic">{field.helpText}</p>}
+          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        </div>
+      );
 
     case 'select':
       return <SelectInput {...commonProps} options={field.options || []} />;
@@ -113,41 +142,45 @@ const FieldRenderer: React.FC<FieldRendererProps> = ({
     case 'radio':
       return <RadioGroup {...commonProps} options={field.options || []} />;
 
-    case 'pain_scale':
+    case 'scale':
       return <PainScaleInput {...commonProps} min={field.min || 0} max={field.max || 10} />;
+
+    case 'chart':
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <div className={`border-2 border-dashed border-gray-200 rounded-lg p-8 text-center ${field.mirrored ? 'grid grid-cols-2 gap-4' : ''}`}>
+            {field.mirrored ? (
+              <>
+                <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                  <p className="text-sm text-gray-400">
+                    {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'} — Left / Front
+                  </p>
+                </div>
+                <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                  <p className="text-sm text-gray-400">
+                    {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'} — Right / Back
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400">
+                {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
+              </p>
+            )}
+          </div>
+          {field.helpText && <p className="text-xs text-gray-400 mt-1 italic">{field.helpText}</p>}
+          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        </div>
+      );
 
     case 'rich_text':
       return <RichTextEditor {...commonProps} />;
 
     case 'tags':
       return <TagsInput {...commonProps} />;
-
-    case 'nested_group':
-      return (
-        <div className="border-l-4 border-sky-300 pl-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            {field.label}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          <div className="space-y-3">
-            {field.fields?.map((nestedField) => (
-              <FieldRenderer
-                key={nestedField.id}
-                field={nestedField}
-                value={value?.[nestedField.id]}
-                onChange={(nestedValue) =>
-                  onChange({
-                    ...value,
-                    [nestedField.id]: nestedValue,
-                  })
-                }
-                error={error}
-                disabled={disabled}
-              />
-            ))}
-          </div>
-        </div>
-      );
 
     default:
       return <div className="text-red-500">Unsupported field type: {field.type}</div>;

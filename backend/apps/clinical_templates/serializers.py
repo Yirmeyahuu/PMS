@@ -10,12 +10,14 @@ class ClinicalTemplateSerializer(serializers.ModelSerializer):
     
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     is_latest_version = serializers.SerializerMethodField()
+    clinic_branch_name = serializers.CharField(source='clinic_branch.name', read_only=True, default=None)
     
     class Meta:
         model = ClinicalTemplate
         fields = [
             'id', 'clinic', 'created_by', 'created_by_name',
-            'name', 'description', 'category', 'structure',
+            'name', 'description', 'category', 'discipline',
+            'clinic_branch', 'clinic_branch_name', 'structure',
             'version', 'parent_template', 'is_active', 'is_archived',
             'is_latest_version', 'created_at', 'updated_at'
         ]

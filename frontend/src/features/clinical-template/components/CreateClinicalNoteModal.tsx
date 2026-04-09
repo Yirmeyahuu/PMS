@@ -126,12 +126,19 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       (template.structure.sections as TemplateSection[]).forEach((section: TemplateSection) => {
         if (section.fields) {
           (section.fields as TemplateField[]).forEach((field: TemplateField) => {
+            // Skip non-input field types
+            if (field.type === 'section_header' || field.type === 'heading') return;
+            
             if (field.type === 'checkbox') {
               initialContent[field.id] = false;
             } else if (field.type === 'checkbox_group') {
               initialContent[field.id] = [];
             } else if (field.type === 'tags') {
               initialContent[field.id] = [];
+            } else if (field.type === 'scale' || field.type === 'number') {
+              initialContent[field.id] = field.defaultValue ?? '';
+            } else if (field.type === 'chart') {
+              initialContent[field.id] = null;
             } else {
               initialContent[field.id] = '';
             }
@@ -332,6 +339,31 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                 </div>
                 <div className="p-4">
                   {section.fields && (section.fields as TemplateField[]).map((field: TemplateField, fieldIndex: number) => {
+                    // Skip non-data field types
+                    if (field.type === 'section_header') return null;
+                    
+                    // Render heading as styled heading
+                    if (field.type === 'heading') {
+                      return (
+                        <div key={field.id || fieldIndex} className="mb-3 last:mb-0 pt-2">
+                          <h5 className="text-base font-semibold text-gray-800">{field.label}</h5>
+                          {field.helpText && <p className="text-xs text-gray-500 mt-0.5">{field.helpText}</p>}
+                        </div>
+                      );
+                    }
+
+                    // Render chart placeholder
+                    if (field.type === 'chart') {
+                      return (
+                        <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
+                          <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
+                          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+                            {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const value = content[field.id];
                     const displayValue = () => {
                       if (value === undefined || value === '' || value === null) {
@@ -342,6 +374,9 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                       }
                       if (Array.isArray(value)) {
                         return value.length > 0 ? value.join(', ') : <span className="text-gray-400 italic">Not filled</span>;
+                      }
+                      if (field.type === 'scale') {
+                        return `${value} / ${field.max || 10}`;
                       }
                       return String(value);
                     };
@@ -429,7 +464,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
               
               {templates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  No active templates available. Please contact your administrator.
+                  No active templates available. Create one from the Clinical Templates page.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -439,21 +474,29 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                       onClick={() => handleTemplateSelect(template)}
                       className="flex flex-col items-start p-4 border border-gray-200 rounded-xl hover:border-sky-500 hover:bg-sky-50 transition-all text-left group"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg font-semibold text-gray-900 group-hover:text-sky-700">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900 group-hover:text-sky-700">
                           {template.name}
                         </span>
-                        {template.category && (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                            {template.category}
+                        {template.discipline && (
+                          <span className="text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">
+                            {template.discipline}
                           </span>
                         )}
                       </div>
                       {template.description && (
-                        <p className="text-sm text-gray-500 line-clamp-2">{template.description}</p>
+                        <p className="text-xs text-gray-500 line-clamp-2">{template.description}</p>
                       )}
-                      <div className="text-xs text-gray-400 mt-2">
-                        v{template.version} · {template.structure?.sections?.length ?? 0} sections
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-2">
+                        <span>v{template.version}</span>
+                        <span>·</span>
+                        <span>{template.structure?.sections?.reduce((acc: number, s: TemplateSection) => acc + (s.fields?.length || 0), 0) || 0} fields</span>
+                        {template.clinic_branch_name && (
+                          <>
+                            <span>·</span>
+                            <span>{template.clinic_branch_name}</span>
+                          </>
+                        )}
                       </div>
                     </button>
                   ))}

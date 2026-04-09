@@ -1,16 +1,21 @@
 export type FieldType =
+  | 'section_header'
+  | 'heading'
   | 'text'
   | 'textarea'
   | 'number'
   | 'date'
+  | 'datetime'
   | 'select'
   | 'checkbox'
   | 'checkbox_group'
   | 'radio'
-  | 'pain_scale'
+  | 'scale'
+  | 'chart'
   | 'rich_text'
-  | 'tags'
-  | 'nested_group';
+  | 'tags';
+
+export type ChartType = 'body' | 'spine' | 'head';
 
 export interface FieldOption {
   value: string;
@@ -25,6 +30,9 @@ export interface ClinicalTemplate {
   name: string;
   description: string;
   category: 'INITIAL' | 'FOLLOW_UP' | 'PROGRESS' | 'DISCHARGE' | 'SOAP' | 'CUSTOM';
+  discipline: string;
+  clinic_branch: number | null;
+  clinic_branch_name: string | null;
   structure: TemplateStructure;
   version: number;
   parent_template: number | null;
@@ -41,12 +49,15 @@ export interface TemplateField {
   label: string;
   placeholder?: string;
   required?: boolean;
+  helpText?: string;
   min?: number;
   max?: number;
   rows?: number;
   options?: FieldOption[];
-  fields?: TemplateField[]; // For nested groups
+  fields?: TemplateField[];
   defaultValue?: any;
+  chartType?: ChartType;
+  mirrored?: boolean;
 }
 
 export interface TemplateSection {

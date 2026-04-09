@@ -42,6 +42,20 @@ class ClinicalTemplate(TimeStampedModel, SoftDeleteModel):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    discipline = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Practitioner discipline this template is designed for'
+    )
+    clinic_branch = models.ForeignKey(
+        'clinics.Clinic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='branch_clinical_templates',
+        help_text='Specific branch this template is for. Null means all locations.'
+    )
     
     # Template structure as JSON schema
     # Example: See TEMPLATE_STRUCTURE_EXAMPLE below
@@ -104,6 +118,8 @@ class ClinicalTemplate(TimeStampedModel, SoftDeleteModel):
             name=self.name,
             description=self.description,
             category=self.category,
+            discipline=self.discipline,
+            clinic_branch=self.clinic_branch,
             structure=self.structure.copy(),
             version=self.version + 1,
             parent_template=self.parent_template or self,

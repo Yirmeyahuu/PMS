@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ClinicalTemplate, TemplateSection } from '@/types/clinicalTemplate';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, ChevronDown, Plus, MapPin } from 'lucide-react';
 import { TemplateBuilder } from './TemplateBuilder';
 import { TemplatePreview } from './TemplatePreview';
+import { DISCIPLINE_OPTIONS } from '@/features/setup/types/staff.types';
+import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 
 interface TemplateFormModalProps {
   isOpen: boolean;
@@ -11,15 +13,6 @@ interface TemplateFormModalProps {
   onSave: (data: Partial<ClinicalTemplate>) => Promise<void>;
   saving?: boolean;
 }
-
-const CATEGORY_OPTIONS = [
-  { value: 'INITIAL', label: 'Initial Assessment' },
-  { value: 'FOLLOW_UP', label: 'Follow-up Note' },
-  { value: 'PROGRESS', label: 'Progress Note' },
-  { value: 'DISCHARGE', label: 'Discharge Summary' },
-  { value: 'SOAP', label: 'SOAP Note' },
-  { value: 'CUSTOM', label: 'Custom Template' },
-];
 
 export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
   isOpen,
@@ -31,33 +24,67 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
   const isEditing = !!template;
 
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<ClinicalTemplate['category']>('SOAP');
+  const [discipline, setDiscipline] = useState('');
+  const [clinicBranch, setClinicBranch] = useState<number | null>(null);
   const [sections, setSections] = useState<TemplateSection[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Clinic branches
+  const { branches } = useClinicBranches();
+
+  // Discipline dropdown state
+  const [disciplineOpen, setDisciplineOpen] = useState(false);
+  const [disciplineSearch, setDisciplineSearch] = useState('');
+  const [customDisciplines, setCustomDisciplines] = useState<string[]>([]);
+  const disciplineRef = useRef<HTMLDivElement>(null);
+
+  // All available disciplines = predefined + custom
+  const allDisciplines = [
+    ...DISCIPLINE_OPTIONS.map((d) => d.label),
+    ...customDisciplines,
+  ];
+
+  const filteredDisciplines = allDisciplines.filter((d) =>
+    d.toLowerCase().includes(disciplineSearch.toLowerCase())
+  );
+
+  const canCreateNew =
+    disciplineSearch.trim().length > 0 &&
+    !allDisciplines.some((d) => d.toLowerCase() === disciplineSearch.trim().toLowerCase());
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (disciplineRef.current && !disciplineRef.current.contains(e.target as Node)) {
+        setDisciplineOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (template) {
       setName(template.name);
-      setDescription(template.description || '');
-      setCategory(template.category);
+      setDiscipline(template.discipline || '');
+      setClinicBranch(template.clinic_branch ?? null);
       setSections(template.structure?.sections || []);
     } else {
       setName('');
-      setDescription('');
-      setCategory('SOAP');
+      setDiscipline('');
+      setClinicBranch(null);
       setSections([]);
     }
+    setDisciplineSearch('');
     setErrors({});
   }, [template, isOpen]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!name.trim()) newErrors.name = 'Template name is required';
-    if (!category) newErrors.category = 'Category is required';
-    if (sections.length === 0) newErrors.sections = 'At least one section is required';
-    const hasEmptySection = sections.some((s) => !s.title.trim());
-    if (hasEmptySection) newErrors.sections = 'All sections must have a title';
+    if (!discipline.trim()) newErrors.discipline = 'Discipline is required';
+    const totalFields = sections.reduce((acc, s) => acc + s.fields.length, 0);
+    if (totalFields === 0) newErrors.sections = 'At least one field is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -67,14 +94,32 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
 
     await onSave({
       name: name.trim(),
-      description: description.trim(),
-      category,
+      description: '',
+      category: 'CUSTOM',
+      discipline: discipline.trim(),
+      clinic_branch: clinicBranch,
       structure: {
         version: '1.0',
         sections,
       },
     });
     onClose();
+  };
+
+  const handleSelectDiscipline = (d: string) => {
+    setDiscipline(d);
+    setDisciplineSearch('');
+    setDisciplineOpen(false);
+  };
+
+  const handleCreateDiscipline = () => {
+    const newName = disciplineSearch.trim();
+    if (newName && canCreateNew) {
+      setCustomDisciplines((prev) => [...prev, newName]);
+      setDiscipline(newName);
+      setDisciplineSearch('');
+      setDisciplineOpen(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -120,35 +165,84 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
               />
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
             </div>
-            <div>
+            <div ref={disciplineRef} className="relative">
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Category *
+                Discipline *
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ClinicalTemplate['category'])}
-                className={`w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white ${
-                  errors.category ? 'border-red-400' : 'border-gray-200'
+              <button
+                type="button"
+                onClick={() => setDisciplineOpen(!disciplineOpen)}
+                className={`w-full text-sm border rounded-lg px-3 py-2 text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white ${
+                  errors.discipline ? 'border-red-400' : 'border-gray-200'
                 }`}
               >
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                <span className={discipline ? 'text-gray-900' : 'text-gray-400'}>
+                  {discipline || 'Select or create a discipline'}
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+              {errors.discipline && <p className="text-xs text-red-500 mt-1">{errors.discipline}</p>}
+
+              {disciplineOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 flex flex-col">
+                  <div className="p-2 border-b border-gray-100">
+                    <input
+                      type="text"
+                      value={disciplineSearch}
+                      onChange={(e) => setDisciplineSearch(e.target.value)}
+                      className="w-full text-sm border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      placeholder="Search or type a new discipline..."
+                      autoFocus
+                    />
+                  </div>
+                  <div className="overflow-y-auto flex-1">
+                    {filteredDisciplines.map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => handleSelectDiscipline(d)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-sky-50 transition-colors ${
+                          discipline === d ? 'bg-sky-50 text-sky-700 font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                    {filteredDisciplines.length === 0 && !canCreateNew && (
+                      <p className="px-3 py-2 text-xs text-gray-400">No disciplines found</p>
+                    )}
+                  </div>
+                  {canCreateNew && (
+                    <button
+                      onClick={handleCreateDiscipline}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-sky-600 hover:bg-sky-50 border-t border-gray-100 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Create "{disciplineSearch.trim()}"
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Description
+                Location
               </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                placeholder="Optional description"
-              />
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <select
+                  value={clinicBranch ?? ''}
+                  onChange={(e) => setClinicBranch(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full text-sm border border-gray-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white appearance-none"
+                >
+                  <option value="">All Locations</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
           {errors.sections && (
@@ -162,7 +256,7 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
           <div className="w-1/2 flex flex-col border-r border-gray-200 overflow-hidden">
             <div className="flex-shrink-0 px-4 py-2 bg-white border-b border-gray-100">
               <h3 className="text-sm font-semibold text-gray-700">Form Builder</h3>
-              <p className="text-xs text-gray-400">Add and configure sections and fields</p>
+              <p className="text-xs text-gray-400">Add and configure fields</p>
             </div>
             <div className="flex-1 overflow-hidden">
               <TemplateBuilder sections={sections} onChange={setSections} />
@@ -184,7 +278,6 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
         {/* Modal Footer */}
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white">
           <div className="text-xs text-gray-400">
-            {sections.length} section{sections.length !== 1 ? 's' : ''} •{' '}
             {sections.reduce((acc, s) => acc + s.fields.length, 0)} field
             {sections.reduce((acc, s) => acc + s.fields.length, 0) !== 1 ? 's' : ''}
           </div>
