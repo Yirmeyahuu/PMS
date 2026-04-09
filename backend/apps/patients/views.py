@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
@@ -124,6 +125,14 @@ def _confirm_portal_booking(booking, confirmed_by_user):
 
 
 
+# ─── Patient Pagination ───────────────────────────────────────────────────────
+
+class PatientPagination(PageNumberPagination):
+    page_size            = 10
+    page_size_query_param = 'page_size'
+    max_page_size        = 100
+
+
 # ─── Patient ViewSet ──────────────────────────────────────────────────────────
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -132,6 +141,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     )
     serializer_class   = PatientSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class   = PatientPagination
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields   = ['clinic', 'gender', 'is_active', 'is_archived']
     search_fields      = ['first_name', 'last_name', 'patient_number', 'phone', 'email']

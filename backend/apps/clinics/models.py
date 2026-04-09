@@ -38,6 +38,13 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
     tin                      = models.CharField(max_length=50, blank=True, verbose_name='TIN')
     philhealth_accreditation = models.CharField(max_length=100, blank=True)
 
+    custom_location = models.CharField(
+        max_length=500, blank=True,
+        help_text='Manual free-text location when standard search fails'
+    )
+    latitude  = models.DecimalField(max_digits=9,  decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+
     logo    = models.ImageField(upload_to='clinic_logos/', null=True, blank=True)
     website = models.URLField(blank=True)
     timezone = models.CharField(max_length=50, default='Asia/Manila')

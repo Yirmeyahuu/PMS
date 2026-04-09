@@ -10,14 +10,17 @@ export interface PortalAvailability {
 }
 
 export interface PortalBranch {
-  id:            number;
-  name:          string;
-  address:       string;
-  city:          string;
-  province:      string;
-  phone:         string;
-  email:         string;
-  is_main_branch: boolean;
+  id:              number;
+  name:            string;
+  address:         string;
+  city:            string;
+  province:        string;
+  phone:           string;
+  email:           string;
+  is_main_branch:  boolean;
+  latitude?:       string | null;
+  longitude?:      string | null;
+  custom_location?: string;
 }
 
 export interface PortalPractitioner {

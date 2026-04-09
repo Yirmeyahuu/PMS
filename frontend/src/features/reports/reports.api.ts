@@ -240,3 +240,113 @@ export const getClinicalNotes = async (
   const response = await axiosInstance.get('/reports/clinical_notes/', { params });
   return response.data;
 };
+
+// ─── Inventory Financial Report ───────────────────────────────────────────────
+
+export interface InventoryFinancialItem {
+  product_id:    number;
+  name:          string;
+  sku:           string;
+  category:      string;
+  item_type:     string;
+  unit:          string;
+  quantity:      number;
+  reorder_level: number;
+  unit_cost:     number;
+  selling_price: number;
+  total_value:   number;
+  stock_flag:    'ok' | 'low' | 'out';
+}
+
+export interface InventoryFinancialSummary {
+  total_inventory_value: number;
+  low_stock_count:       number;
+  out_of_stock_count:    number;
+  total_items:           number;
+}
+
+export interface InventoryCategoryBreakdown {
+  category:    string;
+  total_value: number;
+}
+
+export interface InventoryCategory {
+  id:   number;
+  name: string;
+}
+
+export interface InventoryFinancialResponse {
+  report_type:        string;
+  tab:                string;
+  generated_at:       string;
+  filters:            Record<string, unknown>;
+  summary:            InventoryFinancialSummary;
+  category_breakdown: InventoryCategoryBreakdown[];
+  categories:         InventoryCategory[];
+  items:              InventoryFinancialItem[];
+}
+
+export interface InventoryFinancialParams {
+  category_id?:  number;
+  stock_status?: 'all' | 'low' | 'out';
+}
+
+export const getInventoryFinancial = async (
+  params?: InventoryFinancialParams
+): Promise<InventoryFinancialResponse> => {
+  const response = await axiosInstance.get('/reports/inventory_financial/', { params });
+  return response.data;
+};
+
+// ─── Appointment Costs Report ─────────────────────────────────────────────────
+
+export interface AppointmentCostItem {
+  invoice_id:        number;
+  invoice_number:    string;
+  invoice_date:      string;
+  patient_id:        number;
+  patient_name:      string;
+  patient_number:    string;
+  practitioner_name: string;
+  appointment_type:  string;
+  appointment_date:  string;
+  total_amount:      number;
+  paid_amount:       number;
+  balance_due:       number;
+  payment_status:    string;
+  payment_method:    string;
+}
+
+export interface AppointmentCostsSummary {
+  total_revenue:       number;
+  paid_total:          number;
+  unpaid_total:        number;
+  outstanding_balance: number;
+  total_invoices:      number;
+  paid_count:          number;
+  unpaid_count:        number;
+  partial_count:       number;
+}
+
+export interface AppointmentCostsResponse {
+  report_type:  string;
+  tab:          string;
+  start_date:   string;
+  end_date:     string;
+  generated_at: string;
+  filters:      Record<string, unknown>;
+  summary:      AppointmentCostsSummary;
+  appointments: AppointmentCostItem[];
+}
+
+export interface AppointmentCostsParams extends ReportDateRange {
+  payment_status?:  'ALL' | 'PAID' | 'UNPAID' | 'PARTIALLY_PAID';
+  practitioner_id?: number;
+}
+
+export const getAppointmentCosts = async (
+  params?: AppointmentCostsParams
+): Promise<AppointmentCostsResponse> => {
+  const response = await axiosInstance.get('/reports/appointment_costs/', { params });
+  return response.data;
+};

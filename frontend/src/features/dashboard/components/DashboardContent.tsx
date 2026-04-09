@@ -2,8 +2,8 @@ import React from 'react';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { DashboardStats } from './DashboardStats';
-import { BookingsChart } from './BookingsChart';
-import { UncompletedNotesTable } from './UncompletedNotesTable';
+import { BookingsPerTypeChart } from './BookingsPerTypeChart';
+import { WeeklyBookingsChart } from './WeeklyBookingsChart';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export const DashboardContent: React.FC = () => {
@@ -88,15 +88,12 @@ export const DashboardContent: React.FC = () => {
               }
               isLoading={isLoading}
             />
-            <BookingsChart data={data?.bookingsByCase || []} isLoading={isLoading} />
-            <UncompletedNotesTable
-              notes={data?.uncompletedNotes || []}
-              isLoading={isLoading}
-            />
+            <BookingsPerTypeChart data={data?.bookingsByType || []} isLoading={isLoading} />
+            <WeeklyBookingsChart  data={data?.weeklyBookings  || []} isLoading={isLoading} />
           </div>
         ) : (
           // Desktop: Bento Grid (2 columns)
-          <div className="grid grid-cols-12 gap-6 h-full">
+          <div className="grid grid-cols-12 gap-6">
             {/* Left Column: Stats Cards */}
             <div className="col-span-12 lg:col-span-4 xl:col-span-3 flex flex-col gap-6">
               <DashboardStats
@@ -113,23 +110,10 @@ export const DashboardContent: React.FC = () => {
               />
             </div>
 
-            {/* Right Column: Chart + Table */}
-            <div className="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-6 h-full">
-              {/* Bar Chart */}
-              <div className="flex-shrink-0">
-                <BookingsChart
-                  data={data?.bookingsByCase || []}
-                  isLoading={isLoading}
-                />
-              </div>
-
-              {/* Uncompleted Notes Table - Takes remaining space */}
-              <div className="flex-1 min-h-0">
-                <UncompletedNotesTable
-                  notes={data?.uncompletedNotes || []}
-                  isLoading={isLoading}
-                />
-              </div>
+            {/* Right Column: Two charts stacked vertically */}
+            <div className="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-6">
+              <BookingsPerTypeChart data={data?.bookingsByType || []} isLoading={isLoading} />
+              <WeeklyBookingsChart  data={data?.weeklyBookings  || []} isLoading={isLoading} />
             </div>
           </div>
         )}

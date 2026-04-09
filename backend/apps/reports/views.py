@@ -85,6 +85,10 @@ class ReportViewSet(viewsets.ModelViewSet):
         GET /reports/clients_cases/
         GET /reports/clinical_notes/
 
+    Live report endpoints (Financial tab):
+        GET /reports/inventory_financial/
+        GET /reports/appointment_costs/
+
     Print endpoints:
         GET /reports/uninvoiced_bookings/print/
         GET /reports/cancellations/print/
@@ -778,3 +782,327 @@ class ReportViewSet(viewsets.ModelViewSet):
             ).count(),
         }
         return Response(metrics)
+
+    @action(detail=False, methods=['get'])
+    def dashboard_analytics(self, request):
+        """
+        Returns two datasets for the dashboard graph section:
+          - bookings_per_type   : appointment counts grouped by appointment_type
+          - weekly_bookings     : bookings per day for the last 7 days
+        Uses all branches of the clinic.
+        """
+        clinic, main_clinic, all_branch_ids = self._get_clinic_and_branch_ids(request)
+        today = timezone.now().date()
+
+        # ── Bookings per service/type (current month) ───────────────────────
+        # Group by the linked Service name first; fall back to appointment_type
+        # for legacy records that have no service FK.
+        month_start = today.replace(day=1)
+        base_qs = Appointment.objects.filter(
+            clinic_id__in=all_branch_ids,
+            date__range=[month_start, today],
+            is_deleted=False,
+        )
+
+        # Appointments WITH a linked service → group by service name
+        service_qs = (
+            base_qs
+            .filter(service__isnull=False)
+            .values('service__name')
+            .annotate(count=Count('id'))
+        )
+
+        # Appointments WITHOUT a linked service → group by appointment_type (legacy)
+        TYPE_LABELS: dict[str, str] = {
+            'CONSULTATION': 'General Consultation',
+            'FOLLOW_UP':    'Follow-up Visit',
+            'PROCEDURE':    'Procedure',
+            'SURGERY':      'Surgery',
+            'THERAPY':      'Physical Therapy',
+            'VACCINATION':  'Vaccination',
+            'LAB':          'Laboratory Tests',
+            'IMAGING':      'Imaging',
+            'OTHER':        'Other',
+        }
+        legacy_qs = (
+            base_qs
+            .filter(service__isnull=True)
+            .values('appointment_type')
+            .annotate(count=Count('id'))
+        )
+
+        # Merge: service rows take priority; legacy rows fill the rest
+        counts: dict[str, int] = {}
+        for row in service_qs:
+            label = row['service__name'] or 'Unknown Service'
+            counts[label] = counts.get(label, 0) + row['count']
+        for row in legacy_qs:
+            label = TYPE_LABELS.get(
+                row['appointment_type'],
+                row['appointment_type'].replace('_', ' ').title(),
+            )
+            counts[label] = counts.get(label, 0) + row['count']
+
+        bookings_per_type = [
+            {'type': label, 'count': cnt}
+            for label, cnt in sorted(counts.items(), key=lambda x: -x[1])
+        ]
+
+        # ── Weekly bookings: last 7 days ────────────────────────────────────
+        week_start = today - timedelta(days=6)
+        week_qs = (
+            Appointment.objects
+            .filter(
+                clinic_id__in=all_branch_ids,
+                date__range=[week_start, today],
+                is_deleted=False,
+            )
+            .values('date')
+            .annotate(count=Count('id'))
+        )
+        count_by_date = {row['date']: row['count'] for row in week_qs}
+
+        weekly_bookings = []
+        for i in range(7):
+            d   = week_start + timedelta(days=i)
+            weekly_bookings.append({
+                'day':   d.strftime('%a'),   # Mon, Tue …
+                'date':  str(d),
+                'count': count_by_date.get(d, 0),
+            })
+
+        return Response({
+            'bookings_per_type': bookings_per_type,
+            'weekly_bookings':   weekly_bookings,
+        })
+
+    # ══════════════════════════════════════════════════════════════════════════
+    #  FINANCIAL TAB
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # ── 1. Inventory Financial Report ─────────────────────────────────────────
+
+    @action(detail=False, methods=['get'], url_path='inventory_financial')
+    def inventory_financial(self, request):
+        """
+        GET /api/reports/inventory_financial/
+
+        Query params:
+            category_id  (int)    optional — filter by inventory category
+            stock_status (str)    optional — 'low' | 'out' | 'all' (default: all)
+        """
+        from apps.inventory.models import Product, Category
+        from decimal import Decimal
+
+        clinic = request.user.clinic
+
+        qs = (
+            Product.objects
+            .filter(clinic=clinic, is_archived=False, is_deleted=False)
+            .select_related('category')
+            .order_by('category__name', 'name')
+        )
+
+        # ── Filters ───────────────────────────────────────────────────────────
+        category_id = request.query_params.get('category_id')
+        if category_id:
+            try:
+                qs = qs.filter(category_id=int(category_id))
+            except (ValueError, TypeError):
+                pass
+
+        stock_status = request.query_params.get('stock_status', 'all').lower()
+        if stock_status == 'out':
+            qs = qs.filter(quantity_in_stock=0)
+        elif stock_status == 'low':
+            # low but not zero: qty > 0 AND qty <= reorder_level
+            from django.db.models import F
+            qs = qs.filter(quantity_in_stock__gt=0, quantity_in_stock__lte=F('reorder_level'))
+
+        # ── Build items ───────────────────────────────────────────────────────
+        items = []
+        for product in qs:
+            qty        = Decimal(str(product.quantity_in_stock))
+            unit_cost  = Decimal(str(product.cost_price))
+            total_val  = qty * unit_cost
+
+            stock_flag = 'ok'
+            if qty == 0:
+                stock_flag = 'out'
+            elif product.reorder_level and qty <= Decimal(str(product.reorder_level)):
+                stock_flag = 'low'
+
+            items.append({
+                'product_id':    product.id,
+                'name':          product.name,
+                'sku':           product.sku or '',
+                'category':      product.category.name if product.category else 'Uncategorized',
+                'item_type':     product.item_type,
+                'unit':          product.unit,
+                'quantity':      float(qty),
+                'reorder_level': float(product.reorder_level),
+                'unit_cost':     float(unit_cost),
+                'selling_price': float(product.selling_price),
+                'total_value':   float(total_val),
+                'stock_flag':    stock_flag,   # 'ok' | 'low' | 'out'
+            })
+
+        # ── Summary ───────────────────────────────────────────────────────────
+        total_inventory_value = sum(i['total_value'] for i in items)
+        low_stock_count       = sum(1 for i in items if i['stock_flag'] == 'low')
+        out_of_stock_count    = sum(1 for i in items if i['stock_flag'] == 'out')
+
+        # Category breakdown for pie chart
+        from collections import defaultdict
+        by_category: dict = defaultdict(float)
+        for i in items:
+            by_category[i['category']] += i['total_value']
+        category_breakdown = [
+            {'category': cat, 'total_value': round(val, 2)}
+            for cat, val in sorted(by_category.items(), key=lambda x: -x[1])
+        ]
+
+        # Available categories for filter dropdown
+        categories = list(
+            Category.objects
+            .filter(clinic=clinic, is_active=True)
+            .values('id', 'name')
+            .order_by('name')
+        )
+
+        return Response({
+            'report_type':  'INVENTORY_FINANCIAL',
+            'tab':          'FINANCIAL',
+            'generated_at': timezone.now().isoformat(),
+            'filters': {
+                'category_id':  category_id,
+                'stock_status': stock_status,
+            },
+            'summary': {
+                'total_inventory_value': round(total_inventory_value, 2),
+                'low_stock_count':       low_stock_count,
+                'out_of_stock_count':    out_of_stock_count,
+                'total_items':           len(items),
+            },
+            'category_breakdown': category_breakdown,
+            'categories':         categories,
+            'items':              items,
+        })
+
+    # ── 2. Appointment Costs Report ───────────────────────────────────────────
+
+    @action(detail=False, methods=['get'], url_path='appointment_costs')
+    def appointment_costs(self, request):
+        """
+        GET /api/reports/appointment_costs/
+
+        Query params:
+            start_date      (YYYY-MM-DD)  default: first of current month
+            end_date        (YYYY-MM-DD)  default: today
+            payment_status  (str)         optional — PAID | UNPAID | PARTIALLY_PAID | ALL (default: ALL)
+            practitioner_id (int)         optional
+        """
+        from decimal import Decimal
+
+        clinic, main_clinic, all_branch_ids = self._get_clinic_and_branch_ids(request)
+        start, end = self._get_date_range(request)
+
+        qs = (
+            Invoice.objects
+            .filter(
+                clinic_id__in=all_branch_ids,
+                is_deleted=False,
+                invoice_date__range=[start, end],
+            )
+            .select_related(
+                'patient',
+                'appointment',
+                'appointment__practitioner__user',
+                'appointment__service',
+            )
+            .order_by('-invoice_date', 'invoice_number')
+        )
+
+        # ── Filters ───────────────────────────────────────────────────────────
+        payment_status = request.query_params.get('payment_status', 'ALL').upper()
+        if payment_status == 'UNPAID':
+            qs = qs.filter(status__in=['PENDING', 'OVERDUE', 'DRAFT'])
+        elif payment_status not in ('', 'ALL'):
+            qs = qs.filter(status=payment_status)
+
+        practitioner_id = request.query_params.get('practitioner_id')
+        if practitioner_id:
+            try:
+                qs = qs.filter(appointment__practitioner_id=int(practitioner_id))
+            except (ValueError, TypeError):
+                pass
+
+        # ── Build items ───────────────────────────────────────────────────────
+        items = []
+        for inv in qs:
+            appt = inv.appointment
+            practitioner_name = ''
+            appointment_type  = ''
+            appointment_date  = str(inv.invoice_date)
+
+            if appt:
+                appointment_date  = str(appt.date)
+                appointment_type  = appt.appointment_type
+                if appt.practitioner and appt.practitioner.user:
+                    practitioner_name = appt.practitioner.user.get_full_name()
+
+            total   = float(inv.total_amount)
+            paid    = float(inv.amount_paid)
+            balance = float(inv.balance_due)
+
+            items.append({
+                'invoice_id':         inv.id,
+                'invoice_number':     inv.invoice_number,
+                'invoice_date':       str(inv.invoice_date),
+                'patient_id':         inv.patient_id,
+                'patient_name':       inv.patient.get_full_name() if inv.patient else '',
+                'patient_number':     inv.patient.patient_number if inv.patient else '',
+                'practitioner_name':  practitioner_name,
+                'appointment_type':   appointment_type,
+                'appointment_date':   appointment_date,
+                'total_amount':       total,
+                'paid_amount':        paid,
+                'balance_due':        balance,
+                'payment_status':     inv.status,
+                'payment_method':     inv.payment_method or '',
+            })
+
+        # ── Summary totals ────────────────────────────────────────────────────
+        total_revenue       = sum(i['total_amount'] for i in items)
+        paid_total          = sum(i['paid_amount']  for i in items)
+        unpaid_total        = sum(
+            i['total_amount'] for i in items
+            if i['payment_status'] in ('PENDING', 'OVERDUE', 'DRAFT')
+        )
+        outstanding_balance = sum(i['balance_due']  for i in items)
+        paid_count          = sum(1 for i in items if i['payment_status'] == 'PAID')
+        unpaid_count        = sum(1 for i in items if i['payment_status'] in ('PENDING', 'OVERDUE', 'DRAFT'))
+        partial_count       = sum(1 for i in items if i['payment_status'] == 'PARTIALLY_PAID')
+
+        return Response({
+            'report_type':  'APPOINTMENT_COSTS',
+            'tab':          'FINANCIAL',
+            'start_date':   str(start),
+            'end_date':     str(end),
+            'generated_at': timezone.now().isoformat(),
+            'filters': {
+                'payment_status':  payment_status,
+                'practitioner_id': practitioner_id,
+            },
+            'summary': {
+                'total_revenue':       round(total_revenue, 2),
+                'paid_total':          round(paid_total, 2),
+                'unpaid_total':        round(unpaid_total, 2),
+                'outstanding_balance': round(outstanding_balance, 2),
+                'total_invoices':      len(items),
+                'paid_count':          paid_count,
+                'unpaid_count':        unpaid_count,
+                'partial_count':       partial_count,
+            },
+            'appointments': items,
+        })

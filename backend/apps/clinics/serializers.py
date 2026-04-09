@@ -17,6 +17,7 @@ class ClinicBranchSerializer(serializers.ModelSerializer):
             'id', 'name', 'branch_code', 'is_main_branch', 'is_branch',
             'parent_clinic', 'parent_name', 'is_active', 'city', 'province',
             'email', 'phone', 'address', 'postal_code', 'website', 'tin',
+            'custom_location', 'latitude', 'longitude',
         ]
         read_only_fields = ['id', 'branch_code', 'is_branch', 'parent_name']
 
@@ -46,23 +47,23 @@ class ClinicSerializer(serializers.ModelSerializer):
 class ClinicProfileSetupSerializer(serializers.ModelSerializer):
     """
     Used exclusively for the initial clinic profile setup.
-    - name, email, phone, address, city, province are required.
-    - All other fields are optional.
-    On a valid save, setup_complete is flipped to True.
+    - name, email, phone are required.
+    - At least one of: address+city+province OR custom_location must be provided.
+    - latitude/longitude are optional (set when map pin is placed).
+    - timezone, tin, philhealth_accreditation are managed elsewhere.
     """
 
-    # ✅ email is required here — it's the clinic's business email,
-    #    separate from the admin's personal email used at registration.
-    email = serializers.EmailField(required=True)
+    email       = serializers.EmailField(required=True)
     remove_logo = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model  = Clinic
         fields = [
-            'name', 'email', 'phone', 'address',
-            'city', 'province', 'postal_code',
-            'website', 'tin', 'philhealth_accreditation',
-            'logo', 'timezone', 'remove_logo',
+            'name', 'email', 'phone',
+            'address', 'city', 'province', 'postal_code',
+            'custom_location',
+            'latitude', 'longitude',
+            'website', 'logo', 'remove_logo',
         ]
 
     def validate_name(self, value):
@@ -80,36 +81,26 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Clinic phone number is required.")
         return value.strip()
 
-    def validate_address(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("Clinic address is required.")
-        return value.strip()
-
-    def validate_city(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("City is required.")
-        return value.strip()
-
-    def validate_province(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("Province is required.")
-        return value.strip()
+    def validate(self, attrs):
+        has_standard  = attrs.get('address', '').strip() and attrs.get('city', '').strip() and attrs.get('province', '').strip()
+        has_custom    = attrs.get('custom_location', '').strip()
+        if not has_standard and not has_custom:
+            raise serializers.ValidationError(
+                "Provide a street address + city + province, or enter a custom location."
+            )
+        return attrs
 
     def update(self, instance, validated_data):
-        """Handle logo removal when remove_logo is True."""
         remove_logo = validated_data.pop('remove_logo', False)
         if remove_logo and instance.logo:
-            # Delete the existing logo file
             instance.logo.delete(save=True)
-        
-        # Check if name is being updated and sync to all branches
+
         new_name = validated_data.get('name')
         if new_name and new_name != instance.name:
-            # Update all branches of this clinic with the new name
             branches = Clinic.objects.filter(parent_clinic=instance)
             branches.update(name=new_name)
             logger.info(f"Updated clinic name '{new_name}' to {branches.count()} branches")
-        
+
         return super().update(instance, validated_data)
 
 

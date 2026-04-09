@@ -15,6 +15,9 @@ export interface ClinicBranch {
   postal_code?: string;
   website?: string;
   tin?: string;
+  custom_location?: string;
+  latitude?: string | null;
+  longitude?: string | null;
 }
 
 export interface ClinicBranchesResponse {
@@ -33,4 +36,7 @@ export interface CreateBranchData {
   postal_code: string;
   website?: string;
   tin?: string;
+  custom_location?: string;
+  latitude?: number;
+  longitude?: number;
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Building2, CheckCircle, Star, Search } from 'lucide-react';
+import { MapPin, Phone, Mail, Building2, CheckCircle, Star, Search, Map } from 'lucide-react';
 import type { PortalBranch } from '../types/portal';
+import { BranchLocationModal } from './BranchLocationModal';
 
 interface BranchStepProps {
   branches:       PortalBranch[];
@@ -14,6 +15,7 @@ export const BranchStep: React.FC<BranchStepProps> = ({
   onSelect,
 }) => {
   const [search, setSearch] = useState('');
+  const [mapModalBranch, setMapModalBranch] = useState<PortalBranch | null>(null);
 
   const filtered = branches.filter((b) =>
     b.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -89,105 +91,137 @@ export const BranchStep: React.FC<BranchStepProps> = ({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {sorted.map((branch) => {
             const isSelected = selectedBranch?.id === branch.id;
+            const hasPin = !!(branch.latitude && branch.longitude);
 
             return (
-              <button
+              <div
                 key={branch.id}
-                onClick={() => onSelect(branch)}
                 className={`
-                  relative flex flex-col text-left gap-3 p-5 rounded-2xl border-2 transition-all
+                  relative flex flex-col gap-4 rounded-2xl border-2 transition-all overflow-hidden
                   ${isSelected
-                    ? 'border-teal-500 bg-teal-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-teal-300 hover:shadow-sm'
+                    ? 'border-teal-500 bg-teal-50 shadow-lg'
+                    : 'border-gray-200 bg-white hover:border-teal-300 hover:shadow-md'
                   }
                 `}
               >
-                {/* Selected checkmark */}
-                {isSelected && (
-                  <div className="absolute top-3 right-3">
-                    <CheckCircle className="w-5 h-5 text-teal-500" />
-                  </div>
-                )}
+                {/* Clickable body */}
+                <button
+                  onClick={() => onSelect(branch)}
+                  className="flex flex-col gap-4 p-6 text-left w-full"
+                >
+                  {/* Selected checkmark */}
+                  {isSelected && (
+                    <div className="absolute top-4 right-4">
+                      <CheckCircle className="w-5 h-5 text-teal-500" />
+                    </div>
+                  )}
 
-                {/* Icon + Name + Badge */}
-                <div className="flex items-start gap-3">
-                  <div className={`
-                    w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5
-                    ${isSelected
-                      ? 'bg-teal-500'
-                      : branch.is_main_branch
-                        ? 'bg-teal-600'
-                        : 'bg-teal-100'
-                    }
-                  `}>
-                    <Building2 className={`w-5 h-5 ${
-                      isSelected || branch.is_main_branch ? 'text-white' : 'text-teal-600'
-                    }`} />
-                  </div>
+                  {/* Icon + Name + Badge */}
+                  <div className="flex items-start gap-4">
+                    <div className={`
+                      w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5
+                      ${isSelected
+                        ? 'bg-teal-500'
+                        : branch.is_main_branch
+                          ? 'bg-teal-600'
+                          : 'bg-teal-100'
+                      }
+                    `}>
+                      <Building2 className={`w-6 h-6 ${
+                        isSelected || branch.is_main_branch ? 'text-white' : 'text-teal-600'
+                      }`} />
+                    </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap pr-6">
-                      <p className="text-sm font-bold text-gray-900 leading-tight">
-                        {branch.name}
-                      </p>
-                      {branch.is_main_branch && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full
-                          text-[10px] font-semibold bg-teal-100 text-teal-700 flex-shrink-0">
-                          <Star className="w-2.5 h-2.5" />
-                          Main
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap pr-7">
+                        <p className="text-base font-bold text-gray-900 leading-tight">
+                          {branch.name}
+                        </p>
+                        {branch.is_main_branch && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full
+                            text-[10px] font-semibold bg-teal-100 text-teal-700 shrink-0">
+                            <Star className="w-2.5 h-2.5" />
+                            Main
+                          </span>
+                        )}
+                      </div>
+                      {(branch.city || branch.province) && (
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {[branch.city, branch.province].filter(Boolean).join(', ')}
+                        </p>
                       )}
                     </div>
-                    {(branch.city || branch.province) && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {[branch.city, branch.province].filter(Boolean).join(', ')}
-                      </p>
+                  </div>
+
+                  {/* Contact details */}
+                  <div className="space-y-2">
+                    {branch.address && (
+                      <div className="flex items-start gap-2.5 text-sm text-gray-500">
+                        <MapPin className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <span className="leading-snug line-clamp-2">{branch.address}</span>
+                      </div>
+                    )}
+                    {branch.phone && (
+                      <div className="flex items-center gap-2.5 text-sm text-gray-500">
+                        <Phone className="w-4 h-4 text-teal-400 shrink-0" />
+                        <span>{branch.phone}</span>
+                      </div>
+                    )}
+                    {branch.email && (
+                      <div className="flex items-center gap-2.5 text-sm text-gray-500">
+                        <Mail className="w-4 h-4 text-teal-400 shrink-0" />
+                        <span className="truncate">{branch.email}</span>
+                      </div>
                     )}
                   </div>
-                </div>
+                </button>
 
-                {/* Contact details */}
-                <div className="space-y-1.5">
-                  {branch.address && (
-                    <div className="flex items-start gap-2 text-xs text-gray-500">
-                      <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 mt-0.5" />
-                      <span className="leading-snug line-clamp-2">{branch.address}</span>
-                    </div>
-                  )}
-                  {branch.phone && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Phone className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                      <span>{branch.phone}</span>
-                    </div>
-                  )}
-                  {branch.email && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Mail className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                      <span className="truncate">{branch.email}</span>
-                    </div>
-                  )}
-                </div>
+                {/* Bottom action row */}
+                <div className="flex items-center gap-2 px-6 pb-5 mt-auto">
+                  {/* Select CTA */}
+                  <button
+                    onClick={() => onSelect(branch)}
+                    className={`
+                      flex-1 py-2 rounded-xl text-sm font-semibold text-center transition-colors
+                      ${isSelected
+                        ? 'bg-teal-500 text-white'
+                        : branch.is_main_branch
+                          ? 'bg-teal-600 text-white hover:bg-teal-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    {isSelected ? 'Selected ✓' : 'Select Location'}
+                  </button>
 
-                {/* CTA strip */}
-                <div className={`
-                  w-full py-1.5 rounded-lg text-xs font-semibold text-center transition-colors mt-auto
-                  ${isSelected
-                    ? 'bg-teal-500 text-white'
-                    : branch.is_main_branch
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
-                  }
-                `}>
-                  {isSelected ? 'Selected ✓' : 'Select Location'}
+                  {/* View Pinned Location button */}
+                  {(hasPin || branch.custom_location) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMapModalBranch(branch); }}
+                      title="View pinned location on map"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold
+                        bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 transition-colors shrink-0"
+                    >
+                      <Map className="w-4 h-4" />
+                      <span className="hidden sm:inline">Map</span>
+                    </button>
+                  )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
+
+      {/* Location map modal */}
+      <BranchLocationModal
+        branch={mapModalBranch}
+        isOpen={!!mapModalBranch}
+        onClose={() => setMapModalBranch(null)}
+      />
     </div>
   );
 };

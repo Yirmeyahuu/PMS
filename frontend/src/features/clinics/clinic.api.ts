@@ -56,6 +56,9 @@ export interface ClinicProfile {
   website:                  string;
   tin:                      string;
   philhealth_accreditation: string;
+  custom_location:          string;
+  latitude:                 string | null;
+  longitude:                string | null;
   logo:                     string | null;
   logo_url:                 string | null;
   timezone:                 string;
@@ -69,19 +72,19 @@ export interface ClinicProfile {
 
 // ── NEW: Payload for clinic profile setup ─────────────────────────────────────
 export interface ClinicProfileSetupPayload {
-  name?:                    string;
-  email?:                   string;
-  phone?:                   string;
-  address?:                 string;
-  city?:                    string;
-  province?:                string;
-  postal_code?:             string;
-  website?:                 string;
-  tin?:                     string;
-  philhealth_accreditation?: string;
-  timezone?:                string;
-  logo?:                    File | null;
-  remove_logo?:             boolean;
+  name?:            string;
+  email?:           string;
+  phone?:           string;
+  address?:         string;
+  city?:            string;
+  province?:        string;
+  postal_code?:     string;
+  website?:         string;
+  custom_location?: string;
+  latitude?:        number;
+  longitude?:       number;
+  logo?:            File | null;
+  remove_logo?:     boolean;
 }
 
 // ── Existing functions ────────────────────────────────────────────────────────

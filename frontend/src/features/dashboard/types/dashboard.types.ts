@@ -9,24 +9,23 @@ export interface DashboardStats {
   todayCancellations: number;
 }
 
-export interface BookingByCase {
-  caseName: string;
+export interface BookingByType {
+  type:  string;
   count: number;
   color: string;
 }
 
-export interface UncompletedNote {
-  id: number;
-  patientName: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  practitioner: string;
-  caseType: string;
-  daysPending: number;
+/** @deprecated use BookingByType */
+export type BookingByCase = BookingByType;
+
+export interface WeeklyBooking {
+  day:   string;   // "Mon", "Tue", …
+  date:  string;   // "2026-04-07"
+  count: number;
 }
 
 export interface DashboardData {
-  stats: DashboardStats;
-  bookingsByCase: BookingByCase[];
-  uncompletedNotes: UncompletedNote[];
+  stats:            DashboardStats;
+  bookingsByType:   BookingByType[];
+  weeklyBookings:   WeeklyBooking[];
 }

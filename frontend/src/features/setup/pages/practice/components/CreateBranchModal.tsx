@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import { X, Loader2, GitBranch, Hash } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { X, Loader2, GitBranch, Hash, Edit3, MapPin } from 'lucide-react';
 import { PhLocationSelect } from '@/components/location/PhLocationSelect';
+import { ClinicLocationPicker } from '@/components/maps/ClinicLocationPicker';
+import type { ReverseGeocodeResult } from '@/components/maps/ClinicLocationPicker';
+import { forwardGeocode } from '@/utils/geocode';
 import type { ClinicBranch, CreateBranchData } from '@/types/clinic';
+
+const EMPTY_FORM = {
+  location: '',
+  email: '', phone: '', address: '',
+  city: '', province: '', postal_code: '',
+  website: '', tin: '', custom_location: '',
+};
 
 interface CreateBranchModalProps {
   isOpen: boolean;
@@ -16,15 +26,39 @@ interface CreateBranchModalProps {
 export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
   isOpen, onClose, onSave, branch, mode, saving, mainClinicName,
 }) => {
-  const emptyForm = {
-    location: '',
-    email: '', phone: '', address: '',
-    city: '', province: '', postal_code: '',
-    website: '', tin: '',
-  };
+  const [form, setForm]               = useState(EMPTY_FORM);
+  const [errors, setErrors]           = useState<Record<string, string>>({});
+  const [latitude, setLatitude]       = useState<number | null>(null);
+  const [longitude, setLongitude]     = useState<number | null>(null);
+  const [showManual, setShowManual]   = useState(false);
+  const [mapKey, setMapKey]           = useState(0);
+  const [flyTarget, setFlyTarget]     = useState<[number, number] | null>(null);
+  const skipFwdRef                    = useRef(false);
+  const fwdTimerRef                   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [form, setForm]     = useState(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Forward geocode: pan map when province+city are both set
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (!form.province || !form.city) { setFlyTarget(null); return; }
+    if (skipFwdRef.current) { skipFwdRef.current = false; return; }
+    if (fwdTimerRef.current) clearTimeout(fwdTimerRef.current);
+    fwdTimerRef.current = setTimeout(async () => {
+      const coords = await forwardGeocode(form.city, form.province);
+      if (coords) setFlyTarget(coords);
+    }, 800);
+    return () => { if (fwdTimerRef.current) clearTimeout(fwdTimerRef.current); };
+  }, [form.province, form.city, isOpen]);
+
+  // Reverse geocode callback: fill province/city/address from map pin
+  const handleReverseGeocode = useCallback((result: ReverseGeocodeResult) => {
+    skipFwdRef.current = true;
+    setForm(prev => ({
+      ...prev,
+      ...(result.province && { province: result.province }),
+      ...(result.city     && { city:     result.city }),
+      ...(result.address  && !prev.address && { address: result.address }),
+    }));
+  }, []);
 
   const extractLocation = (fullName: string): string => {
     const sep = fullName.indexOf(' - ');
@@ -33,20 +67,31 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
+      setMapKey((k) => k + 1);
+      setFlyTarget(null);
+      skipFwdRef.current = false;
       if (mode === 'edit' && branch) {
+        const hasCustom = !!(branch.custom_location);
         setForm({
-          location:    extractLocation(branch.name),
-          email:       branch.email       || '',
-          phone:       branch.phone       || '',
-          address:     branch.address     || '',
-          city:        branch.city        || '',
-          province:    branch.province    || '',
-          postal_code: branch.postal_code || '',
-          website:     branch.website     || '',
-          tin:         branch.tin         || '',
+          location:        extractLocation(branch.name),
+          email:           branch.email           || '',
+          phone:           branch.phone           || '',
+          address:         branch.address         || '',
+          city:            branch.city            || '',
+          province:        branch.province        || '',
+          postal_code:     branch.postal_code     || '',
+          website:         branch.website         || '',
+          tin:             branch.tin             || '',
+          custom_location: branch.custom_location || '',
         });
+        setShowManual(hasCustom);
+        setLatitude(branch.latitude  != null ? Number(branch.latitude)  : null);
+        setLongitude(branch.longitude != null ? Number(branch.longitude) : null);
       } else {
-        setForm(emptyForm);
+        setForm(EMPTY_FORM);
+        setShowManual(false);
+        setLatitude(null);
+        setLongitude(null);
       }
       setErrors({});
     }
@@ -80,15 +125,18 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
     e.preventDefault();
     if (!validate()) return;
     const payload: CreateBranchData = {
-      name:        composedName,
-      email:       form.email,
-      phone:       form.phone,
-      address:     form.address,
-      city:        form.city,
-      province:    form.province,
-      postal_code: form.postal_code,
-      website:     form.website,
-      tin:         form.tin,
+      name:            composedName,
+      email:           form.email,
+      phone:           form.phone,
+      address:         form.address,
+      city:            form.city,
+      province:        form.province,
+      postal_code:     form.postal_code,
+      website:         form.website,
+      tin:             form.tin,
+      custom_location: form.custom_location || undefined,
+      ...(latitude  != null && { latitude }),
+      ...(longitude != null && { longitude }),
     };
     await onSave(payload);
   };
@@ -256,6 +304,51 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                   type="text" name="postal_code" value={form.postal_code} onChange={handleChange}
                   placeholder="1634"
                   className={inputBase}
+                />
+              </div>
+
+              {/* Manual location toggle */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowManual((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-700 font-medium transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  {showManual ? 'Hide manual location' : 'Location not found? Enter manually'}
+                </button>
+                {showManual && (
+                  <div className="mt-2">
+                    <label className={labelBase}>Custom Location / Address</label>
+                    <input
+                      type="text"
+                      name="custom_location"
+                      value={form.custom_location}
+                      onChange={handleChange}
+                      placeholder="e.g. Purok Santan, Brgy. Alijis, Bacolod City"
+                      className={inputBase}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Used when the location isn't in the standard list.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Leaflet map */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-2">
+                  <MapPin className="w-3.5 h-3.5 text-sky-500" />
+                  Pin Branch Location
+                  <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <ClinicLocationPicker
+                  key={mapKey}
+                  latitude={latitude}
+                  longitude={longitude}
+                  flyTarget={flyTarget}
+                  onReverseGeocode={handleReverseGeocode}
+                  onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }}
                 />
               </div>
 

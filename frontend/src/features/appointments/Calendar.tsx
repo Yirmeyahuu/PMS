@@ -152,15 +152,7 @@ interface CalendarProps {
   comparePractitionerIdB?: number | null;
 }
 
-const hexToRgba = (hex: string, alpha: number): string => {
-  const cleaned = hex.replace('#', '');
-  const r = parseInt(cleaned.substring(0, 2), 16);
-  const g = parseInt(cleaned.substring(2, 4), 16);
-  const b = parseInt(cleaned.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-// isColorDark removed — was declared but never used
+// isColorDark / hexToRgba removed — replaced by solid color styling
 
 type BlockColors =
   | { useHex: true;  hex: string; bgStyle: React.CSSProperties; textColor: string; subTextColor: string; label: string | null; }
@@ -388,13 +380,12 @@ export const Calendar: React.FC<CalendarProps> = ({
         useHex: true,
         hex:    orangeHex,
         bgStyle: {
-          backgroundColor: hexToRgba(orangeHex, 0.15),
-          borderColor:     orangeHex,
-          borderLeftWidth: '3px',
-          borderLeftColor: orangeHex,
+          backgroundColor: orangeHex,
+          borderColor:     '#ea650d',
+          boxShadow:       '0 1px 3px rgba(0,0,0,0.15)',
         },
-        textColor:    orangeHex,
-        subTextColor: orangeHex,
+        textColor:    '#ffffff',
+        subTextColor: '#fed7aa',
         label: apt.service_name ?? apt.chief_complaint ?? null,
       };
     }
@@ -405,13 +396,12 @@ export const Calendar: React.FC<CalendarProps> = ({
         useHex: true,
         hex:    purpleHex,
         bgStyle: {
-          backgroundColor: hexToRgba(purpleHex, 0.15),
-          borderColor:     purpleHex,
-          borderLeftWidth: '3px',
-          borderLeftColor: purpleHex,
+          backgroundColor: purpleHex,
+          borderColor:     '#7c3aed',
+          boxShadow:       '0 1px 3px rgba(0,0,0,0.15)',
         },
-        textColor:    purpleHex,
-        subTextColor: purpleHex,
+        textColor:    '#ffffff',
+        subTextColor: '#ede9fe',
         label: apt.service_name ?? apt.chief_complaint ?? null,
       };
     }
@@ -420,13 +410,12 @@ export const Calendar: React.FC<CalendarProps> = ({
         useHex: true,
         hex:    apt.service_color,
         bgStyle: {
-          backgroundColor: hexToRgba(apt.service_color, 0.15),
+          backgroundColor: apt.service_color,
           borderColor:     apt.service_color,
-          borderLeftWidth: '3px',
-          borderLeftColor: apt.service_color,
+          boxShadow:       '0 1px 3px rgba(0,0,0,0.15)',
         },
-        textColor:    apt.service_color,
-        subTextColor: apt.service_color,
+        textColor:    '#ffffff',
+        subTextColor: '#f3f4f6',
         label: apt.service_name ?? apt.chief_complaint ?? null,
       };
     }
@@ -1104,8 +1093,8 @@ export const Calendar: React.FC<CalendarProps> = ({
       right:        '4px',
       zIndex:       isDragged ? 5 : 10,
       overflow:     'hidden',
-      borderRadius: '8px',
-      border:       '1px solid',
+      borderRadius: '0',
+      border:       '1px solid transparent',
       padding:      compact ? '2px 6px' : '6px 8px',
       cursor:       canDrag ? (dragState.isDragging ? 'grabbing' : 'grab') : 'pointer',
       transition:   'filter 0.15s, opacity 0.15s, transform 0.15s',
@@ -1123,34 +1112,28 @@ export const Calendar: React.FC<CalendarProps> = ({
         onMouseDown={canDrag ? (e) => { hideHover(); startHold(apt, e); } : undefined}
         onMouseUp={canDrag ? () => { if (!dragState.isDragging) { cancelHold(); handleAppointmentClick(apt); } } : undefined}
         onClick={(e) => { e.stopPropagation(); if (!dragState.isDragging && !dragState.isHolding) handleAppointmentClick(apt); }}
-        className={`hover:brightness-95 select-none ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
+        className={`hover:brightness-90 select-none transition-all duration-150 shadow-sm rounded-none ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
         title={canDrag ? 'Hold 2s to drag and reschedule' : undefined}
       >
         {isHeld && (
           <div
-            className="absolute inset-0 rounded-lg pointer-events-none border-2 border-sky-400 animate-pulse"
+            className="absolute inset-0 pointer-events-none border-2 border-sky-400 animate-pulse"
             style={{ zIndex: 20 }}
           />
         )}
-        {col.useHex && (
-          <div
-            className="absolute top-0 left-0 bottom-0 w-1 rounded-l-lg"
-            style={{ backgroundColor: col.hex }}
-          />
-        )}
-        <div className="pl-2">
+        <div>
           <div
             className="text-xs font-semibold truncate"
-            style={col.useHex ? { color: col.hex } : {}}
+            style={col.useHex ? { color: col.textColor } : {}}
           >
             <span className={!col.useHex ? col.text : ''}>{apt.patient_name}</span>
           </div>
           {!compact && (
             <div
               className="text-xs truncate mt-0.5"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+              style={col.useHex ? { color: col.subTextColor } : {}}
             >
-              <span className={!col.useHex ? 'text-gray-600' : ''}>
+              <span className={!col.useHex ? 'text-white/80' : ''}>
                 {apt.start_time} – {apt.end_time}
               </span>
             </div>
@@ -1158,25 +1141,25 @@ export const Calendar: React.FC<CalendarProps> = ({
           {compact && (
             <div
               className="text-xs truncate"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+              style={col.useHex ? { color: col.subTextColor } : {}}
             >
-              <span className={!col.useHex ? 'text-gray-600' : ''}>{apt.start_time}</span>
+              <span className={!col.useHex ? 'text-white/80' : ''}>{apt.start_time}</span>
             </div>
           )}
           {col.label && !compact && (
             <div
               className="text-xs truncate mt-1 font-medium"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
+              style={col.useHex ? { color: col.subTextColor } : {}}
             >
-              <span className={!col.useHex ? 'text-gray-500' : ''}>{col.label}</span>
+              <span className={!col.useHex ? 'text-white/80' : ''}>{col.label}</span>
             </div>
           )}
           {col.label && compact && (
             <div
               className="text-xs truncate"
-              style={col.useHex ? { color: hexToRgba(col.hex, 0.85) } : {}}
+              style={col.useHex ? { color: col.subTextColor } : {}}
             >
-              <span className={!col.useHex ? 'text-gray-500' : ''}>{col.label}</span>
+              <span className={!col.useHex ? 'text-white/80' : ''}>{col.label}</span>
             </div>
           )}
         </div>
@@ -1252,8 +1235,8 @@ export const Calendar: React.FC<CalendarProps> = ({
       right:        '4px',
       zIndex:      isDragged ? 5 : 10,
       overflow:    'hidden',
-      borderRadius: '6px',
-      backgroundColor: isDragged ? 'rgba(31, 41, 55, 0.4)' : 'rgba(31, 41, 55, 0.8)',
+      borderRadius: '0',
+      backgroundColor: isDragged ? '#6b7280' : '#1f2937',
       cursor:       blockDragState.isDragging ? 'grabbing' : 'grab',
       opacity:      isDragged ? 0.35 : 1,
       transform:    isHeld ? 'scale(1.03)' : 'scale(1)',
@@ -1264,7 +1247,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       <div
         key={`block-${block.id}`}
         style={containerStyle}
-        className="border border-gray-600 px-2 py-1 transition-all select-none hover:brightness-110"
+        className="border border-gray-600 px-2 py-1 transition-all select-none hover:bg-gray-700"
         title="Hold 2s to drag and reschedule"
         onClick={handleClick}
         onMouseDown={handleMouseDown}
@@ -1274,7 +1257,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       >
         {isHeld && (
           <div
-            className="absolute inset-0 rounded border-2 border-sky-400 animate-pulse pointer-events-none"
+            className="absolute inset-0 border-2 border-sky-400 animate-pulse pointer-events-none"
             style={{ zIndex: 20 }}
           />
         )}
@@ -1303,10 +1286,11 @@ export const Calendar: React.FC<CalendarProps> = ({
     const canDrag   = apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED';
 
     const containerStyle: React.CSSProperties = col.useHex ? {
-      backgroundColor: hexToRgba(col.hex, 0.12),
+      backgroundColor: col.hex,
       borderColor:     col.hex,
       borderLeftColor: col.hex,
       borderLeftWidth: '3px',
+      boxShadow:       '0 1px 3px rgba(0,0,0,0.15)',
       opacity:         isDragged ? 0.35 : 1,
       transform:       isHeld ? 'scale(1.02)' : 'scale(1)',
       cursor:          canDrag ? (dragState.isDragging ? 'grabbing' : 'grab') : 'pointer',
@@ -1324,15 +1308,15 @@ export const Calendar: React.FC<CalendarProps> = ({
         onMouseDown={canDrag ? (e) => { e.stopPropagation(); hideHover(); startHold(apt, e); } : undefined}
         onClick={(e) => { e.stopPropagation(); if (!dragState.isDragging && !dragState.isHolding) handleAppointmentClick(apt); }}
         style={containerStyle}
-        className={`border rounded px-2 py-1 transition-all select-none hover:brightness-95 ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
+        className={`border px-2 py-1 transition-all duration-150 select-none hover:brightness-90 shadow-sm ${!col.useHex ? `${col.bg} ${col.border}` : ''}`}
         title={canDrag ? 'Hold 2s to drag and reschedule' : undefined}
       >
         {isHeld && (
-          <div className="absolute inset-0 rounded pointer-events-none border-2 border-sky-400 animate-pulse" />
+          <div className="absolute inset-0 pointer-events-none border-2 border-sky-400 animate-pulse" />
         )}
         <div
           className="text-xs font-semibold truncate"
-          style={col.useHex ? { color: col.hex } : {}}
+          style={col.useHex ? { color: '#ffffff' } : {}}
         >
           <span className={!col.useHex ? col.text : ''}>
             {apt.start_time} · {apt.patient_name}
@@ -1341,9 +1325,9 @@ export const Calendar: React.FC<CalendarProps> = ({
         {apt.service_name && (
           <div
             className="text-xs truncate mt-0.5"
-            style={col.useHex ? { color: hexToRgba(col.hex, 0.75) } : {}}
+            style={col.useHex ? { color: col.subTextColor } : {}}
           >
-            <span className={!col.useHex ? 'text-gray-500' : ''}>{apt.service_name}</span>
+            <span className={!col.useHex ? 'text-white/80' : ''}>{apt.service_name}</span>
           </div>
         )}
       </div>
@@ -1362,11 +1346,11 @@ export const Calendar: React.FC<CalendarProps> = ({
     const isAvailable = dayAvailable && hourAvailable && !isLunch;
 
     // Lunch break rendering (only on duty days within duty hours)
-    // Uses yellow/amber background to distinguish from regular slots
     if (isLunch && dayAvailable && hourAvailable) {
-      const isFirstLunchSlot = slot.quarter === 0 && slot.hour === parseInt((practitionerAvailability?.lunch_start_time || '12:00').split(':')[0]);
       const lunchStart = practitionerAvailability?.lunch_start_time || '12:00';
       const lunchEnd = practitionerAvailability?.lunch_end_time || '13:00';
+      const [lH, lM] = lunchStart.split(':').map(Number);
+      const isFirstLunchSlot = slot.hour === lH && slot.minutes === lM;
       return (
         <div
           key={i}
@@ -1377,17 +1361,14 @@ export const Calendar: React.FC<CalendarProps> = ({
           onMouseEnter={() => handleMouseEnter(slot)}
           onMouseUp={() => handleSlotMouseUp(date, slot)}
           onDoubleClick={() => handleDoubleClick(date, slot)}
-          className={`h-6 relative select-none bg-yellow-100 cursor-pointer border-r border-gray-200
-            ${slot.quarter === 0 ? 'border-t border-yellow-300' : 'border-t border-yellow-200'}`}
+          className={`h-6 relative select-none bg-amber-400 cursor-pointer border-r border-amber-500
+            ${slot.quarter === 0 ? 'border-t border-amber-500' : 'border-t border-amber-400'}`}
         >
           {isFirstLunchSlot && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="flex items-center gap-1.5 bg-yellow-100 border border-yellow-300 rounded-full px-3 py-0.5 shadow-sm">
-                <span style={{ fontSize: 11 }}>🍽</span>
-                <span className="font-semibold text-yellow-700 whitespace-nowrap" style={{ fontSize: 10 }}>
-                  LUNCH &nbsp;·&nbsp; {formatTime12Hour(lunchStart)} – {formatTime12Hour(lunchEnd)}
-                </span>
-              </div>
+            <div className="absolute inset-0 flex items-center px-2 z-10 pointer-events-none">
+              <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wide whitespace-nowrap">
+                Lunch &nbsp;·&nbsp; {formatTime12Hour(lunchStart)} – {formatTime12Hour(lunchEnd)}
+              </span>
             </div>
           )}
         </div>
@@ -1402,8 +1383,8 @@ export const Calendar: React.FC<CalendarProps> = ({
     let slotTitle = 'Double-click or drag to add';
 
     if (!isAvailable) {
-      // Non-duty hours or non-duty day = PURPLE (Nookal-style)
-      slotBgClass = 'bg-purple-300';
+      // Non-duty hours or non-duty day = solid purple
+      slotBgClass = 'bg-purple-400';
       if (!dayAvailable) {
         slotTitle = 'Non-duty day (click to add anyway)';
       } else if (!hourAvailable) {
@@ -1440,10 +1421,10 @@ export const Calendar: React.FC<CalendarProps> = ({
         title={slotTitle}
       >
         {isSelected && (
-          <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />
+          <div className="absolute inset-0 bg-sky-200 pointer-events-none" />
         )}
         {isDropTarget && (
-          <div className="absolute inset-0 border-b border-dashed border-emerald-300 pointer-events-none opacity-50" />
+          <div className="absolute inset-0 border-b border-dashed border-emerald-300 pointer-events-none" />
         )}
       </div>
     );
@@ -1478,17 +1459,14 @@ export const Calendar: React.FC<CalendarProps> = ({
           onMouseEnter={() => handleMouseEnter(slot)}
           onMouseUp={() => handleSlotMouseUp(date, slot)}
           onDoubleClick={() => handleDoubleClick(date, slot)}
-          className={`h-6 relative select-none bg-yellow-100 cursor-pointer border-r border-gray-200
-            ${slot.quarter === 0 ? 'border-t border-yellow-300' : 'border-t border-yellow-200'}`}
+          className={`h-6 relative select-none bg-amber-400 cursor-pointer border-r border-amber-500
+            ${slot.quarter === 0 ? 'border-t border-amber-500' : 'border-t border-amber-400'}`}
         >
           {isFirstLunchSlot && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="flex items-center gap-1 bg-yellow-100 border border-yellow-300 rounded-full px-2 py-0.5 shadow-sm">
-                <span style={{ fontSize: 9 }}>🍽</span>
-                <span className="font-semibold text-yellow-700 whitespace-nowrap" style={{ fontSize: 8 }}>
-                  {formatTime12Hour(lunchStart)}–{formatTime12Hour(lunchEnd)}
-                </span>
-              </div>
+            <div className="absolute inset-0 flex items-center px-2 z-10 pointer-events-none">
+              <span className="text-[9px] font-bold text-amber-900 uppercase tracking-wide whitespace-nowrap">
+                Lunch &nbsp;·&nbsp; {formatTime12Hour(lunchStart)}–{formatTime12Hour(lunchEnd)}
+              </span>
             </div>
           )}
         </div>
@@ -1497,7 +1475,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
     let slotBgClass = '';
     if (!isAvailable) {
-      slotBgClass = 'bg-purple-300';
+      slotBgClass = 'bg-purple-400';
     } else if (isSelected) {
       slotBgClass = 'bg-sky-200 hover:bg-sky-300';
     } else if (isDropTarget) {
@@ -1520,8 +1498,8 @@ export const Calendar: React.FC<CalendarProps> = ({
         onDoubleClick={() => handleDoubleClick(date, slot)}
         className={`h-6 transition-colors relative select-none cursor-pointer border-r border-gray-200 ${borderClass} ${slotBgClass}`}
       >
-        {isSelected && <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />}
-        {isDropTarget && <div className="absolute inset-0 border-b border-dashed border-emerald-300 pointer-events-none opacity-50" />}
+        {isSelected && <div className="absolute inset-0 bg-sky-200 pointer-events-none" />}
+        {isDropTarget && <div className="absolute inset-0 border-b border-dashed border-emerald-300 pointer-events-none" />}
       </div>
     );
   };
@@ -1582,7 +1560,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     Duty
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block" />
+                    <span className="w-2.5 h-2.5 bg-purple-400 inline-block" />
                     Off
                   </span>
                 </div>
@@ -1596,7 +1574,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     Duty
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block" />
+                    <span className="w-2.5 h-2.5 bg-purple-400 inline-block" />
                     Off
                   </span>
                 </div>
@@ -1999,7 +1977,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                       `}
                     >
                       {isDropTarget && (
-                        <div className="absolute inset-0 border-2 border-dashed border-emerald-300 rounded pointer-events-none opacity-0 hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 border-2 border-dashed border-emerald-300 pointer-events-none opacity-0 hover:opacity-100 transition-opacity" />
                       )}
                       <div className="flex items-center justify-between mb-1">
                         <div className={`text-sm font-medium
@@ -2050,7 +2028,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                               onMouseEnter={handleBlockMouseEnter}
                               onMouseLeave={handleBlockMouseLeave}
                               onMouseDown={handleBlockMouseDown}
-                              className="bg-gray-800/80 text-white text-xs px-2 py-1 rounded truncate font-medium border border-gray-600 hover:brightness-110 cursor-pointer transition-all"
+                              className="bg-gray-800 text-white text-xs px-2 py-1 truncate font-medium border border-gray-600 hover:bg-gray-700 cursor-pointer transition-all duration-150 shadow-sm"
                               title="Hold 2s to drag and reschedule"
                             >
                               <div className="font-semibold">{block.event_name}</div>

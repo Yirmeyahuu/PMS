@@ -113,13 +113,13 @@ export interface CreateBlockAppointmentData {
 }
 
 export const APPOINTMENT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  SCHEDULED:   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200'   },
-  CONFIRMED:   { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200'  },
-  CHECKED_IN:  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  IN_PROGRESS: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
-  COMPLETED:   { bg: 'bg-gray-50',   text: 'text-gray-700',   border: 'border-gray-200'   },
-  CANCELLED:   { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200'    },
-  NO_SHOW:     { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  SCHEDULED:   { bg: 'bg-blue-500',   text: 'text-white',   border: 'border-blue-600'   },
+  CONFIRMED:   { bg: 'bg-green-500',  text: 'text-white',  border: 'border-green-600'  },
+  CHECKED_IN:  { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-600' },
+  IN_PROGRESS: { bg: 'bg-amber-500',  text: 'text-white', border: 'border-amber-600' },
+  COMPLETED:   { bg: 'bg-gray-500',   text: 'text-white',   border: 'border-gray-600'   },
+  CANCELLED:   { bg: 'bg-red-500',    text: 'text-white',    border: 'border-red-600'    },
+  NO_SHOW:     { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' },
 };
 
 export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {

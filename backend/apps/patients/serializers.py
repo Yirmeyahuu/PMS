@@ -182,14 +182,17 @@ class PortalClinicServiceSerializer(serializers.ModelSerializer):
 
 
 class PortalBranchSerializer(serializers.Serializer):
-    id             = serializers.IntegerField()
-    name           = serializers.CharField()
-    address        = serializers.SerializerMethodField()
-    city           = serializers.CharField()
-    province       = serializers.CharField()
-    phone          = serializers.SerializerMethodField()
-    email          = serializers.SerializerMethodField()
-    is_main_branch = serializers.BooleanField()
+    id              = serializers.IntegerField()
+    name            = serializers.CharField()
+    address         = serializers.SerializerMethodField()
+    city            = serializers.CharField()
+    province        = serializers.CharField()
+    phone           = serializers.SerializerMethodField()
+    email           = serializers.SerializerMethodField()
+    is_main_branch  = serializers.BooleanField()
+    latitude        = serializers.DecimalField(max_digits=9,  decimal_places=6, allow_null=True)
+    longitude       = serializers.DecimalField(max_digits=10, decimal_places=6, allow_null=True)
+    custom_location = serializers.CharField(allow_blank=True, default='')
 
     def get_address(self, obj) -> str:
         # Return only the street address — city/province shown separately
