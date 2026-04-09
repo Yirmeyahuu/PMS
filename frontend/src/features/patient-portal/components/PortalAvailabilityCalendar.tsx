@@ -43,23 +43,40 @@ const isWithinClinicHours = (slot: string): boolean => {
   return h >= 6 && h < 21;
 };
 
-/** Check if a date is within practitioner's duty days */
+/** Check if a date is within practitioner's duty days (supports duty_schedule keys) */
 const isWithinDutyDays = (date: Date, availability: PortalAvailability | undefined): boolean => {
-  if (!availability?.duty_days?.length) return true;
+  if (!availability) return true;
   const dayName = DAY_MAP[date.getDay()];
+  // duty_schedule keys define the active days when present
+  if (availability.duty_schedule && Object.keys(availability.duty_schedule).length > 0) {
+    return dayName in availability.duty_schedule;
+  }
+  if (!availability.duty_days?.length) return true;
   return availability.duty_days.includes(dayName as any);
 };
 
-/** Check if a slot is within practitioner's duty hours */
-const isWithinDutyHours = (slot: string, availability: PortalAvailability | undefined): boolean => {
+/** Check if a slot is within practitioner's duty hours (supports split-shift blocks) */
+const isWithinDutyHours = (slot: string, date: Date, availability: PortalAvailability | undefined): boolean => {
   if (!availability) return true;
   const [h, m] = slot.split(':').map(Number);
   const slotMins = h * 60 + m;
+  const dayName  = DAY_MAP[date.getDay()];
+
+  // Split-shift: check against specific day blocks
+  if (availability.duty_schedule) {
+    const dayBlocks = availability.duty_schedule[dayName as keyof typeof availability.duty_schedule];
+    if (dayBlocks && dayBlocks.length > 0) {
+      return dayBlocks.some(block => {
+        const [startH, startM] = block.start.split(':').map(Number);
+        const [endH, endM]     = block.end.split(':').map(Number);
+        return slotMins >= startH * 60 + startM && slotMins < endH * 60 + endM;
+      });
+    }
+  }
+  // Legacy single-block
   const [startH, startM] = availability.duty_start_time.split(':').map(Number);
-  const [endH, endM] = availability.duty_end_time.split(':').map(Number);
-  const startMins = startH * 60 + startM;
-  const endMins = endH * 60 + endM;
-  return slotMins >= startMins && slotMins < endMins;
+  const [endH, endM]     = availability.duty_end_time.split(':').map(Number);
+  return slotMins >= startH * 60 + startM && slotMins < endH * 60 + endM;
 };
 
 /** Check if a slot is within practitioner's lunch break */
@@ -125,7 +142,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
   const visibleSlots = availableSlots.filter(
     s => isWithinClinicHours(s)
       && !isWithinLunchBreak(s, practitionerAvailability)
-      && isWithinDutyHours(s, practitionerAvailability)
+      && isWithinDutyHours(s, selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date(), practitionerAvailability)
   );
 
   const morningSlots   = visibleSlots.filter(s => {
@@ -155,9 +172,9 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
     <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden w-full">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-sky-50 border-b border-sky-100">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">
+          <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wider">
             Pick Date &amp; Time
           </p>
           <p className="text-xs font-bold text-gray-800 truncate">{service.name}</p>
@@ -166,16 +183,18 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
           )}
         </div>
         {/* Clinic hours badge */}
-        <div className="hidden sm:flex items-center gap-1 text-[10px] text-teal-600 font-medium bg-teal-100 rounded-full px-2 py-0.5 mr-2 whitespace-nowrap">
+        <div className="hidden sm:flex items-center gap-1 text-[10px] text-sky-600 font-medium bg-sky-100 rounded-full px-2 py-0.5 mr-2 whitespace-nowrap">
           <Clock className="w-2.5 h-2.5" />
-          {practitionerAvailability
+          {practitionerAvailability?.duty_schedule
+            ? 'Split-shift schedule'
+            : practitionerAvailability
             ? `${fmt12(practitionerAvailability.duty_start_time)} – ${fmt12(practitionerAvailability.duty_end_time)}`
             : '6 AM – 9 PM'
           }
         </div>
         <button
           onClick={onClose}
-          className="ml-2 p-1 rounded-md hover:bg-teal-100 text-gray-400 transition-colors flex-shrink-0"
+          className="ml-2 p-1 rounded-md hover:bg-sky-100 text-gray-400 transition-colors shrink-0"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -234,9 +253,9 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
                       ${isDateUnavailable(date)
                         ? 'text-gray-300 cursor-not-allowed bg-gray-50'
                         : isSelected
-                          ? 'bg-gray-800 text-white shadow-sm'
+                          ? 'bg-sky-500 text-white shadow-sm'
                           : isToday
-                            ? 'bg-teal-100 text-teal-700 font-bold hover:bg-teal-200'
+                            ? 'bg-sky-100 text-sky-700 font-bold hover:bg-sky-200'
                             : 'text-gray-700 hover:bg-gray-100'
                       }
                     `}
@@ -270,7 +289,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
             {/* Loading */}
             {loadingSlots && (
               <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-600" />
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500" />
               </div>
             )}
 
@@ -293,10 +312,10 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
                       key={slot}
                       onClick={() => setSelectedSlot(slot)}
                       className={`
-                        px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
+                        px-3 py-2 text-xs font-semibold rounded-xl border transition-all
                         ${selectedSlot === slot
-                          ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                          ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-sky-400 hover:bg-sky-50'
                         }
                       `}
                     >
@@ -334,10 +353,10 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
                       key={slot}
                       onClick={() => setSelectedSlot(slot)}
                       className={`
-                        px-3 py-1.5 text-xs font-semibold rounded-md border transition-all
+                        px-3 py-2 text-xs font-semibold rounded-xl border transition-all
                         ${selectedSlot === slot
-                          ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                          ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-sky-400 hover:bg-sky-50'
                         }
                       `}
                     >
@@ -362,7 +381,7 @@ export const PortalAvailabilityCalendar: React.FC<PortalAvailabilityCalendarProp
           <div className="pt-2 border-t border-gray-100">
             <button
               onClick={() => onConfirm(selectedDate, selectedSlot)}
-              className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-md transition-colors shadow-sm"
+              className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
             >
               Confirm — {format(new Date(selectedDate + 'T00:00:00'), 'MMM d')} at {fmt12(selectedSlot)}
             </button>

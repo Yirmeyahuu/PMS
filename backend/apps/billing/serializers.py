@@ -28,6 +28,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     created_by_name  = serializers.SerializerMethodField()
     status_display   = serializers.CharField(source='get_status_display',     read_only=True)
     items            = InvoiceItemSerializer(many=True, read_only=True)
+    payments         = serializers.SerializerMethodField()
 
     appointment_date       = serializers.DateField(source='appointment.date',       read_only=True, allow_null=True)
     appointment_start_time = serializers.TimeField(source='appointment.start_time', read_only=True, allow_null=True)
@@ -55,6 +56,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None
+
+    def get_payments(self, obj):
+        qs = obj.payments.all().order_by('-payment_date')
+        return PaymentSerializer(qs, many=True).data
 
 
 class InvoiceCreateSerializer(serializers.Serializer):

@@ -314,6 +314,21 @@ class Payment(TimeStampedModel):
         ('CHECK',         'Check'),
     ]
 
+    BANK_CHOICES = [
+        ('BDO',        'BDO Unibank'),
+        ('METROBANK',  'Metropolitan Bank & Trust Company'),
+        ('BPI',        'Bank of the Philippine Islands'),
+        ('LANDBANK',   'Land Bank of the Philippines'),
+        ('PNB',        'Philippine National Bank'),
+        ('SECURITY',   'Security Bank'),
+        ('CHINABANK',  'China Banking Corporation'),
+        ('UNIONBANK',  'Union Bank of the Philippines'),
+        ('RCBC',       'Rizal Commercial Banking Corporation'),
+        ('EASTWEST',   'East West Banking Corporation'),
+        ('DBP',        'Development Bank of the Philippines'),
+        ('AUB',        'Asia United Bank'),
+    ]
+
     invoice = models.ForeignKey(
         Invoice,
         on_delete=models.CASCADE,
@@ -324,6 +339,7 @@ class Payment(TimeStampedModel):
         max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]
     )
     payment_method   = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    bank_name        = models.CharField(max_length=20, choices=BANK_CHOICES, blank=True, default='')
     reference_number = models.CharField(max_length=100, blank=True)
     notes            = models.TextField(blank=True)
     receipt_number   = models.CharField(max_length=50, unique=True, editable=False)

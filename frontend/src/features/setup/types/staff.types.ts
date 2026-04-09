@@ -1,4 +1,4 @@
-import type { DutyDay, PractitionerAvailability } from '@/features/clinics/clinic.api';
+import type { DutyDay, DutySchedule, PractitionerAvailability } from '@/features/clinics/clinic.api';
 
 export type TitleType = 'Mr' | 'Ms' | 'Mrs' | 'Miss' | 'Dr' | 'Prof' | 'Assoc Prof';
 
@@ -37,8 +37,12 @@ export interface StaffMember {
   gender?: GenderType;
   address?: string;
 
-  // Availability (for PRACTITIONER role)
+  // Availability (for PRACTITIONER and STAFF roles)
   availability?: PractitionerAvailability;
+  duty_days?: DutyDay[];
+  lunch_start_time?: string;
+  lunch_end_time?: string;
+  duty_schedule?: DutySchedule | null;
 }
 
 export interface CreateStaffData {
@@ -57,12 +61,15 @@ export interface CreateStaffData {
   address?: string;
   clinic_branch?: number | null;
 
-  // Availability (for PRACTITIONER role)
-  duty_days?: DutyDay[];
+  // Legacy single-block availability (PRACTITIONER only, kept for compat)
   duty_start_time?: string;
   duty_end_time?: string;
+  // Shared availability fields (both STAFF and PRACTITIONER)
+  duty_days?: DutyDay[];
   lunch_start_time?: string;
   lunch_end_time?: string;
+  /** Split-shift schedule — when provided, overrides duty_start/end_time */
+  duty_schedule?: DutySchedule | null;
 }
 
 export interface StaffFormErrors {
@@ -77,8 +84,7 @@ export interface StaffFormErrors {
   clinic_branch?: string;
   general?: string;
   duty_days?: string;
-  duty_start_time?: string;
-  duty_end_time?: string;
+  duty_schedule?: string;
   lunch_start_time?: string;
   lunch_end_time?: string;
 }

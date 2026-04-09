@@ -5,16 +5,28 @@ import type { ClinicBranch, ClinicBranchesResponse, CreateBranchData } from '@/t
 // ── Existing: Practitioner types ──────────────────────────────────────────────
 export type DutyDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 
+/** A single shift block: {start: "08:00", end: "12:00"} */
+export interface ShiftBlock {
+  start: string;
+  end:   string;
+}
+
+/** Split-shift schedule keyed by day abbreviation */
+export type DutySchedule = Partial<Record<DutyDay, ShiftBlock[]>>;
+
 export interface PractitionerAvailability {
-  duty_days: DutyDay[];
-  duty_start_time: string; // e.g., "08:00"
-  duty_end_time: string;   // e.g., "17:00"
+  duty_days:        DutyDay[];
+  duty_start_time:  string; // e.g., "08:00" (legacy single-block)
+  duty_end_time:    string; // e.g., "17:00" (legacy single-block)
   lunch_start_time: string; // e.g., "12:00"
-  lunch_end_time: string;   // e.g., "13:00"
+  lunch_end_time:   string; // e.g., "13:00"
+  /** When set, overrides duty_start_time / duty_end_time for scheduling */
+  duty_schedule?:   DutySchedule | null;
 }
 
 export interface Practitioner {
-  id:                 number;
+  id:                 number | string; // Staff entries use "staff-<userId>"
+  user_id?:           number;          // set for Staff entries
   name:               string;
   email:              string;
   specialization:     string | null;
@@ -23,6 +35,7 @@ export interface Practitioner {
   clinic_branch_id:   number | null;
   clinic_branch_name: string | null;
   availability?:      PractitionerAvailability;
+  role?:              'PRACTITIONER' | 'STAFF';
 }
 
 export interface PractitionersResponse {

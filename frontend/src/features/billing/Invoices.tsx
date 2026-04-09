@@ -22,6 +22,7 @@ import type {
   PaymentMethod 
 } from '@/types/billing';
 import toast from 'react-hot-toast';
+import { PHILIPPINE_BANKS, requiresBankSelection } from '@/data/philippineBanks';
 
 // Status badge colors
 const statusColors: Record<InvoiceStatus, string> = {
@@ -383,7 +384,7 @@ interface AddPaymentModalProps {
   invoice: Invoice | null;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (invoiceId: number, amount: number, paymentMethod: PaymentMethod, paymentDate: string, reference?: string) => Promise<void>;
+  onSubmit: (invoiceId: number, amount: number, paymentMethod: PaymentMethod, paymentDate: string, reference?: string, bankName?: string) => Promise<void>;
 }
 
 const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
@@ -393,6 +394,7 @@ const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 }) => {
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [bankName, setBankName] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -414,16 +416,19 @@ const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSubmit(invoice.id, parseFloat(amount), paymentMethod, paymentDate, reference);
+      await onSubmit(invoice.id, parseFloat(amount), paymentMethod, paymentDate, reference, bankName || undefined);
       onClose();
       setAmount('');
       setReference('');
+      setBankName('');
     } catch (error) {
       toast.error('Failed to add payment');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const showBankSelector = requiresBankSelection(paymentMethod);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -473,7 +478,11 @@ const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                onChange={(e) => {
+                  const val = e.target.value as PaymentMethod;
+                  setPaymentMethod(val);
+                  if (!requiresBankSelection(val)) setBankName('');
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
               >
                 {Object.entries(paymentMethodLabels).map(([value, label]) => (
@@ -481,6 +490,24 @@ const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
                 ))}
               </select>
             </div>
+
+            {showBankSelector && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bank / Card Issuer</label>
+                <select
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                >
+                  <option value="">Select bank...</option>
+                  {PHILIPPINE_BANKS.map((bank) => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.shortName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
@@ -644,13 +671,15 @@ export const Invoices: React.FC = () => {
     amount: number, 
     paymentMethod: PaymentMethod, 
     paymentDate: string, 
-    reference?: string
+    reference?: string,
+    bankName?: string
   ) => {
     await billingApi.createPayment({
       invoice: invoiceId,
       payment_date: paymentDate,
       amount,
       payment_method: paymentMethod,
+      bank_name: bankName,
       reference_number: reference,
     });
     toast.success('Payment added successfully');

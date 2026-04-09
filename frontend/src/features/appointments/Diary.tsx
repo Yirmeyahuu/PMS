@@ -19,20 +19,21 @@ type CalendarView = 'day' | 'week' | 'month';
 export const Diary: React.FC = () => {
   // Get user info early for role-based logic
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin        = user?.role === 'ADMIN';
   const isPractitioner = user?.role === 'PRACTITIONER';
+  const isStaff        = user?.role === 'STAFF';
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  // Default to week view for practitioners
+  // Default to week view for practitioners / staff
   const [view, setView] = useState<CalendarView>('week');
-  const [selectedPractitioner, setSelectedPractitioner] = useState<number | null>(null);
+  const [selectedPractitioner, setSelectedPractitioner] = useState<number | string | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [calendarReadyDate, setCalendarReadyDate] = useState<Date | null>(null);
 
   // ── Admin Compare Mode State ────────────────────────────────────────────────
   const [compareMode, setCompareMode] = useState(false);
-  const [comparePractitioners, setComparePractitioners] = useState<[number | null, number | null]>([null, null]);
+  const [comparePractitioners, setComparePractitioners] = useState<[number | string | null, number | string | null]>([null, null]);
   const [showCompareDropdownA, setShowCompareDropdownA] = useState(false);
   const [showCompareDropdownB, setShowCompareDropdownB] = useState(false);
 
@@ -47,54 +48,61 @@ export const Diary: React.FC = () => {
     clinicBranchId: selectedClinicBranch,
   });
 
-  // Cache the logged-in practitioner's availability AND branch assignment so they
+  // Cache the logged-in user's availability AND branch assignment so they
   // survive branch switches (switching tabs refetches practitioners for that branch,
-  // losing data about the practitioner's home branch).
+  // losing data about the user's home branch).
   const [cachedOwnAvailability, setCachedOwnAvailability] = useState<PractitionerAvailability | null>(null);
   const [cachedOwnBranchId, setCachedOwnBranchId] = useState<number | null>(null);
+  // The practitioner-list id of the logged-in user's own entry (e.g. Practitioner pk or 'staff-{id}')
+  const [cachedOwnId, setCachedOwnId] = useState<number | string | null>(null);
 
   // Single effect: cache own availability + home branch, and auto-navigate to it once.
   useEffect(() => {
-    if (!isPractitioner || !user?.practitioner_id || practitioners.length === 0) return;
-    const own = practitioners.find(p => p.id === user.practitioner_id);
+    if (!(isPractitioner || isStaff) || practitioners.length === 0) return;
+
+    let own;
+    if (isPractitioner && user?.practitioner_id) {
+      own = practitioners.find(p => p.id === user.practitioner_id);
+    } else if (isStaff) {
+      own = practitioners.find(p => p.role === 'STAFF' && (p as any).user_id === user?.id);
+    }
     if (!own) return;
 
     if (own.availability) setCachedOwnAvailability(own.availability);
+    if (cachedOwnId == null) setCachedOwnId(own.id);
 
     if (own.clinic_branch_id != null) {
       if (cachedOwnBranchId == null) setCachedOwnBranchId(own.clinic_branch_id);
 
-      // Auto-open the practitioner's assigned clinic tab on first page load
+      // Auto-open the user's assigned clinic tab on first page load
       if (!hasAutoSelectedBranch.current) {
         hasAutoSelectedBranch.current = true;
         setSelectedClinicBranch(own.clinic_branch_id);
-        setSelectedPractitioner(user.practitioner_id);
+        setSelectedPractitioner(own.id);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPractitioner, user?.practitioner_id, practitioners]);
+  }, [isPractitioner, isStaff, user?.practitioner_id, user?.id, practitioners]);
 
-  // True when the currently selected branch tab is the practitioner's own home clinic.
-  // Used to decide when to auto-show the overlay vs. requiring a manual filter.
+  // True when the currently selected branch tab is the user's own home clinic.
   const isOwnAssignedClinic =
-    isPractitioner && cachedOwnBranchId !== null && selectedClinicBranch === cachedOwnBranchId;
+    (isPractitioner || isStaff) && cachedOwnBranchId !== null && selectedClinicBranch === cachedOwnBranchId;
 
   // Compute the availability to pass to Calendar
-  // For Practitioner users: use cached availability if not found in current branch list
   const getPractitionerAvailability = () => {
     if (!selectedPractitioner) return undefined;
-    
-    // First, try to find in current practitioners list
+
+    // Find in current practitioners list (works for both number and string ids)
     const practitionerInList = practitioners.find(p => p.id === selectedPractitioner);
     if (practitionerInList?.availability) {
       return practitionerInList.availability;
     }
-    
-    // For Practitioner users: fall back to cached own availability
-    if (isPractitioner && selectedPractitioner === user?.practitioner_id && cachedOwnAvailability) {
+
+    // Fallback to cached own availability for practitioner/staff in their home clinic
+    if ((isPractitioner || isStaff) && cachedOwnAvailability) {
       return cachedOwnAvailability;
     }
-    
+
     return undefined;
   };
 
@@ -103,7 +111,7 @@ export const Diary: React.FC = () => {
   const availabilityMap = useMemo<Record<number, PractitionerAvailability>>(() => {
     const map: Record<number, PractitionerAvailability> = {};
     practitioners.forEach(p => {
-      if (p.availability) map[p.id] = p.availability;
+      if (typeof p.id === 'number' && p.availability) map[p.id] = p.availability;
     });
     // Also include the cached availability for the logged-in practitioner so
     // switching branches never causes their own schedule to disappear.
@@ -161,7 +169,7 @@ export const Diary: React.FC = () => {
     if (view === 'month') setView('day');
   };
 
-  const handlePractitionerSelect = (practitionerId: number | null) => {
+  const handlePractitionerSelect = (practitionerId: number | string | null) => {
     setSelectedPractitioner(practitionerId);
     setShowFilterDropdown(false);
   };
@@ -172,17 +180,16 @@ export const Diary: React.FC = () => {
     setCompareMode(false);
     setComparePractitioners([null, null]);
 
-    if (isPractitioner && user?.practitioner_id) {
-      // If switching back to the practitioner's own assigned clinic, restore their filter
-      // so their own schedule is shown automatically. In any other tab, clear the filter
-      // so the calendar starts clean and a manual selection is required.
+    if ((isPractitioner || isStaff) && cachedOwnBranchId !== null) {
+      // If switching back to the user's own assigned clinic, restore their filter.
+      // In any other tab, clear the filter so the calendar starts clean.
       if (branchId === cachedOwnBranchId) {
-        setSelectedPractitioner(user.practitioner_id);
+        setSelectedPractitioner(cachedOwnId);
       } else {
         setSelectedPractitioner(null);
       }
     } else {
-      // Admin / Staff: always clear filter when switching branches
+      // Admin: always clear filter when switching branches
       setSelectedPractitioner(null);
     }
   };
@@ -193,12 +200,12 @@ export const Diary: React.FC = () => {
     if (!enabled) setComparePractitioners([null, null]);
   };
 
-  const handleComparePractitionerASelect = (id: number | null) => {
+  const handleComparePractitionerASelect = (id: number | string | null) => {
     setComparePractitioners([id, comparePractitioners[1]]);
     setShowCompareDropdownA(false);
   };
 
-  const handleComparePractitionerBSelect = (id: number | null) => {
+  const handleComparePractitionerBSelect = (id: number | string | null) => {
     setComparePractitioners([comparePractitioners[0], id]);
     setShowCompareDropdownB(false);
   };
@@ -423,8 +430,8 @@ export const Diary: React.FC = () => {
                   {/* Practitioner Filter / Compare Mode */}
                   <div className="flex items-center gap-2 flex-wrap">
 
-                    {/* ── Compare Mode Toggle (Admin + Practitioner, Day/Week only) ── */}
-                    {(isAdmin || isPractitioner) && (view === 'day' || view === 'week') && (
+                    {/* ── Compare Mode Toggle (Admin + Practitioner + Staff, Day/Week only) ── */}
+                    {(isAdmin || isPractitioner || isStaff) && (view === 'day' || view === 'week') && (
                       <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 bg-gray-50 text-xs font-medium">
                         <button
                           onClick={() => handleSetCompareMode(false)}
@@ -461,7 +468,7 @@ export const Diary: React.FC = () => {
                           {loadingPractitioners
                             ? 'Loading...'
                             : selectedPractitionerName
-                              || (isPractitioner && isOwnAssignedClinic ? 'My Schedule' : 'All Practitioners')
+                              || ((isPractitioner || isStaff) && isOwnAssignedClinic ? 'My Schedule' : 'All Practitioners')
                           }
                         </button>
 
@@ -482,29 +489,29 @@ export const Diary: React.FC = () => {
                                   "All in [Branch]" or "All Practitioners" otherwise */}
                               <button
                                 onClick={() => handlePractitionerSelect(
-                                  isPractitioner && isOwnAssignedClinic && user?.practitioner_id
-                                    ? user.practitioner_id
+                                  (isPractitioner || isStaff) && isOwnAssignedClinic && cachedOwnId
+                                    ? cachedOwnId
                                     : null
                                 )}
                                 className={`
                                   w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
-                                  ${isPractitioner && isOwnAssignedClinic
-                                    ? selectedPractitioner === user?.practitioner_id ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'
+                                  ${(isPractitioner || isStaff) && isOwnAssignedClinic
+                                    ? selectedPractitioner === cachedOwnId ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'
                                     : selectedPractitioner === null ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'
                                   }
                                 `}
                               >
                                 <div className="flex items-center justify-between">
                                   <span>
-                                    {isPractitioner && isOwnAssignedClinic
+                                    {(isPractitioner || isStaff) && isOwnAssignedClinic
                                       ? 'My Schedule'
                                       : selectedClinicBranch
                                         ? `All in ${selectedBranchName}`
                                         : 'All Practitioners'
                                     }
                                   </span>
-                                  {(isPractitioner && isOwnAssignedClinic
-                                    ? selectedPractitioner === user?.practitioner_id
+                                  {((isPractitioner || isStaff) && isOwnAssignedClinic
+                                    ? selectedPractitioner === cachedOwnId
                                     : selectedPractitioner === null) && (
                                     <span className="text-sky-600 text-base">✓</span>
                                   )}
@@ -539,7 +546,7 @@ export const Diary: React.FC = () => {
                                       <div className="min-w-0">
                                         <div className="truncate">
                                           {practitioner.name}
-                                          {isPractitioner && practitioner.id === user?.practitioner_id && (
+                                          {practitioner.id === cachedOwnId && (
                                             <span className="ml-1.5 text-xs text-sky-500 font-medium">(me)</span>
                                           )}
                                         </div>
@@ -602,7 +609,7 @@ export const Diary: React.FC = () => {
                                       ${p.id === comparePractitioners[1] ? 'opacity-40 cursor-not-allowed' : ''}
                                     `}
                                   >
-                                    <div className="truncate">{p.name}{isPractitioner && p.id === user?.practitioner_id && <span className="ml-1 text-xs text-sky-500">(me)</span>}</div>
+                                    <div className="truncate">{p.name}{p.id === cachedOwnId && <span className="ml-1 text-xs text-sky-500">(me)</span>}</div>
                                     {p.specialization && <div className="text-xs text-gray-500 truncate">{p.specialization}</div>}
                                   </button>
                                 ))}
@@ -646,7 +653,7 @@ export const Diary: React.FC = () => {
                                       ${p.id === comparePractitioners[0] ? 'opacity-40 cursor-not-allowed' : ''}
                                     `}
                                   >
-                                    <div className="truncate">{p.name}{isPractitioner && p.id === user?.practitioner_id && <span className="ml-1 text-xs text-violet-500">(me)</span>}</div>
+                                    <div className="truncate">{p.name}{p.id === cachedOwnId && <span className="ml-1 text-xs text-violet-500">(me)</span>}</div>
                                     {p.specialization && <div className="text-xs text-gray-500 truncate">{p.specialization}</div>}
                                   </button>
                                 ))}
@@ -668,11 +675,11 @@ export const Diary: React.FC = () => {
                         - Not shown when practitioner is in own clinic viewing own schedule (that's the default)
                         - Shown when a non-default practitioner is manually selected */}
                     {!compareMode && selectedPractitioner !== null &&
-                      !(isPractitioner && isOwnAssignedClinic && selectedPractitioner === user?.practitioner_id) && (
+                      !((isPractitioner || isStaff) && isOwnAssignedClinic && selectedPractitioner === cachedOwnId) && (
                       <button
                         onClick={() => {
-                          if (isPractitioner && isOwnAssignedClinic && user?.practitioner_id) {
-                            setSelectedPractitioner(user.practitioner_id);
+                          if ((isPractitioner || isStaff) && isOwnAssignedClinic && cachedOwnId) {
+                            setSelectedPractitioner(cachedOwnId);
                           } else {
                             setSelectedPractitioner(null);
                           }
@@ -680,7 +687,7 @@ export const Diary: React.FC = () => {
                         }}
                         className="text-xs text-sky-600 hover:text-sky-800 font-medium"
                       >
-                        {isPractitioner && isOwnAssignedClinic ? 'My Schedule' : 'Clear filter'}
+                        {(isPractitioner || isStaff) && isOwnAssignedClinic ? 'My Schedule' : 'Clear filter'}
                       </button>
                     )}
                   </div>
@@ -729,12 +736,12 @@ export const Diary: React.FC = () => {
                 onCalendarReady={setCalendarReadyDate}
                 practitionerAvailability={compareMode ? undefined : getPractitionerAvailability()}
                 allAvailabilities={calendarAllAvailabilities}
-                compareMode={(isAdmin || isPractitioner) && compareMode && !isDuplicateComparePractitioner && (view === 'day' || view === 'week')}
+                compareMode={(isAdmin || isPractitioner || isStaff) && compareMode && !isDuplicateComparePractitioner && (view === 'day' || view === 'week')}
                 compareAvailabilityA={compareAvailabilityA}
                 compareAvailabilityB={compareAvailabilityB}
                 comparePractitionerNames={[comparePractitionerAName, comparePractitionerBName]}
-                comparePractitionerIdA={comparePractitioners[0]}
-                comparePractitionerIdB={comparePractitioners[1]}
+                comparePractitionerIdA={typeof comparePractitioners[0] === 'number' ? comparePractitioners[0] : null}
+                comparePractitionerIdB={typeof comparePractitioners[1] === 'number' ? comparePractitioners[1] : null}
               />
             </div>
 

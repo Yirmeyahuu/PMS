@@ -410,6 +410,18 @@ class PublicPortalBookView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # ── Validate practitioner is assigned to the service (if service restricts) ──
+        validated  = serializer.validated_data
+        service_obj = validated.get('service')
+        prac_obj    = validated.get('practitioner')
+        if service_obj and prac_obj:
+            assigned_ids = list(service_obj.assigned_practitioners.values_list('id', flat=True))
+            if assigned_ids and prac_obj.id not in assigned_ids:
+                return Response(
+                    {'detail': 'The selected practitioner does not offer this service.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         booking = serializer.save(portal_link=portal_link)
 
         # ── Auto-confirm: skip PENDING, immediately create patient + appointment ──
@@ -478,15 +490,16 @@ class PublicAvailableSlotsView(APIView):
         CLINIC_END   = 21 * 60
 
         # ── Practitioner availability ──────────────────────────────────────────
+        practitioner_obj = None
         practitioner_availability = None
         if practitioner_id:
             try:
-                practitioner = Practitioner.objects.select_related('user').get(
+                practitioner_obj = Practitioner.objects.select_related('user').get(
                     id=practitioner_id,
                     is_deleted=False,
                     user__is_active=True,
                 )
-                practitioner_availability = practitioner.availability
+                practitioner_availability = practitioner_obj.availability
             except Practitioner.DoesNotExist:
                 pass
 
@@ -494,71 +507,74 @@ class PublicAvailableSlotsView(APIView):
         WEEKDAY_MAP = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         target_weekday = WEEKDAY_MAP[target_date.weekday()]
 
-        # If practitioner has availability configured, use it; otherwise fall back to clinic hours
+        # Parse lunch break (always used)
+        def parse_mins(t: str) -> int:
+            h, m = t.split(':')
+            return int(h) * 60 + int(m)
+
+        # ── Build candidate time blocks from duty schedule ─────────────────────
+        # Each block = (start_min, end_min).  Lunch is removed from each block.
+        candidate_blocks: list[tuple[int, int]] = []
+
         if practitioner_availability and practitioner_availability.get('duty_days'):
             duty_days = practitioner_availability.get('duty_days', [])
             if target_weekday not in duty_days:
                 return Response({'date': date_str, 'slots': []})
 
-            duty_start = practitioner_availability.get('duty_start_time', '08:00')
-            duty_end = practitioner_availability.get('duty_end_time', '17:00')
-            lunch_start = practitioner_availability.get('lunch_start_time', '12:00')
-            lunch_end = practitioner_availability.get('lunch_end_time', '13:00')
+            duty_schedule = practitioner_availability.get('duty_schedule')
+            lunch_start_min = parse_mins(practitioner_availability.get('lunch_start_time', '12:00'))
+            lunch_end_min   = parse_mins(practitioner_availability.get('lunch_end_time', '13:00'))
 
-            # Parse duty hours to minutes
-            duty_start_parts = duty_start.split(':')
-            duty_end_parts = duty_end.split(':')
-            lunch_start_parts = lunch_start.split(':')
-            lunch_end_parts = lunch_end.split(':')
-
-            duty_start_min = int(duty_start_parts[0]) * 60 + int(duty_start_parts[1])
-            duty_end_min = int(duty_end_parts[0]) * 60 + int(duty_end_parts[1])
-            lunch_start_min = int(lunch_start_parts[0]) * 60 + int(lunch_start_parts[1])
-            lunch_end_min = int(lunch_end_parts[0]) * 60 + int(lunch_end_parts[1])
-
-            PRACTITIONER_START = duty_start_min
-            PRACTITIONER_END = duty_end_min
-            LUNCH_START = lunch_start_min
-            LUNCH_END = lunch_end_min
+            if duty_schedule and target_weekday in duty_schedule:
+                # Split-shift: multiple blocks for this day
+                for block in duty_schedule[target_weekday]:
+                    b_start = parse_mins(block['start'])
+                    b_end   = parse_mins(block['end'])
+                    # Remove lunch from each block by splitting if needed
+                    if b_end <= lunch_start_min or b_start >= lunch_end_min:
+                        # Block entirely outside lunch — keep whole
+                        candidate_blocks.append((b_start, b_end))
+                    else:
+                        # Block overlaps lunch — split
+                        if b_start < lunch_start_min:
+                            candidate_blocks.append((b_start, lunch_start_min))
+                        if b_end > lunch_end_min:
+                            candidate_blocks.append((lunch_end_min, b_end))
+            else:
+                # Legacy single-block duty hours
+                duty_start_min = parse_mins(practitioner_availability.get('duty_start_time', '08:00'))
+                duty_end_min   = parse_mins(practitioner_availability.get('duty_end_time', '17:00'))
+                if duty_end_min <= lunch_start_min or duty_start_min >= lunch_end_min:
+                    candidate_blocks.append((duty_start_min, duty_end_min))
+                else:
+                    if duty_start_min < lunch_start_min:
+                        candidate_blocks.append((duty_start_min, lunch_start_min))
+                    if duty_end_min > lunch_end_min:
+                        candidate_blocks.append((lunch_end_min, duty_end_min))
         else:
-            PRACTITIONER_START = CLINIC_START
-            PRACTITIONER_END = CLINIC_END
-            LUNCH_START = 12 * 60  # 12:00
-            LUNCH_END = 13 * 60    # 13:00
+            # No practitioner / no duty days config: full clinic hours
+            LUNCH_START = 12 * 60
+            LUNCH_END   = 13 * 60
+            candidate_blocks.append((CLINIC_START, LUNCH_START))
+            candidate_blocks.append((LUNCH_END, CLINIC_END))
 
+        # Generate 30-min candidate slots from all blocks
         def time_to_minutes(t):
             return t.hour * 60 + t.minute
 
         def minutes_to_time(m):
             return time(m // 60, m % 60)
 
-        weekday         = target_date.weekday()
+        SLOT_INTERVAL = 15  # minutes between slots
         candidate_slots = []
-
-        if practitioner_id:
-            schedules = PractitionerSchedule.objects.filter(
-                practitioner_id=practitioner_id,
-                weekday=weekday,
-                is_available=True,
-            )
-            if schedules.exists():
-                for sched in schedules:
-                    start_min = max(time_to_minutes(sched.start_time), PRACTITIONER_START)
-                    end_min   = min(time_to_minutes(sched.end_time),   PRACTITIONER_END)
-                    m = start_min
-                    while m + 15 <= end_min:
-                        candidate_slots.append(minutes_to_time(m))
-                        m += 15
-            else:
-                m = PRACTITIONER_START
-                while m + 15 <= PRACTITIONER_END:
-                    candidate_slots.append(minutes_to_time(m))
-                    m += 15
-        else:
-            m = PRACTITIONER_START
-            while m + 15 <= PRACTITIONER_END:
+        for (b_start, b_end) in candidate_blocks:
+            m = b_start
+            # Only generate a slot if the full service duration fits within this block
+            while m + duration <= b_end:
                 candidate_slots.append(minutes_to_time(m))
-                m += 15
+                m += SLOT_INTERVAL
+
+        weekday         = target_date.weekday()
 
         booked_ranges = []
 

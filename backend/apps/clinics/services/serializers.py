@@ -1,10 +1,17 @@
 from rest_framework import serializers
+from apps.clinics.models import Practitioner
 from .models import Service
 
 
 class ServiceSerializer(serializers.ModelSerializer):
     image_url  = serializers.SerializerMethodField()
     clinic_name = serializers.CharField(source='clinic.name', read_only=True)
+    # List of practitioner PKs — writable for assign/unassign
+    assigned_practitioners = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Practitioner.objects.filter(is_deleted=False),
+        required=False,
+    )
 
     class Meta:
         model  = Service
@@ -13,6 +20,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             'name', 'description', 'duration_minutes',
             'price', 'image', 'image_url', 'color_hex',
             'sort_order', 'is_active', 'show_in_portal',
+            'assigned_practitioners',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'clinic', 'clinic_name', 'image_url', 'created_at', 'updated_at']

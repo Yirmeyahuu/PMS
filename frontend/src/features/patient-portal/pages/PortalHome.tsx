@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
-import { fetchPortal, submitBooking }  from '../portal.api';
-import { PortalSidebar }              from '../components/PortalSidebar';
-import { BranchStep }                 from '../components/BranchStep';
-import { PractitionerStep }           from '../components/PractitionerStep';
-import { ServiceList }                from '../components/ServiceList';
-import { PatientDetailsForm }         from '../components/PatientDetailsForm';
-import { PortalFooterActions }        from '../components/PortalFooterActions';
+import { fetchPortal, submitBooking }        from '../portal.api';
+import { PortalSidebar }                     from '../components/PortalSidebar';
+import { BranchStep }                        from '../components/BranchStep';
+import { PractitionerStep }                  from '../components/PractitionerStep';
+import { ServiceList }                       from '../components/ServiceList';
+import { PortalAvailabilityCalendar }        from '../components/PortalAvailabilityCalendar';
+import { PatientDetailsForm }                from '../components/PatientDetailsForm';
+import { PortalFooterActions }               from '../components/PortalFooterActions';
 
 import type {
   PortalData,
@@ -20,13 +21,14 @@ import type {
 } from '../types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
 
-// ── After branch is picked, 3-step inner flow ─────────────────────────────────
-type InnerStep = 'practitioner' | 'services' | 'details';
+// ── After branch is picked, 4-step inner flow ─────────────────────────────────
+type InnerStep = 'practitioner' | 'services' | 'datetime' | 'details';
 
 const INNER_STEP_NUMBER: Record<InnerStep, number> = {
   practitioner: 2,
   services:     3,
-  details:      4,
+  datetime:     4,
+  details:      5,
 };
 
 const EMPTY_FORM: PatientFormData = {
@@ -86,12 +88,21 @@ export const PortalHome: React.FC = () => {
   };
 
   // ── Inner navigation ─────────────────────────────────────────────────────
-  const handleSelectPractitioner = (p: PortalPractitioner) => setSelectedPractitioner(p);
+  const handleSelectPractitioner = (p: PortalPractitioner) => {
+    // Reset service & date when practitioner changes
+    if (selectedPractitioner?.id !== p.id) {
+      setSelectedService(null);
+      setSelectedDate('');
+      setSelectedSlot('');
+    }
+    setSelectedPractitioner(p);
+  };
 
   const handleSelectService = (svc: PortalService) => {
     setSelectedService(svc);
     setSelectedDate('');
     setSelectedSlot('');
+    setInnerStep('datetime'); // auto-advance to date/time picker
   };
 
   const handleInlineDateTimeConfirm = (date: string, slot: string) => {
@@ -105,9 +116,9 @@ export const PortalHome: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (innerStep === 'details')      { setInnerStep('services');     return; }
+    if (innerStep === 'details')      { setInnerStep('datetime');     return; }
+    if (innerStep === 'datetime')     { setInnerStep('services');     return; }
     if (innerStep === 'services')     { setInnerStep('practitioner'); return; }
-    // Back from first inner step → return to branch selection
     if (innerStep === 'practitioner') { setSelectedBranch(null);      return; }
   };
 
@@ -154,42 +165,43 @@ export const PortalHome: React.FC = () => {
 
   const canContinue = innerStep === 'practitioner' && !!selectedPractitioner;
 
-  // ── Filter practitioners by selected branch ───────────────────────────────
+  // ── Filter practitioners by selected branch (real practitioners only — no "Any") ──
   const branchPractitioners = React.useMemo(() => {
     const all = portal?.practitioners ?? [];
-
-    // ── DEV: log to confirm branch_id values are present ────────────────
-    if (import.meta.env.DEV && selectedBranch) {
-      console.debug(
-        '[Portal] Selected branch id:', selectedBranch.id,
-        '\n[Portal] All practitioners:',
-        all.map((p: PortalPractitioner) => ({ id: p.id, name: p.full_name, branch_id: p.branch_id })),
-      );
-    }
-
     return all.filter((p: PortalPractitioner) => {
-      if (p.id === null) return true;               // "Any Available" — always show
-      return p.branch_id === selectedBranch?.id;    // strict number equality
+      if (p.id === null) return false; // exclude "Any Available"
+      return p.branch_id === selectedBranch?.id;
     });
   }, [portal?.practitioners, selectedBranch]);
 
-  // ── Filter services for search ────────────────────────────────────────────
-  const filteredCategories = (portal?.categories ?? [])
-    .map((cat: PortalCategory) => ({
-      ...cat,
-      services: cat.services.filter(
-        (s: PortalService) =>
-          s.name.toLowerCase().includes(search.toLowerCase()) ||
-          s.description.toLowerCase().includes(search.toLowerCase()),
-      ),
-    }))
-    .filter((cat: PortalCategory) => cat.services.length > 0);
+  // ── Filter services by selected practitioner + search ────────────────────
+  const filteredCategories = React.useMemo(() => {
+    const praId = selectedPractitioner?.id ?? null;
+    return (portal?.categories ?? [])
+      .map((cat: PortalCategory) => ({
+        ...cat,
+        services: cat.services.filter((s: PortalService) => {
+          // Search filter
+          if (
+            search &&
+            !s.name.toLowerCase().includes(search.toLowerCase()) &&
+            !s.description.toLowerCase().includes(search.toLowerCase())
+          ) return false;
+          // Practitioner filter: empty assigned_practitioner_ids = available to all
+          const ids = s.assigned_practitioner_ids;
+          if (!ids || ids.length === 0) return true;
+          if (!praId) return true;
+          return ids.includes(praId);
+        }),
+      }))
+      .filter((cat: PortalCategory) => cat.services.length > 0);
+  }, [portal?.categories, search, selectedPractitioner]);
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500" />
       </div>
     );
   }
@@ -210,30 +222,30 @@ export const PortalHome: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex flex-col">
 
         {/* Top header */}
-        <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-center gap-4">
+        <div className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 lg:py-5 flex items-center gap-4">
           {portal.clinic_logo ? (
             <img
               src={portal.clinic_logo}
               alt={portal.clinic_name}
-              className="w-10 h-10 rounded-xl object-cover border border-gray-200"
+              className="w-10 h-10 rounded-xl object-cover border border-gray-200 shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center text-white font-bold text-base shrink-0">
               {portal.clinic_name.charAt(0)}
             </div>
           )}
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">
+          <div className="min-w-0">
+            <h1 className="text-base lg:text-lg font-bold text-gray-900 truncate">
               {portal.heading || portal.clinic_name}
             </h1>
             {portal.description && (
-              <p className="text-sm text-gray-500">{portal.description}</p>
+              <p className="text-sm text-gray-500 truncate">{portal.description}</p>
             )}
           </div>
         </div>
 
         {/* Branch picker */}
-        <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 max-w-4xl mx-auto w-full">
           <BranchStep
             branches={portal.branches ?? []}
             selectedBranch={null}
@@ -246,26 +258,55 @@ export const PortalHome: React.FC = () => {
 
   // ── MAIN: Branch selected → sidebar + inner steps ─────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
 
-      {/* Sidebar */}
-      <PortalSidebar
-        portal={portal}
-        selectedBranch={selectedBranch}
-        selectedPractitioner={selectedPractitioner}
-        selectedService={selectedService}
-        selectedDate={selectedDate}
-        selectedSlot={selectedSlot}
-        currentStep={INNER_STEP_NUMBER[innerStep]}
-        onChangeBranch={() => setSelectedBranch(null)}
-      />
+      {/* Sidebar — desktop only (hidden on mobile/tablet) */}
+      <div className="hidden lg:block">
+        <PortalSidebar
+          portal={portal}
+          selectedBranch={selectedBranch}
+          selectedPractitioner={selectedPractitioner}
+          selectedService={selectedService}
+          selectedDate={selectedDate}
+          selectedSlot={selectedSlot}
+          currentStep={INNER_STEP_NUMBER[innerStep]}
+          onChangeBranch={() => setSelectedBranch(null)}
+        />
+      </div>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-screen">
+      <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center gap-4">
-          <div className="flex-1">
+        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 lg:px-8 py-3 lg:py-4 flex items-center gap-3 shadow-sm lg:shadow-none shrink-0">
+
+          {/* Mobile/tablet: clinic logo + name + selected branch */}
+          <div className="lg:hidden flex items-center gap-2.5 flex-1 min-w-0">
+            {portal.clinic_logo ? (
+              <img
+                src={portal.clinic_logo}
+                alt={portal.clinic_name}
+                className="w-8 h-8 rounded-lg object-cover border border-gray-200 shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {portal.clinic_name.charAt(0)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-gray-900 leading-tight truncate">
+                {portal.clinic_name}
+              </p>
+              {selectedBranch && (
+                <p className="text-[11px] text-gray-500 leading-tight truncate">
+                  {selectedBranch.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop: page heading */}
+          <div className="hidden lg:block flex-1 min-w-0">
             <h1 className="text-xl font-bold text-gray-900">
               {portal.heading || portal.clinic_name}
             </h1>
@@ -274,22 +315,23 @@ export const PortalHome: React.FC = () => {
             )}
           </div>
 
+          {/* Search bar — services step */}
           {innerStep === 'services' && (
-            <div className="relative w-64">
+            <div className="relative flex-1 lg:flex-none lg:w-64 min-w-0 max-w-xs lg:max-w-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search services..."
-                className="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
             </div>
           )}
         </div>
 
         {/* Step content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8">
 
           {innerStep === 'practitioner' && (
             <PractitionerStep
@@ -304,10 +346,16 @@ export const PortalHome: React.FC = () => {
               categories={filteredCategories}
               selectedService={selectedService}
               onSelectService={handleSelectService}
+            />
+          )}
+
+          {innerStep === 'datetime' && selectedService && token && (
+            <PortalAvailabilityCalendar
               token={token}
-              selectedPractitioner={selectedPractitioner}
-              onDateTimeConfirm={handleInlineDateTimeConfirm}
-              selectedBranch={selectedBranch}
+              service={selectedService}
+              practitioner={selectedPractitioner}
+              onConfirm={handleInlineDateTimeConfirm}
+              onClose={() => setInnerStep('services')}
             />
           )}
 
@@ -320,8 +368,8 @@ export const PortalHome: React.FC = () => {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-8 pb-6">
+        {/* Footer actions — always visible above mobile bottom nav */}
+        <div className="px-4 lg:px-8 pt-3 pb-24 lg:pb-6 bg-white border-t border-gray-200 shrink-0">
           <PortalFooterActions
             step={innerStep}
             canContinue={canContinue}
@@ -332,6 +380,44 @@ export const PortalHome: React.FC = () => {
           />
         </div>
       </main>
+
+      {/* ── Mobile floating step indicator (hidden on desktop) ── */}
+      <div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg pointer-events-none">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 px-4 py-3">
+          <div className="flex items-center">
+            {(
+              [
+                { number: 1, label: 'Location' },
+                { number: 2, label: 'Provider' },
+                { number: 3, label: 'Service'  },
+                { number: 4, label: 'Date'     },
+                { number: 5, label: 'Details'  },
+              ] as { number: number; label: string }[]
+            ).map((step, i, arr) => {
+              const cur      = INNER_STEP_NUMBER[innerStep];
+              const isActive = cur === step.number;
+              const isDone   = cur > step.number;
+              return (
+                <React.Fragment key={step.number}>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div className={`w-2 h-2 rounded-full transition-all ${
+                      isActive ? 'bg-sky-500 scale-125' : isDone ? 'bg-sky-300' : 'bg-gray-200'
+                    }`} />
+                    <span className={`text-[9px] leading-none whitespace-nowrap ${
+                      isActive ? 'font-bold text-sky-600' : isDone ? 'font-medium text-sky-400' : 'font-medium text-gray-300'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <div className={`flex-1 h-px mx-2 transition-colors ${isDone ? 'bg-sky-300' : 'bg-gray-200'}`} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
 
-type InnerStep = 'practitioner' | 'services' | 'details';
+type InnerStep = 'practitioner' | 'services' | 'datetime' | 'details';
 
 interface PortalFooterActionsProps {
   step:        InnerStep;
@@ -48,6 +48,10 @@ export const PortalFooterActions: React.FC<PortalFooterActionsProps> = ({
           )}
         </button>
       ) : step === 'services' ? (
+        <span className="text-xs text-gray-400 italic">
+          Select a service to continue
+        </span>
+      ) : step === 'datetime' ? (
         <span className="text-xs text-gray-400 italic">
           Pick a date &amp; time above to continue
         </span>

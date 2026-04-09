@@ -14,6 +14,7 @@ export interface ClinicService {
   sort_order:       number;
   is_active:        boolean;
   show_in_portal:   boolean;
+  assigned_practitioners: number[]; // practitioner PKs
   created_at:       string;
   updated_at:       string;
 }
@@ -26,6 +27,7 @@ export interface ClinicServicePayload {
   color_hex:        string;
   is_active:        boolean;
   show_in_portal:   boolean;
+  assigned_practitioners?: number[]; // optional list of practitioner PKs
 }
 
 

@@ -1,25 +1,18 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ServiceCard } from './ServiceCard';
-import type { PortalCategory, PortalService, PortalPractitioner } from '../types/portal';
+import type { PortalCategory, PortalService } from '../types/portal';
 
 interface ServiceListProps {
-  categories:           PortalCategory[];
-  selectedService:      PortalService | null;
-  onSelectService:      (service: PortalService) => void;
-  // ── new props ──
-  token?:               string;
-  selectedPractitioner?: PortalPractitioner | null;
-  onDateTimeConfirm?:   (date: string, slot: string) => void;
+  categories:      PortalCategory[];
+  selectedService: PortalService | null;
+  onSelectService: (service: PortalService) => void;
 }
 
 export const ServiceList: React.FC<ServiceListProps> = ({
   categories,
   selectedService,
   onSelectService,
-  token,
-  selectedPractitioner,
-  onDateTimeConfirm,
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<number | null | 'none'>(
     categories.length > 0 ? (categories[0].id ?? 'none') : 'none',
@@ -28,7 +21,7 @@ export const ServiceList: React.FC<ServiceListProps> = ({
   if (categories.length === 0) {
     return (
       <div className="text-center py-16 text-gray-400">
-        No services available at this time.
+        No services available for this practitioner.
       </div>
     );
   }
@@ -36,7 +29,7 @@ export const ServiceList: React.FC<ServiceListProps> = ({
   return (
     <div className="space-y-3">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Select a Service</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Select a Service</h2>
         <p className="text-sm text-gray-500 mt-1">
           Choose the type of appointment you&apos;d like to book.
         </p>
@@ -49,7 +42,7 @@ export const ServiceList: React.FC<ServiceListProps> = ({
         return (
           <div
             key={catKey}
-            className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+            className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-md"
           >
             {/* Category header */}
             <button
@@ -57,13 +50,13 @@ export const ServiceList: React.FC<ServiceListProps> = ({
               className="w-full flex items-center justify-between px-5 py-4 font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
             >
               <div className="text-left">
-                <span className="text-base">{cat.name}</span>
+                <span className="text-base font-medium">{cat.name}</span>
                 {cat.description && (
                   <p className="text-xs text-gray-400 font-normal mt-0.5">{cat.description}</p>
                 )}
               </div>
               <ChevronDown
-                className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${
+                className={`w-5 h-5 text-gray-400 transition-transform shrink-0 ${
                   isExpanded ? 'rotate-180' : ''
                 }`}
               />
@@ -77,10 +70,7 @@ export const ServiceList: React.FC<ServiceListProps> = ({
                     key={svc.id}
                     service={svc}
                     isSelected={selectedService?.id === svc.id}
-                    onBook={() => onSelectService(svc)}
-                    token={token}
-                    practitioner={selectedPractitioner}
-                    onDateTimeConfirm={onDateTimeConfirm}
+                    onSelect={() => onSelectService(svc)}
                   />
                 ))}
               </div>

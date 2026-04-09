@@ -39,6 +39,14 @@ class Service(TimeStampedModel, SoftDeleteModel):
         help_text='If true, patients can book this service online',
     )
 
+    # Practitioners who offer this service (optional — empty means any practitioner)
+    assigned_practitioners = models.ManyToManyField(
+        'clinics.Practitioner',
+        blank=True,
+        related_name='services',
+        help_text='Practitioners who offer this service. Empty = any practitioner.',
+    )
+
     class Meta:
         db_table = 'clinic_services'
         ordering  = ['sort_order', 'name']

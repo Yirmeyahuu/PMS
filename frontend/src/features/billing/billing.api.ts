@@ -169,6 +169,7 @@ export const billingApi = {
     payment_date: string;
     amount: number;
     payment_method: string;
+    bank_name?: string;
     reference_number?: string;
     notes?: string;
   }): Promise<Payment> => {

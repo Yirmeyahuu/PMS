@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { billingApi, type ClinicService } from './billing.api';
 import { getMyClinic, type ClinicProfile } from '@/features/clinics/clinic.api';
+import { productApi } from '@/features/setup/pages/items/services/inventory.api';
+import type { ProductListItem, StockAdjustmentPayload } from '@/types/inventory';
+import { Package } from 'lucide-react';
 import type { 
   Invoice, 
   PaymentMethod 
@@ -27,6 +30,8 @@ import type {
 import axiosInstance from '@/lib/axios';
 import type { Appointment } from '@/types/appointment';
 import toast from 'react-hot-toast';
+import { PMSInvoiceTemplate, type InvoiceClinicInfo, type NextAppointmentInfo } from '@/components/invoices/PMSInvoiceTemplate';
+import { PHILIPPINE_BANKS, requiresBankSelection } from '@/data/philippineBanks';
 
 interface EditableItem {
   id?: number;
@@ -35,16 +40,19 @@ interface EditableItem {
   unit_price: number;
   discount_percent?: number;
   tax_percent?: number;
+  inventoryProductId?: number;
 }
 
 interface PaymentEntry {
   id?: number;
   paymentMethod: PaymentMethod;
+  bankName: string;
   amount: string;
   referenceNumber: string;
 }
 
 // Helper to get display name for payment method
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getPaymentMethodLabel = (method: PaymentMethod): string => {
   const labels: Record<PaymentMethod, string> = {
     CASH: 'Cash',
@@ -67,9 +75,22 @@ export default function GenerateNewInvoice() {
   const [items, setItems] = useState<EditableItem[]>([]);
 
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([
-    { paymentMethod: 'CASH', amount: '', referenceNumber: '' },
+    { paymentMethod: 'CASH', bankName: '', amount: '', referenceNumber: '' },
   ]);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [inventoryDropdownIndex, setInventoryDropdownIndex] = useState<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setInventoryDropdownIndex(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const { data: appointment, isLoading: loadingAppointment } = useQuery<Appointment>({
     queryKey: ['appointment', appointmentId],
@@ -96,6 +117,15 @@ export default function GenerateNewInvoice() {
     queryKey: ['my-clinic'],
     queryFn: getMyClinic,
     staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: inventoryProducts = [] } = useQuery<ProductListItem[]>({
+    queryKey: ['inventory-products-active'],
+    queryFn: async () => {
+      const res = await productApi.list({ is_archived: false, page_size: 500 });
+      return res.results;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: nextAppointment } = useQuery({
@@ -184,10 +214,99 @@ export default function GenerateNewInvoice() {
     return paymentEntries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
   };
 
-  const balanceDue = calculateTotalPaid() > 0 ? totalAmount - calculateTotalPaid() : totalAmount;
+  const totalPaid = calculateTotalPaid();
+  const balanceDue = totalPaid > 0 ? totalAmount - totalPaid : totalAmount;
+
+  const calculateItemTotal = (item: EditableItem) => {
+    const itemTotal = item.quantity * item.unit_price;
+    const afterDiscount = itemTotal - (itemTotal * (item.discount_percent || 0) / 100);
+    return afterDiscount * (1 + (item.tax_percent || 0) / 100);
+  };
+
+  // Build a preview Invoice object from local state for PMSInvoiceTemplate
+  const previewInvoice: Invoice = {
+    id: existingInvoice?.id ?? 0,
+    invoice_number: existingInvoice?.invoice_number ?? 'INV-DRAFT',
+    clinic: existingInvoice?.clinic ?? 0,
+    clinic_name: clinicProfile?.name ?? '',
+    patient: appointment?.patient ?? 0,
+    patient_name: appointment?.patient_name ?? '',
+    patient_number: String(appointment?.patient ?? ''),
+    appointment: appointment?.id ?? null,
+    appointment_date: appointment?.date ?? null,
+    appointment_start_time: appointment?.start_time ?? null,
+    bulk_batch: null,
+    created_by: null,
+    created_by_name: null,
+    invoice_date: invoiceDate,
+    due_date: dueDate || null,
+    status: totalPaid >= totalAmount && totalAmount > 0 ? 'PAID' : totalPaid > 0 ? 'PARTIALLY_PAID' : 'DRAFT',
+    status_display: totalPaid >= totalAmount && totalAmount > 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Draft',
+    subtotal: subtotal.toFixed(2),
+    discount_amount: totalDiscount.toFixed(2),
+    discount_percent: '0',
+    tax_amount: totalTax.toFixed(2),
+    tax_percent: '0',
+    total_amount: totalAmount.toFixed(2),
+    amount_paid: totalPaid.toFixed(2),
+    balance_due: balanceDue.toFixed(2),
+    payment_method: '',
+    payment_notes: '',
+    philhealth_coverage: '0',
+    hmo_coverage: '0',
+    notes: notes,
+    terms_conditions: '',
+    items: items.map((item, idx) => ({
+      id: item.id ?? idx,
+      invoice: existingInvoice?.id ?? 0,
+      description: item.description,
+      quantity: String(item.quantity),
+      unit_price: String(item.unit_price),
+      discount_percent: String(item.discount_percent ?? 0),
+      tax_percent: String(item.tax_percent ?? 0),
+      total: calculateItemTotal(item).toFixed(2),
+      service_code: '',
+      created_at: '',
+      updated_at: '',
+    })),
+    payments: paymentEntries
+      .filter(e => e.amount && Number(e.amount) > 0)
+      .map((e, idx) => ({
+        id: idx,
+        invoice: existingInvoice?.id ?? 0,
+        invoice_number: existingInvoice?.invoice_number ?? '',
+        payment_date: format(new Date(), 'yyyy-MM-dd'),
+        amount: String(e.amount),
+        payment_method: e.paymentMethod,
+        bank_name: e.bankName,
+        reference_number: e.referenceNumber,
+        notes: '',
+        receipt_number: '',
+        received_by: null,
+        received_by_name: null,
+        created_at: '',
+        updated_at: '',
+      })),
+    created_at: existingInvoice?.created_at ?? '',
+    updated_at: '',
+  };
+
+  const previewClinicInfo: InvoiceClinicInfo | undefined = clinicProfile ? {
+    name: clinicProfile.name,
+    address: [clinicProfile.address, clinicProfile.city, clinicProfile.province, clinicProfile.postal_code].filter(Boolean).join(', '),
+    phone: clinicProfile.phone,
+    email: clinicProfile.email,
+    website: clinicProfile.website,
+    tinNumber: clinicProfile.tin,
+    logoUrl: clinicProfile.logo_url,
+  } : undefined;
+
+  const previewNextAppointment: NextAppointmentInfo | null = nextAppointment
+    ? { date: nextAppointment.date, start_time: nextAppointment.start_time ?? '' }
+    : null;
 
   const handleAddPaymentEntry = () => {
-    setPaymentEntries([...paymentEntries, { paymentMethod: 'CASH', amount: '', referenceNumber: '' }]);
+    setPaymentEntries([...paymentEntries, { paymentMethod: 'CASH', bankName: '', amount: '', referenceNumber: '' }]);
   };
 
   const handleRemovePaymentEntry = (index: number) => {
@@ -199,11 +318,27 @@ export default function GenerateNewInvoice() {
   const handleUpdatePaymentEntry = (index: number, field: keyof PaymentEntry, value: string) => {
     const newEntries = [...paymentEntries];
     newEntries[index] = { ...newEntries[index], [field]: value };
+    // Clear bank name when switching to a non-card payment method
+    if (field === 'paymentMethod' && !requiresBankSelection(value)) {
+      newEntries[index].bankName = '';
+    }
     setPaymentEntries(newEntries);
   };
 
   const handleAddItem = () => {
     setItems([...items, { description: '', quantity: 1, unit_price: 0 }]);
+  };
+
+  const handleSelectInventoryItem = (index: number, product: ProductListItem) => {
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      description: product.name,
+      unit_price: Number(product.selling_price) || 0,
+      inventoryProductId: product.id,
+    };
+    setItems(newItems);
+    setInventoryDropdownIndex(null);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -213,13 +348,11 @@ export default function GenerateNewInvoice() {
   const handleUpdateItem = (index: number, field: keyof EditableItem, value: string | number) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
+    // Clear inventory link if user manually edits description
+    if (field === 'description') {
+      newItems[index].inventoryProductId = undefined;
+    }
     setItems(newItems);
-  };
-
-  const calculateItemTotal = (item: EditableItem) => {
-    const itemTotal = item.quantity * item.unit_price;
-    const afterDiscount = itemTotal - (itemTotal * (item.discount_percent || 0) / 100);
-    return afterDiscount * (1 + (item.tax_percent || 0) / 100);
   };
 
   const saveMutation = useMutation({
@@ -265,6 +398,7 @@ export default function GenerateNewInvoice() {
                 payment_date: format(new Date(), 'yyyy-MM-dd'),
                 amount: Number(entry.amount),
                 payment_method: entry.paymentMethod,
+                bank_name: entry.bankName || undefined,
                 reference_number: entry.referenceNumber,
               });
             }
@@ -293,6 +427,7 @@ export default function GenerateNewInvoice() {
                 payment_date: format(new Date(), 'yyyy-MM-dd'),
                 amount: Number(entry.amount),
                 payment_method: entry.paymentMethod,
+                bank_name: entry.bankName || undefined,
                 reference_number: entry.referenceNumber,
               });
             }
@@ -302,9 +437,26 @@ export default function GenerateNewInvoice() {
         return invoice;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (invoice) => {
+      // Deduct inventory stock for items linked to inventory products
+      const inventoryItems = items.filter(i => i.inventoryProductId && i.quantity > 0);
+      for (const item of inventoryItems) {
+        try {
+          const payload: StockAdjustmentPayload = {
+            movement_type: 'OUT',
+            quantity: String(item.quantity),
+            reference: invoice?.invoice_number || '',
+            notes: `Invoice ${invoice?.invoice_number || ''} - ${item.description}`,
+          };
+          await productApi.adjustStock(item.inventoryProductId!, payload);
+        } catch {
+          toast.error(`Failed to deduct stock for "${item.description}"`);
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ['appointment-invoice', appointmentId] });
       qc.invalidateQueries({ queryKey: ['appointment-invoice-exists', appointmentId] });
+      qc.invalidateQueries({ queryKey: ['inventory-products-active'] });
       if (existingInvoice) {
         toast.success('Invoice Updated Successfully!');
       } else {
@@ -495,7 +647,7 @@ export default function GenerateNewInvoice() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-visible">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
@@ -509,16 +661,84 @@ export default function GenerateNewInvoice() {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item, index) => (
+                    {items.map((item, index) => {
+                      const isDropdownOpen = inventoryDropdownIndex === index;
+                      const query = item.description.toLowerCase();
+                      const filteredProducts = query.length > 0
+                        ? inventoryProducts.filter(p => p.name.toLowerCase().includes(query))
+                        : inventoryProducts;
+                      const linkedProduct = item.inventoryProductId
+                        ? inventoryProducts.find(p => p.id === item.inventoryProductId)
+                        : null;
+
+                      return (
                       <tr key={index} className="border-b border-gray-100">
                         <td className="py-1.5 px-2 w-[30%]">
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => handleUpdateItem(index, 'description', e.target.value)}
-                            placeholder="Service description"
-                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg"
-                          />
+                          <div className="relative" ref={isDropdownOpen ? dropdownRef : undefined}>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => {
+                                  handleUpdateItem(index, 'description', e.target.value);
+                                  setInventoryDropdownIndex(index);
+                                }}
+                                onFocus={() => setInventoryDropdownIndex(index)}
+                                placeholder="Type description..."
+                                className="w-full px-2 py-1.5 pr-7 text-xs border border-gray-200 rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setInventoryDropdownIndex(isDropdownOpen ? null : index)}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-sky-600 transition-colors"
+                                title="Select from inventory"
+                              >
+                                <Package className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {linkedProduct && (
+                              <div className={`mt-0.5 text-[10px] flex items-center gap-1 ${
+                                Number(linkedProduct.quantity_in_stock) < item.quantity
+                                  ? 'text-red-500'
+                                  : 'text-gray-400'
+                              }`}>
+                                <Package className="w-2.5 h-2.5" />
+                                Stock: {Number(linkedProduct.quantity_in_stock).toLocaleString()} {linkedProduct.unit.toLowerCase()}
+                                {Number(linkedProduct.quantity_in_stock) < item.quantity && (
+                                  <span className="text-red-500 font-medium"> (insufficient)</span>
+                                )}
+                              </div>
+                            )}
+                            {isDropdownOpen && filteredProducts.length > 0 && (
+                              <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                                <div className="px-2 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50 rounded-t-lg">
+                                  Inventory Items
+                                </div>
+                                {filteredProducts.map((p) => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    className="w-full text-left px-2 py-1.5 text-xs hover:bg-sky-50 flex items-center justify-between gap-2 transition-colors"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      handleSelectInventoryItem(index, p);
+                                    }}
+                                  >
+                                    <span className="truncate text-gray-700">{p.name}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="text-[10px] text-gray-400">{Number(p.quantity_in_stock).toLocaleString()} {p.unit.toLowerCase()}</span>
+                                      <span className="text-[11px] text-gray-400 whitespace-nowrap">₱{Number(p.selling_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {isDropdownOpen && filteredProducts.length === 0 && query.length > 0 && (
+                              <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-2 py-2 text-xs text-gray-400">
+                                No matching inventory items
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-1.5 px-2 w-[14%]">
                           <input
@@ -571,7 +791,8 @@ export default function GenerateNewInvoice() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                     {items.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-4 text-center text-gray-400 text-xs">
@@ -593,55 +814,76 @@ export default function GenerateNewInvoice() {
 
               <div className="space-y-3">
                 {paymentEntries.map((entry, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        {paymentEntries.length > 1 ? `Method ${index + 1}` : 'Method'}
-                      </label>
-                      <select
-                        value={entry.paymentMethod}
-                        onChange={(e) => handleUpdatePaymentEntry(index, 'paymentMethod', e.target.value as PaymentMethod)}
-                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
-                      >
-                        <option value="CASH">Cash</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="DEBIT_CARD">Debit Card</option>
-                        <option value="BANK_TRANSFER">Bank Transfer</option>
-                        <option value="GCASH">GCash</option>
-                      </select>
-                    </div>
-                    <div className="col-span-4">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Amount</label>
-                      <input
-                        type="number"
-                        value={entry.amount}
-                        onChange={(e) => handleUpdatePaymentEntry(index, 'amount', e.target.value)}
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Ref #</label>
-                      <input
-                        type="text"
-                        value={entry.referenceNumber}
-                        onChange={(e) => handleUpdatePaymentEntry(index, 'referenceNumber', e.target.value)}
-                        placeholder="Optional"
-                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      {paymentEntries.length > 1 && (
-                        <button
-                          onClick={() => handleRemovePaymentEntry(index)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                  <div key={index} className="space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          {paymentEntries.length > 1 ? `Method ${index + 1}` : 'Method'}
+                        </label>
+                        <select
+                          value={entry.paymentMethod}
+                          onChange={(e) => handleUpdatePaymentEntry(index, 'paymentMethod', e.target.value as PaymentMethod)}
+                          className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
+                          <option value="CASH">Cash</option>
+                          <option value="CREDIT_CARD">Credit Card</option>
+                          <option value="DEBIT_CARD">Debit Card</option>
+                          <option value="BANK_TRANSFER">Bank Transfer</option>
+                          <option value="GCASH">GCash</option>
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Amount</label>
+                        <input
+                          type="number"
+                          value={entry.amount}
+                          onChange={(e) => handleUpdatePaymentEntry(index, 'amount', e.target.value)}
+                          placeholder="0.00"
+                          min="0"
+                          step="0.01"
+                          className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Ref #</label>
+                        <input
+                          type="text"
+                          value={entry.referenceNumber}
+                          onChange={(e) => handleUpdatePaymentEntry(index, 'referenceNumber', e.target.value)}
+                          placeholder="Optional"
+                          className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        {paymentEntries.length > 1 && (
+                          <button
+                            onClick={() => handleRemovePaymentEntry(index)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Bank selector - shown for credit/debit card */}
+                    {requiresBankSelection(entry.paymentMethod) && (
+                      <div className="ml-0">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Bank / Card Issuer</label>
+                        <select
+                          value={entry.bankName}
+                          onChange={(e) => handleUpdatePaymentEntry(index, 'bankName', e.target.value)}
+                          className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm"
+                        >
+                          <option value="">Select bank...</option>
+                          {PHILIPPINE_BANKS.map((bank) => (
+                            <option key={bank.code} value={bank.code}>
+                              {bank.shortName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <button
@@ -671,162 +913,21 @@ export default function GenerateNewInvoice() {
           </div>
 
           {/* RIGHT COLUMN - 5 cols - Invoice Preview only */}
-          <div className="col-span-5">
-            {/* Invoice Preview / Summary */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-0">
-              <div className="flex items-center gap-2 mb-3">
+          <div className="col-span-5 overflow-y-auto">
+            <div className="sticky top-0">
+              <div className="flex items-center gap-2 mb-3 bg-white rounded-t-xl border border-b-0 border-gray-200 px-4 pt-4 pb-2">
                 <Printer className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Invoice Preview</h2>
               </div>
-
-              {/* Invoice Preview Card */}
-              <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 text-xs">
-                {/* Header */}
-                <div className="flex justify-between items-start pb-2 border-b border-gray-200 mb-2">
-                  <div>
-                    {clinicProfile?.logo_url ? (
-                      <img 
-                        src={clinicProfile.logo_url} 
-                        alt="Clinic Logo" 
-                        className="h-12 mb-1 object-contain"
-                      />
-                    ) : (
-                      <div className="h-12 mb-1 flex items-center justify-center bg-gray-200 rounded text-gray-400 text-xs">
-                        No Logo
-                      </div>
-                    )}
-                    <div className="font-bold text-sky-600 text-sm">INVOICE</div>
-                    <div className="font-semibold text-gray-700 text-xs">
-                      {existingInvoice?.invoice_number || 'INV-YYYY-0000'}
-                    </div>
-                  </div>
-                  <div className="text-right text-xs">
-                    <div className="font-bold text-sky-600">{clinicProfile?.name || 'Clinic Name'}</div>
-                    <div className="text-gray-500">
-                      {clinicProfile?.address || '123 Address'}
-                    </div>
-                    <div className="text-gray-500">
-                      {clinicProfile?.city && clinicProfile?.province 
-                        ? `${clinicProfile.city}, ${clinicProfile.province} ${clinicProfile.postal_code || ''}` 
-                        : 'City, Province'}
-                    </div>
-                    {clinicProfile?.phone && (
-                      <div className="text-gray-500">
-                        Tel: {clinicProfile.phone}
-                      </div>
-                    )}
-                    {clinicProfile?.email && (
-                      <div className="text-gray-500">
-                        {clinicProfile.email}
-                      </div>
-                    )}
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <div className="flex justify-between py-0.5">
-                        <span className="text-gray-500">Invoice Date:</span>
-                        <span className="text-gray-700 font-medium">{invoiceDate}</span>
-                      </div>
-                      <div className="flex justify-between py-0.5">
-                        <span className="text-gray-500">Due Date:</span>
-                        <span className="text-gray-700 font-medium">{dueDate || 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bill To */}
-                <div className="mb-2">
-                  <div className="font-semibold text-gray-700">Bill To:</div>
-                  <div className="text-gray-600">{appointment?.patient_name || 'Patient Name'}</div>
-                </div>
-
-                {/* Items Table */}
-                <div className="mb-2">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-1 font-medium text-gray-500">Description</th>
-                        <th className="text-center py-1 font-medium text-gray-500 w-8">Qty</th>
-                        <th className="text-right py-1 font-medium text-gray-500 w-16">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item, index) => (
-                        <tr key={index} className="border-b border-gray-100">
-                          <td className="py-1 text-gray-900">{item.description || '-'}</td>
-                          <td className="py-1 text-center text-gray-600">{item.quantity}</td>
-                          <td className="py-1 text-right text-gray-900 font-medium">₱{calculateItemTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      ))}
-                      {items.length === 0 && (
-                        <tr>
-                          <td colSpan={3} className="py-2 text-center text-gray-400">No items</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Summary Calculations */}
-                <div className="flex justify-end">
-                  <div className="w-full">
-                    <div className="flex justify-between py-1 text-gray-600">
-                      <span>Subtotal</span>
-                      <span>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between py-1 text-green-600">
-                      <span>Discount (₱{totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
-                      <span>-₱{totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between py-1 text-gray-600">
-                      <span>GST (₱{totalTax.toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
-                      <span>+₱{totalTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-t border-gray-200 font-bold text-gray-900">
-                      <span>Total</span>
-                      <span>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    
-                    {/* Payment Method Breakdown */}
-                    {paymentEntries.some(e => e.amount && Number(e.amount) > 0) && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <div className="font-semibold text-gray-700 mb-1">Payment Breakdown</div>
-                        {paymentEntries.filter(e => e.amount && Number(e.amount) > 0).map((entry, idx) => (
-                          <div key={idx} className="flex justify-between py-0.5 text-green-600">
-                            <span>{getPaymentMethodLabel(entry.paymentMethod)}</span>
-                            <span>₱{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between py-1.5 border-t border-gray-200 font-bold text-sky-600">
-                          <span>Balance Due</span>
-                          <span>₱{balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                {notes && (
-                  <div className="mt-2 pt-2 border-t border-gray-100">
-                    <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Notes</div>
-                    <div className="text-xs text-gray-600">{notes}</div>
-                  </div>
-                )}
-                <div className="mt-2 pt-2 border-t border-gray-100">
-                  <div className="text-center text-xs text-sky-600 font-medium">
-                    Thank you for choosing {clinicProfile?.name || 'our clinic'}. We sincerely appreciate the opportunity to provide you with our clinic services. Please contact us if you have any questions regarding this invoice. Kindly settle this invoice within 30 days. We look forward to seeing you again at your next appointment.
-                  </div>
-                  <div className="mt-2 text-center">
-                    {nextAppointment ? (
-                      <div className="text-xs text-green-600 font-medium">
-                        Next Appointment: {format(new Date(nextAppointment.date), 'yyyy-MM-dd')} {nextAppointment.start_time}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-red-500 font-medium">
-                        No Further Appointments
-                      </div>
-                    )}
-                  </div>
+              <div className="border border-gray-200 rounded-b-xl overflow-hidden bg-gray-100 p-2">
+                <div className="transform origin-top scale-[0.92] -mb-[10%]">
+                  <PMSInvoiceTemplate
+                    invoice={previewInvoice}
+                    clinic={previewClinicInfo}
+                    showPaymentHistory
+                    nextAppointment={previewNextAppointment}
+                    className="shadow-lg rounded-xl"
+                  />
                 </div>
               </div>
             </div>

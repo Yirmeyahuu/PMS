@@ -868,9 +868,56 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 'clinic_branch_name': p.user.clinic_branch.name
                                       if p.user.clinic_branch else None,
                 'availability':       p.availability,
+                'role':               'PRACTITIONER',
             }
             for p in base_qs
         ]
+
+        # ── Also include STAFF users so they appear in the diary filter ──
+        from apps.accounts.models import User as UserModel
+        staff_qs = UserModel.objects.filter(
+            clinic_id__in=all_branch_ids,
+            role='STAFF',
+            is_active=True,
+            is_deleted=False,
+        ).select_related('clinic_branch', 'clinic')
+
+        if clinic_branch_param:
+            try:
+                branch_id = int(clinic_branch_param)
+            except ValueError:
+                branch_id = None
+            if branch_id:
+                staff_qs = staff_qs.filter(
+                    Q(clinic_branch_id=branch_id) |
+                    Q(clinic_id=branch_id, clinic_branch__isnull=True)
+                )
+
+        default_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+        for staff_user in staff_qs:
+            practitioners_data.append({
+                # Use negative user id to avoid collision with Practitioner ids
+                'id':                 f'staff-{staff_user.id}',
+                'user_id':            staff_user.id,
+                'name':               staff_user.get_full_name(),
+                'email':              staff_user.email,
+                'specialization':     None,
+                'clinic_id':          staff_user.clinic_id,
+                'clinic_name':        staff_user.clinic.name if staff_user.clinic else None,
+                'clinic_branch_id':   staff_user.clinic_branch_id,
+                'clinic_branch_name': staff_user.clinic_branch.name
+                                      if staff_user.clinic_branch else None,
+                'availability': {
+                    'duty_days':        staff_user.duty_days or default_days,
+                    'duty_start_time':  '08:00',
+                    'duty_end_time':    '17:00',
+                    'lunch_start_time': staff_user.lunch_start_time or '12:00',
+                    'lunch_end_time':   staff_user.lunch_end_time or '13:00',
+                    'duty_schedule':    staff_user.duty_schedule,
+                },
+                'role': 'STAFF',
+            })
+
         return Response({'practitioners': practitioners_data})
 
     # ── Reminders (existing) ──────────────────────────────────────────────────

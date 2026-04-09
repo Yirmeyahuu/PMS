@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, AlertCircle, Building2, RefreshCw, Clock, CalendarDays } from 'lucide-react';
+import { X, UserPlus, AlertCircle, Building2, RefreshCw, Clock, Plus, Trash2 } from 'lucide-react';
 import type { CreateStaffData, StaffFormErrors, StaffMember, DutyDay } from '../../types/staff.types';
+import type { DutySchedule } from '@/features/clinics/clinic.api';
 import { TITLE_OPTIONS, DISCIPLINE_OPTIONS, GENDER_OPTIONS } from '../../types/staff.types';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 
@@ -13,6 +14,23 @@ const DUTY_DAY_OPTIONS: { value: DutyDay; label: string }[] = [
   { value: 'Sat', label: 'Sat' },
   { value: 'Sun', label: 'Sun' },
 ];
+
+const DEFAULT_DUTY_DAYS: DutyDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+const makeDefaultSchedule = (days: DutyDay[]): DutySchedule =>
+  Object.fromEntries(days.map(d => [d, [{ start: '08:00', end: '17:00' }]])) as DutySchedule;
+
+/** Build a duty_schedule from editing staff data, falling back to legacy fields. */
+const buildDutySchedule = (staff: StaffMember): DutySchedule => {
+  if (staff.duty_schedule) return staff.duty_schedule;
+  if (staff.availability?.duty_schedule) return staff.availability.duty_schedule as DutySchedule;
+  const days: DutyDay[] = (
+    staff.duty_days ?? staff.availability?.duty_days ?? DEFAULT_DUTY_DAYS
+  ) as DutyDay[];
+  const start = staff.availability?.duty_start_time ?? '08:00';
+  const end   = staff.availability?.duty_end_time   ?? '17:00';
+  return Object.fromEntries(days.map(d => [d, [{ start, end }]])) as DutySchedule;
+};
 
 interface CreateStaffAccountModalProps {
   isOpen:        boolean;
@@ -37,11 +55,10 @@ const EMPTY_FORM: CreateStaffData = {
   role:          'STAFF',
   clinic_branch: null,
   // Availability defaults
-  duty_days:       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-  duty_start_time:  '08:00',
-  duty_end_time:    '17:00',
+  duty_days:        DEFAULT_DUTY_DAYS,
   lunch_start_time: '12:00',
   lunch_end_time:   '13:00',
+  duty_schedule:    makeDefaultSchedule(DEFAULT_DUTY_DAYS),
 };
 
 /* ── Reusable field helpers ─────────────────────────────── */
@@ -104,12 +121,11 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
         gender:        editingStaff.gender         ?? 'Male',
         role:          editingStaff.role,
         clinic_branch: editingStaff.clinic_branch  ?? null,
-        // Availability - fields are at root level from API response
-        duty_days:       editingStaff.duty_days       ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        duty_start_time: editingStaff.duty_start_time ?? '08:00',
-        duty_end_time:   editingStaff.duty_end_time   ?? '17:00',
-        lunch_start_time: editingStaff.lunch_start_time ?? '12:00',
-        lunch_end_time:   editingStaff.lunch_end_time   ?? '13:00',
+        // Availability
+        duty_days:       (editingStaff.duty_days ?? editingStaff.availability?.duty_days ?? DEFAULT_DUTY_DAYS) as DutyDay[],
+        lunch_start_time: editingStaff.lunch_start_time ?? editingStaff.availability?.lunch_start_time ?? '12:00',
+        lunch_end_time:   editingStaff.lunch_end_time   ?? editingStaff.availability?.lunch_end_time   ?? '13:00',
+        duty_schedule:    buildDutySchedule(editingStaff),
       };
       console.log('[CreateStaffModal] Setting form data to:', newFormData);
       setFormData(newFormData);
@@ -141,21 +157,29 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
     if (formData.date_of_birth && new Date(formData.date_of_birth) > new Date())
       e.date_of_birth = 'Date of birth cannot be in the future';
 
-    // Availability validation (for PRACTITIONER)
-    if (formData.role === 'PRACTITIONER') {
-      console.log('[CreateStaffModal] Validating PRACTITIONER availability:', {
-        duty_days: formData.duty_days,
-        duty_start_time: formData.duty_start_time,
-        duty_end_time: formData.duty_end_time,
-        lunch_start_time: formData.lunch_start_time,
-        lunch_end_time: formData.lunch_end_time,
-      });
+    // Availability validation (for both PRACTITIONER and STAFF)
+    if (formData.role === 'PRACTITIONER' || formData.role === 'STAFF') {
       if (!formData.duty_days || formData.duty_days.length === 0)
         e.duty_days = 'At least one duty day is required';
-      if (!formData.duty_start_time) e.duty_start_time = 'Required';
-      if (!formData.duty_end_time) e.duty_end_time = 'Required';
+      // Validate per-day blocks
+      if (formData.duty_schedule) {
+        for (const day of (formData.duty_days ?? [])) {
+          const blocks = formData.duty_schedule[day as DutyDay] ?? [];
+          for (const block of blocks) {
+            if (!block.start || !block.end) {
+              e.duty_schedule = `${day}: every block must have a start and end time`;
+              break;
+            }
+            if (block.start >= block.end) {
+              e.duty_schedule = `${day}: shift end must be after shift start (${block.start}–${block.end})`;
+              break;
+            }
+          }
+          if (e.duty_schedule) break;
+        }
+      }
       if (!formData.lunch_start_time) e.lunch_start_time = 'Required';
-      if (!formData.lunch_end_time) e.lunch_end_time = 'Required';
+      if (!formData.lunch_end_time)   e.lunch_end_time   = 'Required';
     }
 
     console.log('[CreateStaffModal] Validation errors:', e);
@@ -199,6 +223,59 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
 
   const set = <K extends keyof CreateStaffData>(field: K, value: CreateStaffData[K]) =>
     setFormData(prev => ({ ...prev, [field]: value }));
+
+  // ── Split-shift schedule handlers ──────────────────────────────────────────
+  const toggleDutyDay = (day: DutyDay) => {
+    const currentDays = formData.duty_days ?? [];
+    const isActive = currentDays.includes(day);
+    if (isActive) {
+      const newDays = currentDays.filter(d => d !== day);
+      const newSchedule = { ...(formData.duty_schedule ?? {}) } as DutySchedule;
+      delete newSchedule[day];
+      setFormData(prev => ({
+        ...prev,
+        duty_days: newDays,
+        duty_schedule: Object.keys(newSchedule).length > 0 ? newSchedule : null,
+      }));
+    } else {
+      const newDays = [...currentDays, day];
+      const existing = formData.duty_schedule ?? {};
+      const newSchedule: DutySchedule = {
+        ...existing,
+        [day]: (existing[day] ?? [{ start: '08:00', end: '17:00' }]),
+      };
+      setFormData(prev => ({ ...prev, duty_days: newDays, duty_schedule: newSchedule }));
+    }
+  };
+
+  const addBlock = (day: DutyDay) => {
+    const existing = formData.duty_schedule ?? {};
+    const blocks = existing[day] ?? [{ start: '08:00', end: '17:00' }];
+    const [h, m] = (blocks[blocks.length - 1]?.end ?? '08:00').split(':').map(Number);
+    const newH = Math.min(h + 1, 23);
+    const newBlock = {
+      start: `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+      end:   `${String(Math.min(newH + 1, 23)).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+    };
+    setFormData(prev => ({
+      ...prev,
+      duty_schedule: { ...existing, [day]: [...blocks, newBlock] },
+    }));
+  };
+
+  const removeBlock = (day: DutyDay, idx: number) => {
+    const existing = formData.duty_schedule ?? {};
+    const blocks = (existing[day] ?? []).filter((_, i) => i !== idx);
+    const newSchedule = { ...existing, [day]: blocks } as DutySchedule;
+    setFormData(prev => ({ ...prev, duty_schedule: newSchedule }));
+  };
+
+  const updateBlock = (day: DutyDay, idx: number, field: 'start' | 'end', value: string) => {
+    const existing = formData.duty_schedule ?? {};
+    const blocks = [...(existing[day] ?? [])];
+    blocks[idx] = { ...blocks[idx], [field]: value };
+    setFormData(prev => ({ ...prev, duty_schedule: { ...existing, [day]: blocks } }));
+  };
 
   if (!isOpen) return null;
 
@@ -424,13 +501,13 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                     </div>
                   </div>
 
-                  {/* ── Availability Section (only for PRACTITIONER) ── */}
-                  {formData.role === 'PRACTITIONER' && (
+                  {/* ── Availability Section (for PRACTITIONER and STAFF) ── */}
+                  {(formData.role === 'PRACTITIONER' || formData.role === 'STAFF') && (
                     <div className="md:col-span-2 border-t border-gray-200 pt-5">
                       <SectionTitle color="text-emerald-600">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
-                          Practitioner Availability
+                          {formData.role === 'PRACTITIONER' ? 'Practitioner' : 'Staff'} Schedule
                         </span>
                       </SectionTitle>
 
@@ -442,13 +519,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                             <button
                               key={day.value}
                               type="button"
-                              onClick={() => {
-                                const current = formData.duty_days ?? [];
-                                const newDays = current.includes(day.value)
-                                  ? current.filter(d => d !== day.value)
-                                  : [...current, day.value];
-                                set('duty_days', newDays);
-                              }}
+                              onClick={() => toggleDutyDay(day.value)}
                               className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
                                 (formData.duty_days ?? []).includes(day.value)
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400'
@@ -462,31 +533,58 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                         {errors.duty_days && <FieldError msg={errors.duty_days} />}
                       </div>
 
-                      {/* Duty Hours */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <Label required>Duty Start Time</Label>
-                          <input
-                            type="time"
-                            value={formData.duty_start_time ?? '08:00'}
-                            onChange={e => set('duty_start_time', e.target.value)}
-                            className={inputCls(!!errors.duty_start_time)}
-                          />
-                          <FieldError msg={errors.duty_start_time} />
-                        </div>
-                        <div>
-                          <Label required>Duty End Time</Label>
-                          <input
-                            type="time"
-                            value={formData.duty_end_time ?? '17:00'}
-                            onChange={e => set('duty_end_time', e.target.value)}
-                            className={inputCls(!!errors.duty_end_time)}
-                          />
-                          <FieldError msg={errors.duty_end_time} />
-                        </div>
+                      {/* Per-day shift blocks */}
+                      <div className="space-y-3 mb-4">
+                        {DUTY_DAY_OPTIONS.filter(d => (formData.duty_days ?? []).includes(d.value)).map(day => {
+                          const blocks = formData.duty_schedule?.[day.value] ?? [{ start: '08:00', end: '17:00' }];
+                          return (
+                            <div key={day.value} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">{day.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => addBlock(day.value)}
+                                  className="flex items-center gap-1 text-xs text-emerald-600 font-medium hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  Add Block
+                                </button>
+                              </div>
+                              <div className="space-y-2">
+                                {blocks.map((block, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <input
+                                      type="time"
+                                      value={block.start}
+                                      onChange={e => updateBlock(day.value, idx, 'start', e.target.value)}
+                                      className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
+                                    />
+                                    <span className="text-gray-400 text-xs shrink-0">–</span>
+                                    <input
+                                      type="time"
+                                      value={block.end}
+                                      onChange={e => updateBlock(day.value, idx, 'end', e.target.value)}
+                                      className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={blocks.length === 1}
+                                      onClick={() => removeBlock(day.value, idx)}
+                                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                      title="Remove block"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                      {errors.duty_schedule && <FieldError msg={errors.duty_schedule} />}
 
-                      {/* Lunch Break */}
+                      {/* Lunch Break (global) */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label required>Lunch Start</Label>

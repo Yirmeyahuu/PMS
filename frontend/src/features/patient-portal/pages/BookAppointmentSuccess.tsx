@@ -1,5 +1,5 @@
-import React from 'react';
-import { useLocation, useParams, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Calendar, User, Stethoscope, MapPin } from 'lucide-react';
 import type { BookingConfirmation } from '../types/portal';
 
@@ -13,16 +13,33 @@ const fmt12 = (time: string) => {
 export const BookAppointmentSuccess: React.FC = () => {
   const { token }    = useParams<{ token: string }>();
   const { state }    = useLocation();
+  const navigate     = useNavigate();
   const confirmation = state?.confirmation as BookingConfirmation | undefined;
+
+  const closePage = () => navigate(`/portal/${token}`);
+
+  const [countdown, setCountdown] = useState(8);
+
+  // Auto-close after 8 seconds with visible countdown
+  useEffect(() => {
+    if (!confirmation) return;
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(interval); navigate(`/portal/${token}`); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!confirmation) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-500">No booking information found.</p>
-          <Link to={`/portal/${token}`} className="mt-4 inline-block text-teal-600 underline text-sm">
+          <button onClick={closePage} className="mt-4 inline-block text-sky-500 underline text-sm">
             Go back to booking portal
-          </Link>
+          </button>
         </div>
       </div>
     );
@@ -33,20 +50,14 @@ export const BookAppointmentSuccess: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-md overflow-hidden">
 
         {/* Header */}
-        <div className="bg-teal-600 px-6 py-8 text-center">
+        <div className="bg-sky-500 px-6 py-8 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
             <CheckCircle className="w-9 h-9 text-white" />
           </div>
           <h1 className="text-xl font-bold text-white">Booking Confirmed!</h1>
-          <p className="text-teal-100 text-sm mt-1">
+          <p className="text-sky-100 text-sm mt-1">
             Your appointment has been successfully booked.
           </p>
-        </div>
-
-        {/* Reference number */}
-        <div className="bg-teal-50 border-b border-teal-100 px-6 py-3 text-center">
-          <p className="text-xs text-teal-600 font-medium uppercase tracking-wide">Reference Number</p>
-          <p className="text-lg font-bold text-teal-800 font-mono">#{confirmation.reference_number}</p>
         </div>
 
         {/* Details */}
@@ -98,20 +109,20 @@ export const BookAppointmentSuccess: React.FC = () => {
         </div>
 
         {/* Notice */}
-        <div className="mx-6 mb-5 bg-teal-50 border border-teal-200 rounded-xl p-3">
-          <p className="text-xs text-teal-700 text-center">
+        <div className="mx-6 mb-5 bg-sky-50 border border-sky-200 rounded-xl p-3">
+          <p className="text-xs text-sky-700 text-center">
             A confirmation has been recorded. Please arrive a few minutes early for your appointment.
           </p>
         </div>
 
         {/* CTA */}
         <div className="px-6 pb-6">
-          <Link
-            to={`/portal/${token}`}
-            className="block w-full text-center py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          <button
+            onClick={closePage}
+            className="block w-full text-center py-2.5 bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold rounded-xl transition-colors"
           >
-            Book Another Appointment
-          </Link>
+            Close Page ({countdown}s)
+          </button>
         </div>
       </div>
     </div>

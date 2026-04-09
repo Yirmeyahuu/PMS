@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X, Clock, CheckCircle, XCircle, AlertCircle, Activity,
   Calendar, User, MapPin, FileText, Receipt,
@@ -6,21 +6,14 @@ import {
   ClipboardList, Printer, Mail,
 } from 'lucide-react';
 import type { Appointment } from '@/types';
+import type { Invoice } from '@/types/billing';
 import { getAppointmentInvoice } from '@/features/appointments/appointment.api';
 import { SendInvoiceEmailModal } from './SendInvoiceEmailModal';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Invoice {
-  id: number;
-  invoice_number: string;
-  status: string;
-  total_amount: string | number;
-  paid_amount: string | number;
-  balance: string | number;
-  due_date: string | null;
-  issued_date: string;
-}
+import { PMSInvoiceTemplate } from '@/components/invoices/PMSInvoiceTemplate';
+import type { InvoiceClinicInfo, NextAppointmentInfo } from '@/components/invoices/PMSInvoiceTemplate';
+import { useReactToPrint } from 'react-to-print';
+import { getMyClinic } from '@/features/clinics/clinic.api';
+import axiosInstance from '@/lib/axios';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -102,15 +95,59 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'invoice'>('details');
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [clinicInfo, setClinicInfo] = useState<InvoiceClinicInfo | undefined>();
+  const [nextAppointment, setNextAppointment] = useState<NextAppointmentInfo | null>(null);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // A4 height in pixels at 96 DPI
+  const A4_HEIGHT_PX = 1122; // 297mm ≈ 1122px
+
+  const handlePrint = useReactToPrint({
+    contentRef: invoiceRef,
+    documentTitle: invoices.length > 0 ? `Invoice-${invoices[0].invoice_number}` : 'Invoice',
+    pageStyle: `
+      @page { size: A4 portrait; margin: 0; }
+      html, body {
+        margin: 0; padding: 0;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    `,
+    onBeforePrint: async () => {
+      const el = invoiceRef.current;
+      if (!el) return;
+      // Measure natural height, scale down if it exceeds A4
+      const naturalHeight = el.scrollHeight;
+      if (naturalHeight > A4_HEIGHT_PX) {
+        const scale = A4_HEIGHT_PX / naturalHeight;
+        el.style.transform = `scale(${scale})`;
+        el.style.transformOrigin = 'top left';
+        el.style.width = `${100 / scale}%`;
+        el.style.maxWidth = 'none';
+        el.dataset.printScaled = 'true';
+      }
+    },
+    onAfterPrint: () => {
+      const el = invoiceRef.current;
+      if (!el || !el.dataset.printScaled) return;
+      el.style.transform = '';
+      el.style.transformOrigin = '';
+      el.style.width = '';
+      el.style.maxWidth = '';
+      delete el.dataset.printScaled;
+    },
+  });
 
   const fetchInvoices = useCallback(async () => {
     if (!appointment) return;
     setLoadingInvoices(true);
     try {
       const data = await getAppointmentInvoice(appointment.id);
-      setInvoices(data?.results ?? data ?? []);
+      const results = data?.results ?? data ?? [];
+      setInvoices(Array.isArray(results) ? results : [results]);
     } catch { setInvoices([]); }
     finally { setLoadingInvoices(false); }
   }, [appointment]);
@@ -119,44 +156,37 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
     if (isOpen && appointment) {
       setActiveTab('details');
       fetchInvoices();
+
+      // Fetch clinic profile
+      getMyClinic().then((profile) => {
+        setClinicInfo({
+          name: profile.name,
+          address: [profile.address, profile.city, profile.province, profile.postal_code].filter(Boolean).join(', '),
+          phone: profile.phone || undefined,
+          email: profile.email || undefined,
+          website: profile.website || undefined,
+          tinNumber: profile.tin || undefined,
+          logoUrl: profile.logo_url || profile.logo || undefined,
+        });
+      }).catch(() => {});
+
+      // Fetch next appointment for this patient
+      if (appointment.patient) {
+        const params = new URLSearchParams({
+          patient: String(appointment.patient),
+          date_from: appointment.date,
+          ordering: 'date,start_time',
+          page_size: '10',
+        });
+        axiosInstance.get(`/appointments/?${params.toString()}`)
+          .then(({ data }) => {
+            const next = data.results?.find((a: Appointment) => a.id !== appointment.id);
+            setNextAppointment(next ? { date: next.date, start_time: next.start_time } : null);
+          })
+          .catch(() => setNextAppointment(null));
+      }
     }
   }, [isOpen, appointment, fetchInvoices]);
-
-  // Fetch PDF client-side when Invoice tab is active
-  useEffect(() => {
-    const fetchPdf = async () => {
-      if (activeTab !== 'invoice' || invoices.length === 0) {
-        setPdfUrl(null);
-        return;
-      }
-
-      setLoadingPdf(true);
-      try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${token}`
-        );
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setPdfUrl(url);
-        }
-      } catch (error) {
-        console.error('Failed to fetch PDF:', error);
-      } finally {
-        setLoadingPdf(false);
-      }
-    };
-
-    fetchPdf();
-
-    // Cleanup blob URL on unmount or when pdfUrl changes
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [activeTab, invoices]);
 
   if (!isOpen || !appointment) return null;
 
@@ -174,7 +204,9 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] pointer-events-auto flex flex-col overflow-hidden"
+          className={`bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] pointer-events-auto flex flex-col overflow-hidden transition-all ${
+            activeTab === 'invoice' ? 'max-w-4xl' : 'max-w-2xl'
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* ── Header ── */}
@@ -342,16 +374,12 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                     <p className="text-xs text-gray-400 mt-1">An invoice will appear here once generated</p>
                   </div>
                 ) : invoices.length > 0 ? (
-                  /* Display PDF preview inline with action buttons */
+                  /* Display React invoice template inline with action buttons */
                   <div className="flex flex-col gap-4">
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => {
-                          // Open print in new tab
-                          const printUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${localStorage.getItem('access_token') || ''}`;
-                          window.open(printUrl, '_blank', 'noopener,noreferrer');
-                        }}
+                        onClick={() => handlePrint()}
                         className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         <Printer className="w-4 h-4" />
@@ -365,37 +393,17 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                         Send Email
                       </button>
                     </div>
-                    {/* PDF Preview Container */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                      {loadingPdf ? (
-                        <div className="w-full h-[500px] flex items-center justify-center">
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 text-sky-500 animate-spin mx-auto mb-2" />
-                            <p className="text-sm text-gray-500">Loading PDF...</p>
-                          </div>
-                        </div>
-                      ) : pdfUrl ? (
-                        <iframe
-                          src={pdfUrl}
-                          className="w-full h-[500px]"
-                          title={`Invoice ${invoices[0].invoice_number}`}
+                    {/* Invoice Preview */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <PMSInvoiceTemplate
+                          ref={invoiceRef}
+                          invoice={invoices[0]}
+                          clinic={clinicInfo}
+                          nextAppointment={nextAppointment}
+                          showPaymentHistory
                         />
-                      ) : (
-                        <div className="w-full h-[500px] flex items-center justify-center">
-                          <div className="text-center">
-                            <p className="text-sm text-gray-500">Unable to load PDF</p>
-                            <button
-                              onClick={() => {
-                                const printUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoices[0].id}/print/?token=${localStorage.getItem('access_token') || ''}`;
-                                window.open(printUrl, '_blank', 'noopener,noreferrer');
-                              }}
-                              className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
-                            >
-                              Open in new tab
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -434,6 +442,9 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
           patientEmail={patientEmail || ''}
           appointmentDate={formatDate(appointment.date)}
           appointmentType={APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
+          invoice={invoices[0]}
+          clinic={clinicInfo}
+          nextAppointment={nextAppointment}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-import type { DutyDay } from '@/features/clinics/clinic.api';
+import type { DutyDay, DutySchedule } from '@/features/clinics/clinic.api';
 
 export interface PortalAvailability {
   duty_days: DutyDay[];
@@ -6,6 +6,7 @@ export interface PortalAvailability {
   duty_end_time: string;
   lunch_start_time: string;
   lunch_end_time: string;
+  duty_schedule?: DutySchedule | null; // split-shift support
 }
 
 export interface PortalBranch {
@@ -31,6 +32,7 @@ export interface PortalPractitioner {
   avatar_url:     string | null;
   branch_id?:     number | null;
   availability?:  PortalAvailability;
+  services?:      Array<{ id: number; name: string }>; // assigned services
 }
 
 export interface PortalService {
@@ -45,6 +47,7 @@ export interface PortalService {
   category:         number | null;
   category_name:    string | null;
   color_hex:        string;
+  assigned_practitioner_ids?: number[]; // empty = any practitioner
 }
 
 export interface PortalCategory {

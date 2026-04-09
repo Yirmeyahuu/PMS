@@ -15,11 +15,13 @@ class UserSerializer(serializers.ModelSerializer):
 
     # ── Practitioner availability fields ─────────────────────────────────────────
     duty_days        = serializers.ListField(child=serializers.CharField(), required=False)
-    duty_start_time  = serializers.CharField(required=False)
-    duty_end_time    = serializers.CharField(required=False)
-    lunch_start_time = serializers.CharField(required=False)
-    lunch_end_time   = serializers.CharField(required=False)
-    
+    duty_start_time  = serializers.CharField(required=False, allow_blank=True)
+    duty_end_time    = serializers.CharField(required=False, allow_blank=True)
+    lunch_start_time = serializers.CharField(required=False, allow_blank=True)
+    lunch_end_time   = serializers.CharField(required=False, allow_blank=True)
+    # Split-shift schedule (both PRACTITIONER and STAFF)
+    duty_schedule    = serializers.JSONField(required=False, allow_null=True)
+
     # ── Position and discipline ──────────────────────────────────────────────
     position         = serializers.CharField(required=False, allow_blank=True)
     discipline       = serializers.CharField(required=False, allow_blank=True)
@@ -33,8 +35,10 @@ class UserSerializer(serializers.ModelSerializer):
             'clinic_setup_complete',   # ← NEW
             # Position (for all staff)
             'position',
-            # Availability fields
+            # Availability fields (legacy single block)
             'duty_days', 'duty_start_time', 'duty_end_time', 'lunch_start_time', 'lunch_end_time',
+            # Split-shift schedule
+            'duty_schedule',
             # Discipline (for PRACTITIONER)
             'discipline',
         ]
@@ -64,7 +68,7 @@ class UserSerializer(serializers.ModelSerializer):
         return False
 
     def to_representation(self, instance):
-        """Add practitioner availability, discipline, and practitioner_id to the serialized output."""
+        """Add practitioner/staff availability, discipline, and practitioner_id to the serialized output."""
         data = super().to_representation(instance)
         if instance.role == 'PRACTITIONER':
             try:
@@ -76,9 +80,18 @@ class UserSerializer(serializers.ModelSerializer):
                     data['duty_end_time']    = practitioner.duty_end_time.strftime('%H:%M') if practitioner.duty_end_time else '17:00'
                     data['lunch_start_time'] = practitioner.lunch_start_time.strftime('%H:%M') if practitioner.lunch_start_time else '12:00'
                     data['lunch_end_time']   = practitioner.lunch_end_time.strftime('%H:%M') if practitioner.lunch_end_time else '13:00'
+                    data['duty_schedule']    = practitioner.duty_schedule
                     data['discipline']       = practitioner.discipline or 'OCCUPATIONAL_THERAPY'
             except Exception:
                 pass
+        elif instance.role == 'STAFF':
+            # Expose Staff availability stored directly on the User model
+            data['duty_days']        = instance.duty_days or []
+            data['duty_start_time']  = ''
+            data['duty_end_time']    = ''
+            data['lunch_start_time'] = instance.lunch_start_time or '12:00'
+            data['lunch_end_time']   = instance.lunch_end_time or '13:00'
+            data['duty_schedule']    = instance.duty_schedule
         return data
 
     def validate_clinic_branch(self, value):
@@ -93,7 +106,44 @@ class UserSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def _validate_duty_schedule(self, schedule):
+        """Validate duty_schedule structure and check for overlaps."""
+        valid_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        if not isinstance(schedule, dict):
+            raise serializers.ValidationError(
+                {'duty_schedule': 'duty_schedule must be an object mapping day names to lists of blocks.'}
+            )
+        for day, blocks in schedule.items():
+            if day not in valid_days:
+                raise serializers.ValidationError(
+                    {'duty_schedule': f'Invalid day key: {day}. Must be one of {valid_days}.'}
+                )
+            if not isinstance(blocks, list):
+                raise serializers.ValidationError(
+                    {'duty_schedule': f'Blocks for {day} must be a list.'}
+                )
+            sorted_blocks = sorted(blocks, key=lambda b: b.get('start', ''))
+            for i, block in enumerate(sorted_blocks):
+                if 'start' not in block or 'end' not in block:
+                    raise serializers.ValidationError(
+                        {'duty_schedule': f'Each block in {day} must have "start" and "end" keys.'}
+                    )
+                if block['start'] >= block['end']:
+                    raise serializers.ValidationError(
+                        {'duty_schedule': f'{day}: block start ({block["start"]}) must be before end ({block["end"]}).'}
+                    )
+                if i > 0:
+                    prev = sorted_blocks[i - 1]
+                    if block['start'] < prev['end']:
+                        raise serializers.ValidationError(
+                            {'duty_schedule': f'{day}: overlapping blocks ({prev["start"]}–{prev["end"]} and {block["start"]}–{block["end"]}).'}
+                        )
+
     def validate(self, attrs):
+        duty_schedule = attrs.get('duty_schedule')
+        if duty_schedule is not None:
+            self._validate_duty_schedule(duty_schedule)
+
         duty_days = attrs.get('duty_days')
         if duty_days is not None:
             valid_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -105,43 +155,37 @@ class UserSerializer(serializers.ModelSerializer):
                         {"duty_days": f"Invalid day: {day}. Must be one of {valid_days}"}
                     )
 
-        duty_start = attrs.get('duty_start_time')
-        duty_end = attrs.get('duty_end_time')
-        lunch_start = attrs.get('lunch_start_time')
-        lunch_end = attrs.get('lunch_end_time')
+        # Only validate legacy single-block times when duty_schedule is NOT provided
+        if not duty_schedule:
+            duty_start  = attrs.get('duty_start_time')
+            duty_end    = attrs.get('duty_end_time')
+            lunch_start = attrs.get('lunch_start_time')
+            lunch_end   = attrs.get('lunch_end_time')
 
-        if duty_start and duty_end:
-            if duty_start >= duty_end:
-                raise serializers.ValidationError({
-                    'duty_end_time': 'Duty end time must be after duty start time.'
-                })
+            if duty_start and duty_end:
+                if duty_start >= duty_end:
+                    raise serializers.ValidationError({
+                        'duty_end_time': 'Duty end time must be after duty start time.'
+                    })
 
-        if lunch_start and lunch_end:
-            if lunch_start >= lunch_end:
-                raise serializers.ValidationError({
-                    'lunch_end_time': 'Lunch end time must be after lunch start time.'
-                })
-
-        if duty_start and duty_end and lunch_start and lunch_end:
-            if not (duty_start <= lunch_start and lunch_end <= duty_end):
-                raise serializers.ValidationError({
-                    'lunch_start_time': 'Lunch must be within duty hours.'
-                })
+            if lunch_start and lunch_end:
+                if lunch_start >= lunch_end:
+                    raise serializers.ValidationError({
+                        'lunch_end_time': 'Lunch end time must be after lunch start time.'
+                    })
 
         return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
-        
-        # Pop practitioner-specific fields - don't set on User model
-        # (Practitioner creation is handled by the view)
-        practitioner_fields = [
-            'duty_days', 'duty_start_time', 'duty_end_time', 
-            'lunch_start_time', 'lunch_end_time'
-        ]
-        for field in practitioner_fields:
+
+        # Pop fields that do not exist on the User model (Practitioner handles them)
+        for field in ['duty_start_time', 'duty_end_time', 'discipline']:
             validated_data.pop(field, None)
-        
+
+        # duty_days, lunch_start_time, lunch_end_time, duty_schedule are columns on User
+        # so they stay in validated_data and are set directly.
+
         user = User.objects.create(**validated_data)
         if password:
             user.set_password(password)
@@ -150,35 +194,43 @@ class UserSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
-        
-        # Pop practitioner-specific fields - don't set on User model
-        practitioner_fields = [
-            'duty_days', 'duty_start_time', 'duty_end_time', 
-            'lunch_start_time', 'lunch_end_time', 'discipline'
-        ]
+
+        # Fields that live on the Practitioner model (not User) — pull them out
+        practitioner_only_fields = ['duty_start_time', 'duty_end_time', 'discipline']
         practitioner_data = {}
-        for field in practitioner_fields:
+        for field in practitioner_only_fields:
             if field in validated_data:
                 practitioner_data[field] = validated_data.pop(field)
-        
+
+        # duty_days, lunch_*, duty_schedule live on User for STAFF and on Practitioner for PRACTITIONER
+        shared_availability = {}
+        for field in ['duty_days', 'lunch_start_time', 'lunch_end_time', 'duty_schedule']:
+            if field in validated_data:
+                shared_availability[field] = validated_data.pop(field)
+
         # Update User fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
+        # Store availability on User for STAFF; Practitioner sync handles PRACTITIONER below
+        if instance.role == 'STAFF' or (validated_data.get('role') == 'STAFF'):
+            for field, value in shared_availability.items():
+                setattr(instance, field, value)
+
         if password:
             instance.set_password(password)
             instance.password_changed = True
         instance.save()
-        
-        # Sync practitioner availability fields if role is PRACTITIONER
-        if instance.role == 'PRACTITIONER' and practitioner_data:
+
+        # Sync Practitioner availability fields when role is PRACTITIONER
+        if instance.role == 'PRACTITIONER':
             try:
                 practitioner = instance.practitioner_profile
                 if practitioner and not practitioner.is_deleted:
                     import json
                     update_data = {}
-                    if 'duty_days' in practitioner_data:
-                        duty_days = practitioner_data['duty_days']
+                    if 'duty_days' in shared_availability:
+                        duty_days = shared_availability['duty_days']
                         if isinstance(duty_days, str):
                             try:
                                 duty_days = json.loads(duty_days)
@@ -189,21 +241,18 @@ class UserSerializer(serializers.ModelSerializer):
                         update_data['duty_start_time'] = practitioner_data['duty_start_time']
                     if 'duty_end_time' in practitioner_data:
                         update_data['duty_end_time'] = practitioner_data['duty_end_time']
-                    if 'lunch_start_time' in practitioner_data:
-                        update_data['lunch_start_time'] = practitioner_data['lunch_start_time']
-                    if 'lunch_end_time' in practitioner_data:
-                        update_data['lunch_end_time'] = practitioner_data['lunch_end_time']
+                    for f in ['lunch_start_time', 'lunch_end_time', 'duty_schedule']:
+                        if f in shared_availability:
+                            update_data[f] = shared_availability[f]
                     if 'discipline' in practitioner_data:
                         update_data['discipline'] = practitioner_data['discipline']
-                    
+
                     if update_data:
                         Practitioner.objects.filter(pk=practitioner.pk).update(**update_data)
-                        # Force refresh of the cached practitioner_profile relation
-                        # so to_representation sees the updated values
                         instance.__dict__.pop('practitioner_profile', None)
             except Exception:
                 pass
-        
+
         return instance
 
 

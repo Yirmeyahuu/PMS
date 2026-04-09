@@ -524,6 +524,7 @@ class UserViewSet(viewsets.ModelViewSet):
                             'duty_end_time': request.data.get('duty_end_time', '17:00'),
                             'lunch_start_time': request.data.get('lunch_start_time', '12:00'),
                             'lunch_end_time': request.data.get('lunch_end_time', '13:00'),
+                            'duty_schedule': request.data.get('duty_schedule', None),
                             'discipline': request.data.get('discipline', 'OCCUPATIONAL_THERAPY'),
                         }
                         Practitioner.objects.create(
@@ -537,6 +538,16 @@ class UserViewSet(viewsets.ModelViewSet):
                         )
                         practitioner_created = True
                         logger.info(f"Practitioner profile created for: {user.email}")
+                elif role == 'STAFF':
+                    # Save Staff availability directly on the User model
+                    duty_schedule = request.data.get('duty_schedule', None)
+                    duty_days = request.data.get('duty_days', [])
+                    if duty_schedule is not None or duty_days:
+                        user.duty_schedule = duty_schedule
+                        user.duty_days = duty_days if isinstance(duty_days, list) else []
+                        user.lunch_start_time = request.data.get('lunch_start_time', '12:00')
+                        user.lunch_end_time = request.data.get('lunch_end_time', '13:00')
+                        user.save()
 
                 company_name = request.user.clinic.name if request.user.clinic else 'Your Organization'
                 email_sent   = EmailService.send_welcome_email(
@@ -623,6 +634,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     'duty_end_time':         request.data.get('duty_end_time', '17:00'),
                     'lunch_start_time':      request.data.get('lunch_start_time', '12:00'),
                     'lunch_end_time':        request.data.get('lunch_end_time', '13:00'),
+                    'duty_schedule':         request.data.get('duty_schedule', None),
                 },
             )
             if practitioner_created:

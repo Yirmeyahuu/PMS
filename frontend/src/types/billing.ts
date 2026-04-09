@@ -249,6 +249,7 @@ export interface Payment {
   payment_date:     string;
   amount:           string;
   payment_method:   PaymentMethod;
+  bank_name:        string;
   reference_number: string;
   notes:            string;
   receipt_number:   string;
@@ -263,6 +264,7 @@ export interface CreatePaymentPayload {
   payment_date:      string;
   amount:            number;
   payment_method:    PaymentMethod;
+  bank_name?:        string;
   reference_number?: string;
   notes?:            string;
 }

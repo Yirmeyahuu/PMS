@@ -64,6 +64,26 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
         help_text='Specific branch this staff/practitioner is assigned to. '
                   'Null means they work across all branches.'
     )
+
+    # ── Availability (for STAFF role — PRACTITIONERs use the Practitioner model) ──
+    duty_days = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of duty days for staff, e.g. ["Mon","Tue"]'
+    )
+    lunch_start_time = models.CharField(
+        max_length=5, blank=True, default='12:00',
+        help_text='Lunch start HH:MM'
+    )
+    lunch_end_time = models.CharField(
+        max_length=5, blank=True, default='13:00',
+        help_text='Lunch end HH:MM'
+    )
+    # Split-shift schedule: {"Mon": [{"start":"08:00","end":"11:00"}, ...], ...}
+    duty_schedule = models.JSONField(
+        null=True, blank=True, default=None,
+        help_text='Per-day list of {start, end} blocks (Staff scheduling)'
+    )
     
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']

@@ -14,7 +14,7 @@ const DISCIPLINE_LABELS: Record<string, string> = {
 
 const getDisciplineLabel = (d?: string | null): string | null => {
   if (!d) return null;
-  return DISCIPLINE_LABELS[d] ?? d; // fallback to raw value if unknown
+  return DISCIPLINE_LABELS[d] ?? d;
 };
 
 interface PractitionerStepProps {
@@ -31,11 +31,11 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
   const [search,       setSearch]       = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  // ── Unique disciplines for filter chips (real practitioners only) ────────
+  // ── Unique disciplines for filter chips ──────────────────────────────────
   const disciplines = Array.from(
     new Set(
       practitioners
-        .filter((p) => p.id !== null && p.discipline)
+        .filter((p) => p.discipline)
         .map((p) => p.discipline as string),
     ),
   );
@@ -52,15 +52,15 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
   });
 
   const displayed = filtered.filter(
-    (p) => !activeFilter || p.id === null || p.discipline === activeFilter,
+    (p) => !activeFilter || p.discipline === activeFilter,
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Select Practitioner</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Choose Practitioner</h2>
         <p className="text-gray-500 text-sm mt-1">
-          Choose a practitioner or select &quot;Any Available&quot; to let us assign one.
+          Select the practitioner you&apos;d like to book with.
         </p>
       </div>
 
@@ -71,13 +71,13 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, position or discipline..."
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+          placeholder="Search by name or specialty..."
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
         />
       </div>
 
       {/* Discipline filter chips */}
-      {disciplines.length > 0 && (
+      {disciplines.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {disciplines.map((disc) => (
             <button
@@ -85,8 +85,8 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
               onClick={() => setActiveFilter(activeFilter === disc ? null : disc)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 activeFilter === disc
-                  ? 'bg-teal-600 text-white border-teal-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-teal-400'
+                  ? 'bg-sky-500 text-white border-sky-500'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-sky-400'
               }`}
             >
               {getDisciplineLabel(disc)}
@@ -107,7 +107,7 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="mt-2 text-xs text-teal-600 hover:underline"
+              className="mt-2 text-xs text-sky-500 hover:underline"
             >
               Clear search
             </button>
@@ -117,42 +117,25 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
 
       {/* Practitioner grid */}
       {displayed.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {displayed.map((p) => {
-            const isSelected =
-              selectedPractitioner?.id === p.id &&
-              (p.id !== null || selectedPractitioner?.full_name === p.full_name);
-            const isAny           = p.id === null;
+            const isSelected      = selectedPractitioner?.id === p.id;
             const disciplineLabel = getDisciplineLabel(p.discipline);
 
             return (
               <button
-                key={p.id ?? 'any'}
+                key={p.id}
                 onClick={() => onSelect(p)}
-                className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all text-center ${
+                className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all text-center shadow-sm ${
                   isSelected
-                    ? 'border-teal-500 bg-teal-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-teal-300 hover:shadow-sm'
+                    ? 'border-sky-500 bg-sky-50 shadow-md'
+                    : 'border-gray-200 bg-white hover:border-sky-300 hover:shadow-md'
                 }`}
               >
                 {/* Avatar */}
-                <div
-                  className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
-                    isAny ? 'bg-teal-100' : 'bg-gray-100'
-                  }`}
-                >
-                  {isAny ? (
-                    <div className="flex -space-x-2">
-                      <div className="w-7 h-7 rounded-full bg-teal-300 border-2 border-white" />
-                      <div className="w-7 h-7 rounded-full bg-teal-400 border-2 border-white" />
-                      <div className="w-7 h-7 rounded-full bg-teal-500 border-2 border-white" />
-                    </div>
-                  ) : p.avatar_url ? (
-                    <img
-                      src={p.avatar_url}
-                      alt={p.full_name}
-                      className="w-full h-full object-cover"
-                    />
+                <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-10 h-10 text-gray-400" />
                   )}
@@ -160,49 +143,51 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
 
                 {/* Info block */}
                 <div className="w-full space-y-1">
-
-                  {/* 1. Name (with title if present) */}
-                  <p className={`text-sm font-bold leading-tight ${
-                    isSelected ? 'text-teal-800' : 'text-gray-900'
-                  }`}>
-                    {!isAny && p.title ? `${p.title}. ${p.full_name}` : p.full_name}
+                  <p className={`text-sm font-bold leading-tight ${isSelected ? 'text-sky-800' : 'text-gray-900'}`}>
+                    {p.title ? `${p.title}. ${p.full_name}` : p.full_name}
                   </p>
 
-                  {/* 2. Occupation / Position */}
-                  {!isAny && (p.occupation || p.position) && (
-                    <p className={`text-xs font-semibold ${
-                      isSelected ? 'text-teal-600' : 'text-gray-600'
-                    }`}>
+                  {(p.occupation || p.position) && (
+                    <p className={`text-xs font-semibold ${isSelected ? 'text-sky-600' : 'text-gray-600'}`}>
                       {p.occupation || p.position}
                     </p>
                   )}
 
-                  {/* 3. Discipline — pill badge */}
-                  {!isAny && disciplineLabel && (
+                  {disciplineLabel && (
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium leading-snug ${
-                      isSelected
-                        ? 'bg-teal-100 text-teal-700'
-                        : 'bg-gray-100 text-gray-500'
+                      isSelected ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {disciplineLabel}
                     </span>
                   )}
 
-                  {/* Fallback: specialization only if no occupation/discipline */}
-                  {!isAny && !p.occupation && !p.position && !disciplineLabel && p.specialization && (
+                  {!p.occupation && !p.position && !disciplineLabel && p.specialization && (
                     <p className="text-xs text-gray-500">{p.specialization}</p>
+                  )}
+
+                  {/* Services offered */}
+                  {p.services && p.services.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-center mt-1">
+                      {p.services.slice(0, 3).map(svc => (
+                        <span
+                          key={svc.id}
+                          className="text-[9px] bg-gray-50 border border-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full"
+                        >
+                          {svc.name}
+                        </span>
+                      ))}
+                      {p.services.length > 3 && (
+                        <span className="text-[9px] text-gray-400">+{p.services.length - 3} more</span>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 {/* CTA button */}
-                <div className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  isSelected
-                    ? 'bg-teal-500 text-white'
-                    : isAny
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-gray-700 text-white'
+                <div className={`w-full py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  isSelected ? 'bg-sky-500 text-white' : 'bg-gray-800 text-white'
                 }`}>
-                  {isAny ? 'ANY PRACTITIONER' : isSelected ? 'Selected ✓' : 'Select'}
+                  {isSelected ? 'Selected ✓' : 'Select'}
                 </div>
               </button>
             );

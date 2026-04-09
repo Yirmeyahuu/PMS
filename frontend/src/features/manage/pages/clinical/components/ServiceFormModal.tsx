@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
+import { getPractitioners } from '@/features/clinics/clinic.api';
+import type { Practitioner } from '@/features/clinics/clinic.api';
 import type { ClinicService, ClinicServicePayload } from '../../../services/clinic-services.api';
 
 interface ServiceFormModalProps {
@@ -17,6 +19,7 @@ const EMPTY: ClinicServicePayload = {
   color_hex:        '#0D9488',
   is_active:        true,
   show_in_portal:   true,
+  assigned_practitioners: [],
 };
 
 // ── Duration options in 15-min increments (15 min → 8 hours) ─────────────────
@@ -42,9 +45,18 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [form,       setForm]       = useState<ClinicServicePayload>(EMPTY);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors,     setErrors]     = useState<Partial<Record<keyof ClinicServicePayload, string>>>({});
+  const [form,         setForm]         = useState<ClinicServicePayload>(EMPTY);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [errors,       setErrors]       = useState<Partial<Record<keyof ClinicServicePayload, string>>>({});
+  const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
+
+  // Load practitioners once on open
+  useEffect(() => {
+    if (!open) return;
+    getPractitioners().then(r => setPractitioners(
+      r.practitioners.filter(p => typeof p.id === 'number') as Practitioner[]
+    )).catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     if (editing) {
@@ -56,6 +68,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         color_hex:        editing.color_hex,
         is_active:        editing.is_active,
         show_in_portal:   editing.show_in_portal,
+        assigned_practitioners: editing.assigned_practitioners ?? [],
       });
     } else {
       setForm(EMPTY);
@@ -65,6 +78,11 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
 
   const set = <K extends keyof ClinicServicePayload>(k: K, v: ClinicServicePayload[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const togglePractitioner = (id: number) => {
+    const current = form.assigned_practitioners ?? [];
+    set('assigned_practitioners', current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
+  };
 
   const validate = (): boolean => {
     const e: typeof errors = {};
@@ -226,6 +244,32 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               </label>
             ))}
           </div>
+
+          {/* Assigned Practitioners */}
+          {practitioners.length > 0 && (
+            <div className="pt-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Assigned Practitioners
+                <span className="ml-1 font-normal text-gray-400">(leave blank to allow any)</span>
+              </label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2.5">
+                {practitioners.map((p) => {
+                  const checked = (form.assigned_practitioners ?? []).includes(p.id as number);
+                  return (
+                    <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => togglePractitioner(p.id as number)}
+                        className="w-4 h-4 rounded accent-teal-600"
+                      />
+                      <span className="text-sm text-gray-700">{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Footer */}

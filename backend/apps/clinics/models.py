@@ -170,11 +170,11 @@ class Practitioner(TimeStampedModel, SoftDeleteModel):
     )
     duty_start_time = models.TimeField(
         default='08:00',
-        help_text='Duty start time'
+        help_text='Duty start time (legacy – superseded by duty_schedule)'
     )
     duty_end_time = models.TimeField(
         default='17:00',
-        help_text='Duty end time'
+        help_text='Duty end time (legacy – superseded by duty_schedule)'
     )
     lunch_start_time = models.TimeField(
         default='12:00',
@@ -183,6 +183,14 @@ class Practitioner(TimeStampedModel, SoftDeleteModel):
     lunch_end_time = models.TimeField(
         default='13:00',
         help_text='Lunch break end time'
+    )
+    # Split-shift schedule: {"Mon": [{"start":"08:00","end":"11:00"}, ...], ...}
+    # When set, overrides duty_start_time / duty_end_time.
+    duty_schedule = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text='Per-day list of {start, end} blocks for split-shift support'
     )
 
     class Meta:
@@ -201,6 +209,7 @@ class Practitioner(TimeStampedModel, SoftDeleteModel):
             'duty_end_time': self.duty_end_time.strftime('%H:%M') if self.duty_end_time else '17:00',
             'lunch_start_time': self.lunch_start_time.strftime('%H:%M') if self.lunch_start_time else '12:00',
             'lunch_end_time': self.lunch_end_time.strftime('%H:%M') if self.lunch_end_time else '13:00',
+            'duty_schedule': self.duty_schedule,  # None when not using split shifts
         }
 
 

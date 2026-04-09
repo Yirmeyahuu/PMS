@@ -21,9 +21,10 @@ interface PortalSidebarProps {
 }
 
 const STEPS = [
-  { number: 2, label: 'Choose Practitioner'   },
-  { number: 3, label: 'Select Service & Time' },
-  { number: 4, label: 'Your Details'          },
+  { number: 2, label: 'Choose Practitioner' },
+  { number: 3, label: 'Select Service'      },
+  { number: 4, label: 'Date & Time'         },
+  { number: 5, label: 'Your Details'        },
 ];
 
 export const PortalSidebar: React.FC<PortalSidebarProps> = ({

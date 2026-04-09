@@ -87,6 +87,7 @@ class PortalPractitionerSerializer(serializers.Serializer):
     avatar_url     = serializers.SerializerMethodField()
     branch_id      = serializers.SerializerMethodField()   # ← critical field
     availability    = serializers.SerializerMethodField() # ← NEW
+    services        = serializers.SerializerMethodField() # ← NEW: assigned services
 
     def get_id(self, obj):
         return obj.id
@@ -137,18 +138,28 @@ class PortalPractitionerSerializer(serializers.Serializer):
         """Return practitioner availability for booking restrictions."""
         return obj.availability
 
+    def get_services(self, obj):
+        """Return list of services assigned to this practitioner."""
+        return [
+            {'id': svc.id, 'name': svc.name}
+            for svc in getattr(obj, 'prefetched_services', obj.services.filter(is_deleted=False, is_active=True))
+        ]
+
 
 class PortalClinicServiceSerializer(serializers.ModelSerializer):
     image_url     = serializers.SerializerMethodField()
     category      = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
+    assigned_practitioner_ids = serializers.SerializerMethodField()
+    sort_order    = serializers.IntegerField()
 
     class Meta:
         model  = ClinicService
         fields = [
             'id', 'name', 'description', 'duration_minutes',
             'price', 'image_url', 'is_active',
-            'category', 'category_name', 'color_hex',
+            'category', 'category_name', 'color_hex', 'sort_order',
+            'assigned_practitioner_ids',
         ]
 
     def get_image_url(self, obj) -> str | None:
@@ -162,6 +173,12 @@ class PortalClinicServiceSerializer(serializers.ModelSerializer):
 
     def get_category_name(self, obj):
         return None
+
+    def get_assigned_practitioner_ids(self, obj) -> list:
+        # Returns empty list when no specific practitioners are assigned (= any practitioner)
+        return list(
+            getattr(obj, 'prefetched_assigned', obj.assigned_practitioners.values_list('id', flat=True))
+        )
 
 
 class PortalBranchSerializer(serializers.Serializer):
@@ -234,13 +251,18 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
             is_active=True,
             show_in_portal=True,
             is_deleted=False,
-        ).order_by('name')
+        ).prefetch_related('assigned_practitioners').order_by('name')
 
         if not services.exists():
             return []
 
+        # Attach prefetched M2M as a list of ids for the serializer
+        services_list = list(services)
+        for svc in services_list:
+            svc.prefetched_assigned = list(svc.assigned_practitioners.values_list('id', flat=True))
+
         serialized = PortalClinicServiceSerializer(
-            services, many=True, context=self.context
+            services_list, many=True, context=self.context
         ).data
 
         return [
@@ -273,7 +295,7 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
             'user',
             'user__clinic_branch',  # ← ensures clinic_branch_id is loaded, not lazy-fetched
             'clinic',
-        )
+        ).prefetch_related('services')  # ← NEW: prefetch assigned services
 
         # Prepend "Any Available" pseudo-entry
         any_available = {
@@ -287,10 +309,16 @@ class PortalLinkPublicSerializer(serializers.ModelSerializer):
             'bio':            '',
             'avatar_url':     None,
             'branch_id':      None,
+            'services':       [],
         }
 
+        # Attach prefetched services for use in get_services()
+        practitioners_list = list(practitioners)
+        for p in practitioners_list:
+            p.prefetched_services = list(p.services.filter(is_deleted=False, is_active=True))
+
         serialized = PortalPractitionerSerializer(
-            practitioners,
+            practitioners_list,
             many=True,
             context=self.context,
         ).data

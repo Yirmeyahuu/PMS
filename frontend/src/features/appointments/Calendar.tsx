@@ -107,13 +107,26 @@ const evalSlotAvailability = (
   const dayOfWeek = DAY_MAP[date.getDay()];
   const dayAvailable = avail.duty_days.includes(dayOfWeek);
   if (!dayAvailable) return { isAvailable: false, isLunch: false, dayAvailable: false };
-  const slotMins = slot.hour * 60 + slot.minutes;
+
+  const slotMins   = slot.hour * 60 + slot.minutes;
+  const lunchStart = timeToMinutes(avail.lunch_start_time);
+  const lunchEnd   = timeToMinutes(avail.lunch_end_time);
+  const isLunch    = slotMins >= lunchStart && slotMins < lunchEnd;
+
+  // ── Split-shift mode: check against duty_schedule blocks ──────────────────
+  if (avail.duty_schedule) {
+    const blocks = avail.duty_schedule[dayOfWeek] ?? [];
+    if (blocks.length === 0) return { isAvailable: false, isLunch: false, dayAvailable: true };
+    const inAnyBlock = blocks.some(
+      b => slotMins >= timeToMinutes(b.start) && slotMins < timeToMinutes(b.end),
+    );
+    return { isAvailable: inAnyBlock && !isLunch, isLunch: isLunch && inAnyBlock, dayAvailable: true };
+  }
+
+  // ── Legacy single-block mode ───────────────────────────────────────────────
   const dutyStart = timeToMinutes(avail.duty_start_time);
   const dutyEnd   = timeToMinutes(avail.duty_end_time);
   if (slotMins < dutyStart || slotMins >= dutyEnd) return { isAvailable: false, isLunch: false, dayAvailable: true };
-  const lunchStart = timeToMinutes(avail.lunch_start_time);
-  const lunchEnd   = timeToMinutes(avail.lunch_end_time);
-  const isLunch = slotMins >= lunchStart && slotMins < lunchEnd;
   return { isAvailable: !isLunch, isLunch, dayAvailable: true };
 };
 
@@ -121,7 +134,7 @@ interface CalendarProps {
   view:                   CalendarView;
   currentDate:            Date;
   onDateChange:           (date: Date) => void;
-  selectedPractitionerId: number | null;
+  selectedPractitionerId: number | string | null;
   selectedClinicBranchId: number | null;
   refreshKey?: number;
   onEventClick?: (event: BlockAppointment) => void;
@@ -237,6 +250,11 @@ export const Calendar: React.FC<CalendarProps> = ({
   comparePractitionerIdA,
   comparePractitionerIdB,
 }) => {
+  // Staff entries have string ids (e.g. 'staff-5') — appointment hooks need a numeric id or null.
+  // Pass null for String ids so appointment filtering is effectively disabled for Staff.
+  const numericPractitionerId: number | null =
+    typeof selectedPractitionerId === 'number' ? selectedPractitionerId : null;
+
   // ── DEBUG: Log when practitionerAvailability changes ──
   React.useEffect(() => {
     console.log('[Calendar] 📊 Practitioner Availability Changed:', {
@@ -244,10 +262,10 @@ export const Calendar: React.FC<CalendarProps> = ({
       practitionerId: selectedPractitionerId,
       availability: practitionerAvailability,
       dutyDays: practitionerAvailability?.duty_days,
-      dutyHours: practitionerAvailability 
+      dutyHours: practitionerAvailability
         ? `${practitionerAvailability.duty_start_time} - ${practitionerAvailability.duty_end_time}`
         : 'N/A',
-      lunchHours: practitionerAvailability 
+      lunchHours: practitionerAvailability
         ? `${practitionerAvailability.lunch_start_time} - ${practitionerAvailability.lunch_end_time}`
         : 'N/A',
     });
@@ -272,15 +290,26 @@ export const Calendar: React.FC<CalendarProps> = ({
   }, [practitionerAvailability, allAvailabilities]);
 
   // Check if a given time slot falls within any practitioner's duty hours.
-  const isDutyHour = useCallback((hour: number, minutes: number): boolean => {
+  const isDutyHour = useCallback((hour: number, minutes: number, forDate?: Date): boolean => {
     const slotMins = hour * 60 + minutes;
     if (practitionerAvailability) {
+      // Split-shift mode
+      if (practitionerAvailability.duty_schedule && forDate) {
+        const dayKey = DAY_MAP[forDate.getDay()];
+        const blocks = practitionerAvailability.duty_schedule[dayKey] ?? [];
+        return blocks.some(b => slotMins >= timeToMinutes(b.start) && slotMins < timeToMinutes(b.end));
+      }
       const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
       const dutyEnd   = timeToMinutes(practitionerAvailability.duty_end_time);
       return slotMins >= dutyStart && slotMins < dutyEnd;
     }
     if (allAvailabilities && Object.keys(allAvailabilities).length > 0) {
       return Object.values(allAvailabilities).some(avail => {
+        if (avail.duty_schedule && forDate) {
+          const dayKey = DAY_MAP[forDate.getDay()];
+          const blocks = avail.duty_schedule[dayKey] ?? [];
+          return blocks.some(b => slotMins >= timeToMinutes(b.start) && slotMins < timeToMinutes(b.end));
+        }
         const dutyStart = timeToMinutes(avail.duty_start_time);
         const dutyEnd   = timeToMinutes(avail.duty_end_time);
         return slotMins >= dutyStart && slotMins < dutyEnd;
@@ -307,7 +336,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // Combined check: is the slot available (duty day + duty hour + not lunch)
   const isSlotFullyAvailable = useCallback((date: Date, hour: number, minutes: number): boolean => {
-    return isDutyDay(date) && isDutyHour(hour, minutes) && !isLunchBreak(hour, minutes);
+    return isDutyDay(date) && isDutyHour(hour, minutes, date) && !isLunchBreak(hour, minutes);
   }, [isDutyDay, isDutyHour, isLunchBreak]);
 
   const { isOpen, selectedSlot, openModal, closeModal } = useAppointmentModal();
@@ -422,7 +451,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   } = useAppointments({
     startDate,
     endDate,
-    practitionerId: selectedPractitionerId,
+    practitionerId: numericPractitionerId,
     clinicBranchId: selectedClinicBranchId,
   });
 
@@ -1329,7 +1358,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     
     // Check availability using our helper functions
     const dayAvailable = isDutyDay(date);
-    const hourAvailable = isDutyHour(slot.hour, slot.minutes);
+    const hourAvailable = isDutyHour(slot.hour, slot.minutes, date);
     const isAvailable = dayAvailable && hourAvailable && !isLunch;
 
     // Lunch break rendering (only on duty days within duty hours)
