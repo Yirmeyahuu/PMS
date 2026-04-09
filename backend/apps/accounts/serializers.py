@@ -64,12 +64,13 @@ class UserSerializer(serializers.ModelSerializer):
         return False
 
     def to_representation(self, instance):
-        """Add practitioner availability and discipline to the serialized output."""
+        """Add practitioner availability, discipline, and practitioner_id to the serialized output."""
         data = super().to_representation(instance)
         if instance.role == 'PRACTITIONER':
             try:
                 practitioner = instance.practitioner_profile
                 if practitioner and not practitioner.is_deleted:
+                    data['practitioner_id']  = practitioner.id
                     data['duty_days']        = practitioner.duty_days or ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
                     data['duty_start_time']  = practitioner.duty_start_time.strftime('%H:%M') if practitioner.duty_start_time else '08:00'
                     data['duty_end_time']    = practitioner.duty_end_time.strftime('%H:%M') if practitioner.duty_end_time else '17:00'

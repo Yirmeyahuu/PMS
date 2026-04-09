@@ -13,6 +13,7 @@ export interface User {
   password_changed:      boolean;
   needs_password_change: boolean;
   clinic_setup_complete: boolean;   // ← NEW
+  practitioner_id?:      number;    // ← For PRACTITIONER role: the linked Practitioner record ID
 }
 
 export interface AuthTokens {

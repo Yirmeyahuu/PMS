@@ -93,7 +93,29 @@ const formatTime12Hour = (time: string): string => {
   const h12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
   const period = hours >= 12 ? 'PM' : 'AM';
   return `${h12}:${minutes.toString().padStart(2, '0')} ${period}`;
-}; 
+};
+
+// ── Module-level availability evaluator for compare mode ──────────────────────
+// Evaluates a single slot against an explicit availability object.
+// Used by renderTimeSlotCompare so each column can have its own availability.
+const evalSlotAvailability = (
+  slot: { hour: number; minutes: number },
+  date: Date,
+  avail: PractitionerAvailability | undefined,
+): { isAvailable: boolean; isLunch: boolean; dayAvailable: boolean } => {
+  if (!avail) return { isAvailable: true, isLunch: false, dayAvailable: true };
+  const dayOfWeek = DAY_MAP[date.getDay()];
+  const dayAvailable = avail.duty_days.includes(dayOfWeek);
+  if (!dayAvailable) return { isAvailable: false, isLunch: false, dayAvailable: false };
+  const slotMins = slot.hour * 60 + slot.minutes;
+  const dutyStart = timeToMinutes(avail.duty_start_time);
+  const dutyEnd   = timeToMinutes(avail.duty_end_time);
+  if (slotMins < dutyStart || slotMins >= dutyEnd) return { isAvailable: false, isLunch: false, dayAvailable: true };
+  const lunchStart = timeToMinutes(avail.lunch_start_time);
+  const lunchEnd   = timeToMinutes(avail.lunch_end_time);
+  const isLunch = slotMins >= lunchStart && slotMins < lunchEnd;
+  return { isAvailable: !isLunch, isLunch, dayAvailable: true };
+};
 
 interface CalendarProps {
   view:                   CalendarView;
@@ -106,6 +128,15 @@ interface CalendarProps {
   onAppointmentsReady?: (appointments: Appointment[]) => void;
   onCalendarReady?: (date: Date) => void;
   practitionerAvailability?: PractitionerAvailability;
+  /** Full availability map for ALL practitioners: { practitionerId: availability } */
+  allAvailabilities?: Record<number, PractitionerAvailability>;
+  // ── Compare Mode (Admin only, Day/Week views) ───────────────────────────
+  compareMode?: boolean;
+  compareAvailabilityA?: PractitionerAvailability;
+  compareAvailabilityB?: PractitionerAvailability;
+  comparePractitionerNames?: [string, string];
+  comparePractitionerIdA?: number | null;
+  comparePractitionerIdB?: number | null;
 }
 
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -198,6 +229,13 @@ export const Calendar: React.FC<CalendarProps> = ({
   onAppointmentsReady,
   onCalendarReady,
   practitionerAvailability,
+  allAvailabilities,
+  compareMode = false,
+  compareAvailabilityA,
+  compareAvailabilityB,
+  comparePractitionerNames,
+  comparePractitionerIdA,
+  comparePractitionerIdB,
 }) => {
   // ── DEBUG: Log when practitionerAvailability changes ──
   React.useEffect(() => {
@@ -216,34 +254,56 @@ export const Calendar: React.FC<CalendarProps> = ({
   }, [practitionerAvailability, selectedPractitionerId]);
 
   // ── AVAILABILITY HELPER FUNCTIONS ──────────────────────────────────────────
-  // Check if a given date is a duty day
+  // Whether the allAvailabilities map has any entries
+  const hasAvailabilityMap = allAvailabilities != null && Object.keys(allAvailabilities).length > 0;
+
+  // Check if a given date is a duty day.
+  // Single-practitioner mode: uses practitionerAvailability.
+  // Multi-practitioner mode: true if ANY practitioner works that day.
   const isDutyDay = useCallback((date: Date): boolean => {
-    if (!practitionerAvailability) return true; // No availability set = all days available
     const dayOfWeek = DAY_MAP[date.getDay()];
-    return practitionerAvailability.duty_days.includes(dayOfWeek);
-  }, [practitionerAvailability]);
-
-  // Check if a given time (HH:MM format or hour+minutes) is within duty hours
-  const isDutyHour = useCallback((hour: number, minutes: number): boolean => {
-    if (!practitionerAvailability) return true; // No availability set = all hours available
-    const slotMins = hour * 60 + minutes;
-    const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
-    const dutyEnd = timeToMinutes(practitionerAvailability.duty_end_time);
-    return slotMins >= dutyStart && slotMins < dutyEnd;
-  }, [practitionerAvailability]);
-
-  // Check if slot is during lunch break
-  const isLunchBreak = useCallback((hour: number, minutes: number): boolean => {
-    if (!practitionerAvailability) {
-      // Default lunch: 12:00 - 13:00
-      const slotMins = hour * 60 + minutes;
-      return slotMins >= 720 && slotMins < 780;
+    if (practitionerAvailability) {
+      return practitionerAvailability.duty_days.includes(dayOfWeek);
     }
+    if (allAvailabilities && Object.keys(allAvailabilities).length > 0) {
+      return Object.values(allAvailabilities).some(avail => avail.duty_days.includes(dayOfWeek));
+    }
+    return true; // No availability info = all days open
+  }, [practitionerAvailability, allAvailabilities]);
+
+  // Check if a given time slot falls within any practitioner's duty hours.
+  const isDutyHour = useCallback((hour: number, minutes: number): boolean => {
     const slotMins = hour * 60 + minutes;
-    const lunchStart = timeToMinutes(practitionerAvailability.lunch_start_time);
-    const lunchEnd = timeToMinutes(practitionerAvailability.lunch_end_time);
-    return slotMins >= lunchStart && slotMins < lunchEnd;
-  }, [practitionerAvailability]);
+    if (practitionerAvailability) {
+      const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
+      const dutyEnd   = timeToMinutes(practitionerAvailability.duty_end_time);
+      return slotMins >= dutyStart && slotMins < dutyEnd;
+    }
+    if (allAvailabilities && Object.keys(allAvailabilities).length > 0) {
+      return Object.values(allAvailabilities).some(avail => {
+        const dutyStart = timeToMinutes(avail.duty_start_time);
+        const dutyEnd   = timeToMinutes(avail.duty_end_time);
+        return slotMins >= dutyStart && slotMins < dutyEnd;
+      });
+    }
+    return true;
+  }, [practitionerAvailability, allAvailabilities]);
+
+  // Check if slot is during lunch break.
+  // In multi-practitioner mode we skip lunch-break coloring (each prac has different hours).
+  const isLunchBreak = useCallback((hour: number, minutes: number): boolean => {
+    if (practitionerAvailability) {
+      const slotMins  = hour * 60 + minutes;
+      const lunchStart = timeToMinutes(practitionerAvailability.lunch_start_time);
+      const lunchEnd   = timeToMinutes(practitionerAvailability.lunch_end_time);
+      return slotMins >= lunchStart && slotMins < lunchEnd;
+    }
+    // Multi-practitioner mode: practitioners have different lunch hours — skip visualization
+    if (hasAvailabilityMap) return false;
+    // Default fallback (no availability configured at all)
+    const slotMins = hour * 60 + minutes;
+    return slotMins >= 720 && slotMins < 780;
+  }, [practitionerAvailability, hasAvailabilityMap]);
 
   // Combined check: is the slot available (duty day + duty hour + not lunch)
   const isSlotFullyAvailable = useCallback((date: Date, hour: number, minutes: number): boolean => {
@@ -1263,8 +1323,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // ── Shared time-slot renderer (drop target) ───────────────────────────────
   // ── Nookal-style time slot renderer with 15-min intervals ───────────────────
-  const renderTimeSlot = (slot: typeof timeSlots[0], date: Date, i: number, forWeekView = false) => {
-    const isSelected   = isSlotSelected(slot);
+  const renderTimeSlot = (slot: typeof timeSlots[0], date: Date, i: number, forWeekView = false) => {    const isSelected   = isSlotSelected(slot);
     const isDropTarget = dragState.isDragging;
     const isLunch      = isLunchBreak(slot.hour, slot.minutes);
     
@@ -1361,6 +1420,83 @@ export const Calendar: React.FC<CalendarProps> = ({
     );
   };
 
+  // ── Compare-mode time slot renderer ──────────────────────────────────────
+  // Like renderTimeSlot but evaluates against an EXPLICIT availability object
+  // instead of the component-level hooks. Used for each column in Compare Mode.
+  const renderTimeSlotCompare = (
+    slot: typeof timeSlots[0],
+    date: Date,
+    i: number,
+    avail: PractitionerAvailability | undefined,
+    colKey: string,
+  ) => {
+    const { isAvailable, isLunch, dayAvailable } = evalSlotAvailability(slot, date, avail);
+    const isSelected   = isSlotSelected(slot);
+    const isDropTarget = dragState.isDragging;
+
+    if (isLunch && dayAvailable && avail) {
+      const lunchStart = avail.lunch_start_time;
+      const lunchEnd   = avail.lunch_end_time;
+      const [lH, lM] = lunchStart.split(':').map(Number);
+      const isFirstLunchSlot = slot.hour === lH && slot.minutes === lM;
+      return (
+        <div
+          key={`${colKey}-${i}`}
+          data-slot-date={format(date, 'yyyy-MM-dd')}
+          data-slot-hour={slot.hour}
+          data-slot-minute={slot.minutes}
+          onMouseDown={() => handleMouseDown(date, slot)}
+          onMouseEnter={() => handleMouseEnter(slot)}
+          onMouseUp={() => handleSlotMouseUp(date, slot)}
+          onDoubleClick={() => handleDoubleClick(date, slot)}
+          className={`h-6 relative select-none bg-yellow-100 cursor-pointer border-r border-gray-200
+            ${slot.quarter === 0 ? 'border-t border-yellow-300' : 'border-t border-yellow-200'}`}
+        >
+          {isFirstLunchSlot && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div className="flex items-center gap-1 bg-yellow-100 border border-yellow-300 rounded-full px-2 py-0.5 shadow-sm">
+                <span style={{ fontSize: 9 }}>🍽</span>
+                <span className="font-semibold text-yellow-700 whitespace-nowrap" style={{ fontSize: 8 }}>
+                  {formatTime12Hour(lunchStart)}–{formatTime12Hour(lunchEnd)}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    let slotBgClass = '';
+    if (!isAvailable) {
+      slotBgClass = 'bg-purple-300';
+    } else if (isSelected) {
+      slotBgClass = 'bg-sky-200 hover:bg-sky-300';
+    } else if (isDropTarget) {
+      slotBgClass = 'bg-white hover:bg-emerald-100';
+    } else {
+      slotBgClass = 'bg-white hover:bg-sky-50';
+    }
+
+    const borderClass = slot.quarter === 0 ? 'border-t border-gray-300' : 'border-t border-gray-100';
+
+    return (
+      <div
+        key={`${colKey}-${i}`}
+        data-slot-date={format(date, 'yyyy-MM-dd')}
+        data-slot-hour={slot.hour}
+        data-slot-minute={slot.minutes}
+        onMouseDown={() => handleMouseDown(date, slot)}
+        onMouseEnter={() => handleMouseEnter(slot)}
+        onMouseUp={() => handleSlotMouseUp(date, slot)}
+        onDoubleClick={() => handleDoubleClick(date, slot)}
+        className={`h-6 transition-colors relative select-none cursor-pointer border-r border-gray-200 ${borderClass} ${slotBgClass}`}
+      >
+        {isSelected && <div className="absolute inset-0 bg-sky-400 opacity-30 pointer-events-none" />}
+        {isDropTarget && <div className="absolute inset-0 border-b border-dashed border-emerald-300 pointer-events-none opacity-50" />}
+      </div>
+    );
+  };
+
   // ── Global mouse-move / mouse-up on the calendar wrapper ─────────────────
   const calendarWrapperProps = {
     onMouseMove:  (e: React.MouseEvent) => {
@@ -1379,45 +1515,115 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // ── DAY VIEW ──────────────────────────────────────────────────────────────
   if (view === 'day') {
-    const dayOfWeek = DAY_MAP[currentDate.getDay()];
-    const isDayAvailable = !practitionerAvailability || practitionerAvailability.duty_days.includes(dayOfWeek);
 
-    if (!isDayAvailable) {
+    // ── COMPARE MODE (Day) ───────────────────────────────────────────────────
+    if (compareMode) {
+      const nameA = comparePractitionerNames?.[0] ?? 'Practitioner A';
+      const nameB = comparePractitionerNames?.[1] ?? 'Practitioner B';
+      const dayAppts = getAppointmentsForDate(currentDate);
+      const dayBlocks = getBlockAppointmentsForDate(currentDate);
+      const colAAppts = dayAppts.filter(a =>
+        comparePractitionerIdA != null ? a.practitioner === comparePractitionerIdA : true
+      );
+      const colBAppts = dayAppts.filter(a =>
+        comparePractitionerIdB != null ? a.practitioner === comparePractitionerIdB : true
+      );
+
       return (
         <div {...calendarWrapperProps} className="h-full flex flex-col">
-          <div className="flex flex-col h-full bg-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-            <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-500">
-                  {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                </h3>
-                <p className="text-sm text-gray-400 mt-1">Practitioner not available on this day</p>
+          <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+            {/* Day header */}
+            <div className="flex-shrink-0 p-3 border-b border-gray-200 bg-gray-50 text-center">
+              <h3 className="text-base font-semibold text-gray-900">
+                {format(currentDate, 'EEEE, MMMM d, yyyy')}
+              </h3>
+              <p className="text-xs text-sky-600 font-medium mt-0.5">Compare Mode — side-by-side schedules</p>
+            </div>
+
+            {/* Practitioner column headers */}
+            <div className="flex-shrink-0 grid grid-cols-[80px_1fr_1fr] border-b border-gray-200">
+              <div className="bg-gray-50 border-r border-gray-200" />
+              {/* Prac A header */}
+              <div className="py-3 px-4 bg-sky-50 border-r border-gray-200 text-center">
+                <div className="text-sm font-bold text-sky-700 truncate">{nameA}</div>
+                <div className="flex items-center justify-center gap-2 mt-1 text-xs text-sky-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-white border border-sky-300 inline-block" />
+                    Duty
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block" />
+                    Off
+                  </span>
+                </div>
+              </div>
+              {/* Prac B header */}
+              <div className="py-3 px-4 bg-violet-50 text-center">
+                <div className="text-sm font-bold text-violet-700 truncate">{nameB}</div>
+                <div className="flex items-center justify-center gap-2 mt-1 text-xs text-violet-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-white border border-violet-300 inline-block" />
+                    Duty
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block" />
+                    Off
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-gray-400">
-                <div className="text-6xl mb-4">📅</div>
-                <p className="text-lg font-medium">Unavailable</p>
-                <p className="text-sm mt-1">This day is not in the practitioner's duty schedule</p>
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="grid grid-cols-[80px_1fr_1fr]">
+                {/* Time column */}
+                <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
+                  {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                </div>
+                {/* Practitioner A column */}
+                <div className="border-r border-gray-200 relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                  {timeSlots.map((slot, i) => renderTimeSlotCompare(slot, currentDate, i, compareAvailabilityA, 'a'))}
+                  {colAAppts.map(apt => renderTimelineCard(apt, false, false))}
+                  {dayBlocks.map(block => renderBlockTimelineCard(block, false, false))}
+                </div>
+                {/* Practitioner B column */}
+                <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
+                  {timeSlots.map((slot, i) => renderTimeSlotCompare(slot, currentDate, i, compareAvailabilityB, 'b'))}
+                  {colBAppts.map(apt => renderTimelineCard(apt, false, false))}
+                  {dayBlocks.map(block => renderBlockTimelineCard(block, false, false))}
+                </div>
               </div>
             </div>
           </div>
           {sharedModals}
           {dragOverlays}
+          {rescheduleModal}
           {hoverCardOverlay}
           {blockHoverCardOverlay}
         </div>
       );
     }
 
+    const dayOfWeek = DAY_MAP[currentDate.getDay()];
+    const isDayAvailable = !practitionerAvailability || practitionerAvailability.duty_days.includes(dayOfWeek);
+
+    // NOTE: Non-duty days are still shown (not blocked) - availability is VISUAL ONLY
+    // Users can still click and create appointments on non-duty days/hours
+
     return (
       <div {...calendarWrapperProps} className="h-full flex flex-col">
-        <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
+        <div className={`flex flex-col h-full rounded-xl border overflow-hidden ${isDayAvailable ? 'bg-white border-gray-200' : 'bg-purple-50 border-purple-200'}`}>
+          <div className={`flex-shrink-0 p-4 border-b ${isDayAvailable ? 'border-gray-200 bg-gray-50' : 'border-purple-200 bg-purple-100'}`}>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className={`text-lg font-semibold ${isDayAvailable ? 'text-gray-900' : 'text-purple-700'}`}>
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
               </h3>
+              {!isDayAvailable && (
+                <p className="text-sm text-purple-600 mt-1">
+                  ⚠️ Non-duty day (appointments can still be added)
+                </p>
+              )}
               {dragState.isDragging && (
                 <p className="text-xs text-emerald-600 font-medium mt-1 animate-pulse">
                   🗓 Hover a time slot and release to reschedule
@@ -1438,8 +1644,9 @@ export const Calendar: React.FC<CalendarProps> = ({
               const dayBlocks = getBlockAppointmentsForDate(currentDate);
               const hasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
               
-              // Use filtered slots for Day view (only duty hours)
-              const slotsToRender = dayViewTimeSlots;
+              // For non-duty days, show all time slots (not filtered)
+              // For duty days, show filtered slots (duty hours only)
+              const slotsToRender = isDayAvailable ? dayViewTimeSlots : timeSlots;
               
               if (hasConflict) {
                 // 2-column layout when there's a conflict
@@ -1452,12 +1659,13 @@ export const Calendar: React.FC<CalendarProps> = ({
                     {/* Appointments column */}
                     <div className="border-r border-gray-200 relative" onMouseUp={() => handleMouseUp(currentDate)}>
                       {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {dayAppts.map(apt => renderTimelineCard(apt, false, true))}
+                      {/* For non-duty days, use week-view positioning (6AM offset) */}
+                      {dayAppts.map(apt => renderTimelineCard(apt, false, isDayAvailable))}
                     </div>
                     {/* Block appointments column */}
                     <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
                       {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {dayBlocks.map(block => renderBlockTimelineCard(block, false, true))}
+                      {dayBlocks.map(block => renderBlockTimelineCard(block, false, isDayAvailable))}
                     </div>
                   </div>
                 );
@@ -1473,8 +1681,9 @@ export const Calendar: React.FC<CalendarProps> = ({
                   {/* Day column */}
                   <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
                     {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                    {dayAppts.map(apt => renderTimelineCard(apt, false, true))}
-                    {dayBlocks.map(block => renderBlockTimelineCard(block, false, true))}
+                    {/* For non-duty days, use week-view positioning (6AM offset) */}
+                    {dayAppts.map(apt => renderTimelineCard(apt, false, isDayAvailable))}
+                    {dayBlocks.map(block => renderBlockTimelineCard(block, false, isDayAvailable))}
                   </div>
                 </div>
               );
@@ -1493,6 +1702,98 @@ export const Calendar: React.FC<CalendarProps> = ({
   // ── WEEK VIEW ─────────────────────────────────────────────────────────────
   if (view === 'week') {
     const weekDays = getWeekDays(currentDate);
+
+    // ── COMPARE MODE (Week) ─────────────────────────────────────────────────
+    if (compareMode) {
+      const nameA = comparePractitionerNames?.[0] ?? 'Practitioner A';
+      const nameB = comparePractitionerNames?.[1] ?? 'Practitioner B';
+      // 14 data columns (2 per day) + 1 time col
+      const gridCols = `80px repeat(14, 1fr)`;
+
+      return (
+        <div {...calendarWrapperProps} className="h-full flex flex-col">
+          <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+            {/* Compare banner */}
+            <div
+              className="flex-shrink-0 border-b border-gray-200 bg-gray-50"
+              style={{ display: 'grid', gridTemplateColumns: gridCols }}
+            >
+              <div className="p-2 border-r border-gray-200 flex items-center justify-center">
+                <span className="text-xs font-semibold text-gray-500">Wk</span>
+              </div>
+              {weekDays.map(day => (
+                <React.Fragment key={day.toISOString()}>
+                  {/* Prac A sub-header */}
+                  <div className={`p-2 text-center border-l border-gray-200 bg-sky-50 ${isSameDay(day, new Date()) ? 'ring-inset ring-1 ring-sky-300' : ''}`}>
+                    <div className="text-xs font-semibold text-sky-700 truncate leading-tight">
+                      {nameA.split(' ')[0]}
+                    </div>
+                    <div className="text-xs text-gray-500 leading-tight">{format(day, 'EEE d')}</div>
+                  </div>
+                  {/* Prac B sub-header */}
+                  <div className={`p-2 text-center border-l border-gray-200 bg-violet-50 ${isSameDay(day, new Date()) ? 'ring-inset ring-1 ring-violet-300' : ''}`}>
+                    <div className="text-xs font-semibold text-violet-700 truncate leading-tight">
+                      {nameB.split(' ')[0]}
+                    </div>
+                    <div className="text-xs text-gray-500 leading-tight">{format(day, 'EEE d')}</div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+
+            {dragState.isDragging && (
+              <div className="flex-shrink-0 bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-xs text-emerald-700 font-medium text-center animate-pulse">
+                🗓 Hover a time slot and release to reschedule
+              </div>
+            )}
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div style={{ display: 'grid', gridTemplateColumns: gridCols }}>
+                {/* Time column */}
+                <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
+                  {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
+                </div>
+                {/* Day columns — 2 sub-columns per day */}
+                {weekDays.map(day => {
+                  const dayStr = format(day, 'yyyy-MM-dd');
+                  const dayAppts  = getAppointmentsForDate(day);
+                  const dayBlocks = getBlockAppointmentsForDate(day);
+                  const colAAppts = dayAppts.filter(a =>
+                    comparePractitionerIdA != null ? a.practitioner === comparePractitionerIdA : true
+                  );
+                  const colBAppts = dayAppts.filter(a =>
+                    comparePractitionerIdB != null ? a.practitioner === comparePractitionerIdB : true
+                  );
+                  return (
+                    <React.Fragment key={day.toISOString()}>
+                      {/* Prac A sub-column */}
+                      <div className="border-l border-gray-200 relative">
+                        {timeSlots.map((slot, i) => renderTimeSlotCompare(slot, day, i, compareAvailabilityA, `a-${dayStr}`))}
+                        {colAAppts.map(apt => renderTimelineCard(apt, true))}
+                        {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
+                      </div>
+                      {/* Prac B sub-column */}
+                      <div className="border-l border-gray-200 relative">
+                        {timeSlots.map((slot, i) => renderTimeSlotCompare(slot, day, i, compareAvailabilityB, `b-${dayStr}`))}
+                        {colBAppts.map(apt => renderTimelineCard(apt, true))}
+                        {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          {sharedModals}
+          {dragOverlays}
+          {rescheduleModal}
+          {hoverCardOverlay}
+          {blockHoverCardOverlay}
+        </div>
+      );
+    }
 
     return (
       <div {...calendarWrapperProps} className="h-full flex flex-col">
