@@ -3,6 +3,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +12,18 @@ def get_clinic_logo_url(clinic) -> str | None:
     """Get the clinic logo URL for use in emails."""
     if not clinic.logo:
         return None
-    # If logo is a Cloudinary URL, return it directly
     if hasattr(clinic.logo, 'url'):
         try:
-            return clinic.logo.url
+            url = clinic.logo.url
+            # Cloudinary / absolute URLs are already usable
+            if url.startswith('http'):
+                return url
+            # Local storage: build an absolute URL so email clients can fetch it
+            backend_url = getattr(
+                settings, 'BACKEND_URL',
+                os.environ.get('BACKEND_URL', 'http://localhost:8000'),
+            )
+            return f"{backend_url.rstrip('/')}{url}"
         except Exception:
             return None
     return None

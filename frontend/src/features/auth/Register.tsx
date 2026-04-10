@@ -114,23 +114,23 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-clinical-cloud py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div>
           <div className="flex justify-center">
-            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-primary-gradient rounded-full flex items-center justify-center">
               <User className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-trust-harbor">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-steady-slate">
             Already have an account?{' '}
             <Link
               to="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              className="font-medium text-care-blue hover:text-trust-harbor"
             >
               Sign in
             </Link>
@@ -156,7 +156,7 @@ export const Register: React.FC = () => {
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="first_name" className="block text-sm font-medium text-trust-harbor">
                   First name
                 </label>
                 <input
@@ -167,8 +167,8 @@ export const Register: React.FC = () => {
                   value={formData.first_name}
                   onChange={handleChange}
                   className={`mt-1 appearance-none block w-full px-3 py-2 border ${
-                    validationErrors.first_name ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.first_name ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   disabled={isLoading}
                 />
                 {validationErrors.first_name && (
@@ -177,7 +177,7 @@ export const Register: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="last_name" className="block text-sm font-medium text-trust-harbor">
                   Last name
                 </label>
                 <input
@@ -188,8 +188,8 @@ export const Register: React.FC = () => {
                   value={formData.last_name}
                   onChange={handleChange}
                   className={`mt-1 appearance-none block w-full px-3 py-2 border ${
-                    validationErrors.last_name ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.last_name ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   disabled={isLoading}
                 />
                 {validationErrors.last_name && (
@@ -200,7 +200,7 @@ export const Register: React.FC = () => {
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-trust-harbor">
                 Email address
               </label>
               <div className="mt-1 relative">
@@ -216,8 +216,8 @@ export const Register: React.FC = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
-                    validationErrors.email ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.email ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   placeholder="you@example.com"
                   disabled={isLoading}
                 />
@@ -229,7 +229,7 @@ export const Register: React.FC = () => {
 
             {/* Phone Field (Optional) */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="phone" className="block text-sm font-medium text-trust-harbor">
                 Phone number <span className="text-gray-500">(optional)</span>
               </label>
               <div className="mt-1 relative">
@@ -243,8 +243,8 @@ export const Register: React.FC = () => {
                   value={formData.phone}
                   onChange={handleChange}
                   className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
-                    validationErrors.phone ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.phone ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   placeholder="09xxxxxxxxx"
                   disabled={isLoading}
                 />
@@ -256,7 +256,7 @@ export const Register: React.FC = () => {
 
             {/* Role Selection */}
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="role" className="block text-sm font-medium text-trust-harbor">
                 Role
               </label>
               <select
@@ -264,7 +264,7 @@ export const Register: React.FC = () => {
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-200 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm rounded-2xl"
                 disabled={isLoading}
               >
                 <option value="STAFF">Staff</option>
@@ -274,8 +274,7 @@ export const Register: React.FC = () => {
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+              <label htmlFor="password" className="block text-sm font-medium text-trust-harbor">
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -290,8 +289,8 @@ export const Register: React.FC = () => {
                   value={formData.password}
                   onChange={handleChange}
                   className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
-                    validationErrors.password ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.password ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   placeholder="••••••••"
                   disabled={isLoading}
                 />
@@ -311,14 +310,14 @@ export const Register: React.FC = () => {
               {validationErrors.password && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
               )}
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-steady-slate">
                 Must be at least 8 characters with uppercase, lowercase, and number
               </p>
             </div>
 
             {/* Confirm Password Field */}
             <div>
-              <label htmlFor="password_confirm" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password_confirm" className="block text-sm font-medium text-trust-harbor">
                 Confirm password
               </label>
               <div className="mt-1 relative">
@@ -334,8 +333,8 @@ export const Register: React.FC = () => {
                   value={formData.password_confirm}
                   onChange={handleChange}
                   className={`appearance-none block w-full pl-10 pr-10 py-2 border ${
-                    validationErrors.password_confirm ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    validationErrors.password_confirm ? 'border-red-300' : 'border-gray-200'
+                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
                   placeholder="••••••••"
                   disabled={isLoading}
                 />
@@ -363,7 +362,7 @@ export const Register: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-2xl text-white bg-primary-gradient hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-care-blue disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
             >
               {isLoading ? (
                 <span className="flex items-center">
@@ -396,13 +395,13 @@ export const Register: React.FC = () => {
           </div>
 
           {/* Terms Notice */}
-          <p className="text-xs text-center text-gray-500">
+          <p className="text-xs text-center text-steady-slate">
             By creating an account, you agree to our{' '}
-            <a href="#" className="text-blue-600 hover:text-blue-500">
+            <a href="#" className="text-care-blue hover:text-trust-harbor">
               Terms of Service
             </a>{' '}
             and{' '}
-            <a href="#" className="text-blue-600 hover:text-blue-500">
+            <a href="#" className="text-care-blue hover:text-trust-harbor">
               Privacy Policy
             </a>
           </p>

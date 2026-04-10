@@ -43,7 +43,7 @@ const PLAN: Readonly<Plan> = {
 
 export const Plans: React.FC = () => {
   return (
-    <section id="plans" className="py-20 sm:py-28 bg-gray-900">
+    <section id="plans" className="py-20 sm:py-28 bg-trust-harbor">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
@@ -60,7 +60,7 @@ export const Plans: React.FC = () => {
           <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
             {/* Popular Badge */}
             <div className="absolute top-4 right-4 z-10">
-              <span className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg flex items-center font-body">
+              <span className="bg-primary-gradient text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg flex items-center font-body">
                 <Sparkles className="w-4 h-4 mr-2" />
                 {PLAN.trialDays}-Day Free Trial
               </span>
@@ -90,7 +90,7 @@ export const Plans: React.FC = () => {
                 {/* CTA Button */}
                 <Link
                   to="/register"
-                  className="mt-8 block w-full py-4 px-6 text-center text-lg font-bold rounded-xl transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5 font-body"
+                  className="mt-8 block w-full py-4 px-6 text-center text-lg font-bold rounded-xl transition-all bg-primary-gradient text-white hover:opacity-95 shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5 font-body"
                   aria-label={`${PLAN.cta} - ${PLAN.trialDays} days free`}
                 >
                   {PLAN.cta}
@@ -134,7 +134,7 @@ export const Plans: React.FC = () => {
             Questions about pricing?{' '}
             <a 
               href="mailto:support@mespms.com" 
-              className="text-cyan-400 font-semibold hover:text-cyan-300 transition-colors font-body"
+              className="text-healing-mint font-semibold hover:text-gentle-renewal transition-colors font-body"
             >
               Contact our support team
             </a>

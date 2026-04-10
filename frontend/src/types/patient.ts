@@ -34,6 +34,7 @@ export interface Patient {
   archived_by_name?: string | null;
   // Notification Settings
   send_email_notifications: boolean;
+  sms_notifications_enabled: boolean;
   allow_push_notifications: boolean;
   data_sharing_preferences: Record<string, any>;
 }
@@ -80,6 +81,7 @@ export interface CreatePatientData {
   medications?: string;
   // Notification Settings
   send_email_notifications?: boolean;
+  sms_notifications_enabled?: boolean;
   allow_push_notifications?: boolean;
   data_sharing_preferences?: Record<string, unknown>;
 }

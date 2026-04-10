@@ -1,0 +1,25 @@
+{{ clinic_name }} — Welcome!
+========================================
+
+Welcome, {{ patient_first_name }}!
+
+You've been registered as a new client at {{ clinic_name }}.
+We're glad to have you on board!
+
+YOUR REGISTRATION DETAILS
+-------------------------
+Patient ID : {{ patient_number }}
+Name       : {{ patient_full_name }}
+Clinic     : {{ clinic_name }}
+{% if clinic_address %}Address    : {{ clinic_address }}{% endif %}
+
+If you have any questions or need to book an appointment, feel free to contact us:
+{% if clinic_phone %}Phone : {{ clinic_phone }}{% endif %}
+{% if clinic_email %}Email : {{ clinic_email }}{% endif %}
+
+We look forward to caring for you!
+
+— {{ clinic_name }} Team
+
+---
+This is an automated message. Please do not reply to this email.

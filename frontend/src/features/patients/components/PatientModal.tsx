@@ -33,6 +33,8 @@ export const PatientModal: React.FC<PatientModalProps> = ({
     emergency_contact_name: '', emergency_contact_phone: '', emergency_contact_relationship: '',
     philhealth_number: '', hmo_provider: '', hmo_number: '',
     medical_conditions: '', allergies: '', medications: '',
+    send_email_notifications: true,
+    sms_notifications_enabled: false,
   };
 
   const [formData, setFormData] = useState<CreatePatientData>(emptyForm);
@@ -61,6 +63,8 @@ export const PatientModal: React.FC<PatientModalProps> = ({
         medical_conditions: patient.medical_conditions || '',
         allergies:          patient.allergies          || '',
         medications:        patient.medications        || '',
+        send_email_notifications: patient.send_email_notifications ?? true,
+        sms_notifications_enabled: patient.sms_notifications_enabled ?? false,
       });
     }
   }, [mode, patient]);
@@ -425,6 +429,37 @@ export const PatientModal: React.FC<PatientModalProps> = ({
                       placeholder="Current medications and dosages…"
                       className={`${inputBase} resize-none`}
                     />
+                  </div>
+
+                  {/* ── Notification Preferences ── */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <p className={`${labelBase} mb-3`}>Notification Preferences</p>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.send_email_notifications ?? true}
+                          onChange={(e) => setFormData(prev => ({ ...prev, send_email_notifications: e.target.checked }))}
+                          className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500"
+                        />
+                        <div>
+                          <p className="text-sm text-gray-900">Email notifications</p>
+                          <p className="text-xs text-gray-500">Receive appointment reminders and updates via email</p>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.sms_notifications_enabled ?? false}
+                          onChange={(e) => setFormData(prev => ({ ...prev, sms_notifications_enabled: e.target.checked }))}
+                          className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500"
+                        />
+                        <div>
+                          <p className="text-sm text-gray-900">SMS notifications</p>
+                          <p className="text-xs text-gray-500">Receive appointment reminders via text message</p>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
               )}

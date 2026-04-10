@@ -5,7 +5,7 @@ import { useSidebar } from '@/hooks/useSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 import { sidebarItems } from './sidebarItems';
-import MESLogo from '@/assets/Malasakit-Logo-Relicon.webp';
+import MESLogo from '@/assets/malasakit/Icon - Colored.svg';
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ export const Sidebar: React.FC = () => {
 
       <aside
         className={`
-          fixed left-0 top-0 h-screen bg-sky-600 border-r border-sky-700 shadow-xl z-50
+          fixed left-0 top-0 h-screen bg-white border-r border-gray-200 shadow-xl z-50
           transition-all duration-300 ease-in-out overflow-hidden
           ${isMobile ? (isMobileOpen ? 'translate-x-0' : '-translate-x-full') : ''}
         `}
@@ -72,7 +72,7 @@ export const Sidebar: React.FC = () => {
         <div className="flex flex-col h-full overflow-hidden">
 
           {/* ── Logo Section ── */}
-          <div className="flex-shrink-0 p-4 border-b border-sky-500">
+          <div className="flex-shrink-0 p-4 border-b border-gray-100">
             <div className="flex items-center justify-center gap-3 relative">
               <img
                 src={MESLogo}
@@ -87,12 +87,12 @@ export const Sidebar: React.FC = () => {
               {!isMobile && isExpanded && (
                 <button
                   onClick={togglePin}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-colors animate-fadeIn"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-lg transition-colors animate-fadeIn"
                   title={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
                 >
                   {isPinned
-                    ? <PinOff className="w-4 h-4 text-white" />
-                    : <Pin    className="w-4 h-4 text-white/70 hover:text-white" />
+                    ? <PinOff className="w-4 h-4 text-steady-slate" />
+                    : <Pin    className="w-4 h-4 text-steady-slate/70 hover:text-steady-slate" />
                   }
                 </button>
               )}
@@ -101,10 +101,10 @@ export const Sidebar: React.FC = () => {
               {isMobile && (
                 <button
                   onClick={closeMobileSidebar}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   aria-label="Close menu"
                 >
-                  <X className="w-5 h-5 text-white" />
+                  <X className="w-5 h-5 text-steady-slate" />
                 </button>
               )}
             </div>
@@ -125,15 +125,15 @@ export const Sidebar: React.FC = () => {
                       w-full flex items-center gap-3 px-4 py-3 rounded-xl
                       transition-all duration-200 group relative
                       ${isActive
-                        ? 'bg-white text-sky-600 shadow-md'
-                        : 'text-white hover:bg-white hover:text-sky-600'
+                        ? 'bg-primary-gradient text-white shadow-md'
+                        : 'text-trust-harbor hover:bg-clinical-cloud'
                       }
                     `}
                   >
                     <Icon
                       className={`
                         w-5 h-5 flex-shrink-0 transition-colors
-                        ${isActive ? 'text-sky-600' : 'text-white group-hover:text-sky-600'}
+                        ${isActive ? 'text-white' : 'text-trust-harbor group-hover:text-care-blue'}
                       `}
                     />
 
@@ -163,7 +163,7 @@ export const Sidebar: React.FC = () => {
           </nav>
 
           {/* ── User Section ── */}
-          <div className="flex-shrink-0 border-t border-sky-500 bg-sky-700">
+          <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50">
             <div
               className={`
                 flex items-center gap-3 p-4 min-w-0 relative group
@@ -178,10 +178,10 @@ export const Sidebar: React.FC = () => {
               >
                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
-                  transition-all ring-2 ring-white duration-200 overflow-hidden
+                  transition-all ring-2 ring-care-blue/30 duration-200 overflow-hidden
                   ${isProfileActive
-                    ? 'ring-2 ring-white'
-                    : 'group-hover:ring-2 group-hover:ring-white/60'
+                    ? 'ring-2 ring-care-blue'
+                    : 'group-hover:ring-2 group-hover:ring-care-blue/60'
                   }
                 `}>
                   {user?.avatar_url ? (
@@ -203,11 +203,11 @@ export const Sidebar: React.FC = () => {
                   <div className="flex-1 min-w-0 animate-fadeIn text-left">
                     <p className={`
                       font-medium text-sm truncate transition-colors
-                      ${isProfileActive ? 'text-white' : 'text-white/90 group-hover:text-white'}
+                      ${isProfileActive ? 'text-trust-harbor' : 'text-trust-harbor/90 group-hover:text-trust-harbor'}
                     `}>
                       {user?.first_name} {user?.last_name}
                     </p>
-                    <p className="text-sky-200 text-xs truncate">{user?.role}</p>
+                    <p className="text-steady-slate text-xs truncate">{user?.role}</p>
                   </div>
                 )}
               </button>
@@ -216,10 +216,10 @@ export const Sidebar: React.FC = () => {
               {(isExpanded || isMobile) && (
                 <button
                   onClick={handleLogout}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0 group/logout animate-fadeIn"
+                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0 group/logout animate-fadeIn"
                   title="Sign out"
                 >
-                  <LogOut className="w-4 h-4 text-white/70 group-hover/logout:text-white" />
+                  <LogOut className="w-4 h-4 text-steady-slate group-hover/logout:text-trust-harbor" />
                 </button>
               )}
 

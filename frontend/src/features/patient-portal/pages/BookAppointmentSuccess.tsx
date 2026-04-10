@@ -111,7 +111,8 @@ export const BookAppointmentSuccess: React.FC = () => {
         {/* Notice */}
         <div className="mx-6 mb-5 bg-sky-50 border border-sky-200 rounded-xl p-3">
           <p className="text-xs text-sky-700 text-center">
-            A confirmation has been recorded. Please arrive a few minutes early for your appointment.
+            A confirmation email has been sent to <strong>{confirmation.patient_email}</strong>.
+            Please arrive a few minutes early for your appointment.
           </p>
         </div>
 

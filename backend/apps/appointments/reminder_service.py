@@ -24,13 +24,27 @@ def send_all_reminders(appointment) -> dict:
         'sms':   {'success': False, 'message': ''},
     }
 
+    patient = appointment.patient
+
     # ── Email ─────────────────────────────────────────────────────────────────
-    email_success, email_msg = send_appointment_reminder_email(appointment)
-    result['email'] = {'success': email_success, 'message': email_msg}
+    if getattr(patient, 'send_email_notifications', True):
+        email_success, email_msg = send_appointment_reminder_email(appointment)
+        result['email'] = {'success': email_success, 'message': email_msg}
+    else:
+        result['email'] = {
+            'success': False,
+            'message': f'Patient {patient.id} has email notifications disabled — skipping.',
+        }
 
     # ── SMS ───────────────────────────────────────────────────────────────────
-    sms_success, sms_msg = send_appointment_reminder_sms(appointment)
-    result['sms'] = {'success': sms_success, 'message': sms_msg}
+    if getattr(patient, 'sms_notifications_enabled', False):
+        sms_success, sms_msg = send_appointment_reminder_sms(appointment)
+        result['sms'] = {'success': sms_success, 'message': sms_msg}
+    else:
+        result['sms'] = {
+            'success': False,
+            'message': f'Patient {patient.id} has SMS notifications disabled — skipping.',
+        }
 
     logger.info(
         "send_all_reminders → appointment_id=%s email=%s sms=%s",

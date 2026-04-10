@@ -1,6 +1,8 @@
 import React from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { CheckCircle, Mail, ArrowRight, RefreshCw, AlertCircle, Stethoscope } from 'lucide-react';
+import { CheckCircle, Mail, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
+import MalasakitWhiteLogo from '@/assets/malasakit/Primary Logo - White.svg';
+import MalasakitColoredLogo from '@/assets/malasakit/Primary Logo - Colored.svg';
 
 interface LocationState {
   email: string;
@@ -30,21 +32,24 @@ export const RegisterSuccess: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-sky-600 via-blue-600 to-cyan-500 p-12 flex-col justify-between relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-primary-gradient p-12 flex-col justify-between relative overflow-hidden">
+        {/* Floating Particles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="animate-float-slow absolute top-[10%] left-[5%] w-28 h-28 rounded-full bg-white/10" style={{ animationDelay: '0s' }} />
+          <div className="animate-float-slow absolute top-[55%] left-[2%] w-36 h-36 rounded-full bg-healing-mint/15" style={{ animationDelay: '3s' }} />
+          <div className="animate-float-slow absolute top-[20%] right-[10%] w-24 h-24 rounded-full bg-white/10" style={{ animationDelay: '6s' }} />
+          <div className="animate-float-slow absolute bottom-[8%] left-[28%] w-32 h-32 rounded-full bg-healing-mint/10" style={{ animationDelay: '1.5s' }} />
+          <div className="animate-float-medium absolute top-[35%] left-[16%] w-16 h-16 rounded-full bg-white/15" style={{ animationDelay: '1s' }} />
+          <div className="animate-float-medium absolute top-[8%] left-[48%] w-20 h-20 rounded-full bg-healing-mint/20" style={{ animationDelay: '4s' }} />
+          <div className="animate-float-medium absolute top-[65%] left-[52%] w-14 h-14 rounded-full bg-white/10" style={{ animationDelay: '2s' }} />
+          <div className="animate-float-fast absolute top-[28%] left-[33%] w-8 h-8 rounded-full bg-white/20" style={{ animationDelay: '0.5s' }} />
+          <div className="animate-float-fast absolute top-[50%] left-[10%] w-10 h-10 rounded-full bg-healing-mint/25" style={{ animationDelay: '2.5s' }} />
+          <div className="animate-float-fast absolute bottom-[28%] left-[60%] w-6 h-6 rounded-full bg-white/20" style={{ animationDelay: '1s' }} />
         </div>
-        
-        {/* Logo & Brand */}
+
+        {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">MES</span>
-          </div>
+          <img src={MalasakitWhiteLogo} alt="Malasakit Logo" className="h-10 w-auto" />
         </div>
 
         {/* Success Message */}
@@ -57,17 +62,17 @@ export const RegisterSuccess: React.FC = () => {
               <h1 className="text-3xl font-bold text-white">
                 Account Created!
               </h1>
-              <p className="text-blue-100">Welcome to MES, {companyName}</p>
+              <p className="text-white/80">Welcome to MES, {companyName}</p>
             </div>
           </div>
           
-          <p className="text-blue-100 text-lg max-w-md">
+          <p className="text-white/80 text-lg max-w-md">
             Your clinic account has been successfully created. Follow the steps below to get started.
           </p>
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-blue-200 text-sm">
+        <div className="relative z-10 text-white/60 text-sm">
           © 2024 MES - Malasakit EMR Solutions
         </div>
       </div>
@@ -76,11 +81,8 @@ export const RegisterSuccess: React.FC = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-600 to-blue-600 rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">MES</span>
+          <div className="lg:hidden flex items-center justify-center mb-8">
+            <img src={MalasakitColoredLogo} alt="Malasakit Logo" className="h-10 w-auto" />
           </div>
 
           {/* Success Card */}
@@ -131,8 +133,8 @@ export const RegisterSuccess: React.FC = () => {
                   { num: '4', title: 'Set up clinic', desc: 'Complete your clinic profile' }
                 ].map((step) => (
                   <div key={step.num} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="w-6 h-6 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-sky-600">{step.num}</span>
+                    <div className="w-6 h-6 bg-care-blue/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-care-blue">{step.num}</span>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{step.title}</p>
@@ -164,7 +166,7 @@ export const RegisterSuccess: React.FC = () => {
             <div className="space-y-3">
               <button
                 onClick={handleGoToLogin}
-                className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-semibold text-white bg-primary-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-care-blue transition-all"
               >
                 Go to Login
                 <ArrowRight className="ml-2 w-4 h-4" />
@@ -186,7 +188,7 @@ export const RegisterSuccess: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Need help?{' '}
-              <a href="mailto:support@mespms.com" className="font-medium text-sky-600 hover:text-sky-700">
+              <a href="mailto:support@mespms.com" className="font-medium text-care-blue hover:text-trust-harbor">
                 Contact Support
               </a>
             </p>

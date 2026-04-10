@@ -171,6 +171,15 @@ class PatientViewSet(viewsets.ModelViewSet):
 
         return base_qs
 
+    def perform_create(self, serializer):
+        patient = serializer.save()
+        # Send welcome email in the background (fire-and-forget)
+        try:
+            from apps.common.email_utils import send_new_client_welcome_email
+            send_new_client_welcome_email(patient)
+        except Exception as e:
+            logger.warning(f"Welcome email failed for patient {patient.id}: {e}")
+
     @action(detail=True, methods=['get'])
     def intake_forms(self, request, pk=None):
         patient    = self.get_object()
@@ -447,6 +456,15 @@ class PublicPortalBookView(APIView):
                 f"Portal booking #{booking.reference_number} auto-confirmed "
                 f"for clinic '{portal_link.clinic.name}'"
             )
+
+            # Send booking confirmation email
+            try:
+                from apps.common.email_utils import send_booking_confirmation_email
+                send_booking_confirmation_email(booking)
+            except Exception as email_err:
+                logger.warning(
+                    f"Booking confirmation email failed for #{booking.reference_number}: {email_err}"
+                )
         except Exception as e:
             logger.error(f"Auto-confirm failed for portal booking #{booking.reference_number}: {e}")
             # Still return success to the patient — staff can confirm manually if needed

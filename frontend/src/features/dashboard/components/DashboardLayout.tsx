@@ -11,7 +11,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   const { sidebarWidth, isMobile } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+    <div className="min-h-screen bg-clinical-cloud overflow-hidden">
       {/* Mobile Header */}
       {isMobile && <MobileHeader />}
       

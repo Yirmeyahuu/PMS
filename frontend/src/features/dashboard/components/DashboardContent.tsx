@@ -42,10 +42,10 @@ export const DashboardContent: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-trust-harbor mb-1 font-heading">
               Dashboard Overview
             </h1>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-steady-slate font-body">
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -57,7 +57,7 @@ export const DashboardContent: React.FC = () => {
           {!isLoading && (
             <button
               onClick={refresh}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-steady-slate rounded-2xl hover:bg-clinical-cloud transition-colors text-sm font-medium font-body"
             >
               <RefreshCw className="w-4 h-4" />
               <span className="hidden sm:inline">Refresh</span>

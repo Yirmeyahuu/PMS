@@ -9,24 +9,24 @@ export const Features: React.FC = () => {
     const color = colors[index % colors.length];
     switch (color) {
       case 'cyan':
-        return 'bg-cyan-100 text-cyan-600';
+        return 'bg-care-blue/10 text-care-blue';
       case 'purple':
         return 'bg-purple-100 text-purple-600';
       case 'green':
-        return 'bg-green-100 text-green-600';
+        return 'bg-healing-mint/20 text-healing-mint';
       case 'blue':
-        return 'bg-blue-100 text-blue-600';
+        return 'bg-trust-harbor/10 text-trust-harbor';
       case 'indigo':
         return 'bg-indigo-100 text-indigo-600';
       case 'emerald':
-        return 'bg-emerald-100 text-emerald-600';
+        return 'bg-gentle-renewal/30 text-emerald-600';
       default:
         return 'bg-gray-100 text-gray-600';
     }
   };
 
   return (
-    <section id="features" className="py-20 sm:py-28 bg-gray-50">
+    <section id="features" className="py-20 sm:py-28 bg-clinical-cloud">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
@@ -64,7 +64,7 @@ export const Features: React.FC = () => {
                 {/* Learn more link */}
                 <button
                   onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="mt-4 inline-flex items-center text-cyan-600 font-semibold hover:text-cyan-700 transition-colors font-body"
+                  className="mt-4 inline-flex items-center text-care-blue font-semibold hover:text-trust-harbor transition-colors font-body"
                 >
                   Learn more <ArrowRight className="ml-2 w-4 h-4" />
                 </button>
@@ -80,7 +80,7 @@ export const Features: React.FC = () => {
               Ready to transform your practice?{' '}
               <button
                 onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
-                className="text-cyan-600 font-semibold hover:text-cyan-700 transition-colors font-body"
+                className="text-care-blue font-semibold hover:text-trust-harbor transition-colors font-body"
               >
                 View pricing plans →
               </button>

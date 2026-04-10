@@ -1,0 +1,32 @@
+{{ clinic_name }} — Booking Confirmation
+========================================
+
+Hi {{ patient_first_name }},
+
+Your appointment has been confirmed! Here are the details:
+
+APPOINTMENT DETAILS
+-------------------
+Date         : {{ appointment_date }}
+Time         : {{ appointment_time }}
+Service      : {{ service_name }}
+{% if practitioner_name %}Practitioner : {{ practitioner_name }}{% endif %}
+Location     : {{ clinic_name }}
+{% if clinic_address %}Address      : {{ clinic_address }}{% endif %}
+
+{% if notes %}
+YOUR NOTES
+----------
+{{ notes }}
+
+{% endif %}
+If you need to reschedule or cancel, please contact us as soon as possible:
+{% if clinic_phone %}Phone : {{ clinic_phone }}{% endif %}
+{% if clinic_email %}Email : {{ clinic_email }}{% endif %}
+
+We look forward to seeing you!
+
+— {{ clinic_name }} Team
+
+---
+This is an automated confirmation. Please do not reply to this email.

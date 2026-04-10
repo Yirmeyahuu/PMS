@@ -15,19 +15,19 @@ export const FAQ: React.FC = () => {
     const color = colors[index % colors.length];
     switch (color) {
       case 'cyan':
-        return 'text-cyan-600 bg-cyan-50';
+        return 'text-care-blue bg-care-blue/10';
       case 'purple':
         return 'text-purple-600 bg-purple-50';
       case 'green':
-        return 'text-green-600 bg-green-50';
+        return 'text-healing-mint bg-healing-mint/10';
       case 'blue':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-trust-harbor bg-trust-harbor/10';
       case 'indigo':
         return 'text-indigo-600 bg-indigo-50';
       case 'emerald':
         return 'text-emerald-600 bg-emerald-50';
       default:
-        return 'text-cyan-600 bg-cyan-50';
+        return 'text-care-blue bg-care-blue/10';
     }
   };
 
@@ -84,7 +84,7 @@ export const FAQ: React.FC = () => {
 
         {/* Contact Support with gradient */}
         <div className="mt-16 text-center">
-          <div className="inline-flex items-center justify-center bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-8 py-4 rounded-2xl shadow-lg">
+          <div className="inline-flex items-center justify-center bg-care-blue text-white px-8 py-4 rounded-2xl shadow-lg">
             <MessageCircle className="w-5 h-5 mr-3" />
             <p className="text-base font-medium font-body">
               Still have questions?{' '}

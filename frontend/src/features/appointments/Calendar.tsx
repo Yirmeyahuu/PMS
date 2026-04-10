@@ -1378,13 +1378,13 @@ export const Calendar: React.FC<CalendarProps> = ({
     // Determine background class based on availability
     // COLOR RULES (Nookal-style):
     // - AVAILABLE (Duty Hours) → bg-white
-    // - NOT AVAILABLE → bg-purple-300 (non-duty hours/days)
+    // - NOT AVAILABLE → bg-trust-harbor (non-duty hours/days)
     let slotBgClass = '';
     let slotTitle = 'Double-click or drag to add';
 
     if (!isAvailable) {
-      // Non-duty hours or non-duty day = solid purple
-      slotBgClass = 'bg-purple-400';
+      // Non-duty hours or non-duty day = trust-harbor tint
+      slotBgClass = 'bg-trust-harbor';
       if (!dayAvailable) {
         slotTitle = 'Non-duty day (click to add anyway)';
       } else if (!hourAvailable) {
@@ -1475,7 +1475,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
     let slotBgClass = '';
     if (!isAvailable) {
-      slotBgClass = 'bg-purple-400';
+      slotBgClass = 'bg-trust-harbor/30';
     } else if (isSelected) {
       slotBgClass = 'bg-sky-200 hover:bg-sky-300';
     } else if (isDropTarget) {
@@ -1560,7 +1560,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     Duty
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 bg-purple-400 inline-block" />
+                    <span className="w-2.5 h-2.5 bg-trust-harbor/30 inline-block" />
                     Off
                   </span>
                 </div>
@@ -1574,7 +1574,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                     Duty
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 bg-purple-400 inline-block" />
+                    <span className="w-2.5 h-2.5 bg-trust-harbor/30 inline-block" />
                     Off
                   </span>
                 </div>
@@ -1620,14 +1620,14 @@ export const Calendar: React.FC<CalendarProps> = ({
 
     return (
       <div {...calendarWrapperProps} className="h-full flex flex-col">
-        <div className={`flex flex-col h-full rounded-xl border overflow-hidden ${isDayAvailable ? 'bg-white border-gray-200' : 'bg-purple-50 border-purple-200'}`}>
-          <div className={`flex-shrink-0 p-4 border-b ${isDayAvailable ? 'border-gray-200 bg-gray-50' : 'border-purple-200 bg-purple-100'}`}>
+        <div className={`flex flex-col h-full rounded-xl border overflow-hidden ${isDayAvailable ? 'bg-white border-gray-200' : 'bg-trust-harbor/5 border-trust-harbor/20'}`}>
+          <div className={`flex-shrink-0 p-4 border-b ${isDayAvailable ? 'border-gray-200 bg-gray-50' : 'border-trust-harbor/20 bg-trust-harbor/10'}`}>
             <div className="text-center">
-              <h3 className={`text-lg font-semibold ${isDayAvailable ? 'text-gray-900' : 'text-purple-700'}`}>
+              <h3 className={`text-lg font-semibold ${isDayAvailable ? 'text-gray-900' : 'text-trust-harbor'}`}>
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
               </h3>
               {!isDayAvailable && (
-                <p className="text-sm text-purple-600 mt-1">
+                <p className="text-sm text-trust-harbor mt-1">
                   ⚠️ Non-duty day (appointments can still be added)
                 </p>
               )}
@@ -1814,14 +1814,14 @@ export const Calendar: React.FC<CalendarProps> = ({
               return (
                 <div 
                   key={day.toISOString()} 
-                  className={`p-4 text-center border-l border-gray-200 ${!isAvailableDay ? 'bg-purple-200' : 'bg-white'}`}
+                  className={`p-4 text-center border-l border-gray-200 ${!isAvailableDay ? 'bg-trust-harbor/20' : 'bg-white'}`}
                 >
-                  <div className={`text-xs font-medium uppercase ${!isAvailableDay ? 'text-purple-600' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
-                  <div className={`text-sm font-semibold mt-1 ${!isAvailableDay ? 'text-purple-600' : ''} ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs' : 'text-gray-700'}`}>
+                  <div className={`text-xs font-medium uppercase ${!isAvailableDay ? 'text-trust-harbor' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
+                  <div className={`text-sm font-semibold mt-1 ${!isAvailableDay ? 'text-trust-harbor' : ''} ${isSameDay(day, new Date()) ? 'bg-sky-600 text-white w-6 h-6 rounded-full flex items-center justify-center mx-auto text-xs' : 'text-gray-700'}`}>
                     {format(day, 'd')}
                   </div>
                   {!isAvailableDay && (
-                    <div className="text-xs text-purple-500 mt-1">Non-duty</div>
+                    <div className="text-xs text-trust-harbor/70 mt-1">Non-duty</div>
                   )}
                 </div>
               );

@@ -1,39 +1,94 @@
 @import "tailwindcss";
 
-/* Import Bricolage Grotesque and Geist from Google Fonts */
-/* Note: These are loaded via index.html */
-
-/* Font Families - Tailwind v4 theme configuration */
+/* ── PMS Design System: Typography & Colors ── */
 @theme {
-  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand Colors */
+  --color-care-blue: #0575E6;
+  --color-healing-mint: #5CDB95;
+  --color-trust-harbor: #144A86;
+  --color-gentle-renewal: #A9E4C4;
+  --color-steady-slate: #556A73;
+  --color-clinical-cloud: #F3F8F7;
 }
 
-/* Font Variables */
+/* CSS Variables */
 :root {
-  --font-primary: 'Bricolage Grotesque', sans-serif;
-  --font-secondary: 'Geist', sans-serif;
+  --font-primary: 'Inter', sans-serif;
+  --font-secondary: 'Plus Jakarta Sans', sans-serif;
+  --gradient-primary: linear-gradient(to right, #0575E6, #5CDB95);
 }
 
-/* Apply fonts globally */
+/* Global font application */
 html, body {
   font-family: var(--font-secondary);
 }
 
-/* Headings use Bricolage Grotesque Bold */
+/* Headings use Inter Bold */
 h1, h2, h3, h4, h5, h6,
 .text-display,
-.font-display {
-  font-family: 'Bricolage Grotesque', sans-serif;
+.font-display,
+.font-heading {
+  font-family: 'Inter', sans-serif;
   font-weight: 700;
 }
 
-/* Body text uses Geist */
+/* Body text uses Plus Jakarta Sans */
 p, span, li, div,
 .text-body,
 .font-body {
-  font-family: 'Geist', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Primary gradient utility */
+.bg-primary-gradient {
+  background: linear-gradient(to top right, #0575E6, #5CDB95);
+}
+.text-primary-gradient {
+  background: linear-gradient(to top right, #0575E6, #5CDB95);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Floating Particle Animations */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) translateX(0px) scale(1); }
+  33%       { transform: translateY(-40px) translateX(20px) scale(1.05); }
+  66%       { transform: translateY(-20px) translateX(-15px) scale(0.95); }
+}
+@keyframes float-medium {
+  0%, 100% { transform: translateY(0px) translateX(0px) scale(1); }
+  40%       { transform: translateY(-55px) translateX(-25px) scale(1.08); }
+  70%       { transform: translateY(-30px) translateX(30px) scale(0.97); }
+}
+@keyframes float-fast {
+  0%, 100% { transform: translateY(0px) translateX(0px) scale(1); }
+  50%       { transform: translateY(-70px) translateX(10px) scale(1.1); }
+}
+.animate-float-slow   { animation: float-slow   14s ease-in-out infinite; }
+.animate-float-medium { animation: float-medium 10s ease-in-out infinite; }
+.animate-float-fast   { animation: float-fast    7s ease-in-out infinite; }
+
+/* Component Primitives */
+@layer components {  .card-base {
+    @apply rounded-3xl bg-white shadow-sm border border-gray-100;
+  }
+  .btn-primary {
+    @apply text-white rounded-2xl hover:opacity-95 transition-all;
+    background: linear-gradient(to right, #0575E6, #5CDB95);
+  }
+  .btn-secondary {
+    @apply border border-trust-harbor text-trust-harbor bg-white rounded-2xl hover:bg-clinical-cloud transition-all;
+  }
+  .input-base {
+    @apply rounded-2xl border border-gray-200 bg-white focus:ring-2 focus:ring-care-blue focus:border-care-blue transition-all;
+  }
 }
 
 /* Custom Cursor Styles */

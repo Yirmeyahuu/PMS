@@ -297,7 +297,7 @@ export const Diary: React.FC = () => {
 
         {/* ── Branch Tabs ── */}
         {branches.length > 0 && (
-          <div className="flex-shrink-0 bg-gray-50 border-b border-gray-200">
+          <div className="flex-shrink-0 bg-clinical-cloud border-b border-gray-200">
             <div className="flex items-center overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
 
               {/* All Branches */}
@@ -308,8 +308,8 @@ export const Diary: React.FC = () => {
                   relative flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap
                   transition-all duration-200 border-b-2
                   ${selectedClinicBranch === null
-                    ? 'bg-white text-sky-600 border-sky-500 shadow-sm'
-                    : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-100/50'
+                    ? 'bg-white text-care-blue border-care-blue shadow-sm'
+                    : 'bg-transparent text-steady-slate border-transparent hover:text-trust-harbor hover:bg-gray-100/50'
                   }
                   ${loadingBranches ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -328,8 +328,8 @@ export const Diary: React.FC = () => {
                     relative flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap
                     transition-all duration-200 border-b-2
                     ${selectedClinicBranch === branch.id
-                      ? 'bg-white text-sky-600 border-sky-500 shadow-sm'
-                      : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-100/50'
+                      ? 'bg-white text-care-blue border-care-blue shadow-sm'
+                      : 'bg-transparent text-steady-slate border-transparent hover:text-trust-harbor hover:bg-gray-100/50'
                     }
                     ${loadingBranches ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
@@ -352,7 +352,7 @@ export const Diary: React.FC = () => {
         <div className="flex-1 flex overflow-hidden">
 
           {/* Left Sidebar */}
-          <div className="w-72 flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
+          <div className="w-56 flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
             {/* Current Month Mini Calendar */}
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 text-center">
@@ -415,13 +415,13 @@ export const Diary: React.FC = () => {
                     </button>
                   </div>
 
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-trust-harbor">
                     {getDateRangeText()}
                   </h2>
 
                   {/* Active branch badge */}
                   {selectedBranchName && (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-care-blue/10 text-care-blue border border-care-blue/20">
                       <Building2 className="w-3 h-3" />
                       {selectedBranchName}
                     </span>
@@ -435,13 +435,13 @@ export const Diary: React.FC = () => {
                       <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 bg-gray-50 text-xs font-medium">
                         <button
                           onClick={() => handleSetCompareMode(false)}
-                          className={`px-3 py-1.5 transition-colors ${!compareMode ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          className={`px-3 py-1.5 transition-colors ${!compareMode ? 'bg-white text-care-blue shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                           Single
                         </button>
                         <button
                           onClick={() => handleSetCompareMode(true)}
-                          className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${compareMode ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 transition-colors ${compareMode ? 'bg-white text-care-blue shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                           <Users className="w-3 h-3" />
                           Compare
@@ -458,8 +458,8 @@ export const Diary: React.FC = () => {
                           className={`
                             flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors
                             ${selectedPractitioner
-                              ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
+                              : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
                             }
                             ${loadingPractitioners ? 'opacity-50 cursor-not-allowed' : ''}
                           `}
@@ -478,8 +478,8 @@ export const Diary: React.FC = () => {
                             <div className="absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-20 max-h-80 overflow-y-auto">
 
                               {selectedClinicBranch && (
-                                <div className="px-4 py-2 bg-sky-50 border-b border-sky-100">
-                                  <p className="text-xs font-semibold text-sky-700">
+                                <div className="px-4 py-2 bg-care-blue/10 border-b border-care-blue/20">
+                                  <p className="text-xs font-semibold text-care-blue">
                                     Showing practitioners for: {selectedBranchName}
                                   </p>
                                 </div>
@@ -496,8 +496,8 @@ export const Diary: React.FC = () => {
                                 className={`
                                   w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
                                   ${(isPractitioner || isStaff) && isOwnAssignedClinic
-                                    ? selectedPractitioner === cachedOwnId ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'
-                                    : selectedPractitioner === null ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'
+                                    ? selectedPractitioner === cachedOwnId ? 'bg-care-blue/10 text-care-blue font-semibold' : 'text-gray-700'
+                                    : selectedPractitioner === null ? 'bg-care-blue/10 text-care-blue font-semibold' : 'text-gray-700'
                                   }
                                 `}
                               >
@@ -513,7 +513,7 @@ export const Diary: React.FC = () => {
                                   {((isPractitioner || isStaff) && isOwnAssignedClinic
                                     ? selectedPractitioner === cachedOwnId
                                     : selectedPractitioner === null) && (
-                                    <span className="text-sky-600 text-base">✓</span>
+                                    <span className="text-care-blue text-base">✓</span>
                                   )}
                                 </div>
                               </button>
@@ -537,7 +537,7 @@ export const Diary: React.FC = () => {
                                     className={`
                                       w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
                                       ${selectedPractitioner === practitioner.id
-                                        ? 'bg-sky-50 text-sky-700 font-semibold'
+                                        ? 'bg-care-blue/10 text-care-blue font-semibold'
                                         : 'text-gray-700'
                                       }
                                     `}
@@ -547,7 +547,7 @@ export const Diary: React.FC = () => {
                                         <div className="truncate">
                                           {practitioner.name}
                                           {practitioner.id === cachedOwnId && (
-                                            <span className="ml-1.5 text-xs text-sky-500 font-medium">(me)</span>
+                                            <span className="ml-1.5 text-xs text-care-blue font-medium">(me)</span>
                                           )}
                                         </div>
                                         {practitioner.specialization && (
@@ -556,14 +556,14 @@ export const Diary: React.FC = () => {
                                           </div>
                                         )}
                                         {!selectedClinicBranch && practitioner.clinic_branch_name && (
-                                          <div className="text-xs text-sky-600 mt-0.5 flex items-center gap-1">
+                                          <div className="text-xs text-care-blue mt-0.5 flex items-center gap-1">
                                             <Building2 className="w-3 h-3" />
                                             {practitioner.clinic_branch_name}
                                           </div>
                                         )}
                                       </div>
                                       {selectedPractitioner === practitioner.id && (
-                                        <span className="text-sky-600 flex-shrink-0 text-base">✓</span>
+                                        <span className="text-care-blue flex-shrink-0 text-base">✓</span>
                                       )}
                                     </div>
                                   </button>
@@ -583,21 +583,21 @@ export const Diary: React.FC = () => {
                             disabled={loadingPractitioners}
                             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors
                               ${comparePractitioners[0]
-                                ? 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100'
-                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
+                                : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
                               }
                               ${loadingPractitioners ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                           >
-                            <span className="text-xs font-bold mr-0.5 text-sky-600">A:</span>
+                            <span className="text-xs font-bold mr-0.5 text-care-blue">A:</span>
                             {loadingPractitioners ? 'Loading…' : (comparePractitionerAName !== 'Practitioner A' ? comparePractitionerAName : 'Select A')}
                           </button>
                           {showCompareDropdownA && !loadingPractitioners && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setShowCompareDropdownA(false)} />
                               <div className="absolute left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-20 max-h-72 overflow-y-auto">
-                                <div className="px-4 py-2 bg-sky-50 border-b border-sky-100">
-                                  <p className="text-xs font-semibold text-sky-700">Select Practitioner A</p>
+                                <div className="px-4 py-2 bg-care-blue/10 border-b border-care-blue/20">
+                                  <p className="text-xs font-semibold text-care-blue">Select Practitioner A</p>
                                 </div>
                                 {practitioners.map((p) => (
                                   <button
@@ -605,11 +605,11 @@ export const Diary: React.FC = () => {
                                     onClick={() => handleComparePractitionerASelect(p.id)}
                                     disabled={p.id === comparePractitioners[1]}
                                     className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
-                                      ${comparePractitioners[0] === p.id ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-700'}
+                                      ${comparePractitioners[0] === p.id ? 'bg-care-blue/10 text-care-blue font-semibold' : 'text-gray-700'}
                                       ${p.id === comparePractitioners[1] ? 'opacity-40 cursor-not-allowed' : ''}
                                     `}
                                   >
-                                    <div className="truncate">{p.name}{p.id === cachedOwnId && <span className="ml-1 text-xs text-sky-500">(me)</span>}</div>
+                                    <div className="truncate">{p.name}{p.id === cachedOwnId && <span className="ml-1 text-xs text-care-blue">(me)</span>}</div>
                                     {p.specialization && <div className="text-xs text-gray-500 truncate">{p.specialization}</div>}
                                   </button>
                                 ))}
@@ -685,7 +685,7 @@ export const Diary: React.FC = () => {
                           }
                           setShowFilterDropdown(false);
                         }}
-                        className="text-xs text-sky-600 hover:text-sky-800 font-medium"
+                        className="text-xs text-care-blue hover:text-trust-harbor font-medium"
                       >
                         {(isPractitioner || isStaff) && isOwnAssignedClinic ? 'My Schedule' : 'Clear filter'}
                       </button>
@@ -705,8 +705,8 @@ export const Diary: React.FC = () => {
                       className={`
                         px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
                         ${view === v
-                          ? 'bg-white text-sky-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
+                          ? 'bg-white text-care-blue shadow-sm'
+                          : 'text-steady-slate hover:text-trust-harbor'
                         }
                       `}
                     >
@@ -723,7 +723,7 @@ export const Diary: React.FC = () => {
             </div>
 
             {/* Calendar */}
-            <div className="flex-1 overflow-hidden p-4 bg-gray-50">
+            <div className="flex-1 overflow-hidden p-4 bg-clinical-cloud">
               <Calendar
                 view={view}
                 currentDate={currentDate}
@@ -843,8 +843,8 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateS
                 onClick={() => onDateSelect(dayDate)}
                 className={`
                   aspect-square flex items-center justify-center rounded-md transition-all hover:bg-gray-100
-                  ${isSelected ? 'bg-sky-500 text-white hover:bg-sky-600' : ''}
-                  ${isToday && !isSelected ? 'bg-sky-100 text-sky-700 font-semibold' : ''}
+                  ${isSelected ? 'bg-care-blue text-white hover:bg-care-blue/90' : ''}
+                  ${isToday && !isSelected ? 'bg-care-blue/10 text-care-blue font-semibold' : ''}
                   ${!isSelected && !isToday ? 'text-gray-700' : ''}
                 `}
               >

@@ -8,7 +8,9 @@ import {
   validateCompanyName,
   sanitizeInput,
 } from '@/utils/validation';
-import { Mail, User, Building2, Phone, CheckCircle, AlertCircle, Stethoscope, ArrowLeft } from 'lucide-react';
+import { Mail, User, Building2, Phone, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import MalasakitWhiteLogo from '@/assets/malasakit/Primary Logo - White.svg';
+import MalasakitColoredLogo from '@/assets/malasakit/Primary Logo - Colored.svg';
 import type { AdminRegisterData, AuthError } from '@/types/auth';
 import toast from 'react-hot-toast';
 
@@ -147,21 +149,24 @@ export const AdminRegister: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-sky-600 via-blue-600 to-cyan-500 p-12 flex-col justify-between relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-primary-gradient p-12 flex-col justify-between relative overflow-hidden">
+        {/* Floating Particles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="animate-float-slow absolute top-[10%] left-[5%] w-28 h-28 rounded-full bg-white/10" style={{ animationDelay: '0s' }} />
+          <div className="animate-float-slow absolute top-[55%] left-[2%] w-36 h-36 rounded-full bg-healing-mint/15" style={{ animationDelay: '3s' }} />
+          <div className="animate-float-slow absolute top-[20%] right-[10%] w-24 h-24 rounded-full bg-white/10" style={{ animationDelay: '6s' }} />
+          <div className="animate-float-slow absolute bottom-[8%] left-[28%] w-32 h-32 rounded-full bg-healing-mint/10" style={{ animationDelay: '1.5s' }} />
+          <div className="animate-float-medium absolute top-[35%] left-[16%] w-16 h-16 rounded-full bg-white/15" style={{ animationDelay: '1s' }} />
+          <div className="animate-float-medium absolute top-[8%] left-[48%] w-20 h-20 rounded-full bg-healing-mint/20" style={{ animationDelay: '4s' }} />
+          <div className="animate-float-medium absolute top-[65%] left-[52%] w-14 h-14 rounded-full bg-white/10" style={{ animationDelay: '2s' }} />
+          <div className="animate-float-fast absolute top-[28%] left-[33%] w-8 h-8 rounded-full bg-white/20" style={{ animationDelay: '0.5s' }} />
+          <div className="animate-float-fast absolute top-[50%] left-[10%] w-10 h-10 rounded-full bg-healing-mint/25" style={{ animationDelay: '2.5s' }} />
+          <div className="animate-float-fast absolute bottom-[28%] left-[60%] w-6 h-6 rounded-full bg-white/20" style={{ animationDelay: '1s' }} />
         </div>
-        
-        {/* Logo & Brand */}
+
+        {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">MES</span>
-          </div>
+          <img src={MalasakitWhiteLogo} alt="Malasakit Logo" className="h-10 w-auto" />
         </div>
 
         {/* Hero Content */}
@@ -169,7 +174,7 @@ export const AdminRegister: React.FC = () => {
           <h1 className="text-4xl font-bold text-white leading-tight">
             Start Your Free Trial
           </h1>
-          <p className="text-blue-100 text-lg max-w-md">
+          <p className="text-healing-mint text-lg max-w-md">
             Create your clinic account and start managing patients efficiently.
           </p>
           
@@ -181,12 +186,12 @@ export const AdminRegister: React.FC = () => {
               { title: 'Cancel anytime', desc: 'No long-term contracts' }
             ].map((item, index) => (
               <div key={index} className="flex items-center space-x-3">
-                <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-healing-mint flex items-center justify-center">
                   <CheckCircle className="w-4 h-4 text-white" />
                 </div>
                 <div>
                   <p className="text-white font-medium">{item.title}</p>
-                  <p className="text-blue-200 text-sm">{item.desc}</p>
+                  <p className="text-white/70 text-sm">{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -194,19 +199,19 @@ export const AdminRegister: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-blue-200 text-sm">
+        <div className="relative z-10 text-white/60 text-sm">
           © 2024 MES - Malasakit EMR Solutions
         </div>
       </div>
 
       {/* Right Side - Registration Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-clinical-cloud">
         <div className="w-full max-w-md">
           {/* Go Back Button */}
           <div className="mb-6">
             <Link
               to="/"
-              className="inline-flex items-center text-sm text-gray-600 hover:text-sky-600 transition-colors"
+              className="inline-flex items-center text-sm text-steady-slate hover:text-care-blue transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Go back
@@ -214,17 +219,14 @@ export const AdminRegister: React.FC = () => {
           </div>
 
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-600 to-blue-600 rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">MES</span>
+          <div className="lg:hidden flex items-center justify-center mb-8">
+            <img src={MalasakitColoredLogo} alt="Malasakit Logo" className="h-10 w-auto" />
           </div>
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
-            <p className="mt-2 text-gray-600">Set up your clinic and start managing patients</p>
+            <h2 className="text-3xl font-bold text-trust-harbor">Create your account</h2>
+            <p className="mt-2 text-steady-slate">Set up your clinic and start managing patients</p>
           </div>
 
           {/* Form */}
@@ -244,7 +246,7 @@ export const AdminRegister: React.FC = () => {
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="first_name" className="block text-sm font-medium text-trust-harbor mb-1.5">
                   First Name
                 </label>
                 <div className="relative">
@@ -258,8 +260,8 @@ export const AdminRegister: React.FC = () => {
                     required
                     value={formData.first_name}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm ${
-                      validationErrors.first_name ? 'border-red-300' : 'border-gray-300'
+                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                      validationErrors.first_name ? 'border-red-300' : 'border-gray-200'
                     }`}
                     placeholder="Juan"
                     disabled={isLoading}
@@ -271,7 +273,7 @@ export const AdminRegister: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="last_name" className="block text-sm font-medium text-trust-harbor mb-1.5">
                   Last Name
                 </label>
                 <div className="relative">
@@ -285,8 +287,8 @@ export const AdminRegister: React.FC = () => {
                     required
                     value={formData.last_name}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm ${
-                      validationErrors.last_name ? 'border-red-300' : 'border-gray-300'
+                    className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                      validationErrors.last_name ? 'border-red-300' : 'border-gray-200'
                     }`}
                     placeholder="Dela Cruz"
                     disabled={isLoading}
@@ -300,7 +302,7 @@ export const AdminRegister: React.FC = () => {
 
             {/* Company Name */}
             <div>
-              <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="company_name" className="block text-sm font-medium text-trust-harbor mb-1.5">
                 Clinic/Company Name
               </label>
               <div className="relative">
@@ -314,8 +316,8 @@ export const AdminRegister: React.FC = () => {
                   required
                   value={formData.company_name}
                   onChange={handleChange}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm ${
-                    validationErrors.company_name ? 'border-red-300' : 'border-gray-300'
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                    validationErrors.company_name ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="My Medical Clinic"
                   disabled={isLoading}
@@ -328,8 +330,8 @@ export const AdminRegister: React.FC = () => {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email Address
+              <label htmlFor="email" className="block text-sm font-medium text-trust-harbor mb-1.5">
+                  Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -343,8 +345,8 @@ export const AdminRegister: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm ${
-                    validationErrors.email ? 'border-red-300' : 'border-gray-300'
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                    validationErrors.email ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="you@example.com"
                   disabled={isLoading}
@@ -360,7 +362,7 @@ export const AdminRegister: React.FC = () => {
 
             {/* Phone (Optional) */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="phone" className="block text-sm font-medium text-trust-harbor mb-1.5">
                 Phone Number <span className="text-gray-500 font-normal">(optional)</span>
               </label>
               <div className="relative">
@@ -373,8 +375,8 @@ export const AdminRegister: React.FC = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={handleChange}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-lg bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm ${
-                    validationErrors.phone ? 'border-red-300' : 'border-gray-300'
+                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                    validationErrors.phone ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="09XXXXXXXXX"
                   disabled={isLoading}
@@ -389,7 +391,7 @@ export const AdminRegister: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-semibold text-white bg-primary-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-care-blue disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {isLoading ? (
                 <span className="flex items-center">
@@ -410,9 +412,9 @@ export const AdminRegister: React.FC = () => {
 
           {/* Login Link */}
           <div className="mt-8 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-steady-slate">
               Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-sky-600 hover:text-sky-700">
+              <Link to="/login" className="font-semibold text-care-blue hover:text-trust-harbor">
                 Sign in
               </Link>
             </p>
@@ -421,11 +423,11 @@ export const AdminRegister: React.FC = () => {
           {/* Terms Notice */}
           <p className="mt-6 text-xs text-center text-gray-500">
             By creating an account, you agree to our{' '}
-            <a href="#" className="text-sky-600 hover:text-sky-700 font-medium">
+            <a href="#" className="text-care-blue hover:text-trust-harbor font-medium">
               Terms of Service
             </a>{' '}
             and{' '}
-            <a href="#" className="text-sky-600 hover:text-sky-700 font-medium">
+            <a href="#" className="text-care-blue hover:text-trust-harbor font-medium">
               Privacy Policy
             </a>
           </p>

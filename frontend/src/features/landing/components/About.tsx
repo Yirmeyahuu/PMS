@@ -26,11 +26,11 @@ export const About: React.FC = () => {
   const getColorClasses = (color: string) => {
     switch (color) {
       case 'cyan':
-        return 'bg-cyan-50 text-cyan-600';
+        return 'bg-care-blue/10 text-care-blue';
       case 'purple':
         return 'bg-purple-50 text-purple-600';
       case 'green':
-        return 'bg-green-50 text-green-600';
+        return 'bg-healing-mint/20 text-healing-mint';
       default:
         return 'bg-gray-50 text-gray-600';
     }
@@ -74,7 +74,7 @@ export const About: React.FC = () => {
         </div>
 
         {/* Bottom Container */}
-        <div className="mt-16 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-3xl p-10 sm:p-12">
+        <div className="mt-16 bg-gradient-to-r from-clinical-cloud to-care-blue/5 rounded-3xl p-10 sm:p-12">
           <div className="max-w-3xl mx-auto text-center">
             <p className="text-lg sm:text-xl text-gray-600 leading-relaxed font-body">
               Founded by healthcare professionals and technologists, MES was born from 
