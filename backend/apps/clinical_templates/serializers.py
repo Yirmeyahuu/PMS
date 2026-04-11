@@ -94,7 +94,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             'appointment', 'appointment_date', 'appointment_time', 'appointment_service', 'appointment_practitioner',
             'clinic', 'template', 'template_name', 'template_version',
             'date', 'note_type', 'is_signed', 'signed_at', 'is_draft', 'last_autosave',
-            'content', 'decrypted_content', 'created_at', 'updated_at'
+            'content', 'decrypted_content', 'chart_annotation_data', 'created_at', 'updated_at'
         ]
         extra_kwargs = {
             'content': {'required': False, 'allow_null': True, 'default': {}},
@@ -258,47 +258,83 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         
         # Log final validated data
         logger.info(f"Final validated_data: clinic={validated_data.get('clinic')}, template_version={validated_data.get('template_version')}, practitioner={validated_data.get('practitioner')}")
-        
+
+        # Extract chart annotation data from content before encrypting
+        content, chart_annotation_data = self._extract_chart_annotations(content)
+
         # Create instance
         instance = ClinicalNote(**validated_data)
-        
+
         # Set encrypted content
         instance.set_content(content)
+
+        # Persist chart annotation data
+        if chart_annotation_data:
+            instance.chart_annotation_data = chart_annotation_data
+
         instance.save()
-        
+
         # Log creation
         self._create_audit_log(instance, 'CREATED')
-        
+
         return instance
-    
+
     def update(self, instance, validated_data):
         """Update note with encrypted content"""
         content = validated_data.pop('content', None)
-        
+
         # Prevent editing signed notes
         if instance.is_signed:
             raise serializers.ValidationError('Cannot edit a signed clinical note')
-        
+
         # Update fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         # Update content if provided
         if content is not None:
+            content, chart_annotation_data = self._extract_chart_annotations(content)
             instance.set_content(content)
             instance.last_autosave = timezone.now()
-        
+            if chart_annotation_data:
+                instance.chart_annotation_data = chart_annotation_data
+
         instance.save()
-        
+
         # Log update
         self._create_audit_log(instance, 'UPDATED')
-        
+
         return instance
-    
+
+    def _extract_chart_annotations(self, content: dict) -> tuple[dict, dict]:
+        """
+        Separate chart doodle strokes from main content.
+
+        For each field whose value is a dict containing 'doodle_data':
+        - Keep only 'canvas_image' (base64 PNG) in the encrypted content dict.
+        - Collect { chart_type, doodle_data } into chart_annotation_data.
+
+        Returns (cleaned_content, chart_annotation_data).
+        """
+        chart_annotation_data: dict = {}
+        cleaned: dict = {}
+
+        for field_id, val in content.items():
+            if isinstance(val, dict) and 'doodle_data' in val:
+                chart_annotation_data[field_id] = {
+                    'chart_type': val.get('chart_type', 'body'),
+                    'doodle_data': val.get('doodle_data', []),
+                }
+                # Store only the composited image in encrypted content
+                cleaned[field_id] = val.get('canvas_image', None)
+            else:
+                cleaned[field_id] = val
+
+        return cleaned, chart_annotation_data
+
     def _create_audit_log(self, instance, action):
         """Create audit log entry"""
         request = self.context.get('request')
-        
         ClinicalNoteAuditLog.objects.create(
             clinical_note=instance,
             user=request.user if request else None,
@@ -306,7 +342,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             ip_address=self._get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', '') if request else ''
         )
-    
+
     def _get_client_ip(self, request):
         """Extract client IP from request"""
         if not request:

@@ -6,6 +6,7 @@ import type { ClinicalNote, ClinicalTemplate, TemplateSection, TemplateField } f
 import { ClinicalNoteTemplate } from './ClinicalNoteTemplate';
 import { SendClinicalNoteModal } from './SendClinicalNoteModal';
 import toast from 'react-hot-toast';
+import { useClinicSettings } from '@/hooks/useClinicSettings';
 
 interface ViewClinicalNoteModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const { emailEnabled } = useClinicSettings();
 
   useEffect(() => {
     if (isOpen && noteId) {
@@ -180,9 +182,15 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
               </button>
             )}
             <button
-              onClick={() => setSendEmailOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Send Clinical Note via Email"
+              onClick={() => emailEnabled && setSendEmailOpen(true)}
+              disabled={!emailEnabled}
+              title={!emailEnabled
+                ? 'Email notifications are currently disabled in Clinic Setup. Enable Email Notifications to use this feature.'
+                : 'Send Clinical Note via Email'
+              }
+              className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors ${
+                !emailEnabled ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''
+              }`}
             >
               <Mail className="w-4 h-4" />
               Send Email
@@ -304,14 +312,38 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
                             );
                           }
 
-                          // Render chart as a placeholder
+                          // Render chart with saved annotation image
                           if (field.type === 'chart') {
+                            const chartValue = note.decrypted_content?.[field.id];
+                            // After backend processing, chartValue is a plain base64 string.
+                            // Guard against legacy object format too.
+                            const canvasImage: string | null =
+                              typeof chartValue === 'string' && chartValue.startsWith('data:image/')
+                                ? chartValue
+                                : chartValue && typeof chartValue === 'object' && 'canvas_image' in chartValue
+                                  ? (chartValue as { canvas_image: string | null }).canvas_image
+                                  : null;
+                            const chartName =
+                              field.chartType === 'spine'
+                                ? 'Spine Chart'
+                                : field.chartType === 'head'
+                                  ? 'Head Chart'
+                                  : 'Body Chart';
                             return (
                               <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
                                 <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
-                                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                                  {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
-                                </div>
+                                {canvasImage ? (
+                                  <img
+                                    src={canvasImage}
+                                    alt={`${chartName} annotation`}
+                                    className="w-full rounded-xl border border-gray-200"
+                                    style={{ display: 'block' }}
+                                  />
+                                ) : (
+                                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+                                    <p className="text-sm text-gray-400">{chartName} — No annotations recorded</p>
+                                  </div>
+                                )}
                               </div>
                             );
                           }

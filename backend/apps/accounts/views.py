@@ -17,6 +17,7 @@ from .services.password_service import PasswordService
 from .services.email_service import EmailService
 from .utils.generators import generate_verification_code
 from apps.clinics.models import Clinic, Practitioner
+from apps.common.permissions import IsAdminOrStaffOnly
 import logging
 
 logger = logging.getLogger(__name__)
@@ -422,7 +423,13 @@ class UserViewSet(viewsets.ModelViewSet):
     
     queryset = User.objects.filter(is_deleted=False).select_related('clinic', 'clinic_branch')
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrStaffOnly]
+
+    def get_permissions(self):
+        # The 'me' action must remain accessible to all authenticated users
+        if self.action == 'me':
+            return [IsAuthenticated()]
+        return super().get_permissions()
     
     def get_queryset(self):
         user = self.request.user
@@ -787,10 +794,10 @@ class UserViewSet(viewsets.ModelViewSet):
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrStaffOnly]
 
 
 class PermissionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated, IsAdminOrStaffOnly] 

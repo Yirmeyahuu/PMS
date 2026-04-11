@@ -199,6 +199,10 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
     # Draft support
     is_draft = models.BooleanField(default=True)
     last_autosave = models.DateTimeField(null=True, blank=True)
+
+    # Chart annotation stroke data (non-encrypted, structural doodle JSON)
+    # Format: { "<field_id>": { "chart_type": "body|head|spine", "doodle_data": [...strokes] } }
+    chart_annotation_data = models.JSONField(null=True, blank=True)
     
     class Meta:
         db_table = 'clinical_notes_v2'

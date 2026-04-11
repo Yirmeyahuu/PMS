@@ -16,7 +16,6 @@ interface CancelAppointmentModalProps {
   selectedCount?: number;  // For bulk mode - number of appointments selected
 }
 
-const MIN_REASON_LENGTH = 5;
 const MAX_REASON_LENGTH = 1000;
 
 export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
@@ -28,14 +27,12 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   onClose,
   selectedCount = 0,
 }) => {
-  const [reason,  setReason]  = useState('');
-  const [touched, setTouched] = useState(false);
+  const [reason, setReason] = useState('');
 
   // Reset on open/close
   useEffect(() => {
     if (!isOpen) {
       setReason('');
-      setTouched(false);
     }
   }, [isOpen]);
 
@@ -46,13 +43,9 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   // If in single appointment mode but no appointment provided, return null
   if (!isBulkMode && !appointment) return null;
 
-  const reasonTooShort = reason.trim().length < MIN_REASON_LENGTH;
-  const showError      = touched && reasonTooShort;
-  const charsLeft      = MAX_REASON_LENGTH - reason.length;
+  const charsLeft = MAX_REASON_LENGTH - reason.length;
 
   const handleConfirm = () => {
-    setTouched(true);
-    if (reasonTooShort) return;
     onConfirm(reason.trim());
   };
 
@@ -66,9 +59,15 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
   const formattedDate = isBulkMode 
     ? `${selectedCount} appointments selected` 
     : format(new Date(appointment!.date), 'EEEE, MMMM d, yyyy');
+
+  const fmt12 = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
   const formattedTime = isBulkMode 
     ? 'Multiple time slots' 
-    : `${appointment!.start_time} – ${appointment!.end_time}`;
+    : `${fmt12(appointment!.start_time)} – ${fmt12(appointment!.end_time)}`;
 
   return (
     <>
@@ -158,36 +157,23 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Reason for Cancellation
-                <span className="text-red-500 ml-1">*</span>
+                <span className="text-gray-400 text-xs font-normal ml-1">(optional)</span>
               </label>
               <textarea
                 value={reason}
                 onChange={e => {
                   setReason(e.target.value.slice(0, MAX_REASON_LENGTH));
-                  setTouched(true);
                 }}
                 onKeyDown={handleKeyDown}
                 rows={4}
                 placeholder="Please provide a clear reason for cancelling this appointment…"
                 disabled={isCancelling}
-                className={`w-full px-3 py-2 text-sm border rounded-lg resize-none
-                  focus:outline-none focus:ring-2 transition-colors
-                  disabled:bg-gray-50 disabled:text-gray-400
-                  ${showError
-                    ? 'border-red-300 bg-red-50 focus:ring-red-300'
-                    : 'border-gray-300 focus:ring-sky-400'
-                  }`}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-sky-400 transition-colors disabled:bg-gray-50 disabled:text-gray-400"
               />
               <div className="flex items-center justify-between mt-1">
-                {showError ? (
-                  <p className="text-xs text-red-600">
-                    Please provide at least {MIN_REASON_LENGTH} characters.
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400">
-                    This reason will be included in the cancellation email.
-                  </p>
-                )}
+                <p className="text-xs text-gray-400">
+                  Optional — will be included in the cancellation email if provided.
+                </p>
                 <span className={`text-xs ${charsLeft < 100 ? 'text-amber-500' : 'text-gray-400'}`}>
                   {charsLeft} left
                 </span>
@@ -214,7 +200,7 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
             </button>
             <button
               onClick={handleConfirm}
-              disabled={isCancelling || (touched && reasonTooShort)}
+              disabled={isCancelling}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCancelling ? (

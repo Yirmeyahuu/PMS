@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ManageNavbar } from './components/ManageNavbar';
 import type { ManageCategory } from './types/manage.types';
@@ -44,8 +45,19 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
 ];
 
 export const Manage: React.FC = () => {
+  const location = useLocation();
   const [activeCategory, setActiveCategory] = useState('administration');
   const [activeItem, setActiveItem] = useState('admin1');
+
+  useEffect(() => {
+    const state = location.state as { activeCategory?: string; activeItem?: string } | null;
+    if (state?.activeCategory && state?.activeItem) {
+      setActiveCategory(state.activeCategory);
+      setActiveItem(state.activeItem);
+      // Clear the state so a page refresh doesn't re-apply it
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const handleItemSelect = (categoryId: string, itemId: string) => {
     setActiveCategory(categoryId);

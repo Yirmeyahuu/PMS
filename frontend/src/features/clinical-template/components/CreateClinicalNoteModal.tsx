@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, FileText, Loader2, Save, Calendar, ClipboardList, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, FileText, Loader2, Save, Calendar, ClipboardList, Eye, Plus } from 'lucide-react';
 import { getActiveTemplates, createNote } from '../clinical-templates.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from './DynamicFormRenderer';
-import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
+import { ChartDrawingCanvas } from './ChartDrawingCanvas';
+import type { ChartAnnotation } from './ChartDrawingCanvas';
+import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, TemplateField, ChartType } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -67,6 +70,13 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+
+  const navigate = useNavigate();
+
+  const handleGoToTemplates = () => {
+    onClose();
+    navigate('/manage', { state: { activeCategory: 'clinical', activeItem: 'clinical2' } });
+  };
 
   // Fetch templates and appointments on mount
   const fetchData = useCallback(async () => {
@@ -352,14 +362,16 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                       );
                     }
 
-                    // Render chart placeholder
+                    // Render chart preview in disabled/read-only mode
                     if (field.type === 'chart') {
                       return (
                         <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
-                          <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
-                          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                            {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
-                          </div>
+                          <ChartDrawingCanvas
+                            chartType={(field.chartType as ChartType) || 'body'}
+                            value={content[field.id] as ChartAnnotation | null}
+                            disabled
+                            label={field.label}
+                          />
                         </div>
                       );
                     }
@@ -457,9 +469,18 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
           ) : step === 'template' ? (
             // Step 1: Template Selection
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-sky-600" />
-                <h3 className="text-sm font-semibold text-gray-700">Select a Template</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-sky-600" />
+                  <h3 className="text-sm font-semibold text-gray-700">Select a Template</h3>
+                </div>
+                <button
+                  onClick={handleGoToTemplates}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New Template
+                </button>
               </div>
               
               {templates.length === 0 ? (

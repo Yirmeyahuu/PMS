@@ -3,10 +3,10 @@ import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout
 import { ChevronLeft, ChevronRight, Filter, Building2, Users } from 'lucide-react';
 import { Calendar } from './Calendar';
 import { ArrivalsList } from './components/ArrivalsList';
-import { AddEventModal } from './components/AddEventModal';
-import { AddDragEventModal } from './components/AddDragEventModal';
 import { EventViewModal } from './components/EventViewModal';
-import { DraggableEventButton } from './components/DraggableEventButton';
+import { AddEventModal } from './components/AddEventModal';
+import { SelectOptionModal } from './components/SelectOptionModal';
+import { AppointmentModal } from './components/AppointmentModal';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
@@ -238,16 +238,20 @@ export const Diary: React.FC = () => {
   const selectedPractitionerName = practitioners.find(p => p.id === selectedPractitioner)?.name;
   const selectedBranchName = branches.find(b => b.id === selectedClinicBranch)?.name;
 
-  // ── Add Event Modal State ───────────────────────────────────────────────────
+  // ── Modal State ─────────────────────────────────────────────────────────────
+  // Select-option modal (admin double-click / drag-select on calendar)
+  const [showSelectOptionModal, setShowSelectOptionModal] = useState(false);
+  const [pendingSlot, setPendingSlot] = useState<{
+    date: Date; time: string; hour: number; minutes: number; duration: number;
+  } | null>(null);
+  // Appointment creation (from SelectOptionModal "Create New Appointment")
+  const [showCreateAppointmentModal, setShowCreateAppointmentModal] = useState(false);
+  // Block appointment creation (from SelectOptionModal "Add Block Appointment")
   const [showAddEventModal, setShowAddEventModal] = useState(false);
-  const [showDragEventModal, setShowDragEventModal] = useState(false);
-  const [dragEventData, setDragEventData] = useState<{
-    initialDate?: Date;
-    initialStartTime?: string;
-    initialEndTime?: string;
-  }>({});
   const [eventRefreshKey, setEventRefreshKey] = useState(0);
-  
+  // Increment to trigger Calendar to refetch regular appointments
+  const [appointmentRefreshKey, setAppointmentRefreshKey] = useState(0);
+
   // Appointments from Calendar for conflict detection
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>([]);
 
@@ -276,19 +280,28 @@ export const Diary: React.FC = () => {
     setEventRefreshKey(prev => prev + 1);
   };
 
-  // Handle drag event drop on calendar
-  const handleDragEventDrop = (date: Date, hour: number, minute: number) => {
-    const startTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    // Default 1 hour duration
-    const endHour = hour + 1;
-    const endTime = `${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    
-    setDragEventData({
-      initialDate: date,
-      initialStartTime: startTime,
-      initialEndTime: endTime,
-    });
-    setShowDragEventModal(true);
+  // ── Admin slot action (double-click or drag-select) → SelectOptionModal ──────
+  const handleAdminSlotAction = (slot: {
+    date: Date; time: string; hour: number; minutes: number; duration: number;
+  }) => {
+    setPendingSlot(slot);
+    setShowSelectOptionModal(true);
+  };
+
+  const handleSelectOptionClose = () => {
+    setShowSelectOptionModal(false);
+    setPendingSlot(null);
+  };
+
+  const handleSelectNewAppointment = () => {
+    setShowSelectOptionModal(false);
+    setShowCreateAppointmentModal(true);
+  };
+
+  const handleSelectBlockAppointment = () => {
+    if (!pendingSlot) return;
+    setShowSelectOptionModal(false);
+    setShowAddEventModal(true);
   };
 
   return (
@@ -715,10 +728,7 @@ export const Diary: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Add Event Button - Admin Only - Draggable */}
-                {isAdmin && (
-                  <DraggableEventButton onDragEnd={handleDragEventDrop} onClick={() => setShowAddEventModal(true)} />
-                )}
+                {/* Add Event Button removed — admin uses double-click / drag-select on calendar */}
               </div>
             </div>
 
@@ -731,7 +741,10 @@ export const Diary: React.FC = () => {
                 selectedPractitionerId={compareMode ? null : selectedPractitioner}
                 selectedClinicBranchId={selectedClinicBranch}
                 refreshKey={eventRefreshKey}
+                appointmentRefreshKey={appointmentRefreshKey}
+                onRecurringCreated={() => setAppointmentRefreshKey(prev => prev + 1)}
                 onEventClick={isAdmin ? handleEventClick : undefined}
+                onAdminSlotAction={isAdmin ? handleAdminSlotAction : undefined}
                 onAppointmentsReady={setCalendarAppointments}
                 onCalendarReady={setCalendarReadyDate}
                 practitionerAvailability={compareMode ? undefined : getPractitionerAvailability()}
@@ -745,30 +758,53 @@ export const Diary: React.FC = () => {
               />
             </div>
 
-            {/* Add Event Modal */}
-            <AddEventModal
-              isOpen={showAddEventModal}
-              onClose={() => setShowAddEventModal(false)}
-              onCreated={handleEventCreated}
-              selectedClinicBranchId={selectedClinicBranch}
-              appointments={calendarAppointments}
+            {/* Select Option Modal — Admin: double-click / drag-select on calendar */}
+            <SelectOptionModal
+              isOpen={showSelectOptionModal}
+              onClose={handleSelectOptionClose}
+              onSelectNewAppointment={handleSelectNewAppointment}
+              onSelectBlockAppointment={handleSelectBlockAppointment}
             />
-            {/* Add Drag Event Modal (for drag-and-drop) */}
-            {showDragEventModal && dragEventData.initialDate && (
-              <AddDragEventModal
-                isOpen={showDragEventModal}
-                onClose={() => {
-                  setShowDragEventModal(false);
-                  setDragEventData({});
-                }}
-                onCreated={handleEventCreated}
-                selectedClinicBranchId={selectedClinicBranch}
-                initialDate={dragEventData.initialDate}
-                initialStartTime={dragEventData.initialStartTime}
-                initialEndTime={dragEventData.initialEndTime}
-                appointments={calendarAppointments}
-              />
-            )}
+
+            {/* Appointment Modal — opened via SelectOptionModal "Create New Appointment" */}
+            <AppointmentModal
+              isOpen={showCreateAppointmentModal}
+              onClose={() => { setShowCreateAppointmentModal(false); setPendingSlot(null); }}
+              onCreated={() => {
+                setShowCreateAppointmentModal(false);
+                setPendingSlot(null);
+                setAppointmentRefreshKey(prev => prev + 1);
+              }}
+              selectedSlot={pendingSlot}
+              selectedClinicBranchId={selectedClinicBranch}
+            />
+
+            {/* Add Event Modal — opened via SelectOptionModal "Add Block Appointment" */}
+            {(() => {
+              const startH = pendingSlot ? String(pendingSlot.hour).padStart(2, '0') : '09';
+              const startM = pendingSlot ? String(pendingSlot.minutes).padStart(2, '0') : '00';
+              const endMin = pendingSlot
+                ? pendingSlot.hour * 60 + pendingSlot.minutes + pendingSlot.duration
+                : 600;
+              const endH  = String(Math.floor(endMin / 60)).padStart(2, '0');
+              const endMm = String(endMin % 60).padStart(2, '0');
+              return (
+                <AddEventModal
+                  isOpen={showAddEventModal}
+                  onClose={() => { setShowAddEventModal(false); setPendingSlot(null); }}
+                  onCreated={(event) => {
+                    setShowAddEventModal(false);
+                    setPendingSlot(null);
+                    handleEventCreated(event);
+                  }}
+                  selectedClinicBranchId={selectedClinicBranch}
+                  initialDate={pendingSlot?.date}
+                  initialTime={pendingSlot ? `${startH}:${startM}` : undefined}
+                  initialEndTime={pendingSlot ? `${endH}:${endMm}` : undefined}
+                  appointments={calendarAppointments}
+                />
+              );
+            })()}
 
             {/* Event View Modal (for admin to view/edit/delete events) */}
             <EventViewModal

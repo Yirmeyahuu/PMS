@@ -14,10 +14,12 @@ Practitioner: {{ practitioner_name }}
 Location:     {{ location_name }}
 {% if cancelled_at %}Cancelled on: {{ cancelled_at }}{% endif %}
 
+{% if cancellation_reason %}
 REASON FOR CANCELLATION
 ------------------------
 {{ cancellation_reason }}
 
+{% endif %}
 If you believe this was a mistake or would like to reschedule,
 please contact us at your earliest convenience.
 

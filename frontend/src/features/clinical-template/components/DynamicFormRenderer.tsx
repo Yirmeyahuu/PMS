@@ -13,6 +13,8 @@ import {
   RichTextEditor,
   TagsInput,
 } from '../field-components';
+import { ChartDrawingCanvas } from './ChartDrawingCanvas';
+import type { ChartAnnotation } from './ChartDrawingCanvas';
 
 interface DynamicFormRendererProps {
   sections: TemplateSection[];
@@ -147,33 +149,16 @@ const FieldRenderer: React.FC<FieldRendererProps> = ({
 
     case 'chart':
       return (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          <div className={`border-2 border-dashed border-gray-200 rounded-lg p-8 text-center ${field.mirrored ? 'grid grid-cols-2 gap-4' : ''}`}>
-            {field.mirrored ? (
-              <>
-                <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-                  <p className="text-sm text-gray-400">
-                    {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'} — Left / Front
-                  </p>
-                </div>
-                <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-                  <p className="text-sm text-gray-400">
-                    {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'} — Right / Back
-                  </p>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-gray-400">
-                {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
-              </p>
-            )}
-          </div>
-          {field.helpText && <p className="text-xs text-gray-400 mt-1 italic">{field.helpText}</p>}
-          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-        </div>
+        <ChartDrawingCanvas
+          chartType={(field.chartType as ChartType) || 'body'}
+          value={value as ChartAnnotation | null}
+          onChange={(annotation) => onChange(annotation)}
+          disabled={disabled}
+          label={field.label}
+          required={field.required}
+          error={error}
+          helpText={field.helpText}
+        />
       );
 
     case 'rich_text':

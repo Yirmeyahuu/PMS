@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Mail, Loader2, FileText, CheckCircle } from 'lucide-react';
+import { X, Mail, Loader2, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { PMSInvoiceTemplate } from '@/components/invoices/PMSInvoiceTemplate';
 import type { InvoiceClinicInfo, NextAppointmentInfo } from '@/components/invoices/PMSInvoiceTemplate';
 import type { Invoice } from '@/types/billing';
+import { useClinicSettings } from '@/hooks/useClinicSettings';
 
 interface SendInvoiceEmailModalProps {
   isOpen: boolean;
@@ -49,6 +50,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const { emailEnabled } = useClinicSettings();
 
   // Auto-generate PDF from PMSInvoiceTemplate on mount
   const generatePdf = useCallback(async () => {
@@ -245,6 +247,16 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
               </div>
             )}
 
+            {/* Email notifications disabled warning */}
+            {!emailEnabled && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
+                  Email notifications are currently disabled in Clinic Settings. Enable Email Notifications to send emails.
+                </p>
+              </div>
+            )}
+
             {/* To Email */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -321,7 +333,8 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
             </button>
             <button
               onClick={handleSend}
-              disabled={isSending || isGeneratingPdf}
+              disabled={isSending || isGeneratingPdf || !emailEnabled}
+              title={!emailEnabled ? 'Email notifications are currently disabled in Clinic Settings.' : undefined}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSending ? (

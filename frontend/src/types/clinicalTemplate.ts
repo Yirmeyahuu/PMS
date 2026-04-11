@@ -96,6 +96,8 @@ export interface ClinicalNote {
   is_draft: boolean;
   last_autosave: string | null;
   decrypted_content: Record<string, any> | null;
+  /** Stroke JSON for each chart field: { [fieldId]: { chart_type, doodle_data } } */
+  chart_annotation_data: Record<string, { chart_type: string; doodle_data: Record<string, unknown>[] }> | null;
   created_at: string;
   updated_at: string;
 }

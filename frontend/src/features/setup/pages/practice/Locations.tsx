@@ -6,9 +6,19 @@ import {
 } from 'lucide-react';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 import { createClinicBranch, updateClinicBranch } from '@/features/clinics/clinic.api';
+import { invalidateClinicSettingsCache } from '@/hooks/useClinicSettings';
 import { CreateBranchModal } from './components/CreateBranchModal';
 import type { ClinicBranch, CreateBranchData } from '@/types/clinic';
 import toast from 'react-hot-toast';
+
+// Strip redundant clinic name prefix: "Biosymm - Biosymm - Lacson" → "Biosymm - Lacson"
+const deduplicateName = (name: string): string => {
+  const parts = name.split(' - ');
+  if (parts.length >= 2 && parts[0] === parts[1]) {
+    return [parts[0], ...parts.slice(2)].join(' - ');
+  }
+  return name;
+};
 
 // ─── BranchCard ───────────────────────────────────────────────────────────────
 
@@ -37,7 +47,7 @@ const BranchCard: React.FC<BranchCardProps> = ({ branch, onEdit }) => {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm font-bold text-gray-900 truncate">{branch.name}</h3>
+                <h3 className="text-sm font-bold text-gray-900 truncate">{deduplicateName(branch.name)}</h3>
                 {branch.is_main_branch && (
                   <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200 flex-shrink-0">
                     <Star className="w-3 h-3 fill-sky-500 text-sky-500" />
@@ -147,7 +157,7 @@ export const PracticeOption1: React.FC = () => {
   const [saving, setSaving]               = useState(false);
 
   const mainClinic     = branches.find((b) => b.is_main_branch);
-  const mainClinicName = mainClinic?.name ?? '';
+  const mainClinicName = deduplicateName(mainClinic?.name ?? '');
 
   const total    = branches.length;
   const active   = branches.filter((b) => b.is_active).length;
@@ -161,6 +171,7 @@ export const PracticeOption1: React.FC = () => {
     try {
       if (editingBranch) {
         await updateClinicBranch(editingBranch.id, data);
+        if (editingBranch.is_main_branch) invalidateClinicSettingsCache();
         toast.success('Branch updated successfully');
       } else {
         if (!mainClinicId) throw new Error('No main clinic found');

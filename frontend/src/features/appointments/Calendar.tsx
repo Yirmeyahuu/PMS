@@ -150,6 +150,12 @@ interface CalendarProps {
   comparePractitionerNames?: [string, string];
   comparePractitionerIdA?: number | null;
   comparePractitionerIdB?: number | null;
+  /** Admin-only: intercept double-click / drag-select instead of opening AppointmentModal internally */
+  onAdminSlotAction?: (slot: { date: Date; time: string; hour: number; minutes: number; duration: number }) => void;
+  /** Increment to trigger a refetch of appointments (e.g. after creating one from outside Calendar) */
+  appointmentRefreshKey?: number;
+  /** Called after recurring appointments are saved, so parent can trigger a refetch */
+  onRecurringCreated?: () => void;
 }
 
 // isColorDark / hexToRgba removed — replaced by solid color styling
@@ -177,7 +183,7 @@ const DragGhost: React.FC<DragGhostProps> = ({ appointment, position }) => (
     <div className="bg-sky-500 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-sky-300">
       <div className="truncate">{appointment.patient_name}</div>
       <div className="text-sky-200 mt-0.5 truncate">
-        {appointment.start_time} · {appointment.service_name ?? appointment.appointment_type}
+        {formatTime12Hour(appointment.start_time)} · {appointment.service_name ?? appointment.appointment_type}
       </div>
       <div className="mt-1 flex items-center gap-1 text-sky-100">
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -223,6 +229,60 @@ const HoldRing: React.FC<HoldRingProps> = ({ progress, position }) => {
   );
 };
 
+// ── Overlap-aware column layout ───────────────────────────────────────────────
+// Given appointments and block appointments for one day/column, assigns each
+// item a left/right style so overlapping items are displayed side-by-side
+// within a single calendar column (no extra grid columns needed).
+const computeColumnLayout = (
+  apts:   { id: number; start_time: string; end_time: string }[],
+  blocks: { id: number; start_time: string; end_time: string }[],
+): {
+  aptStyles:   Map<number, { left: string; right: string }>;
+  blockStyles: Map<number, { left: string; right: string }>;
+} => {
+  const t2m = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  type LItem = { id: number; type: 'apt' | 'block'; start: number; end: number };
+
+  const items: LItem[] = [
+    ...apts.map(a   => ({ id: a.id, type: 'apt'   as const, start: t2m(a.start_time), end: t2m(a.end_time) })),
+    ...blocks.map(b => ({ id: b.id, type: 'block' as const, start: t2m(b.start_time), end: t2m(b.end_time) })),
+  ].sort((a, b) => a.start - b.start || b.end - a.end);
+
+  // Greedy column assignment: each item goes into the first column whose last
+  // item ends at or before the current item's start.
+  const colEnds: number[] = [];
+  const assigned: { item: LItem; col: number }[] = [];
+  for (const item of items) {
+    let col = colEnds.findIndex(end => end <= item.start);
+    if (col === -1) col = colEnds.length;
+    colEnds[col] = item.end;
+    assigned.push({ item, col });
+  }
+
+  const aptStyles   = new Map<number, { left: string; right: string }>();
+  const blockStyles = new Map<number, { left: string; right: string }>();
+
+  for (const { item, col } of assigned) {
+    // Find the max column index among all items that overlap with this one to
+    // determine how many concurrent columns this item participates in.
+    let maxCol = col;
+    for (const { item: other, col: otherCol } of assigned) {
+      if (other === item) continue;
+      if (item.start < other.end && item.end > other.start) maxCol = Math.max(maxCol, otherCol);
+    }
+    const total    = maxCol + 1;
+    const leftPct  = (col / total) * 100;
+    const rightPct = ((total - col - 1) / total) * 100;
+    const style    = {
+      left:  `calc(${leftPct.toFixed(2)}% + 2px)`,
+      right: `calc(${rightPct.toFixed(2)}% + 2px)`,
+    };
+    if (item.type === 'apt') aptStyles.set(item.id, style);
+    else                     blockStyles.set(item.id, style);
+  }
+  return { aptStyles, blockStyles };
+};
+
 export const Calendar: React.FC<CalendarProps> = ({
   view,
   currentDate,
@@ -241,6 +301,9 @@ export const Calendar: React.FC<CalendarProps> = ({
   comparePractitionerNames,
   comparePractitionerIdA,
   comparePractitionerIdB,
+  onAdminSlotAction,
+  appointmentRefreshKey,
+  onRecurringCreated,
 }) => {
   // Staff entries have string ids (e.g. 'staff-5') — appointment hooks need a numeric id or null.
   // Pass null for String ids so appointment filtering is effectively disabled for Staff.
@@ -493,6 +556,13 @@ export const Calendar: React.FC<CalendarProps> = ({
     }
   }, [refreshKey, refetchBlockAppointments]);
 
+  // Trigger appointment refetch when appointmentRefreshKey changes (e.g. created from Diary-level modal)
+  React.useEffect(() => {
+    if (appointmentRefreshKey && appointmentRefreshKey > 0) {
+      refetch();
+    }
+  }, [appointmentRefreshKey, refetch]);
+
   // Expose appointments to parent via callback
   React.useEffect(() => {
     if (onAppointmentsReady && appointments.length > 0) {
@@ -650,6 +720,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           end_time:   `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`,
         });
         updateBlockAppointmentInState(updated);
+        refetchBlockAppointments();
         toast.success(
           `Event rescheduled to ${format(newDate, 'MMM d')} at ` +
           `${String(newHour).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`
@@ -825,13 +896,18 @@ export const Calendar: React.FC<CalendarProps> = ({
       const duration  = getSelectionDuration();
       const startTime = getSelectionStartTime();
       if (isDraggingRef.current && duration > 15 && startTime) {
-        openModal({
+        const slotInfo = {
           date,
           time:    `${startTime.hour}:${startTime.minutes.toString().padStart(2, '0')}`,
           hour:    startTime.hour,
           minutes: startTime.minutes,
           duration,
-        });
+        };
+        if (onAdminSlotAction) {
+          onAdminSlotAction(slotInfo);
+        } else {
+          openModal(slotInfo);
+        }
       }
     }
     endSelection();
@@ -853,6 +929,10 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const handleDoubleClick = (date: Date, slot: any) => {
     if (dragState.isDragging || dragState.isHolding || blockDragState.isDragging || blockDragState.isHolding) return;
+    if (onAdminSlotAction) {
+      onAdminSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+      return;
+    }
     openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
   };
 
@@ -909,7 +989,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           <div className="bg-gray-800 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-gray-600">
             <div className="truncate">{blockDragState.draggedBlock.event_name}</div>
             <div className="text-gray-300 mt-0.5 truncate">
-              {blockDragState.draggedBlock.start_time} · {blockDragState.draggedBlock.end_time}
+              {formatTime12Hour(blockDragState.draggedBlock.start_time)} · {formatTime12Hour(blockDragState.draggedBlock.end_time)}
             </div>
             <div className="mt-1 flex items-center gap-1 text-gray-400">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -957,13 +1037,12 @@ export const Calendar: React.FC<CalendarProps> = ({
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
               <div className="flex items-center gap-2 text-gray-500">
                 <span className="font-medium text-gray-700">From:</span>
-                {rescheduleTarget.appointment.date} at {rescheduleTarget.appointment.start_time}
+                {rescheduleTarget.appointment.date} at {formatTime12Hour(rescheduleTarget.appointment.start_time)}
               </div>
               <div className="flex items-center gap-2 text-sky-600">
                 <span className="font-medium">To:</span>
                 {format(rescheduleTarget.newDate, 'yyyy-MM-dd')} at{' '}
-                {String(rescheduleTarget.newHour).padStart(2, '0')}:
-                {String(rescheduleTarget.newMinutes).padStart(2, '0')}
+                {formatTime12Hour(`${String(rescheduleTarget.newHour).padStart(2, '0')}:${String(rescheduleTarget.newMinutes).padStart(2, '0')}`)}
               </div>
             </div>
           </>
@@ -975,13 +1054,12 @@ export const Calendar: React.FC<CalendarProps> = ({
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
               <div className="flex items-center gap-2 text-gray-500">
                 <span className="font-medium text-gray-700">From:</span>
-                {rescheduleTarget.block.date} at {rescheduleTarget.block.start_time} - {rescheduleTarget.block.end_time}
+                {rescheduleTarget.block.date} at {formatTime12Hour(rescheduleTarget.block.start_time)} - {formatTime12Hour(rescheduleTarget.block.end_time)}
               </div>
               <div className="flex items-center gap-2 text-sky-600">
                 <span className="font-medium">To:</span>
                 {format(rescheduleTarget.newDate, 'yyyy-MM-dd')} at{' '}
-                {String(rescheduleTarget.newHour).padStart(2, '0')}:
-                {String(rescheduleTarget.newMinutes).padStart(2, '0')}
+                {formatTime12Hour(`${String(rescheduleTarget.newHour).padStart(2, '0')}:${String(rescheduleTarget.newMinutes).padStart(2, '0')}`)}
               </div>
             </div>
           </>
@@ -1032,6 +1110,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           updateAppointmentInState(updated);
           setSelectedAppointment(updated);
         }}
+        onRecurringCreated={onRecurringCreated}
       />
       {/* Conflict Modal for block drag/reschedule */}
       <ConflictModal
@@ -1079,7 +1158,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   // ── Appointment Card — Day/Week ───────────────────────────────────────────
   // compact = true for week view (smaller cards)
   // forDayView = true when rendering in Day view (filtered slots)
-  const renderTimelineCard = (apt: Appointment, compact = false, forDayView = false) => {
+  const renderTimelineCard = (apt: Appointment, compact = false, forDayView = false, positionOverride?: { left: string; right: string }) => {
     const style     = getAppointmentStyle(apt, forDayView);
     const col       = getBlockColors(apt);
     const isDragged = dragState.draggedAppointment?.id === apt.id;
@@ -1089,8 +1168,8 @@ export const Calendar: React.FC<CalendarProps> = ({
     const containerStyle: React.CSSProperties = {
       ...style,
       position:     'absolute',
-      left:         '4px',
-      right:        '4px',
+      left:         positionOverride?.left  ?? '4px',
+      right:        positionOverride?.right ?? '4px',
       zIndex:       isDragged ? 5 : 10,
       overflow:     'hidden',
       borderRadius: '0',
@@ -1134,7 +1213,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               style={col.useHex ? { color: col.subTextColor } : {}}
             >
               <span className={!col.useHex ? 'text-white/80' : ''}>
-                {apt.start_time} – {apt.end_time}
+                {formatTime12Hour(apt.start_time)} – {formatTime12Hour(apt.end_time)}
               </span>
             </div>
           )}
@@ -1143,7 +1222,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               className="text-xs truncate"
               style={col.useHex ? { color: col.subTextColor } : {}}
             >
-              <span className={!col.useHex ? 'text-white/80' : ''}>{apt.start_time}</span>
+              <span className={!col.useHex ? 'text-white/80' : ''}>{formatTime12Hour(apt.start_time)}</span>
             </div>
           )}
           {col.label && !compact && (
@@ -1168,30 +1247,10 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   // Helper to check if there's a conflict between appointment and any block
-  const hasBlockConflict = useCallback((apt: Appointment, blocks: BlockAppointment[]): boolean => {
-    const timeToMinutes = (time: string): number => {
-      const [hours, minutes] = time.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-    const aptStart = timeToMinutes(apt.start_time);
-    const aptEnd = timeToMinutes(apt.end_time);
-
-    for (const block of blocks) {
-      if (block.date !== apt.date) continue;
-      const blockStart = timeToMinutes(block.start_time);
-      const blockEnd = timeToMinutes(block.end_time);
-      // Check for overlap
-      if (aptStart < blockEnd && aptEnd > blockStart) {
-        return true;
-      }
-    }
-    return false;
-  }, []);
-
   // ── Block Appointment Card — Day/Week ────────────────────────────────────────
   // compact = true for week view (smaller cards)
   // forDayView = true when rendering in Day view (filtered slots)
-  const renderBlockTimelineCard = (block: BlockAppointment, compact = false, forDayView = false) => {
+  const renderBlockTimelineCard = (block: BlockAppointment, compact = false, forDayView = false, positionOverride?: { left: string; right: string }) => {
     const style = getBlockAppointmentStyle(block, forDayView);
 
     const isDragged = blockDragState.draggedBlock?.id === block.id;
@@ -1231,8 +1290,8 @@ export const Calendar: React.FC<CalendarProps> = ({
     const containerStyle: React.CSSProperties = {
       ...style,
       position:     'absolute',
-      left:         '4px',
-      right:        '4px',
+      left:         positionOverride?.left  ?? '4px',
+      right:        positionOverride?.right ?? '4px',
       zIndex:      isDragged ? 5 : 10,
       overflow:    'hidden',
       borderRadius: '0',
@@ -1319,7 +1378,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           style={col.useHex ? { color: '#ffffff' } : {}}
         >
           <span className={!col.useHex ? col.text : ''}>
-            {apt.start_time} · {apt.patient_name}
+            {formatTime12Hour(apt.start_time)} · {apt.patient_name}
           </span>
         </div>
         {apt.service_name && (
@@ -1384,7 +1443,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
     if (!isAvailable) {
       // Non-duty hours or non-duty day = trust-harbor tint
-      slotBgClass = 'bg-trust-harbor';
+      slotBgClass = 'bg-trust-harbor/30';
       if (!dayAvailable) {
         slotTitle = 'Non-duty day (click to add anyway)';
       } else if (!hourAvailable) {
@@ -1647,50 +1706,21 @@ export const Calendar: React.FC<CalendarProps> = ({
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {(() => {
-              const dayAppts = getAppointmentsForDate(currentDate);
+              const dayAppts  = getAppointmentsForDate(currentDate);
               const dayBlocks = getBlockAppointmentsForDate(currentDate);
-              const hasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
-              
-              // For non-duty days, show all time slots (not filtered)
-              // For duty days, show filtered slots (duty hours only)
               const slotsToRender = isDayAvailable ? dayViewTimeSlots : timeSlots;
-              
-              if (hasConflict) {
-                // 2-column layout when there's a conflict
-                return (
-                  <div className="grid grid-cols-[80px_1fr_1fr]">
-                    {/* Time column */}
-                    <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
-                      {slotsToRender.map((slot, i) => renderTimeLabel(slot, i))}
-                    </div>
-                    {/* Appointments column */}
-                    <div className="border-r border-gray-200 relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                      {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {/* For non-duty days, use week-view positioning (6AM offset) */}
-                      {dayAppts.map(apt => renderTimelineCard(apt, false, isDayAvailable))}
-                    </div>
-                    {/* Block appointments column */}
-                    <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
-                      {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                      {dayBlocks.map(block => renderBlockTimelineCard(block, false, isDayAvailable))}
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Default layout (no conflict)
+              const { aptStyles, blockStyles } = computeColumnLayout(dayAppts, dayBlocks);
               return (
                 <div className="grid grid-cols-[80px_1fr]">
                   {/* Time column */}
                   <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
                     {slotsToRender.map((slot, i) => renderTimeLabel(slot, i))}
                   </div>
-                  {/* Day column */}
+                  {/* Day column — cards auto-offset when overlapping */}
                   <div className="relative" onMouseUp={() => handleMouseUp(currentDate)}>
                     {slotsToRender.map((slot, i) => renderTimeSlot(slot, currentDate, i))}
-                    {/* For non-duty days, use week-view positioning (6AM offset) */}
-                    {dayAppts.map(apt => renderTimelineCard(apt, false, isDayAvailable))}
-                    {dayBlocks.map(block => renderBlockTimelineCard(block, false, isDayAvailable))}
+                    {dayAppts.map(apt   => renderTimelineCard(apt, false, isDayAvailable, aptStyles.get(apt.id)))}
+                    {dayBlocks.map(block => renderBlockTimelineCard(block, false, isDayAvailable, blockStyles.get(block.id)))}
                   </div>
                 </div>
               );
@@ -1837,54 +1867,22 @@ export const Calendar: React.FC<CalendarProps> = ({
           {/* ── Scrollable body ── */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {(() => {
-              // Calculate grid columns based on each day's conflict status
-              const getGridColumns = () => {
-                const dayHasConflict = weekDays.map(day => {
-                  const dayAppts = getAppointmentsForDate(day);
-                  const dayBlocks = getBlockAppointmentsForDate(day);
-                  return dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
-                });
-                // Build grid template: time column + each day (1 or 2 columns)
-                const cols = ['80px', ...dayHasConflict.map(has => has ? '1fr 1fr' : '1fr')];
-                return cols.join(' ');
-              };
-
               return (
-                <div className="grid" style={{ gridTemplateColumns: getGridColumns() }}>
+                <div className="grid grid-cols-[80px_repeat(7,1fr)]">
                   {/* Time column */}
                   <div className="border-r border-gray-200 sticky left-0 bg-gray-50 z-10">
                     {timeSlots.map((slot, i) => renderTimeLabel(slot, i))}
                   </div>
-                  {/* Day columns - each day handled independently */}
+                  {/* Day columns — cards auto-offset when overlapping */}
                   {weekDays.map(day => {
-                    const dayAppts = getAppointmentsForDate(day);
+                    const dayAppts  = getAppointmentsForDate(day);
                     const dayBlocks = getBlockAppointmentsForDate(day);
-                    const dayHasConflict = dayAppts.some(apt => hasBlockConflict(apt, dayBlocks));
-
-                    if (dayHasConflict) {
-                      // 2-column layout for this day
-                      return (
-                        <React.Fragment key={day.toISOString()}>
-                          {/* Appointments column */}
-                          <div className="border-l border-gray-200 relative">
-                            {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
-                            {dayAppts.map(apt => renderTimelineCard(apt, true))}
-                          </div>
-                          {/* Block appointments column */}
-                          <div className="border-l border-gray-200 relative">
-                            {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
-                            {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
-                          </div>
-                        </React.Fragment>
-                      );
-                    }
-
-                    // Single column for this day
+                    const { aptStyles, blockStyles } = computeColumnLayout(dayAppts, dayBlocks);
                     return (
                       <div key={day.toISOString()} className="border-l border-gray-200 relative">
                         {timeSlots.map((slot, i) => renderTimeSlot(slot, day, i))}
-                        {dayAppts.map(apt => renderTimelineCard(apt, true))}
-                        {dayBlocks.map(block => renderBlockTimelineCard(block, true))}
+                        {dayAppts.map(apt   => renderTimelineCard(apt, true, false, aptStyles.get(apt.id)))}
+                        {dayBlocks.map(block => renderBlockTimelineCard(block, true, false, blockStyles.get(block.id)))}
                       </div>
                     );
                   })}

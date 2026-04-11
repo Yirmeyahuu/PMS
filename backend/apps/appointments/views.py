@@ -242,18 +242,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not reason:
-            return Response(
-                {'detail': 'cancellation_reason is required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if len(reason) < 5:
-            return Response(
-                {'detail': 'cancellation_reason must be at least 5 characters.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         # Get all appointments that can be cancelled (not already cancelled)
         appointments = self.queryset.filter(
             id__in=appointment_ids,

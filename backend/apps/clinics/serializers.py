@@ -18,6 +18,7 @@ class ClinicBranchSerializer(serializers.ModelSerializer):
             'parent_clinic', 'parent_name', 'is_active', 'city', 'province',
             'email', 'phone', 'address', 'postal_code', 'website', 'tin',
             'custom_location', 'latitude', 'longitude',
+            'email_notifications_enabled', 'sms_notifications_enabled',
         ]
         read_only_fields = ['id', 'branch_code', 'is_branch', 'parent_name']
 
@@ -64,6 +65,7 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
             'custom_location',
             'latitude', 'longitude',
             'website', 'logo', 'remove_logo',
+            'email_notifications_enabled', 'sms_notifications_enabled',
         ]
 
     def validate_name(self, value):
@@ -97,9 +99,17 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
 
         new_name = validated_data.get('name')
         if new_name and new_name != instance.name:
+            old_name = instance.name
+            old_prefix = old_name + ' - '
             branches = Clinic.objects.filter(parent_clinic=instance)
-            branches.update(name=new_name)
-            logger.info(f"Updated clinic name '{new_name}' to {branches.count()} branches")
+            for branch in branches:
+                if branch.name.startswith(old_prefix):
+                    suffix = branch.name[len(old_prefix):]
+                    branch.name = new_name + ' - ' + suffix
+                else:
+                    branch.name = new_name
+                branch.save(update_fields=['name'])
+            logger.info(f"Updated clinic name '{old_name}' -> '{new_name}' for {branches.count()} branches")
 
         return super().update(instance, validated_data)
 

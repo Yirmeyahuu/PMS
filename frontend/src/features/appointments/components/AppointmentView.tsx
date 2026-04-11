@@ -4,7 +4,7 @@ import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
   Receipt, Plus, Printer, AlertCircle,
   RefreshCw, ChevronDown, Building2, Edit3, Trash2,
-  Save, XCircle, Search, UserCircle, StickyNote, ClipboardList,
+  Save, XCircle, Search, UserCircle, ClipboardList,
   ExternalLink, Repeat, List,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -26,7 +26,13 @@ import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
 import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';
 import type { AppointmentEditPayload } from '../appointment.api';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── helpers ─────────────────────────────────────────────────────────────────
+const fmt12 = (t: string): string => {
+  const [h, m] = t.split(':').map(Number);
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
 const INVOICE_STATUS_STYLES: Record<string, string> = {
   DRAFT:          'bg-gray-100 text-gray-600 border-gray-200',
   PENDING:        'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -36,13 +42,14 @@ const INVOICE_STATUS_STYLES: Record<string, string> = {
   CANCELLED:      'bg-gray-100 text-gray-400 border-gray-200',
 };
 
-type Tab = 'client' | 'appointment' | 'status' | 'notes' | 'clinical_notes' | 'invoice';
+type Tab = 'client' | 'appointment' | 'status' | 'clinical_notes' | 'invoice';
 
 interface AppointmentViewProps {
   isOpen:      boolean;
   onClose:     () => void;
   appointment: Appointment | null;
   onUpdated?:  (appointment: Appointment) => void;
+  onRecurringCreated?: () => void;
 }
 
 interface EditableItem {
@@ -96,7 +103,7 @@ const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointmen
           <div>
             <p className="text-xs text-gray-500">Date &amp; Time</p>
             <p className="font-semibold text-gray-800">
-              {formattedDate} · {appointment.start_time} – {appointment.end_time}
+              {formattedDate} · {fmt12(appointment.start_time)} – {fmt12(appointment.end_time)}
             </p>
           </div>
         </div>
@@ -549,6 +556,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   onClose,
   appointment: initialAppointment,
   onUpdated,
+  onRecurringCreated,
 }) => {
   const [activeTab,             setActiveTab]             = useState<Tab>('client');
   const [showCancelModal,       setShowCancelModal]       = useState(false);
@@ -646,7 +654,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const serviceColor = appointment.service_color;
 
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
-  const formattedTime = `${appointment.start_time} - ${appointment.end_time}`;
+  const formattedTime = `${fmt12(appointment.start_time)} - ${fmt12(appointment.end_time)}`;
   const isCancelled   = appointment.status === 'CANCELLED';
   const isCompleted   = appointment.status === 'COMPLETED';
   const isTerminal    = isCancelled || isCompleted;
@@ -726,7 +734,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
               { key: 'client', label: 'Client Information', icon: UserCircle },
               { key: 'appointment', label: 'Appointment', icon: Calendar, isDropdown: true },
               { key: 'status', label: 'Status', icon: ClipboardList },
-              { key: 'notes', label: 'Clinic Notes', icon: StickyNote },
               { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
               { key: 'invoice', label: hasInvoice ? 'View Invoice' : 'Generate Invoice', icon: Receipt },
             ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
@@ -769,6 +776,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
                       <button
                         onClick={() => {
                           setShowAppointmentDropdown(false);
+                          setActiveTab('appointment');
                           startEdit();
                         }}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
@@ -1174,41 +1182,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
               </div>
             )}
 
-            {/* ── Clinic Notes Tab ── */}
-            {activeTab === 'notes' && (
-              <div className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">
-                    Clinic Notes
-                  </p>
-                  {appointment.chief_complaint ? (
-                    <div className="mb-4">
-                      <p className="text-xs text-amber-600 font-medium mb-1">Chief Complaint</p>
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.chief_complaint}</p>
-                    </div>
-                  ) : null}
-                  {appointment.notes ? (
-                    <div className="mb-4">
-                      <p className="text-xs text-amber-600 font-medium mb-1">Internal Notes</p>
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.notes}</p>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400 italic">No internal notes recorded.</p>
-                  )}
-                </div>
-                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
-                    Patient Notes
-                  </p>
-                  {appointment.patient_notes ? (
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.patient_notes}</p>
-                  ) : (
-                    <p className="text-sm text-gray-400 italic">No patient notes recorded.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* ── Invoice Tab ── */}
             {activeTab === 'invoice' && (
               <InvoiceTab appointment={appointment} />
@@ -1252,6 +1225,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
             });
             console.log('Recurring appointments created:', result);
             toast.success(`${result.created} recurring appointment(s) created!`);
+            onRecurringCreated?.();
             setShowRecurringModal(false);
           } catch (error: any) {
             console.error('Failed to create recurring appointments:', error);

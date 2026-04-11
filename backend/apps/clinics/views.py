@@ -13,6 +13,7 @@ from .serializers import (
     PractitionerSerializer,
     LocationSerializer,
 )
+from apps.common.permissions import IsAdminOrStaffOnly
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,11 +24,17 @@ class ClinicViewSet(viewsets.ModelViewSet):
 
     queryset           = Clinic.objects.filter(is_deleted=False)
     serializer_class   = ClinicSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrStaffOnly]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter]
     search_fields      = ['name', 'city', 'province', 'branch_code']
     filterset_fields   = ['is_main_branch', 'parent_clinic']
+
+    def get_permissions(self):
+        # Read-only actions needed by all authenticated users (e.g. Diary branch tabs)
+        if self.action in ('my_clinic', 'branches', 'list', 'retrieve'):
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user
@@ -165,7 +172,7 @@ class PractitionerViewSet(viewsets.ModelViewSet):
 class LocationViewSet(viewsets.ModelViewSet):
     queryset           = Location.objects.filter(is_deleted=False)
     serializer_class   = LocationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrStaffOnly]
     filter_backends    = [DjangoFilterBackend]
     filterset_fields   = ['clinic', 'is_active']
 

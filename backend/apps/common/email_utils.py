@@ -48,6 +48,12 @@ def send_booking_confirmation_email(booking) -> tuple[bool, str]:
 
     clinic = booking.portal_link.clinic
 
+    _notif_clinic = getattr(clinic, 'main_clinic', clinic)
+    if not getattr(_notif_clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {_notif_clinic.id} has email notifications disabled — skipping booking confirmation for #{booking.reference_number}."
+        logger.info(msg)
+        return False, msg
+
     practitioner_name = ''
     if booking.practitioner and booking.practitioner.user:
         practitioner_name = booking.practitioner.user.get_full_name()
@@ -123,6 +129,12 @@ def send_new_client_welcome_email(patient) -> tuple[bool, str]:
         return False, msg
 
     clinic = patient.clinic
+
+    _notif_clinic = getattr(clinic, 'main_clinic', clinic)
+    if not getattr(_notif_clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {_notif_clinic.id} has email notifications disabled — skipping welcome email for patient {patient.id}."
+        logger.info(msg)
+        return False, msg
 
     context = {
         'patient_first_name': patient.first_name,

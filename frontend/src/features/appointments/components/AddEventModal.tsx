@@ -15,6 +15,7 @@ interface AddEventModalProps {
   selectedClinicBranchId?: number | null;
   initialDate?: Date;
   initialTime?: string;
+  initialEndTime?: string;
   appointments?: Appointment[];
 }
 
@@ -33,6 +34,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   selectedClinicBranchId,
   initialDate,
   initialTime,
+  initialEndTime,
   appointments = [],
 }) => {
   const { branches } = useClinicBranches();
@@ -58,15 +60,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   const getInitialFormData = (): FormData => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    const defaultTime = initialTime || '09:00';
-    const endTime = initialTime 
-      ? calculateEndTime(initialTime, 60) 
-      : '10:00';
+    const startTime = initialTime || '09:00';
+    const endTime = initialEndTime || (initialTime ? calculateEndTime(initialTime, 60) : '10:00');
 
     return {
       event_name: '',
       date: initialDate ? format(initialDate, 'yyyy-MM-dd') : today,
-      start_time: defaultTime,
+      start_time: startTime,
       end_time: endTime,
       notes: '',
     };
@@ -77,13 +77,21 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   // Reset form when modal opens with new initial values
   React.useEffect(() => {
     if (isOpen) {
-      setFormData(getInitialFormData());
+      const startTime = initialTime || '09:00';
+      const endTime   = initialEndTime || (initialTime ? calculateEndTime(initialTime, 60) : '10:00');
+      setFormData({
+        event_name: '',
+        date:       initialDate ? format(initialDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+        start_time: startTime,
+        end_time:   endTime,
+        notes:      '',
+      });
       setErrors({});
       setShowConflictModal(false);
       setConflictingAppointment(null);
       setPendingBlockData(null);
     }
-  }, [isOpen, initialDate, initialTime]);
+  }, [isOpen, initialDate, initialTime, initialEndTime]);
 
   const calculateEndTime = (startTime: string, durationMinutes: number): string => {
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -206,22 +214,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Generate time options (30-minute intervals from 6 AM to 9 PM)
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 6; hour <= 21; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-        const period = hour >= 12 ? 'PM' : 'AM';
-        times.push({ value: time, label: `${displayHour}:${String(minute).padStart(2, '0')} ${period}` });
-      }
-    }
-    return times;
-  };
-
-  const timeOptions = generateTimeOptions();
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
@@ -297,7 +289,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                 <Clock className="w-4 h-4 inline mr-1" />
                 Start Time <span className="text-red-500">*</span>
               </label>
-              <select
+              <input
+                type="time"
                 value={formData.start_time}
                 onChange={(e) => handleChange('start_time', e.target.value)}
                 className={`
@@ -308,12 +301,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                     : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
                   }
                 `}
-              >
-                <option value="">Select time</option>
-                {timeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              />
               {errors.start_time && (
                 <p className="mt-1 text-xs text-red-500">{errors.start_time}</p>
               )}
@@ -325,7 +313,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                 <Clock className="w-4 h-4 inline mr-1" />
                 End Time <span className="text-red-500">*</span>
               </label>
-              <select
+              <input
+                type="time"
                 value={formData.end_time}
                 onChange={(e) => handleChange('end_time', e.target.value)}
                 className={`
@@ -336,12 +325,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                     : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
                   }
                 `}
-              >
-                <option value="">Select time</option>
-                {timeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              />
               {errors.end_time && (
                 <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>
               )}

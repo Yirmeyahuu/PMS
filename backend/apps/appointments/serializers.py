@@ -172,18 +172,13 @@ class AppointmentEditSerializer(serializers.ModelSerializer):
 class AppointmentCancelSerializer(serializers.Serializer):
     """
     Validates the cancellation payload.
-    cancellation_reason is required and must be non-empty.
+    cancellation_reason is optional.
     """
     cancellation_reason = serializers.CharField(
-        required=True,
-        allow_blank=False,
-        min_length=5,
+        required=False,
+        allow_blank=True,
         max_length=1000,
-        error_messages={
-            'required':  'A cancellation reason is required.',
-            'blank':     'A cancellation reason is required.',
-            'min_length': 'Please provide a more detailed reason (at least 5 characters).',
-        }
+        default='',
     )
 
 

@@ -48,6 +48,12 @@ def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
         logger.info(msg)
         return False, msg
 
+    _notif_clinic = getattr(clinic, 'main_clinic', clinic)
+    if not getattr(_notif_clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {_notif_clinic.id} has email notifications disabled — skipping reminder for appointment {appointment.id}."
+        logger.info(msg)
+        return False, msg
+
     practitioner_name = (
         appointment.practitioner.user.get_full_name()
         if appointment.practitioner and appointment.practitioner.user

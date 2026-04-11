@@ -275,19 +275,34 @@ export const ClinicalNoteTemplate = forwardRef<HTMLDivElement, ClinicalNoteTempl
                   >
                     {field.label}
                   </p>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#111827',
-                      background: '#f9fafb',
-                      border: '1px solid #f3f4f6',
-                      borderRadius: '4px',
-                      padding: '5px 8px',
-                      minHeight: '24px',
-                    }}
-                  >
-                    {field.value || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>Not filled</span>}
-                  </div>
+                  {field.image ? (
+                    /* Chart annotation — render composited image */
+                    <img
+                      src={field.image}
+                      alt={field.label}
+                      crossOrigin="anonymous"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        borderRadius: '4px',
+                        border: '1px solid #f3f4f6',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '1px solid #f3f4f6',
+                        borderRadius: '4px',
+                        padding: '5px 8px',
+                        minHeight: '24px',
+                      }}
+                    >
+                      {field.value || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>Not filled</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

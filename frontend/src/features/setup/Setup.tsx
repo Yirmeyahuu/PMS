@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ArrowLeft, Building2, Package, Users, CreditCard } from 'lucide-react';
 import { SetupCard as SetupCardComponent } from './components/SetupCard';
+import { AccessDeniedPage } from '@/components/auth/AccessDeniedPage';
+import { useAuthStore } from '@/store/auth.store';
 import type { SetupCard } from './types/setup.types';
 
 // Import all subpage components
@@ -11,6 +13,22 @@ import { Inventory } from './pages/items/Inventory';
 import { Staff } from './pages/users/Staff';
 import { Permissions } from './pages/users/Permissions';
 import { Subscription } from './pages/account/Subscription';
+
+// Option IDs restricted for Practitioner role
+const PRACTITIONER_RESTRICTED_OPTIONS = [
+  'option1',      // Locations
+  'option2',      // Invoicing
+  'staff',        // Staff
+  'permissions',  // Permissions
+  'subscription', // Subscription (Account > option1)
+];
+
+// Map of card+option combos to restricted option IDs for lookup
+const RESTRICTED_OPTION_MAP: Record<string, string[]> = {
+  practice: ['option1', 'option2'],
+  users:    ['staff', 'permissions'],
+  account:  ['subscription'],
+};
 
 // Define setup cards
 const SETUP_CARDS: SetupCard[] = [
@@ -53,7 +71,7 @@ const SETUP_CARDS: SetupCard[] = [
     color: 'bg-emerald-500',
     bgColor: 'bg-emerald-50',
     options: [
-      { id: 'option1', label: 'Subscription', component: Subscription },
+      { id: 'subscription', label: 'Subscription', component: Subscription },
     ],
   },
 ];
@@ -61,8 +79,15 @@ const SETUP_CARDS: SetupCard[] = [
 export const Setup: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const { user } = useAuthStore();
+
+  const isPractitioner = user?.role === 'PRACTITIONER';
 
   const handleOptionClick = (cardId: string, optionId: string) => {
+    // Block practitioners from accessing restricted options
+    if (isPractitioner && PRACTITIONER_RESTRICTED_OPTIONS.includes(optionId)) {
+      return;
+    }
     setSelectedCard(cardId);
     setSelectedOption(optionId);
   };
@@ -79,12 +104,31 @@ export const Setup: React.FC = () => {
         ?.options.find((option) => option.id === selectedOption)?.component
     : null;
 
+  // Double-check: block rendering of restricted component for practitioners
+  const isRestrictedAccess =
+    isPractitioner &&
+    selectedOption &&
+    PRACTITIONER_RESTRICTED_OPTIONS.includes(selectedOption);
+
   return (
     <DashboardLayout>
       <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
 
         {/* ── Subpage View ── */}
-        {ActiveComponent ? (
+        {isRestrictedAccess ? (
+          <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-4">
+              <button
+                onClick={handleBackToCards}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-sm font-medium">Back to Setup</span>
+              </button>
+            </div>
+            <AccessDeniedPage />
+          </div>
+        ) : ActiveComponent ? (
           <div className="h-full flex flex-col overflow-hidden">
             {/* Back button header */}
             <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-4">
@@ -122,6 +166,7 @@ export const Setup: React.FC = () => {
                       key={card.id}
                       card={card}
                       onOptionClick={handleOptionClick}
+                      restrictedOptionIds={isPractitioner ? (RESTRICTED_OPTION_MAP[card.id] ?? []) : []}
                     />
                   ))}
                 </div>

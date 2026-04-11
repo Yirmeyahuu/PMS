@@ -58,6 +58,16 @@ class Clinic(TimeStampedModel, SoftDeleteModel):
         help_text='True once the admin has completed the initial clinic profile setup.'
     )
 
+    # ── Notification preferences ──────────────────────────────────────────────
+    email_notifications_enabled = models.BooleanField(
+        default=True,
+        help_text='Master switch: when False, NO automated or manual emails are sent.'
+    )
+    sms_notifications_enabled = models.BooleanField(
+        default=False,
+        help_text='Master switch for SMS notifications (placeholder — not yet active).'
+    )
+
     subscription_plan = models.CharField(
         max_length=20,
         choices=[

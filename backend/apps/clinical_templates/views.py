@@ -465,15 +465,27 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
                 for field in section_fields:
                     field_id = field.get('id', '')
                     field_label = field.get('label', '')
+                    field_type = field.get('type', '')
                     field_value = content.get(field_id, '')
                     
                     if field_value:
-                        if isinstance(field_value, list):
-                            field_value = ', '.join(field_value)
-                        fields.append({
-                            'label': field_label,
-                            'value': str(field_value)
-                        })
+                        # Chart fields: value is a base64 PNG string — render as image in print
+                        if field_type == 'chart' and isinstance(field_value, str) and field_value.startswith('data:image/'):
+                            fields.append({
+                                'label': field_label,
+                                'value': '',
+                                'image': field_value,
+                            })
+                        else:
+                            if isinstance(field_value, list):
+                                field_value = ', '.join(str(v) for v in field_value)
+                            elif isinstance(field_value, dict):
+                                # Fallback: stringify dicts that weren't handled above
+                                field_value = str(field_value)
+                            fields.append({
+                                'label': field_label,
+                                'value': str(field_value)
+                            })
                 
                 if fields:
                     sections.append({

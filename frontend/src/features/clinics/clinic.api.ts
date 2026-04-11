@@ -64,8 +64,10 @@ export interface ClinicProfile {
   timezone:                 string;
   is_main_branch:           boolean;
   is_active:                boolean;
-  setup_complete:           boolean;
-  subscription_plan:        string;
+  setup_complete:                boolean;
+  subscription_plan:             string;
+  email_notifications_enabled:   boolean;
+  sms_notifications_enabled:     boolean;
   created_at:               string;
   updated_at:               string;
 }
@@ -83,8 +85,10 @@ export interface ClinicProfileSetupPayload {
   custom_location?: string;
   latitude?:        number;
   longitude?:       number;
-  logo?:            File | null;
-  remove_logo?:     boolean;
+  logo?:                          File | null;
+  remove_logo?:                   boolean;
+  email_notifications_enabled?:   boolean;
+  sms_notifications_enabled?:     boolean;
 }
 
 // ── Existing functions ────────────────────────────────────────────────────────

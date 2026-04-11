@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, Loader2, GitBranch, Hash, Edit3, MapPin } from 'lucide-react';
+import { X, Loader2, GitBranch, Hash, Edit3, MapPin, Bell } from 'lucide-react';
 import { PhLocationSelect } from '@/components/location/PhLocationSelect';
 import { ClinicLocationPicker } from '@/components/maps/ClinicLocationPicker';
 import type { ReverseGeocodeResult } from '@/components/maps/ClinicLocationPicker';
@@ -10,7 +10,7 @@ const EMPTY_FORM = {
   location: '',
   email: '', phone: '', address: '',
   city: '', province: '', postal_code: '',
-  website: '', tin: '', custom_location: '',
+  custom_location: '',
 };
 
 interface CreateBranchModalProps {
@@ -33,6 +33,8 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
   const [showManual, setShowManual]   = useState(false);
   const [mapKey, setMapKey]           = useState(0);
   const [flyTarget, setFlyTarget]     = useState<[number, number] | null>(null);
+  const [emailNotifEnabled, setEmailNotifEnabled] = useState(true);
+  const [smsNotifEnabled,   setSmsNotifEnabled]   = useState(false);
   const skipFwdRef                    = useRef(false);
   const fwdTimerRef                   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -60,10 +62,7 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
     }));
   }, []);
 
-  const extractLocation = (fullName: string): string => {
-    const sep = fullName.indexOf(' - ');
-    return sep !== -1 ? fullName.slice(sep + 3) : fullName;
-  };
+  const isMainBranch = mode === 'edit' && !!branch?.is_main_branch;
 
   React.useEffect(() => {
     if (isOpen) {
@@ -71,31 +70,49 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
       setFlyTarget(null);
       skipFwdRef.current = false;
       if (mode === 'edit' && branch) {
+        const isMain = !!branch.is_main_branch;
         const hasCustom = !!(branch.custom_location);
+
+        // Extract location suffix from the full branch name
+        let location = branch.name;
+        if (!isMain) {
+          const prefix = mainClinicName + ' - ';
+          if (branch.name.startsWith(prefix)) {
+            location = branch.name.slice(prefix.length);
+          } else {
+            const sep = branch.name.indexOf(' - ');
+            location = sep !== -1 ? branch.name.slice(sep + 3) : branch.name;
+          }
+        }
+
         setForm({
-          location:        extractLocation(branch.name),
+          location,
           email:           branch.email           || '',
           phone:           branch.phone           || '',
           address:         branch.address         || '',
           city:            branch.city            || '',
           province:        branch.province        || '',
           postal_code:     branch.postal_code     || '',
-          website:         branch.website         || '',
-          tin:             branch.tin             || '',
           custom_location: branch.custom_location || '',
         });
         setShowManual(hasCustom);
         setLatitude(branch.latitude  != null ? Number(branch.latitude)  : null);
         setLongitude(branch.longitude != null ? Number(branch.longitude) : null);
+        if (isMain) {
+          setEmailNotifEnabled(branch.email_notifications_enabled ?? true);
+          setSmsNotifEnabled(branch.sms_notifications_enabled     ?? false);
+        }
       } else {
         setForm(EMPTY_FORM);
         setShowManual(false);
         setLatitude(null);
         setLongitude(null);
+        setEmailNotifEnabled(true);
+        setSmsNotifEnabled(false);
       }
       setErrors({});
     }
-  }, [isOpen, mode, branch]);
+  }, [isOpen, mode, branch, mainClinicName]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -103,9 +120,11 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
-  const composedName = form.location.trim()
-    ? `${mainClinicName} - ${form.location.trim()}`
-    : mainClinicName;
+  const composedName = isMainBranch
+    ? form.location.trim() || mainClinicName
+    : form.location.trim()
+      ? `${mainClinicName} - ${form.location.trim()}`
+      : mainClinicName;
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -132,11 +151,13 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
       city:            form.city,
       province:        form.province,
       postal_code:     form.postal_code,
-      website:         form.website,
-      tin:             form.tin,
       custom_location: form.custom_location || undefined,
       ...(latitude  != null && { latitude }),
       ...(longitude != null && { longitude }),
+      ...(isMainBranch && {
+        email_notifications_enabled: emailNotifEnabled,
+        sms_notifications_enabled:   smsNotifEnabled,
+      }),
     };
     await onSave(payload);
   };
@@ -215,29 +236,47 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
               {/* Branch Name composer */}
               <div>
                 <label className={labelBase}>
-                  Branch Name <span className="text-red-500">*</span>
+                  {isMainBranch ? 'Clinic Name' : 'Branch Name'} <span className="text-red-500">*</span>
                 </label>
-                <div className="flex items-center gap-0 mb-2 rounded-lg border border-gray-300 overflow-hidden focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
-                  <span className="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-500 border-r border-gray-300 whitespace-nowrap flex-shrink-0">
-                    {mainClinicName} —
-                  </span>
-                  <input
-                    type="text"
-                    name="location"
-                    value={form.location}
-                    onChange={handleChange}
-                    placeholder="Barangay / Location name"
-                    className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white"
-                  />
-                </div>
-                {errors.location && (
-                  <p className="text-red-500 text-xs mt-1">{errors.location}</p>
-                )}
-                {form.location.trim() && (
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Full name preview:&nbsp;
-                    <span className="font-medium text-gray-700">{composedName}</span>
-                  </p>
+                {isMainBranch ? (
+                  <>
+                    <input
+                      type="text"
+                      name="location"
+                      value={form.location}
+                      onChange={handleChange}
+                      placeholder="Clinic name"
+                      className={`${inputBase} ${errors.location ? inputErr : ''}`}
+                    />
+                    {errors.location && (
+                      <p className="text-red-500 text-xs mt-1">{errors.location}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-0 mb-2 rounded-lg border border-gray-300 overflow-hidden focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-transparent">
+                      <span className="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-500 border-r border-gray-300 whitespace-nowrap flex-shrink-0">
+                        {mainClinicName} —
+                      </span>
+                      <input
+                        type="text"
+                        name="location"
+                        value={form.location}
+                        onChange={handleChange}
+                        placeholder="Barangay / Location name"
+                        className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white"
+                      />
+                    </div>
+                    {errors.location && (
+                      <p className="text-red-500 text-xs mt-1">{errors.location}</p>
+                    )}
+                    {form.location.trim() && (
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        Full name preview:&nbsp;
+                        <span className="font-medium text-gray-700">{composedName}</span>
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -352,32 +391,81 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                 />
               </div>
 
-              {/* Website + TIN */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelBase}>Website</label>
-                  <input
-                    type="url" name="website" value={form.website} onChange={handleChange}
-                    placeholder="https://clinic.com"
-                    className={inputBase}
-                  />
-                </div>
-                <div>
-                  <label className={labelBase}>TIN</label>
-                  <input
-                    type="text" name="tin" value={form.tin} onChange={handleChange}
-                    placeholder="123-456-789-000"
-                    className={inputBase}
-                  />
-                </div>
-              </div>
-
               {/* Subscription inheritance note */}
               {mode === 'create' && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
                   <GitBranch className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700">
                     This branch will inherit the subscription plan from the main clinic.
+                  </p>
+                </div>
+              )}
+
+              {/* ── Notification Preferences (main branch only) ── */}
+              {isMainBranch && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bell className="w-4 h-4 text-sky-500" />
+                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                      Notification Preferences
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-400 -mt-1">
+                    These settings apply to all branches. Only the main branch controls them.
+                  </p>
+
+                  {/* Email */}
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="mt-0.5 flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={emailNotifEnabled}
+                        onChange={(e) => setEmailNotifEnabled(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-800 group-hover:text-sky-700 transition-colors">
+                        Email Notifications
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Appointment reminders, booking confirmations, and welcome messages.
+                        When disabled, no automated or manual emails are sent from any branch.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* SMS (placeholder) */}
+                  <label className="flex items-start gap-3 cursor-not-allowed opacity-50">
+                    <div className="mt-0.5 flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={smsNotifEnabled}
+                        disabled
+                        className="w-4 h-4 rounded border-gray-300 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                        SMS Notifications
+                        <span className="text-xs px-1.5 py-0.5 bg-sky-100 text-sky-600 rounded-full font-normal">
+                          Coming Soon
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        SMS reminders will be available in a future update.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Notification note for non-main branches (edit mode) */}
+              {mode === 'edit' && !isMainBranch && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-start gap-2">
+                  <Bell className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-500">
+                    Notification preferences are managed by the main branch and apply to all locations.
                   </p>
                 </div>
               )}

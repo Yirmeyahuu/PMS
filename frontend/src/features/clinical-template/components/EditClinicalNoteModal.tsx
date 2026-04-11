@@ -3,7 +3,9 @@ import { X, FileText, Loader2, Save, Calendar, ClipboardList, Eye } from 'lucide
 import { getActiveTemplates, getNote, updateNote } from '../clinical-templates.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from './DynamicFormRenderer';
-import type { ClinicalTemplate, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
+import { ChartDrawingCanvas } from './ChartDrawingCanvas';
+import type { ChartAnnotation } from './ChartDrawingCanvas';
+import type { ClinicalTemplate, TemplateSection, TemplateField, ChartType } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -335,14 +337,16 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
                       );
                     }
 
-                    // Render chart placeholder
+                    // Render chart preview in disabled/read-only mode
                     if (field.type === 'chart') {
                       return (
                         <div key={field.id || fieldIndex} className="mb-3 last:mb-0">
-                          <p className="text-xs font-medium text-gray-600 mb-1">{field.label}</p>
-                          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                            {field.chartType === 'spine' ? 'Spine Chart' : field.chartType === 'head' ? 'Head Chart' : 'Body Chart'}
-                          </div>
+                          <ChartDrawingCanvas
+                            chartType={(field.chartType as ChartType) || 'body'}
+                            value={content[field.id] as ChartAnnotation | null}
+                            disabled
+                            label={field.label}
+                          />
                         </div>
                       );
                     }

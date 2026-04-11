@@ -9,9 +9,10 @@ import type { ReverseGeocodeResult } from '@/components/maps/ClinicLocationPicke
 import { forwardGeocode } from '@/utils/geocode';
 import {
   Building2, MapPin, Phone, Mail, Globe,
-  Upload, X, ChevronRight, CheckCircle2, Loader2, Edit3,
+  Upload, X, ChevronRight, CheckCircle2, Loader2, Edit3, Bell,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { invalidateClinicSettingsCache } from '@/hooks/useClinicSettings';
 
 interface FormState {
   name:            string;
@@ -52,6 +53,9 @@ export const ClinicSetupPage: React.FC = () => {
     website:         '',
     custom_location: '',
   });
+
+  const [emailNotifEnabled, setEmailNotifEnabled] = useState(true);
+  const [smsNotifEnabled,   setSmsNotifEnabled]   = useState(false);
 
   // Forward geocode: when province + city are both set, pan map to that area
   const fwdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +102,8 @@ export const ClinicSetupPage: React.FC = () => {
         if (hasCustom) setShowManual(true);
         if (clinic.latitude  != null) setLatitude(Number(clinic.latitude));
         if (clinic.longitude != null) setLongitude(Number(clinic.longitude));
+        setEmailNotifEnabled(clinic.email_notifications_enabled ?? true);
+        setSmsNotifEnabled(clinic.sms_notifications_enabled     ?? false);
         if (clinic.logo_url) setLogoPreview(clinic.logo_url);
       } catch {
         toast.error('Could not load clinic data. Please refresh.');
@@ -163,21 +169,25 @@ export const ClinicSetupPage: React.FC = () => {
     setIsLoading(true);
     try {
       const payload: ClinicProfileSetupPayload = {
-        name:            form.name,
-        email:           form.email,
-        phone:           form.phone,
-        address:         form.address,
-        city:            form.city,
-        province:        form.province,
-        postal_code:     form.postal_code,
-        website:         form.website,
-        custom_location: form.custom_location,
+        name:                        form.name,
+        email:                       form.email,
+        phone:                       form.phone,
+        address:                     form.address,
+        city:                        form.city,
+        province:                    form.province,
+        postal_code:                 form.postal_code,
+        website:                     form.website,
+        custom_location:             form.custom_location,
+        email_notifications_enabled: emailNotifEnabled,
+        sms_notifications_enabled:   smsNotifEnabled,
         ...(latitude  != null && { latitude }),
         ...(longitude != null && { longitude }),
       };
       if (logoFile) payload.logo = logoFile;
 
       await setupClinicProfile(clinicId, payload);
+
+      invalidateClinicSettingsCache();
 
       if (user && tokens) {
         setAuth({ ...user, clinic_setup_complete: true }, tokens);
@@ -442,6 +452,58 @@ export const ClinicSetupPage: React.FC = () => {
                 onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }}
               />
             </div>
+          </div>
+
+          {/* ── Notification Preferences ── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-sky-500" />
+              Notification Preferences
+            </h2>
+
+            {/* Email Notifications */}
+            <label className="flex items-start gap-4 cursor-pointer group">
+              <div className="mt-0.5 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={emailNotifEnabled}
+                  onChange={(e) => setEmailNotifEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800 group-hover:text-sky-700 transition-colors">
+                  Email Notifications
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Master switch for all clinic emails — appointment reminders, booking confirmations, and welcome messages.
+                  When disabled, no automated or manual emails will be sent from this clinic.
+                </p>
+              </div>
+            </label>
+
+            {/* SMS Notifications (placeholder) */}
+            <label className="flex items-start gap-4 cursor-not-allowed opacity-50">
+              <div className="mt-0.5 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={smsNotifEnabled}
+                  disabled
+                  className="w-4 h-4 rounded border-gray-300 text-gray-400 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  SMS Notifications
+                  <span className="text-xs font-normal px-1.5 py-0.5 bg-sky-100 text-sky-600 rounded-full">
+                    Coming Soon
+                  </span>
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  SMS reminders and alerts will be available in a future update.
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* ── Submit ── */}

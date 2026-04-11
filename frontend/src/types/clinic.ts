@@ -18,6 +18,8 @@ export interface ClinicBranch {
   custom_location?: string;
   latitude?: string | null;
   longitude?: string | null;
+  email_notifications_enabled?: boolean;
+  sms_notifications_enabled?: boolean;
 }
 
 export interface ClinicBranchesResponse {
@@ -39,4 +41,6 @@ export interface CreateBranchData {
   custom_location?: string;
   latitude?: number;
   longitude?: number;
+  email_notifications_enabled?: boolean;
+  sms_notifications_enabled?: boolean;
 }
