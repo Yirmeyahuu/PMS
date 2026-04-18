@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { User, CalendarDays, Clock, FileText } from 'lucide-react';
+import { User, Users, CalendarDays, Clock, FileText, Pencil } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { BlockAppointment } from '@/types';
 
@@ -123,6 +123,24 @@ export const BlockHoverCard: React.FC<BlockHoverCardProps> = ({
             icon={<User className="w-3.5 h-3.5" />}
             label="Created By"
             value={block.created_by_name}
+          />
+        )}
+
+        {/* Modified By */}
+        {block.modified_by_name && (
+          <HoverRow
+            icon={<Pencil className="w-3.5 h-3.5" />}
+            label="Modified By"
+            value={block.modified_by_name}
+          />
+        )}
+
+        {/* People / Users Involved */}
+        {block.visible_to_user_names && block.visible_to_user_names.length > 0 && (
+          <HoverRow
+            icon={<Users className="w-3.5 h-3.5" />}
+            label="People Involved"
+            value={block.visible_to_user_names.join(', ')}
           />
         )}
 

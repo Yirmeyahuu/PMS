@@ -271,6 +271,7 @@ class BlockAppointment(TimeStampedModel, SoftDeleteModel):
     VISIBILITY_TYPE_CHOICES = [
         ('ALL', 'All Users'),
         ('SELECTED', 'Selected Users'),
+        ('SELF', 'Myself Only'),
     ]
 
     clinic = models.ForeignKey(
@@ -323,7 +324,7 @@ class BlockAppointment(TimeStampedModel, SoftDeleteModel):
 
     # ── Visibility Control Fields ────────────────────────────────────────────────
     visibility_type = models.CharField(
-        max_length=10,
+        max_length=15,
         choices=VISIBILITY_TYPE_CHOICES,
         default='ALL',
         help_text='Controls who can see this block appointment'

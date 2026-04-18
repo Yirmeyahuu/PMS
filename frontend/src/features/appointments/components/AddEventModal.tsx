@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Calendar, Clock, FileText, Users, Globe } from 'lucide-react';
+import { X, Calendar, Clock, FileText, Users, Globe, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { createBlockAppointment } from '../appointment.api';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
@@ -9,7 +9,7 @@ import { ConflictModal } from './ConflictModal';
 import { UserSelector } from './UserSelector';
 import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
-import type { BlockAppointment, Appointment } from '@/types';
+import type { BlockAppointment, Appointment, CreateBlockAppointmentData } from '@/types';
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -28,7 +28,7 @@ interface FormData {
   start_time: string;
   end_time: string;
   notes: string;
-  visibility_type: 'ALL' | 'SELECTED';
+  visibility_type: 'ALL' | 'SELECTED' | 'SELF';
   visible_to_user_ids: number[];
 }
 
@@ -69,7 +69,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     start_time: string;
     end_time: string;
     notes: string;
-    visibility_type: 'ALL' | 'SELECTED';
+    visibility_type: 'ALL' | 'SELECTED' | 'SELF';
     visible_to_user_ids: number[];
   } | null>(null);
 
@@ -215,7 +215,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         visible_to_user_ids: formData.visible_to_user_ids,
       };
 
-      const payload: any = {
+      const payload: CreateBlockAppointmentData = {
         clinic: blockData.clinicId,
         event_name: blockData.event_name,
         date: blockData.date,
@@ -449,6 +449,35 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         Only specific users can see this block event
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-purple-200 hover:bg-purple-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility_type"
+                      value="SELF"
+                      checked={formData.visibility_type === 'SELF'}
+                      onChange={() => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          visibility_type: 'SELF' as const,
+                          visible_to_user_ids: [] // Clear selected users
+                        }));
+                        if (errors.visible_to_user_ids) {
+                          setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                        }
+                      }}
+                      className="mt-0.5 w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900">Myself Only</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Only you can see this block event (private)
                       </p>
                     </div>
                   </label>

@@ -101,7 +101,7 @@ export interface BlockAppointment {
   created_by_name: string | null;
   modified_by: number | null;
   modified_by_name: string | null;
-  visibility_type: 'ALL' | 'SELECTED';
+  visibility_type: 'ALL' | 'SELECTED' | 'SELF';
   visible_to_user_ids: number[];
   visible_to_user_names: string[];
   created_at: string;
@@ -115,7 +115,7 @@ export interface CreateBlockAppointmentData {
   start_time: string;
   end_time: string;
   notes?: string;
-  visibility_type?: 'ALL' | 'SELECTED';
+  visibility_type?: 'ALL' | 'SELECTED' | 'SELF';
   visible_to_user_ids?: number[];
 }
 

@@ -394,14 +394,28 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create block appointment and properly set visible_to_users M2M field"""
         visible_to_users = validated_data.pop('visible_to_users', [])
+        visibility_type = validated_data.get('visibility_type', 'ALL')
+        
         instance = BlockAppointment.objects.create(**validated_data)
-        if visible_to_users:
-            instance.visible_to_users.set(visible_to_users)
+        
+        # Handle visibility based on type
+        if visibility_type == 'SELF':
+            # Myself Only - assign to creator only
+            request = self.context.get('request')
+            if request and request.user:
+                instance.visible_to_users.set([request.user])
+        elif visibility_type == 'SELECTED':
+            # Selected Users - assign provided users
+            if visible_to_users:
+                instance.visible_to_users.set(visible_to_users)
+        # For 'ALL', no need to set visible_to_users
+        
         return instance
 
     def update(self, instance, validated_data):
         """Update block appointment and properly set visible_to_users M2M field"""
         visible_to_users = validated_data.pop('visible_to_users', None)
+        visibility_type = validated_data.get('visibility_type', instance.visibility_type)
 
         # Update all other fields
         for attr, value in validated_data.items():
@@ -409,8 +423,18 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
         
         instance.save()
 
-        # Update M2M relationship if provided
-        if visible_to_users is not None:
-            instance.visible_to_users.set(visible_to_users)
+        # Handle visibility based on type
+        if visibility_type == 'SELF':
+            # Myself Only - assign to creator/modifier only
+            request = self.context.get('request')
+            if request and request.user:
+                instance.visible_to_users.set([request.user])
+        elif visibility_type == 'SELECTED':
+            # Selected Users - update if provided
+            if visible_to_users is not None:
+                instance.visible_to_users.set(visible_to_users)
+        elif visibility_type == 'ALL':
+            # All Users - clear visible_to_users
+            instance.visible_to_users.clear()
         
         return instance

@@ -587,7 +587,16 @@ export const Calendar: React.FC<CalendarProps> = ({
       console.log('[Calendar] No block appointments or not an array');
       return [];
     }
-    const filtered = blockAppointments.filter(apt => apt.date === dateStr);
+    const filtered = blockAppointments.filter(apt => {
+      if (apt.date !== dateStr) return false;
+      // When a specific branch tab is active, every block appointment is scoped
+      // to its own clinic — regardless of visibility_type.
+      // The "All Branches" tab (null) shows the full set returned by the backend.
+      if (selectedClinicBranchId !== null && apt.clinic !== selectedClinicBranchId) {
+        return false;
+      }
+      return true;
+    });
     console.log('[Calendar] Filtered block appointments:', filtered);
     return filtered;
   };
