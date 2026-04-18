@@ -151,7 +151,7 @@ interface CalendarProps {
   comparePractitionerIdA?: number | null;
   comparePractitionerIdB?: number | null;
   /** Admin-only: intercept double-click / drag-select instead of opening AppointmentModal internally */
-  onAdminSlotAction?: (slot: { date: Date; time: string; hour: number; minutes: number; duration: number }) => void;
+  onSlotAction?: (slot: { date: Date; time: string; hour: number; minutes: number; duration: number }) => void;
   /** Increment to trigger a refetch of appointments (e.g. after creating one from outside Calendar) */
   appointmentRefreshKey?: number;
   /** Called after recurring appointments are saved, so parent can trigger a refetch */
@@ -301,7 +301,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   comparePractitionerNames,
   comparePractitionerIdA,
   comparePractitionerIdB,
-  onAdminSlotAction,
+  onSlotAction,
   appointmentRefreshKey,
   onRecurringCreated,
 }) => {
@@ -903,8 +903,8 @@ export const Calendar: React.FC<CalendarProps> = ({
           minutes: startTime.minutes,
           duration,
         };
-        if (onAdminSlotAction) {
-          onAdminSlotAction(slotInfo);
+        if (onSlotAction) {
+          onSlotAction(slotInfo);
         } else {
           openModal(slotInfo);
         }
@@ -929,8 +929,8 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const handleDoubleClick = (date: Date, slot: any) => {
     if (dragState.isDragging || dragState.isHolding || blockDragState.isDragging || blockDragState.isHolding) return;
-    if (onAdminSlotAction) {
-      onAdminSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+    if (onSlotAction) {
+      onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
       return;
     }
     openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });

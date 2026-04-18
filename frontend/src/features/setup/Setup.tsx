@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
-import { ArrowLeft, Building2, Package, Users, CreditCard } from 'lucide-react';
+import { ArrowLeft, Building2, Package, Users, CreditCard, Bell } from 'lucide-react';
 import { SetupCard as SetupCardComponent } from './components/SetupCard';
 import { AccessDeniedPage } from '@/components/auth/AccessDeniedPage';
 import { useAuthStore } from '@/store/auth.store';
@@ -13,21 +13,26 @@ import { Inventory } from './pages/items/Inventory';
 import { Staff } from './pages/users/Staff';
 import { Permissions } from './pages/users/Permissions';
 import { Subscription } from './pages/account/Subscription';
+import CommunicationSettings from './pages/communication/CommunicationSettings';
+import CommunicationLogs from './pages/communication/CommunicationLogs';
 
 // Option IDs restricted for Practitioner role
 const PRACTITIONER_RESTRICTED_OPTIONS = [
-  'option1',      // Locations
-  'option2',      // Invoicing
-  'staff',        // Staff
-  'permissions',  // Permissions
-  'subscription', // Subscription (Account > option1)
+  'option1',        // Locations
+  'option2',        // Invoicing
+  'staff',          // Staff
+  'permissions',    // Permissions
+  'subscription',   // Subscription (Account > option1)
+  'comm-settings',  // Communication Settings
+  'comm-logs',      // Communication Logs
 ];
 
 // Map of card+option combos to restricted option IDs for lookup
 const RESTRICTED_OPTION_MAP: Record<string, string[]> = {
-  practice: ['option1', 'option2'],
-  users:    ['staff', 'permissions'],
-  account:  ['subscription'],
+  practice:       ['option1', 'option2'],
+  users:          ['staff', 'permissions'],
+  account:        ['subscription'],
+  communication:  ['comm-settings', 'comm-logs'],
 };
 
 // Define setup cards
@@ -72,6 +77,17 @@ const SETUP_CARDS: SetupCard[] = [
     bgColor: 'bg-emerald-50',
     options: [
       { id: 'subscription', label: 'Subscription', component: Subscription },
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Communication',
+    icon: Bell,
+    color: 'bg-sky-500',
+    bgColor: 'bg-sky-50',
+    options: [
+      { id: 'comm-settings', label: 'Settings', component: CommunicationSettings },
+      { id: 'comm-logs', label: 'Logs', component: CommunicationLogs },
     ],
   },
 ];

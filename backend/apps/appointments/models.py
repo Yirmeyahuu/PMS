@@ -119,6 +119,39 @@ class Appointment(TimeStampedModel, SoftDeleteModel):
     cancellation_reason = models.TextField(blank=True)
     cancelled_at        = models.DateTimeField(null=True, blank=True)
 
+    # ── Communication workflow fields ─────────────────────────────────────────
+    CONFIRMATION_STATUS_CHOICES = [
+        ('PENDING',   'Pending'),
+        ('CONFIRMED', 'Confirmed'),
+        ('DECLINED',  'Declined'),
+    ]
+
+    confirmation_sent    = models.BooleanField(default=False)
+    confirmation_sent_at = models.DateTimeField(null=True, blank=True)
+    confirmation_status  = models.CharField(
+        max_length=10,
+        choices=CONFIRMATION_STATUS_CHOICES,
+        default='PENDING',
+        blank=True,
+    )
+    patient_reply        = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text='Y or N reply from patient via SMS.',
+    )
+    patient_reply_at     = models.DateTimeField(null=True, blank=True)
+    dna_followup_sent    = models.BooleanField(default=False)
+    dna_followup_sent_at = models.DateTimeField(null=True, blank=True)
+    rebook_followup_sent    = models.BooleanField(default=False)
+    rebook_followup_sent_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Recurring group identifier ────────────────────────────────────────────
+    recurring_group_id = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='Shared ID linking appointments in the same recurring series.',
+    )
+
     class Meta:
         db_table = 'appointments'
         ordering = ['-date', '-start_time']
@@ -227,11 +260,17 @@ class BlockAppointment(TimeStampedModel, SoftDeleteModel):
     """
     Block Appointments are special events that block time slots in the clinic schedule.
     Examples: Staff Meeting, Clinic Holiday, Team Training, Maintenance Schedule.
-    Only Admins can create/edit/delete these events, but all users can view them.
+    All authenticated users can create/edit/delete block appointments.
+    Visibility can be controlled per-event (All Users or Selected Users).
     """
 
     EVENT_TYPE_CHOICES = [
         ('BLOCK', 'Blocked Schedule'),
+    ]
+
+    VISIBILITY_TYPE_CHOICES = [
+        ('ALL', 'All Users'),
+        ('SELECTED', 'Selected Users'),
     ]
 
     clinic = models.ForeignKey(
@@ -269,7 +308,32 @@ class BlockAppointment(TimeStampedModel, SoftDeleteModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='block_appointments_created'
+        related_name='block_appointments_created',
+        help_text='User who created this block appointment'
+    )
+
+    modified_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='block_appointments_modified',
+        help_text='User who last modified this block appointment'
+    )
+
+    # ── Visibility Control Fields ────────────────────────────────────────────────
+    visibility_type = models.CharField(
+        max_length=10,
+        choices=VISIBILITY_TYPE_CHOICES,
+        default='ALL',
+        help_text='Controls who can see this block appointment'
+    )
+
+    visible_to_users = models.ManyToManyField(
+        'accounts.User',
+        blank=True,
+        related_name='visible_block_appointments',
+        help_text='Users who can see this block (only applies when visibility_type=SELECTED)'
     )
 
     class Meta:

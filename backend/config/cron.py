@@ -16,3 +16,61 @@ def send_reminders_cron():
     except Exception as e:
         logger.error("Cron: send_reminders_cron failed — %s", str(e))
         raise
+
+
+def send_communication_reminders_cron():
+    """
+    Called daily at 8:00 AM by django-crontab.
+    Sends Y/N appointment reminders via the new communication workflow.
+    Uses clinic-configurable reminder_hours_before setting.
+    """
+    logger.info("Cron: send_communication_reminders_cron started")
+    try:
+        call_command('send_communication_reminders')
+        logger.info("Cron: send_communication_reminders_cron completed")
+    except Exception as e:
+        logger.error("Cron: send_communication_reminders_cron failed — %s", str(e))
+        raise
+
+
+def send_dna_followups_cron():
+    """
+    Called every 2 hours by django-crontab.
+    Sends DNA follow-ups for appointments marked as DNA/NO_SHOW.
+    """
+    logger.info("Cron: send_dna_followups_cron started")
+    try:
+        call_command('send_dna_followups')
+        logger.info("Cron: send_dna_followups_cron completed")
+    except Exception as e:
+        logger.error("Cron: send_dna_followups_cron failed — %s", str(e))
+        raise
+
+
+def send_rebook_followups_cron():
+    """
+    Called daily at 10:00 AM by django-crontab.
+    Sends no-rebook follow-ups for patients who haven't rebooked
+    after X days (configurable per clinic).
+    """
+    logger.info("Cron: send_rebook_followups_cron started")
+    try:
+        call_command('send_rebook_followups')
+        logger.info("Cron: send_rebook_followups_cron completed")
+    except Exception as e:
+        logger.error("Cron: send_rebook_followups_cron failed — %s", str(e))
+        raise
+
+
+def send_inactive_checkins_cron():
+    """
+    Called weekly on Monday at 9:00 AM.
+    Sends wellness check-ins to patients who haven't visited in X months.
+    """
+    logger.info("Cron: send_inactive_checkins_cron started")
+    try:
+        call_command('send_inactive_checkins')
+        logger.info("Cron: send_inactive_checkins_cron completed")
+    except Exception as e:
+        logger.error("Cron: send_inactive_checkins_cron failed — %s", str(e))
+        raise

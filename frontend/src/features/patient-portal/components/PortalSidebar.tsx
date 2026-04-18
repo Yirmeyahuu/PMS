@@ -38,7 +38,7 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
   onChangeBranch,
 }) => {
   return (
-    <aside className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen">
+    <aside className="w-80 shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen">
 
       {/* Clinic info */}
       <div className="p-6 border-b border-gray-100">

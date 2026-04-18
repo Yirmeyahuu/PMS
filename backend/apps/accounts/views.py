@@ -429,6 +429,9 @@ class UserViewSet(viewsets.ModelViewSet):
         # The 'me' action must remain accessible to all authenticated users
         if self.action == 'me':
             return [IsAuthenticated()]
+        # Allow practitioners to list users (needed for block appointment user selection)
+        if self.action == 'list':
+            return [IsAuthenticated()]
         return super().get_permissions()
     
     def get_queryset(self):

@@ -17,6 +17,7 @@ from apps.reports.views import ReportViewSet
 from apps.integrations.views import PhilHealthClaimViewSet, HMOClaimViewSet
 from apps.contacts.views import ContactViewSet
 from apps.clinics.services.views import ServiceViewSet as ClinicServiceViewSet
+from apps.notifications.views_webhook import SMSReplyWebhookView
 
 
 router = DefaultRouter()
@@ -76,6 +77,9 @@ urlpatterns = [
 
     path('api/auth/verify-token/', AuthViewSet.as_view({'post': 'verify_token'}), name='verify-token'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # SMS webhook (Twilio inbound)
+    path('api/sms/reply-webhook/', SMSReplyWebhookView.as_view(), name='sms-reply-webhook'),
 ]
 
 if settings.DEBUG:

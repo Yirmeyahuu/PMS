@@ -131,6 +131,14 @@ ROOT_URLCONF = 'config.urls'
 CRONJOBS = [
     # Every day at 8:00 AM Asia/Manila — send reminders for tomorrow's appointments
     ('0 8 * * *', 'config.cron.send_reminders_cron'),
+    # Every day at 8:00 AM — send Y/N communication reminders (clinic-configurable timing)
+    ('0 8 * * *', 'config.cron.send_communication_reminders_cron'),
+    # Every 2 hours — send DNA follow-ups for missed/declined appointments
+    ('0 */2 * * *', 'config.cron.send_dna_followups_cron'),
+    # Every day at 10:00 AM — send no-rebook follow-ups (delayed outreach)
+    ('0 10 * * *', 'config.cron.send_rebook_followups_cron'),
+    # Every Monday at 9:00 AM — send inactive patient wellness check-ins
+    ('0 9 * * 1', 'config.cron.send_inactive_checkins_cron'),
 ]
 
 

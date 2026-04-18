@@ -1,10 +1,13 @@
-import React, { useState, useCallback } from 'react';
-import { X, Calendar, Clock, FileText } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { X, Calendar, Clock, FileText, Users, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { createBlockAppointment } from '../appointment.api';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 import { useBlockConflictDetection } from '../hooks/useBlockConflictDetection';
+import { useClinicUsers } from '../hooks/useClinicUsers';
 import { ConflictModal } from './ConflictModal';
+import { UserSelector } from './UserSelector';
+import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
 import type { BlockAppointment, Appointment } from '@/types';
 
@@ -27,6 +30,8 @@ interface FormData {
   start_time: string;
   end_time: string;
   notes: string;
+  visibility_type: 'ALL' | 'SELECTED';
+  visible_to_user_ids: number[];
 }
 
 export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
@@ -39,7 +44,15 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
   initialEndTime,
   appointments = [],
 }) => {
+  const { user: currentUser } = useAuthStore();
   const { branches } = useClinicBranches();
+  const { users, loading: loadingUsers } = useClinicUsers(selectedClinicBranchId);
+  
+  // Filter out current user from selection
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => user.id !== currentUser?.id);
+  }, [users, currentUser?.id]);
+  
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -58,6 +71,8 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
     start_time: string;
     end_time: string;
     notes: string;
+    visibility_type: 'ALL' | 'SELECTED';
+    visible_to_user_ids: number[];
   } | null>(null);
 
   const getInitialFormData = (): FormData => {
@@ -68,6 +83,8 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
       start_time: initialStartTime || '09:00',
       end_time: initialEndTime || '10:00',
       notes: '',
+      visibility_type: 'ALL',
+      visible_to_user_ids: [],
     };
   };
 
@@ -112,8 +129,10 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
       if (formData.end_time <= formData.start_time) {
         newErrors.end_time = 'End time must be after start time';
       }
+    }    // Validate visibility
+    if (formData.visibility_type === 'SELECTED' && formData.visible_to_user_ids.length === 0) {
+      newErrors.visible_to_user_ids = 'Select at least one user';
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -147,6 +166,8 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
           start_time: formData.start_time,
           end_time: formData.end_time,
           notes: formData.notes,
+          visibility_type: formData.visibility_type,
+          visible_to_user_ids: formData.visible_to_user_ids,
         });
         setConflictingAppointment(conflict);
         setShowConflictModal(true);
@@ -176,16 +197,26 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
         start_time: formData.start_time,
         end_time: formData.end_time,
         notes: formData.notes,
+        visibility_type: formData.visibility_type,
+        visible_to_user_ids: formData.visible_to_user_ids,
       };
 
-      const created = await createBlockAppointment({
+      const payload: any = {
         clinic: data.clinicId,
         event_name: data.event_name,
         date: data.date,
         start_time: data.start_time,
         end_time: data.end_time,
         notes: data.notes,
-      });
+        visibility_type: data.visibility_type,
+      };
+
+      // Only include visible_to_user_ids if visibility_type is SELECTED
+      if (data.visibility_type === 'SELECTED') {
+        payload.visible_to_user_ids = data.visible_to_user_ids;
+      }
+
+      const created = await createBlockAppointment(payload);
 
       toast.success('Event created successfully');
       onCreated?.(created);
@@ -398,6 +429,84 @@ export const AddDragEventModal: React.FC<AddDragEventModalProps> = ({
                 rows={3}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 focus:ring-offset-1 focus:outline-none resize-none"
               />
+            </div>
+
+            {/* Visibility Controls */}
+            <div className="border-t border-gray-200 pt-4 space-y-3">
+              <label className="block text-sm font-semibold text-gray-700">
+                Visibility
+              </label>
+
+              {/* Visibility Type Radio Buttons */}
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-sky-200 hover:bg-sky-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="visibility_type"
+                    value="ALL"
+                    checked={formData.visibility_type === 'ALL'}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, visibility_type: 'ALL' as const }));
+                      if (errors.visible_to_user_ids) {
+                        setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                      }
+                    }}
+                    className="mt-0.5 w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-900">All Users</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Everyone in the clinic can see this block event
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-amber-200 hover:bg-amber-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="visibility_type"
+                    value="SELECTED"
+                    checked={formData.visibility_type === 'SELECTED'}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, visibility_type: 'SELECTED' as const }));
+                    }}
+                    className="mt-0.5 w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-900">Selected Users</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Only specific users can see this block event
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* User Selection - Show only when SELECTED is chosen */}
+              {formData.visibility_type === 'SELECTED' && (
+                <div className="pl-7">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    Select Users <span className="text-red-500">*</span>
+                  </label>
+                  <UserSelector
+                    users={filteredUsers}
+                    selectedUserIds={formData.visible_to_user_ids}
+                    onSelectionChange={(ids) => {
+                      setFormData(prev => ({ ...prev, visible_to_user_ids: ids }));
+                      if (errors.visible_to_user_ids) {
+                        setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                      }
+                    }}
+                    disabled={loadingUsers}
+                    error={errors.visible_to_user_ids}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Actions */}

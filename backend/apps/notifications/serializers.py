@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Notification, NotificationRead, EmailLog, SMSLog
+from .models import Notification, NotificationRead, EmailLog, SMSLog, CommunicationLog
+from apps.clinics.models import ClinicCommunicationSettings
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -82,3 +83,58 @@ class SMSLogSerializer(serializers.ModelSerializer):
         model  = SMSLog
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'sent_at']
+
+
+class ClinicCommunicationSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ClinicCommunicationSettings
+        fields = [
+            'id',
+            'booking_confirmation_method',
+            'reminder_method',
+            'reminder_hours_before',
+            'no_rebook_followup_days',
+            'inactive_patient_months',
+            'booking_confirmations_enabled',
+            'reminders_enabled',
+            'dna_followup_enabled',
+            'rebook_followup_enabled',
+            'inactive_checkin_enabled',
+        ]
+        read_only_fields = ['id']
+
+
+class CommunicationLogSerializer(serializers.ModelSerializer):
+    comm_type_display = serializers.CharField(source='get_comm_type_display', read_only=True)
+    channel_display   = serializers.CharField(source='get_channel_display', read_only=True)
+    status_display    = serializers.CharField(source='get_status_display', read_only=True)
+    patient_name      = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = CommunicationLog
+        fields = [
+            'id',
+            'clinic',
+            'patient',
+            'patient_name',
+            'appointment',
+            'comm_type',
+            'comm_type_display',
+            'channel',
+            'channel_display',
+            'status',
+            'status_display',
+            'recipient',
+            'subject',
+            'body_preview',
+            'error_message',
+            'patient_reply',
+            'replied_at',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_patient_name(self, obj) -> str:
+        if obj.patient:
+            return obj.patient.get_full_name()
+        return ''

@@ -1,0 +1,16 @@
+Hi {{ patient_first_name }},
+
+We hope you've been well! It's been {{ months_away }} months since your last visit, and we wanted to check in.
+
+{% if last_condition and last_condition != 'your previous concern' %}How have things been with {{ last_condition }}? {% endif %}Your health and wellness matter to us.
+
+If you'd like to schedule a follow-up or discuss any concerns, we'd love to see you again.
+
+📅 Book a visit: {{ booking_url }}
+
+We're always here for you:
+{% if clinic_phone %}📞 {{ clinic_phone }}{% endif %}
+{% if clinic_email %}✉️ {{ clinic_email }}{% endif %}
+
+Warm regards,
+{{ clinic_name }} Team

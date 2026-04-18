@@ -142,3 +142,76 @@ class SMSLog(TimeStampedModel):
 
     def __str__(self):
         return f"SMS to {self.recipient_phone}"
+
+
+class CommunicationLog(TimeStampedModel):
+    """
+    Unified log for all automated patient communications.
+    Tracks confirmations, reminders, DNA follow-ups, rebook follow-ups,
+    inactive check-ins, and patient replies.
+    """
+
+    COMM_TYPE_CHOICES = [
+        ('BOOKING_CONFIRMATION',    'Booking Confirmation'),
+        ('RECURRING_CONFIRMATION',  'Recurring Booking Confirmation'),
+        ('APPOINTMENT_REMINDER',    'Appointment Reminder'),
+        ('DNA_FOLLOWUP',            'DNA / Decline Follow-up'),
+        ('REBOOK_FOLLOWUP',         'No-Rebook Follow-up'),
+        ('INACTIVE_CHECKIN',        'Inactive Patient Check-in'),
+        ('CANCELLATION_NOTICE',     'Cancellation Notice'),
+    ]
+
+    CHANNEL_CHOICES = [
+        ('EMAIL', 'Email'),
+        ('SMS',   'SMS'),
+    ]
+
+    STATUS_CHOICES = [
+        ('SENT',      'Sent'),
+        ('FAILED',    'Failed'),
+        ('DELIVERED', 'Delivered'),
+        ('REPLIED',   'Replied'),
+    ]
+
+    clinic = models.ForeignKey(
+        'clinics.Clinic',
+        on_delete=models.CASCADE,
+        related_name='communication_logs',
+    )
+    patient = models.ForeignKey(
+        'patients.Patient',
+        on_delete=models.CASCADE,
+        related_name='communication_logs',
+        null=True,
+        blank=True,
+    )
+    appointment = models.ForeignKey(
+        'appointments.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='communication_logs',
+    )
+
+    comm_type = models.CharField(max_length=30, choices=COMM_TYPE_CHOICES, db_index=True)
+    channel   = models.CharField(max_length=5,  choices=CHANNEL_CHOICES)
+    status    = models.CharField(max_length=10, choices=STATUS_CHOICES, default='SENT')
+
+    recipient       = models.CharField(max_length=200, help_text='Email or phone number')
+    subject         = models.CharField(max_length=500, blank=True)
+    body_preview    = models.TextField(blank=True, help_text='First 500 chars of message body')
+    error_message   = models.TextField(blank=True)
+    patient_reply   = models.CharField(max_length=10, blank=True, help_text='Y or N')
+    replied_at      = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'communication_logs'
+        ordering = ['-created_at']
+        indexes  = [
+            models.Index(fields=['clinic', 'comm_type', 'created_at']),
+            models.Index(fields=['patient', 'comm_type']),
+            models.Index(fields=['appointment', 'comm_type']),
+        ]
+
+    def __str__(self):
+        return f"[{self.comm_type}] {self.channel} → {self.recipient} ({self.status})"

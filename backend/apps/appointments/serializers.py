@@ -2,6 +2,7 @@ from apps.clinics import models
 from rest_framework import serializers
 from .models import Appointment, PractitionerSchedule, AppointmentReminder, BlockAppointment
 from apps.clinics.services.models import Service
+from apps.accounts.models import User
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -273,9 +274,24 @@ class BlockAppointmentSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True
     )
+    modified_by_name = serializers.CharField(
+        source='modified_by.get_full_name',
+        read_only=True,
+        allow_null=True
+    )
     clinic_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
     clinic_branch_id = serializers.IntegerField(source='clinic.id', read_only=True, allow_null=True)
     clinic_branch_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
+    
+    # Visibility fields
+    visible_to_user_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        source='visible_to_users',
+        queryset=User.objects.all(),
+        required=False,
+        allow_empty=True
+    )
+    visible_to_user_names = serializers.SerializerMethodField()
 
     class Meta:
         model = BlockAppointment
@@ -293,10 +309,22 @@ class BlockAppointmentSerializer(serializers.ModelSerializer):
             'notes',
             'created_by',
             'created_by_name',
+            'modified_by',
+            'modified_by_name',
+            'visibility_type',
+            'visible_to_user_ids',
+            'visible_to_user_names',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'event_type', 'created_by_name', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'event_type', 'created_by_name', 'modified_by_name',
+            'visible_to_user_names', 'created_at', 'updated_at'
+        ]
+
+    def get_visible_to_user_names(self, obj):
+        """Get names of users who can see this block"""
+        return [user.get_full_name() for user in obj.visible_to_users.all()]
 
     def validate(self, data):
         start_time = data.get('start_time')
@@ -307,11 +335,28 @@ class BlockAppointmentSerializer(serializers.ModelSerializer):
                 'end_time': 'End time must be after start time'
             })
 
+        # Validate visibility - if SELECTED, must have at least one user
+        visibility_type = data.get('visibility_type', 'ALL')
+        visible_to_users = data.get('visible_to_users', [])
+        
+        if visibility_type == 'SELECTED' and not visible_to_users:
+            raise serializers.ValidationError({
+                'visible_to_user_ids': 'Select at least one user when visibility type is "Selected Users"'
+            })
+
         return data
 
 
 class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating Block Appointments - used in POST/PUT requests"""
+    
+    visible_to_user_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        source='visible_to_users',
+        queryset=User.objects.all(),
+        required=False,
+        allow_empty=True
+    )
 
     class Meta:
         model = BlockAppointment
@@ -322,6 +367,8 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
             'start_time',
             'end_time',
             'notes',
+            'visibility_type',
+            'visible_to_user_ids',
         ]
 
     def validate(self, data):
@@ -333,4 +380,37 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
                 'end_time': 'End time must be after start time'
             })
 
+        # Validate visibility - if SELECTED, must have at least one user
+        visibility_type = data.get('visibility_type', 'ALL')
+        visible_to_users = data.get('visible_to_users', [])
+        
+        if visibility_type == 'SELECTED' and not visible_to_users:
+            raise serializers.ValidationError({
+                'visible_to_user_ids': 'Select at least one user when visibility type is "Selected Users"'
+            })
+
         return data
+
+    def create(self, validated_data):
+        """Create block appointment and properly set visible_to_users M2M field"""
+        visible_to_users = validated_data.pop('visible_to_users', [])
+        instance = BlockAppointment.objects.create(**validated_data)
+        if visible_to_users:
+            instance.visible_to_users.set(visible_to_users)
+        return instance
+
+    def update(self, instance, validated_data):
+        """Update block appointment and properly set visible_to_users M2M field"""
+        visible_to_users = validated_data.pop('visible_to_users', None)
+
+        # Update all other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+
+        # Update M2M relationship if provided
+        if visible_to_users is not None:
+            instance.visible_to_users.set(visible_to_users)
+        
+        return instance

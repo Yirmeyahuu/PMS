@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Clock, User, Pencil, Trash2, AlertTriangle, Users, Globe } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { updateBlockAppointment, deleteBlockAppointment } from '../appointment.api';
+import { useClinicUsers } from '../hooks/useClinicUsers';
+import { UserSelector } from './UserSelector';
 import toast from 'react-hot-toast';
 import type { BlockAppointment } from '@/types';
 
@@ -19,6 +21,8 @@ interface FormData {
   start_time: string;
   end_time: string;
   notes: string;
+  visibility_type: 'ALL' | 'SELECTED';
+  visible_to_user_ids: number[];
 }
 
 export const EventViewModal: React.FC<EventViewModalProps> = ({
@@ -28,6 +32,7 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
   onUpdated,
   onDeleted,
 }) => {
+  const { users, loading: loadingUsers } = useClinicUsers(event?.clinic);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,6 +46,8 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
         start_time: '09:00',
         end_time: '10:00',
         notes: '',
+        visibility_type: 'ALL',
+        visible_to_user_ids: [],
       };
     }
     return {
@@ -49,6 +56,8 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
       start_time: event.start_time,
       end_time: event.end_time,
       notes: event.notes || '',
+      visibility_type: event.visibility_type || 'ALL',
+      visible_to_user_ids: event.visible_to_user_ids || [],
     };
   };
 
@@ -94,6 +103,11 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
       }
     }
 
+    // Validate visibility
+    if (formData.visibility_type === 'SELECTED' && formData.visible_to_user_ids.length === 0) {
+      newErrors.visible_to_user_ids = 'Select at least one user';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -103,7 +117,21 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
 
     setSaving(true);
     try {
-      const updated = await updateBlockAppointment(event.id, formData);
+      const payload: any = {
+        event_name: formData.event_name,
+        date: formData.date,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        notes: formData.notes,
+        visibility_type: formData.visibility_type,
+      };
+
+      // Only include visible_to_user_ids if visibility_type is SELECTED
+      if (formData.visibility_type === 'SELECTED') {
+        payload.visible_to_user_ids = formData.visible_to_user_ids;
+      }
+
+      const updated = await updateBlockAppointment(event.id, payload);
       toast.success('Event updated successfully');
       setIsEditing(false);
       onUpdated?.(updated);
@@ -306,6 +334,84 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                   placeholder="Add any notes..."
                 />
               </div>
+
+              {/* Visibility Controls */}
+              <div className="border-t border-gray-200 pt-4 space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Visibility
+                </label>
+
+                {/* Visibility Type Radio Buttons */}
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-sky-200 hover:bg-sky-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility_type"
+                      value="ALL"
+                      checked={formData.visibility_type === 'ALL'}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, visibility_type: 'ALL' as const }));
+                        if (errors.visible_to_user_ids) {
+                          setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                        }
+                      }}
+                      className="mt-0.5 w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900">All Users</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Everyone in the clinic can see this block event
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-amber-200 hover:bg-amber-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility_type"
+                      value="SELECTED"
+                      checked={formData.visibility_type === 'SELECTED'}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, visibility_type: 'SELECTED' as const }));
+                      }}
+                      className="mt-0.5 w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900">Selected Users</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Only specific users can see this block event
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* User Selection - Show only when SELECTED is chosen */}
+                {formData.visibility_type === 'SELECTED' && (
+                  <div className="pl-7">
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Select Users <span className="text-red-500">*</span>
+                    </label>
+                    <UserSelector
+                      users={users}
+                      selectedUserIds={formData.visible_to_user_ids}
+                      onSelectionChange={(ids) => {
+                        setFormData(prev => ({ ...prev, visible_to_user_ids: ids }));
+                        if (errors.visible_to_user_ids) {
+                          setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                        }
+                      }}
+                      disabled={loadingUsers}
+                      error={errors.visible_to_user_ids}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             /* View Mode - Event Details */
@@ -344,7 +450,7 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                 </div>
               </div>
 
-              {/* Added By */}
+              {/* Created By */}
               <div className="flex items-start gap-3">
                 <div className="p-2 bg-sky-100 rounded-lg">
                   <User className="w-5 h-5 text-sky-600" />
@@ -356,8 +462,35 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                   <p className="text-sm font-medium text-gray-900">
                     {event.created_by_name || 'Unknown'}
                   </p>
+                  {event.created_at && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {format(parseISO(event.created_at), 'MMM d, yyyy - h:mm a')}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Modified By - Only show if event was modified */}
+              {event.modified_by_name && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <User className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">
+                      Last Modified By
+                    </label>
+                    <p className="text-sm font-medium text-gray-900">
+                      {event.modified_by_name}
+                    </p>
+                    {event.updated_at && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {format(parseISO(event.updated_at), 'MMM d, yyyy - h:mm a')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Notes */}
               {event.notes && (
@@ -370,6 +503,30 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                   </p>
                 </div>
               )}
+
+              {/* Visibility */}
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-sky-100 rounded-lg">
+                  {event.visibility_type === 'ALL' ? (
+                    <Globe className="w-5 h-5 text-sky-600" />
+                  ) : (
+                    <Users className="w-5 h-5 text-sky-600" />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">
+                    Visibility
+                  </label>
+                  <p className="text-sm font-medium text-gray-900">
+                    {event.visibility_type === 'ALL' ? 'All Users' : `Selected Users (${event.visible_to_user_names?.length || 0})`}
+                  </p>
+                  {event.visibility_type === 'SELECTED' && event.visible_to_user_names && event.visible_to_user_names.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {event.visible_to_user_names.join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

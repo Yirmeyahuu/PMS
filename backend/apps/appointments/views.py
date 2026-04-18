@@ -101,10 +101,36 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     # ── Audit hooks ───────────────────────────────────────────────────────────
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        appointment = serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+        # ── Trigger booking confirmation (non-blocking) ───────────────────
+        try:
+            from apps.notifications.services.communication_service import send_booking_confirmation
+            send_booking_confirmation(appointment)
+        except Exception as e:
+            logger.warning("Booking confirmation failed for appt #%s: %s", appointment.id, e)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        old_status = serializer.instance.status
+        appointment = serializer.save(updated_by=self.request.user)
+
+        # ── Trigger DNA follow-up when status changes to DNA/NO_SHOW ──────
+        new_status = appointment.status
+        if new_status in ('DNA', 'NO_SHOW') and old_status not in ('DNA', 'NO_SHOW'):
+            try:
+                from apps.notifications.services.communication_service import send_dna_followup
+                send_dna_followup(appointment)
+            except Exception as e:
+                logger.warning("DNA follow-up failed for appt #%s: %s", appointment.id, e)
+
+        # ── Update patient last_visit_date when completed ─────────────────
+        if new_status == 'COMPLETED' and old_status != 'COMPLETED':
+            try:
+                patient = appointment.patient
+                patient.last_visit_date = appointment.date
+                patient.save(update_fields=['last_visit_date'])
+            except Exception as e:
+                logger.warning("Failed to update last_visit_date for patient: %s", e)
 
     # ── NEW: Partial edit action (restricted fields only) ─────────────────────
     @action(detail=True, methods=['patch'], url_path='edit')
@@ -1125,13 +1151,14 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
     """
     CRUD operations for Block Appointments (events that block time slots).
     
-    - All authenticated users can view block appointments.
-    - Only Admins can create, update, or delete block appointments.
+    - All authenticated users can create, view, update, and delete block appointments.
+    - Users only see events they have access to (visibility_type='ALL' or they're in visible_to_users).
+    - Creators always see their own events regardless of visibility settings.
     """
 
     queryset = BlockAppointment.objects.filter(is_deleted=False).select_related(
         'clinic', 'created_by'
-    )
+    ).prefetch_related('visible_to_users')
     serializer_class = BlockAppointmentSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -1140,7 +1167,14 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
     ordering = ['-date', '-start_time']
 
     def get_queryset(self):
-        """Filter queryset to only show block appointments for the user's clinic"""
+        """
+        Filter queryset to show only events the user has access to:
+        1. Events with visibility_type='ALL'
+        2. Events where user is in visible_to_users
+        3. Events created by the user (creator always sees their events)
+        Also filtered by clinic branches the user has access to.
+        """
+        from django.db.models import Q
         user = self.request.user
 
         if not user.clinic:
@@ -1151,7 +1185,18 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
             main_clinic.get_all_branches().values_list('id', flat=True)
         )
 
+        # Base filter: clinic branches
         queryset = self.queryset.filter(clinic_id__in=all_branch_ids)
+
+        # Visibility filter: show events where:
+        # - visibility_type is 'ALL', OR
+        # - user is in visible_to_users, OR
+        # - user created the event
+        queryset = queryset.filter(
+            Q(visibility_type='ALL') |
+            Q(visible_to_users=user) |
+            Q(created_by=user)
+        ).distinct()
 
         # Filter by specific clinic branch
         clinic_branch_param = self.request.query_params.get('clinic_branch')
@@ -1184,37 +1229,13 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
             return BlockAppointmentCreateSerializer
         return BlockAppointmentSerializer
 
-    def check_admin_permission(self):
-        """Helper to check if user is admin"""
-        from rest_framework.exceptions import PermissionDenied
-        if not self.request.user.is_admin:
-            raise PermissionDenied({
-                'detail': 'Only administrators can perform this action.'
-            })
-
-    def create(self, request, *args, **kwargs):
-        """Create a new block appointment - Admin only"""
-        self.check_admin_permission()
-        return super().create(request, *args, **kwargs)
-
-    def update(self, request, *args, **kwargs):
-        """Update a block appointment - Admin only"""
-        self.check_admin_permission()
-        return super().update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        """Partial update a block appointment - Admin only"""
-        self.check_admin_permission()
-        return super().partial_update(request, *args, **kwargs)
-
-    def destroy(self, request, *args, **kwargs):
-        """Delete a block appointment - Admin only"""
-        self.check_admin_permission()
-        return super().destroy(request, *args, **kwargs)
-
     def perform_create(self, serializer):
         """Set created_by to the current user"""
         serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        """Set modified_by to the current user"""
+        serializer.save(modified_by=self.request.user)
 
     # ── Custom action: Get block appointments for calendar ───────────────────────
     @action(detail=False, methods=['get'], url_path='calendar')

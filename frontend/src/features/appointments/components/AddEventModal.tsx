@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, FileText } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Calendar, Clock, FileText, Users, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { createBlockAppointment } from '../appointment.api';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 import { useBlockConflictDetection } from '../hooks/useBlockConflictDetection';
+import { useClinicUsers } from '../hooks/useClinicUsers';
 import { ConflictModal } from './ConflictModal';
+import { UserSelector } from './UserSelector';
+import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
 import type { BlockAppointment, Appointment } from '@/types';
 
@@ -25,6 +28,8 @@ interface FormData {
   start_time: string;
   end_time: string;
   notes: string;
+  visibility_type: 'ALL' | 'SELECTED';
+  visible_to_user_ids: number[];
 }
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
@@ -37,7 +42,15 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   initialEndTime,
   appointments = [],
 }) => {
+  const { user: currentUser } = useAuthStore();
   const { branches } = useClinicBranches();
+  const { users, loading: loadingUsers } = useClinicUsers(selectedClinicBranchId);
+  
+  // Filter out current user from selection
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => user.id !== currentUser?.id);
+  }, [users, currentUser?.id]);
+  
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -56,6 +69,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     start_time: string;
     end_time: string;
     notes: string;
+    visibility_type: 'ALL' | 'SELECTED';
+    visible_to_user_ids: number[];
   } | null>(null);
 
   const getInitialFormData = (): FormData => {
@@ -69,6 +84,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       start_time: startTime,
       end_time: endTime,
       notes: '',
+      visibility_type: 'ALL',
+      visible_to_user_ids: [],
     };
   };
 
@@ -85,6 +102,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         start_time: startTime,
         end_time:   endTime,
         notes:      '',
+        visibility_type: 'ALL',
+        visible_to_user_ids: [],
       });
       setErrors({});
       setShowConflictModal(false);
@@ -130,6 +149,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         newErrors.end_time = 'End time must be after start time';
       }
     }
+    // Validate visibility
+    if (formData.visibility_type === 'SELECTED' && formData.visible_to_user_ids.length === 0) {
+      newErrors.visible_to_user_ids = 'Select at least one user';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -156,6 +179,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         start_time: formData.start_time,
         end_time: formData.end_time,
         notes: formData.notes,
+        visibility_type: formData.visibility_type,
+        visible_to_user_ids: formData.visible_to_user_ids,
       });
       setConflictingAppointment(conflict);
       setShowConflictModal(true);
@@ -186,16 +211,26 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         start_time: formData.start_time,
         end_time: formData.end_time,
         notes: formData.notes,
+        visibility_type: formData.visibility_type,
+        visible_to_user_ids: formData.visible_to_user_ids,
       };
 
-      const created = await createBlockAppointment({
+      const payload: any = {
         clinic: blockData.clinicId,
         event_name: blockData.event_name,
         date: blockData.date,
         start_time: blockData.start_time,
         end_time: blockData.end_time,
         notes: blockData.notes,
-      });
+        visibility_type: blockData.visibility_type,
+      };
+
+      // Only include visible_to_user_ids if visibility_type is SELECTED
+      if (blockData.visibility_type === 'SELECTED') {
+        payload.visible_to_user_ids = blockData.visible_to_user_ids;
+      }
+
+      const created = await createBlockAppointment(payload);
 
       toast.success('Event created successfully');
       onCreated?.(created);
@@ -216,7 +251,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div>
@@ -232,123 +267,219 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Event Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Event Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.event_name}
-              onChange={(e) => handleChange('event_name', e.target.value)}
-              placeholder="e.g., Staff Meeting, Clinic Holiday"
-              className={`
-                w-full px-4 py-2.5 rounded-lg border transition-colors
-                focus:ring-2 focus:ring-offset-1 focus:outline-none
-                ${errors.event_name 
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                  : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
-                }
-              `}
-            />
-            {errors.event_name && (
-              <p className="mt-1 text-xs text-red-500">{errors.event_name}</p>
-            )}
-          </div>
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="grid grid-cols-2 gap-6">
+            {/* LEFT COLUMN - Event Details */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+                <Calendar className="w-4 h-4" />
+                Event Details
+              </h3>
 
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => handleChange('date', e.target.value)}
-              className={`
-                w-full px-4 py-2.5 rounded-lg border transition-colors
-                focus:ring-2 focus:ring-offset-1 focus:outline-none
-                ${errors.date 
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                  : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
-                }
-              `}
-            />
-            {errors.date && (
-              <p className="mt-1 text-xs text-red-500">{errors.date}</p>
-            )}
-          </div>
+              {/* Event Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Event Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.event_name}
+                  onChange={(e) => handleChange('event_name', e.target.value)}
+                  placeholder="e.g., Staff Meeting, Clinic Holiday"
+                  className={`
+                    w-full px-4 py-2.5 rounded-lg border transition-colors
+                    focus:ring-2 focus:ring-offset-1 focus:outline-none
+                    ${errors.event_name 
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
+                    }
+                  `}
+                />
+                {errors.event_name && (
+                  <p className="mt-1 text-xs text-red-500">{errors.event_name}</p>
+                )}
+              </div>
 
-          {/* Time Row */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Start Time */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Clock className="w-4 h-4 inline mr-1" />
-                Start Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={formData.start_time}
-                onChange={(e) => handleChange('start_time', e.target.value)}
-                className={`
-                  w-full px-4 py-2.5 rounded-lg border transition-colors
-                  focus:ring-2 focus:ring-offset-1 focus:outline-none
-                  ${errors.start_time 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
-                  }
-                `}
-              />
-              {errors.start_time && (
-                <p className="mt-1 text-xs text-red-500">{errors.start_time}</p>
-              )}
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => handleChange('date', e.target.value)}
+                  className={`
+                    w-full px-4 py-2.5 rounded-lg border transition-colors
+                    focus:ring-2 focus:ring-offset-1 focus:outline-none
+                    ${errors.date 
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
+                    }
+                  `}
+                />
+                {errors.date && (
+                  <p className="mt-1 text-xs text-red-500">{errors.date}</p>
+                )}
+              </div>
+
+              {/* Time Row */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Start Time */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Start Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.start_time}
+                    onChange={(e) => handleChange('start_time', e.target.value)}
+                    className={`
+                      w-full px-4 py-2.5 rounded-lg border transition-colors
+                      focus:ring-2 focus:ring-offset-1 focus:outline-none
+                      ${errors.start_time 
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
+                        : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
+                      }
+                    `}
+                  />
+                  {errors.start_time && (
+                    <p className="mt-1 text-xs text-red-500">{errors.start_time}</p>
+                  )}
+                </div>
+
+                {/* End Time */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    End Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.end_time}
+                    onChange={(e) => handleChange('end_time', e.target.value)}
+                    className={`
+                      w-full px-4 py-2.5 rounded-lg border transition-colors
+                      focus:ring-2 focus:ring-offset-1 focus:outline-none
+                      ${errors.end_time 
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
+                        : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
+                      }
+                    `}
+                  />
+                  {errors.end_time && (
+                    <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FileText className="w-4 h-4 inline mr-1" />
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => handleChange('notes', e.target.value)}
+                  placeholder="Add any additional details about this event..."
+                  rows={4}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 focus:ring-offset-1 focus:outline-none resize-none"
+                />
+              </div>
             </div>
 
-            {/* End Time */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Clock className="w-4 h-4 inline mr-1" />
-                End Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={formData.end_time}
-                onChange={(e) => handleChange('end_time', e.target.value)}
-                className={`
-                  w-full px-4 py-2.5 rounded-lg border transition-colors
-                  focus:ring-2 focus:ring-offset-1 focus:outline-none
-                  ${errors.end_time 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-300 focus:border-sky-500 focus:ring-sky-200'
-                  }
-                `}
-              />
-              {errors.end_time && (
-                <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>
-              )}
-            </div>
-          </div>
+            {/* RIGHT COLUMN - User Selection */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+                <Users className="w-4 h-4" />
+                User Selection
+              </h3>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <FileText className="w-4 h-4 inline mr-1" />
-              Notes (optional)
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="Add any additional details about this event..."
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 focus:ring-offset-1 focus:outline-none resize-none"
-            />
+              {/* Visibility Controls */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Who can see this event?
+                </label>
+
+                {/* Visibility Type Radio Buttons */}
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-sky-200 hover:bg-sky-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility_type"
+                      value="ALL"
+                      checked={formData.visibility_type === 'ALL'}
+                      onChange={() => {
+                        setFormData(prev => ({ ...prev, visibility_type: 'ALL' as const }));
+                        if (errors.visible_to_user_ids) {
+                          setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                        }
+                      }}
+                      className="mt-0.5 w-4 h-4 text-sky-600 border-gray-300 focus:ring-sky-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900">All Users</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Everyone in the clinic can see this block event
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-3 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-amber-200 hover:bg-amber-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibility_type"
+                      value="SELECTED"
+                      checked={formData.visibility_type === 'SELECTED'}
+                      onChange={() => {
+                        setFormData(prev => ({ ...prev, visibility_type: 'SELECTED' as const }));
+                      }}
+                      className="mt-0.5 w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900">Selected Users</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Only specific users can see this block event
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* User Selection - Show only when SELECTED is chosen */}
+                {formData.visibility_type === 'SELECTED' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Select Users <span className="text-red-500">*</span>
+                    </label>
+                    <UserSelector
+                      users={filteredUsers}
+                      selectedUserIds={formData.visible_to_user_ids}
+                      onSelectionChange={(ids) => {
+                        setFormData(prev => ({ ...prev, visible_to_user_ids: ids }));
+                        if (errors.visible_to_user_ids) {
+                          setErrors(prev => ({ ...prev, visible_to_user_ids: '' }));
+                        }
+                      }}
+                      disabled={loadingUsers}
+                      error={errors.visible_to_user_ids}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}

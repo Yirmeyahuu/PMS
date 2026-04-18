@@ -255,3 +255,92 @@ class Location(TimeStampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"{self.clinic.name} - {self.name}"
+
+
+# ── Clinic Communication Settings ─────────────────────────────────────────────
+
+class ClinicCommunicationSettings(TimeStampedModel):
+    """
+    Per-clinic configuration for the automated communication workflow.
+    One-to-one with the main/root Clinic.
+    """
+
+    CHANNEL_CHOICES = [
+        ('EMAIL', 'Email Only'),
+        ('SMS',   'SMS Only'),
+        ('BOTH',  'Email & SMS'),
+    ]
+
+    clinic = models.OneToOneField(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name='communication_settings',
+    )
+
+    # ── Channel preferences ───────────────────────────────────────────────────
+    booking_confirmation_method = models.CharField(
+        max_length=5,
+        choices=CHANNEL_CHOICES,
+        default='EMAIL',
+        help_text='How to send booking confirmations.',
+    )
+    reminder_method = models.CharField(
+        max_length=5,
+        choices=CHANNEL_CHOICES,
+        default='EMAIL',
+        help_text='How to send appointment reminders.',
+    )
+
+    # ── Reminder timing (hours before appointment) ────────────────────────────
+    reminder_hours_before = models.PositiveIntegerField(
+        default=24,
+        help_text='Send reminder this many hours before the appointment.',
+    )
+
+    # ── No-rebook follow-up delay (days) ──────────────────────────────────────
+    no_rebook_followup_days = models.PositiveIntegerField(
+        default=30,
+        help_text='Days to wait after DNA/decline before sending rebook follow-up.',
+    )
+
+    # ── Inactive patient threshold (months) ───────────────────────────────────
+    inactive_patient_months = models.PositiveIntegerField(
+        default=3,
+        help_text='Months of inactivity before sending wellness check-in.',
+    )
+
+    # ── Feature toggles ──────────────────────────────────────────────────────
+    booking_confirmations_enabled = models.BooleanField(
+        default=True,
+        help_text='Send booking confirmation upon appointment creation.',
+    )
+    reminders_enabled = models.BooleanField(
+        default=True,
+        help_text='Send appointment reminders.',
+    )
+    dna_followup_enabled = models.BooleanField(
+        default=True,
+        help_text='Send follow-up after DNA / patient declines.',
+    )
+    rebook_followup_enabled = models.BooleanField(
+        default=True,
+        help_text='Send delayed rebook follow-up if patient hasn\'t rescheduled.',
+    )
+    inactive_checkin_enabled = models.BooleanField(
+        default=True,
+        help_text='Send wellness check-in to inactive patients.',
+    )
+
+    class Meta:
+        db_table = 'clinic_communication_settings'
+        verbose_name_plural = 'Clinic communication settings'
+
+    def __str__(self):
+        return f"CommSettings — {self.clinic.name}"
+
+    @classmethod
+    def get_for_clinic(cls, clinic):
+        """Get or create settings for the main/root clinic."""
+        main = clinic.main_clinic
+        obj, _ = cls.objects.get_or_create(clinic=main)
+        return obj

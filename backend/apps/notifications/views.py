@@ -5,8 +5,12 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 
-from .models import Notification, NotificationRead, EmailLog, SMSLog
-from .serializers import NotificationSerializer, EmailLogSerializer, SMSLogSerializer
+from .models import Notification, NotificationRead, EmailLog, SMSLog, CommunicationLog
+from .serializers import (
+    NotificationSerializer, EmailLogSerializer, SMSLogSerializer,
+    ClinicCommunicationSettingsSerializer, CommunicationLogSerializer,
+)
+from apps.clinics.models import ClinicCommunicationSettings
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -149,3 +153,106 @@ class SMSLogViewSet(viewsets.ReadOnlyModelViewSet):
         if self.request.user.role == 'ADMIN':
             return SMSLog.objects.all()
         return SMSLog.objects.none()
+
+
+class ClinicCommunicationSettingsViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for clinic communication settings.
+
+    GET    /communication-settings/       — list (returns settings for user's clinic)
+    GET    /communication-settings/{id}/  — detail
+    PUT    /communication-settings/{id}/  — update
+    PATCH  /communication-settings/{id}/  — partial update
+    GET    /communication-settings/my_settings/ — get/create settings for current clinic
+    """
+    serializer_class   = ClinicCommunicationSettingsSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names  = ['get', 'put', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.clinic:
+            return ClinicCommunicationSettings.objects.none()
+
+        main_clinic = user.clinic.main_clinic
+        return ClinicCommunicationSettings.objects.filter(clinic=main_clinic)
+
+    @action(detail=False, methods=['get', 'patch'], url_path='my-settings')
+    def my_settings(self, request):
+        """Get or update the communication settings for the current clinic."""
+        user = request.user
+        if not user.clinic:
+            return Response({'detail': 'No clinic assigned.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        main_clinic = user.clinic.main_clinic
+        settings_obj = ClinicCommunicationSettings.get_for_clinic(main_clinic)
+
+        if request.method == 'PATCH':
+            if user.role not in ('ADMIN', 'STAFF'):
+                return Response(
+                    {'detail': 'Only admins and staff can update communication settings.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            serializer = ClinicCommunicationSettingsSerializer(settings_obj, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+
+        serializer = ClinicCommunicationSettingsSerializer(settings_obj)
+        return Response(serializer.data)
+
+
+class CommunicationLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only log of all automated communications.
+
+    GET  /communication-logs/              — list (filtered by clinic)
+    GET  /communication-logs/{id}/         — detail
+    GET  /communication-logs/summary/      — aggregated stats
+    """
+    serializer_class   = CommunicationLogSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends    = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields   = ['comm_type', 'channel', 'status']
+    ordering_fields    = ['created_at']
+    ordering           = ['-created_at']
+    search_fields      = ['recipient', 'subject', 'patient__first_name', 'patient__last_name']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.clinic:
+            return CommunicationLog.objects.none()
+
+        main_clinic = user.clinic.main_clinic
+        branch_ids = list(
+            main_clinic.get_all_branches().values_list('id', flat=True)
+        )
+        return CommunicationLog.objects.filter(
+            clinic_id__in=branch_ids
+        ).select_related('patient', 'appointment')
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Return aggregated communication stats."""
+        from django.db.models import Count, Q
+
+        qs = self.get_queryset()
+        stats = qs.aggregate(
+            total=Count('id'),
+            sent=Count('id', filter=Q(status='SENT')),
+            failed=Count('id', filter=Q(status='FAILED')),
+            replied=Count('id', filter=Q(status='REPLIED')),
+        )
+
+        by_type = list(
+            qs.values('comm_type').annotate(count=Count('id')).order_by('-count')
+        )
+        by_channel = list(
+            qs.values('channel').annotate(count=Count('id')).order_by('-count')
+        )
+
+        return Response({
+            'stats': stats,
+            'by_type': by_type,
+            'by_channel': by_channel,
+        })

@@ -99,6 +99,11 @@ export interface BlockAppointment {
   notes: string;
   created_by: number | null;
   created_by_name: string | null;
+  modified_by: number | null;
+  modified_by_name: string | null;
+  visibility_type: 'ALL' | 'SELECTED';
+  visible_to_user_ids: number[];
+  visible_to_user_names: string[];
   created_at: string;
   updated_at: string;
 }
@@ -110,6 +115,8 @@ export interface CreateBlockAppointmentData {
   start_time: string;
   end_time: string;
   notes?: string;
+  visibility_type?: 'ALL' | 'SELECTED';
+  visible_to_user_ids?: number[];
 }
 
 export const APPOINTMENT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {

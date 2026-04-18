@@ -66,6 +66,18 @@ class Patient(TimeStampedModel, SoftDeleteModel):
         help_text='Patient preferences for data sharing with third parties.',
     )
 
+    # ── Communication workflow fields ─────────────────────────────────────────
+    last_visit_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Date of the patient\'s most recent completed appointment.',
+    )
+    last_checkin_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Last time an inactive-patient wellness check-in was sent.',
+    )
+
     # Archive fields
     is_archived = models.BooleanField(
         default=False,

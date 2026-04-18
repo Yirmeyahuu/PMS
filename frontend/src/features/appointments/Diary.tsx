@@ -280,8 +280,9 @@ export const Diary: React.FC = () => {
     setEventRefreshKey(prev => prev + 1);
   };
 
-  // ── Admin slot action (double-click or drag-select) → SelectOptionModal ──────
-  const handleAdminSlotAction = (slot: {
+  // ── Slot action (double-click or drag-select) → SelectOptionModal ──────
+  // Available to all users: Admin, Practitioner, Staff
+  const handleSlotAction = (slot: {
     date: Date; time: string; hour: number; minutes: number; duration: number;
   }) => {
     setPendingSlot(slot);
@@ -743,8 +744,8 @@ export const Diary: React.FC = () => {
                 refreshKey={eventRefreshKey}
                 appointmentRefreshKey={appointmentRefreshKey}
                 onRecurringCreated={() => setAppointmentRefreshKey(prev => prev + 1)}
-                onEventClick={isAdmin ? handleEventClick : undefined}
-                onAdminSlotAction={isAdmin ? handleAdminSlotAction : undefined}
+                onEventClick={handleEventClick}
+                onSlotAction={handleSlotAction}
                 onAppointmentsReady={setCalendarAppointments}
                 onCalendarReady={setCalendarReadyDate}
                 practitionerAvailability={compareMode ? undefined : getPractitionerAvailability()}
@@ -758,7 +759,7 @@ export const Diary: React.FC = () => {
               />
             </div>
 
-            {/* Select Option Modal — Admin: double-click / drag-select on calendar */}
+            {/* Select Option Modal — All users: double-click / drag-select on calendar */}
             <SelectOptionModal
               isOpen={showSelectOptionModal}
               onClose={handleSelectOptionClose}
