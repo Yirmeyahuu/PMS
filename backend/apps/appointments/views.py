@@ -1188,22 +1188,16 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
         # Base filter: clinic branches
         queryset = self.queryset.filter(clinic_id__in=all_branch_ids)
 
-        # Visibility filter based on user role:
-        # - Admin & Staff: See ALL events (full visibility)
-        # - Practitioners: See only events they have access to
-        if user.role in ['ADMIN', 'STAFF']:
-            # Admin and Staff can see all block appointments in their clinic family
-            pass  # No additional filtering needed
-        else:
-            # Practitioners see:
-            # - Events with visibility_type='ALL'
-            # - Events where they are in visible_to_users (SELECTED)
-            # - Events they created themselves (SELF or any type)
-            queryset = queryset.filter(
-                Q(visibility_type='ALL') |
-                Q(visible_to_users=user) |
-                Q(created_by=user)
-            ).distinct()
+        # Uniform visibility filter — applies to ALL roles including Admin/Staff.
+        # Visibility rules are determined by visibility_type, not by user role:
+        #   ALL      → visible to every user
+        #   SELECTED → visible only to users in visible_to_users
+        #   SELF     → visible only to the creator
+        queryset = queryset.filter(
+            Q(visibility_type='ALL') |
+            Q(visibility_type='SELECTED', visible_to_users=user) |
+            Q(visibility_type='SELF', created_by=user)
+        ).distinct()
 
         # Filter by specific clinic branch
         clinic_branch_param = self.request.query_params.get('clinic_branch')

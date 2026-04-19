@@ -400,16 +400,17 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
         
         # Handle visibility based on type
         if visibility_type == 'SELF':
-            # Myself Only - assign to creator only
-            request = self.context.get('request')
-            if request and request.user:
-                instance.visible_to_users.set([request.user])
+            # Myself Only — creator is identified via created_by FK in the queryset.
+            # visible_to_users is irrelevant for SELF events; keep it empty.
+            instance.visible_to_users.clear()
         elif visibility_type == 'SELECTED':
             # Selected Users - assign provided users
             if visible_to_users:
                 instance.visible_to_users.set(visible_to_users)
-        # For 'ALL', no need to set visible_to_users
-        
+        else:
+            # ALL — visible to everyone; no need to track individual users.
+            instance.visible_to_users.clear()
+
         return instance
 
     def update(self, instance, validated_data):
@@ -425,16 +426,15 @@ class BlockAppointmentCreateSerializer(serializers.ModelSerializer):
 
         # Handle visibility based on type
         if visibility_type == 'SELF':
-            # Myself Only - assign to creator/modifier only
-            request = self.context.get('request')
-            if request and request.user:
-                instance.visible_to_users.set([request.user])
+            # Myself Only — creator is identified via created_by FK in the queryset.
+            # visible_to_users is irrelevant for SELF events; keep it empty.
+            instance.visible_to_users.clear()
         elif visibility_type == 'SELECTED':
-            # Selected Users - update if provided
+            # Selected Users — sync the M2M to exactly what was submitted.
             if visible_to_users is not None:
                 instance.visible_to_users.set(visible_to_users)
-        elif visibility_type == 'ALL':
-            # All Users - clear visible_to_users
+        else:
+            # ALL — visible to everyone; no need to track individual users.
             instance.visible_to_users.clear()
-        
+
         return instance

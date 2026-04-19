@@ -589,10 +589,11 @@ export const Calendar: React.FC<CalendarProps> = ({
     }
     const filtered = blockAppointments.filter(apt => {
       if (apt.date !== dateStr) return false;
-      // When a specific branch tab is active, every block appointment is scoped
-      // to its own clinic — regardless of visibility_type.
-      // The "All Branches" tab (null) shows the full set returned by the backend.
-      if (selectedClinicBranchId !== null && apt.clinic !== selectedClinicBranchId) {
+      // Branch-tab scoping depends on visibility_type:
+      //   ALL      → show in every branch tab (global event)
+      //   SELECTED → show in every branch tab (backend already restricts who sees it)
+      //   SELF     → show only in the branch where the event was created
+      if (selectedClinicBranchId !== null && apt.visibility_type === 'SELF' && apt.clinic !== selectedClinicBranchId) {
         return false;
       }
       return true;

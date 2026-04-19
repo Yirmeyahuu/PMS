@@ -27,10 +27,12 @@ const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
   { value: 'scale', label: 'Scale' },
 ];
 
+// 'spine' is intentionally excluded — deprecated for new templates (existing data preserved)
 const CHART_TYPE_OPTIONS: { value: ChartType; label: string }[] = [
   { value: 'body', label: 'Body Chart' },
-  { value: 'spine', label: 'Spine Chart' },
   { value: 'head', label: 'Head Chart' },
+  { value: 'hand', label: 'Hand Chart' },
+  { value: 'feet', label: 'Feet Chart' },
 ];
 
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(
