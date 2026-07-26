@@ -326,6 +326,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
       primary_practitioner_name: data.primaryPractitionerName || undefined,
       payer:       data.payer || undefined,
       alert_notes:  data.alertNotes || undefined,
+      approved_sessions: data.approvedSessions,
       referred_by:  data.referredBy || undefined,
       referral_info: data.referralInfo || undefined,
     }).then(async (created) => {
@@ -353,6 +354,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
       primary_practitioner_name: data.primaryPractitionerName || undefined,
       payer:       data.payer || undefined,
       alert_notes:  data.alertNotes || undefined,
+      approved_sessions: data.approvedSessions,
       referred_by:  data.referredBy || undefined,
       referral_info: data.referralInfo || undefined,
     }).then(() => {
@@ -1482,23 +1484,14 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     if (tab.isDropdown) {
                       setShowAppointmentDropdown(!showAppointmentDropdown);
                     } else if (tab.key === 'clinical_notes') {
-                      // Redirect to PatientCasesNotesPage and either open existing note or create a new one
+                      // Redirect to Clinical Documentation Workspace
                       onClose();
-                      const existingNote = patientNotes.find(note => note.appointment === appointment.id);
-                      if (existingNote) {
-                        navigate(`/patients/${appointment.patient}/cases`, { 
-                          state: { 
-                            preselectedCaseId: appointment.patient_case ? String(appointment.patient_case) : undefined
-                          } 
-                        });
-                      } else {
-                        navigate(`/patients/${appointment.patient}/cases`, { 
-                          state: { 
-                            openCreateNoteForAppointment: appointment.id,
-                            preselectedCaseId: appointment.patient_case ? String(appointment.patient_case) : undefined
-                          } 
-                        });
-                      }
+                      navigate(`/patients/${appointment.patient}/clinical`, { 
+                        state: { 
+                          appointmentId: appointment.id,
+                          caseId: appointment.patient_case ? Number(appointment.patient_case) : undefined
+                        } 
+                      });
                     } else {
                       setActiveTab(tab.key);
                       if (isEditing) cancelEdit();

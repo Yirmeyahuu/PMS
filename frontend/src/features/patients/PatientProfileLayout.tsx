@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2 } from 'lucide-react';
+import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList } from 'lucide-react';
 import { Navigate, NavLink, Outlet, useParams } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { PatientProfileProvider, usePatientProfileContext } from './context/PatientProfileContext';
@@ -33,12 +33,12 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
 
   return (
     <DashboardLayout>
-      <div className="h-full p-4 md:p-6">
-        <div className="h-full flex flex-col lg:flex-row gap-4">
-          <aside className="w-full lg:w-70 xl:w-75">
-            <div className="h-full bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+      <div className="h-[calc(100vh-80px)] p-4 md:p-6 overflow-hidden flex flex-col">
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+          <aside className="w-full lg:w-70 xl:w-75 flex-shrink-0 overflow-y-auto">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
               <div className="text-center border-b border-gray-100 pb-5 mb-5">
-                <div className="w-24 h-24 mx-auto rounded-full bg-linear-to-br from-sky-500 to-sky-700 text-white flex items-center justify-center text-2xl font-bold shadow-sm">
+                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-sky-500 to-sky-700 text-white flex items-center justify-center text-2xl font-bold shadow-sm">
                   {loadingPatient || !patient
                     ? '...'
                     : `${patient.first_name.charAt(0)}${patient.last_name.charAt(0)}`
@@ -69,9 +69,14 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                   icon={<Calendar className="w-4 h-4" />}
                 />
                 <NavItem
+                  label="Cases"
+                  to={`/patients/${patientId}/cases`}
+                  icon={<FolderKanban className="w-4 h-4" />}
+                />
+                <NavItem
                   label="Clinical Documentation"
                   to={`/patients/${patientId}/clinical`}
-                  icon={<FolderKanban className="w-4 h-4" />}
+                  icon={<ClipboardList className="w-4 h-4" />}
                 />
                 <NavItem
                   label="Unassigned Notes"
@@ -92,7 +97,7 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
             </div>
           </aside>
 
-          <section className="flex-1 min-h-0 overflow-y-auto">
+          <section className="flex-1 min-h-0 overflow-y-auto flex flex-col relative">
             <Outlet />
           </section>
         </div>

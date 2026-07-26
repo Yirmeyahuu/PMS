@@ -57,8 +57,23 @@ export const Diary: React.FC = () => {
   }, [rebookMode, exitRebook]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  // Default to week view for practitioners / staff
-  const [view, setView] = useState<CalendarView>('week');
+  // Default to week view for practitioners / staff, but restore from localStorage if available
+  const [view, setView] = useState<CalendarView>(() => {
+    if (!user?.id) return 'week';
+    const saved = localStorage.getItem(`diary_view_${user.id}`);
+    if (saved === 'day' || saved === 'week' || saved === 'month') {
+      return saved as CalendarView;
+    }
+    return 'week';
+  });
+
+  // Sync view preference to localStorage when it changes
+  useEffect(() => {
+    if (user?.id && view) {
+      localStorage.setItem(`diary_view_${user.id}`, view);
+    }
+  }, [view, user?.id]);
+
   const [selectedPractitioner, setSelectedPractitioner] = useState<number | string | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);

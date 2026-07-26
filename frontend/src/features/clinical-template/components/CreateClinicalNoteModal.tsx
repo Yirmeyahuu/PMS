@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, FileText, Loader2, Save, Calendar, ClipboardList, Plus, History } from 'lucide-react';
-import { getActiveTemplates, createNote, getNotes } from '../clinical-templates.api';
+import { getActiveTemplates, createNote, getNotes, getNote } from '../clinical-templates.api';
 import type { ClinicalNote } from '@/types/clinicalTemplate';
 import { PreviewPreviousNoteModal } from './PreviewPreviousNoteModal';
 import { getAppointments } from '@/features/appointments/appointment.api';
@@ -21,6 +21,8 @@ interface CreateClinicalNoteModalProps {
   patientCaseId?: number;
   onSuccess?: () => void;
   existingNotes?: { appointment: number }[]; // Array of appointments that already have notes
+  preselectedTemplateId?: number;
+  copyFromNoteId?: number;
 }
 
 // Helper to format time
@@ -52,6 +54,8 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   patientCaseId,
   onSuccess,
   existingNotes = [],
+  preselectedTemplateId,
+  copyFromNoteId,
 }) => {
   const [step, setStep] = useState<'template' | 'form'>('template');
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
@@ -124,23 +128,63 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       );
       console.log('[CreateClinicalNoteModal] sorted appointments:', sortedAppointments);
       setAppointments(sortedAppointments);
+      
+      return templatesData;
     } catch {
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, patientCaseId]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchData();
+      fetchData().then(async (fetchedTemplates) => {
+        if (copyFromNoteId && fetchedTemplates) {
+          try {
+            const sourceNote = await getNote(copyFromNoteId);
+            const template = fetchedTemplates.find(t => t.id === sourceNote.template);
+            if (template) {
+              setSelectedTemplate(template);
+              let mergedValues = { ...sourceNote.decrypted_content };
+              if (sourceNote.chart_annotation_data) {
+                Object.entries(sourceNote.chart_annotation_data).forEach(([fieldId, annotationData]: [string, any]) => {
+                  mergedValues[fieldId] = {
+                    canvas_image: mergedValues[fieldId] || null,
+                    doodle_data: annotationData.doodle_data || [],
+                  };
+                });
+              }
+              setContent(mergedValues);
+              setStep('form');
+            } else {
+              setStep('template');
+              setSelectedTemplate(null);
+            }
+          } catch (err) {
+            toast.error('Failed to copy note');
+            setStep('template');
+          }
+        } else if (preselectedTemplateId && fetchedTemplates) {
+          const template = fetchedTemplates.find(t => t.id === preselectedTemplateId);
+          if (template) {
+            setSelectedTemplate(template);
+            setStep('form');
+          } else {
+            setStep('template');
+            setSelectedTemplate(null);
+          }
+        } else {
+          setStep('template');
+          setSelectedTemplate(null);
+        }
+      });
       // Reset state
-      setStep('template');
-      setSelectedTemplate(null);
       setSelectedAppointment(initialAppointmentId || null);
-      setContent({});
+      if (!copyFromNoteId) setContent({});
+      setNoteDate(new Date().toISOString().split('T')[0]);
     }
-  }, [isOpen, fetchData, initialAppointmentId]);
+  }, [isOpen, fetchData, initialAppointmentId, preselectedTemplateId, copyFromNoteId]);
 
   const isAppointmentMode = Boolean(initialAppointmentId);
 

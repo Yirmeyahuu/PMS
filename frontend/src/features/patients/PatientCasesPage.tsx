@@ -1,189 +1,58 @@
-import { useEffect, useMemo, useState } from 'react';
-import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { getPractitioners } from '@/features/clinics/clinic.api';
-import type { Practitioner } from '@/features/clinics/clinic.api';
-import { CaseModal, type CaseFormData } from './CaseModal';
+import { FolderKanban, Plus, Clock, FileText, CheckCircle, Search } from 'lucide-react';
 import { usePatientProfileContext } from './context/PatientProfileContext';
-import {
-  getPatientCases,
-  createPatientCase as apiCreatePatientCase,
-  updatePatientCase as apiUpdatePatientCase,
-  deletePatientCase as apiDeletePatientCase,
-} from './patientCases.api';
+import { CaseModal } from './CaseModal';
 import type { PatientCase, PatientCaseStatus } from '@/types/patient';
-import { formatDate } from './patientProfile.utils.tsx';
+import toast from 'react-hot-toast';
 
 export const PatientCasesPage = () => {
+  const { patient, cases, refreshCases } = usePatientProfileContext();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { patient, clinicalNotes, loadingPatient } = usePatientProfileContext();
+  
+  const [isCreateCaseOpen, setIsCreateCaseOpen] = useState(false);
+  const [filter, setFilter] = useState<'ALL' | PatientCaseStatus>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingCase, setEditingCase] = useState<PatientCase | null>(null);
-  const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
-  const [loadingPractitioners, setLoadingPractitioners] = useState(false);
-
-  const { data: cases = [], isLoading: loadingCases } = useQuery<PatientCase[]>({
-    queryKey: ['patient-cases', patient?.id],
-    queryFn: () => getPatientCases(patient!.id),
-    enabled: !!patient,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoadingPractitioners(true);
-      try {
-        const { practitioners: list } = await getPractitioners();
-        if (!cancelled) setPractitioners(list);
-      } catch {
-        // Non-critical
-      } finally {
-        if (!cancelled) setLoadingPractitioners(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const caseMetrics = useMemo(() => {
-    if (!patient) return {} as Record<string, { noteCount: number; lastUpdated: string }>;
-
-    const metrics: Record<string, { noteCount: number; lastUpdated: string }> = {};
-
-    cases.forEach((caseItem) => {
-      const notes = clinicalNotes.filter(note => note.patient_case === caseItem.id);
-      const noteCount = notes.length;
-      const latestNoteDate = notes
-        .map((note) => note.updated_at || note.date)
-        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-
-      metrics[caseItem.id] = {
-        noteCount,
-        lastUpdated: latestNoteDate || caseItem.created_at,
-      };
+  const filteredCases = useMemo(() => {
+    return cases.filter(c => {
+      const matchesFilter = filter === 'ALL' || c.status === filter;
+      const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            c.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesFilter && matchesSearch;
     });
+  }, [cases, filter, searchQuery]);
 
-    return metrics;
-  }, [cases, clinicalNotes, patient]);
-
-  const createCaseMutation = useMutation({
-    mutationFn: (data: CaseFormData) =>
-      apiCreatePatientCase({
-        patient: patient!.id,
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
-        primary_practitioner_name: data.primaryPractitionerName || undefined,
-        payer: data.payer || undefined,
-        alert_notes: data.alertNotes || undefined,
-        referred_by: data.referredBy || undefined,
-        referral_info: data.referralInfo || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patient-cases', patient?.id] });
-      toast.success('Case created successfully');
-      setIsCreateOpen(false);
-    },
-    onError: () => {
-      toast.error('Failed to create case');
-    },
-  });
-
-  const updateCaseMutation = useMutation({
-    mutationFn: ({ caseId, data }: { caseId: number; data: CaseFormData }) =>
-      apiUpdatePatientCase(caseId, {
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
-        primary_practitioner_name: data.primaryPractitionerName || undefined,
-        payer: data.payer || undefined,
-        alert_notes: data.alertNotes || undefined,
-        referred_by: data.referredBy || undefined,
-        referral_info: data.referralInfo || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patient-cases', patient?.id] });
-      toast.success('Case updated successfully');
-      setEditingCase(null);
-    },
-    onError: () => {
-      toast.error('Failed to update case');
-    },
-  });
-
-  const deleteCaseMutation = useMutation({
-    mutationFn: (caseId: number) => apiDeletePatientCase(caseId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patient-cases', patient?.id] });
-      toast.success('Case deleted');
-    },
-    onError: () => {
-      toast.error('Failed to delete case');
-    },
-  });
-
-  const handleCreateCase = (data: CaseFormData) => {
-    if (!patient) return;
-    createCaseMutation.mutate(data);
+  const getStatusColor = (status: PatientCaseStatus) => {
+    switch (status) {
+      case 'OPEN': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'MONITORING': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'DISCHARGED': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'CLOSED': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
-  const handleSaveEditCase = (data: CaseFormData) => {
-    if (!patient || !editingCase) return;
-    updateCaseMutation.mutate({ caseId: editingCase.id, data });
+  const handleCaseClick = (caseId: number) => {
+    // Navigate to the case details (we will build this in Phase 4)
+    navigate(`/patients/${patient?.id}/cases/${caseId}`);
   };
-
-  const handleStatusChange = (caseId: number, status: PatientCaseStatus) => {
-    if (!patient) return;
-    updateCaseMutation.mutate({
-      caseId,
-      data: { title: '', description: '', status, primaryPractitionerId: '', primaryPractitionerName: '', payer: '', alertNotes: '', referredBy: '', referralInfo: '' } as CaseFormData,
-    });
-  };
-
-  const handleDeleteCase = (caseId: number, title: string) => {
-    if (!patient) return;
-
-    const confirmed = window.confirm(`Delete case "${title}"? This will remove note-to-case links.`);
-    if (!confirmed) return;
-
-    deleteCaseMutation.mutate(caseId);
-  };
-
-  if (loadingPatient || !patient) {
-    return (
-      <div className="h-full flex items-center justify-center bg-gray-50 rounded-2xl border border-gray-200">
-        <p className="text-sm text-gray-500">Loading patient cases...</p>
-      </div>
-    );
-  }
-
-  if (loadingCases) {
-    return (
-      <div className="h-full flex items-center justify-center bg-gray-50 rounded-2xl border border-gray-200">
-        <p className="text-sm text-gray-500">Loading cases...</p>
-      </div>
-    );
-  }
 
   return (
     <>
       <div className="space-y-4">
+        {/* Header */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-xl font-heading text-gray-900">Cases</h1>
-              <p className="text-sm text-gray-500 mt-1">Manage patient cases and case-linked clinical notes</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {patient?.full_name || 'Patient'} • {cases.length} total cases
+              </p>
             </div>
-
             <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
+              onClick={() => setIsCreateCaseOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-xl hover:bg-sky-700 transition-colors shadow-sm"
             >
               <Plus className="w-4 h-4" />
               New Case
@@ -191,112 +60,114 @@ export const PatientCasesPage = () => {
           </div>
         </div>
 
-        {cases.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gray-100 flex items-center justify-center">
-              <FolderKanban className="w-7 h-7 text-gray-400" />
+        {/* Filters and Search */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-1 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+              {(['ALL', 'OPEN', 'MONITORING', 'DISCHARGED', 'CLOSED'] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setFilter(status)}
+                  className={`whitespace-nowrap text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                    filter === status
+                      ? 'bg-sky-600 text-white'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {status.charAt(0) + status.slice(1).toLowerCase()}
+                </button>
+              ))}
             </div>
-            <p className="text-sm font-medium text-gray-700">No cases yet</p>
-            <p className="text-xs text-gray-500 mt-1">Create your first case to start organizing notes by clinical context.</p>
+
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search cases..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:ring-sky-500 focus:border-sky-500 w-full sm:w-64"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Cases Grid */}
+        {filteredCases.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderKanban className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No cases found</h3>
+            <p className="text-gray-500 text-sm mb-4">
+              {searchQuery ? 'Try adjusting your filters or search query.' : 'Create a new case to start tracking episodes of care.'}
+            </p>
+            {!searchQuery && filter === 'ALL' && (
+              <button
+                onClick={() => setIsCreateCaseOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-50 text-sky-700 text-sm font-medium rounded-xl hover:bg-sky-100 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create First Case
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {cases.map((caseItem) => {
-              const metrics = caseMetrics[caseItem.id];
-              const noteCount = metrics?.noteCount ?? 0;
-              const lastUpdated = metrics?.lastUpdated ?? caseItem.created_at;
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredCases.map((c) => (
+              <div
+                key={c.id}
+                onClick={() => handleCaseClick(c.id)}
+                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-sky-300 hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="font-semibold text-gray-900 group-hover:text-sky-700 line-clamp-1">
+                    {c.title}
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(c.status)}`}>
+                    {c.status.charAt(0) + c.status.slice(1).toLowerCase()}
+                  </span>
+                </div>
+                
+                {c.description && (
+                  <p className="text-sm text-gray-500 mb-4 line-clamp-2">{c.description}</p>
+                )}
 
-              return (
-                <article key={caseItem.id} className="bg-white border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900">{caseItem.title}</h3>
-                      {caseItem.primary_practitioner_name && (
-                        <p className="text-xs text-gray-500 mt-0.5">Primary: {caseItem.primary_practitioner_name}</p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-0.5">Created {formatDate(caseItem.created_at)}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditingCase(caseItem)}
-                        className="p-2 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
-                        title="Edit case"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCase(caseItem.id, caseItem.title)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete case"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                <div className="space-y-2 mt-auto">
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <CheckCircle className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Practitioner: <strong>{c.primary_practitioner_name || 'Unassigned'}</strong></span>
                   </div>
-
-                  {caseItem.description && (
-                    <p className="text-sm text-gray-600 mt-3">{caseItem.description}</p>
+                  
+                  {c.approved_sessions !== null && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Sessions: <strong>{c.completed_sessions}</strong> / {c.approved_sessions}</span>
+                    </div>
                   )}
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="border border-gray-200 rounded-lg p-2.5">
-                      <p className="text-[11px] text-gray-500">Case Notes</p>
-                      <p className="text-lg font-semibold text-gray-900">{noteCount}</p>
-                    </div>
-                    <div className="border border-gray-200 rounded-lg p-2.5">
-                      <p className="text-[11px] text-gray-500">Last Updated</p>
-                      <p className="text-sm font-medium text-gray-900">{formatDate(lastUpdated)}</p>
-                    </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <FileText className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Created: {new Date(c.created_at).toLocaleDateString()}</span>
                   </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <select
-                      value={caseItem.status}
-                      onChange={(event) => handleStatusChange(caseItem.id, event.target.value as PatientCaseStatus)}
-                      className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    >
-                      <option value="OPEN">Open</option>
-                      <option value="MONITORING">Monitoring</option>
-                      <option value="DISCHARGED">Discharged</option>
-                      <option value="CLOSED">Closed</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/patients/${patient.id}/notes?case=${caseItem.id}`)}
-                      className="px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
-                    >
-                      View Notes
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       <CaseModal
-        key="create-case"
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        mode="create"
-        onSave={handleCreateCase}
-        practitioners={practitioners}
-        loadingPractitioners={loadingPractitioners}
-      />
-
-      <CaseModal
-        key={editingCase?.id ?? 'edit-case'}
-        isOpen={Boolean(editingCase)}
-        onClose={() => setEditingCase(null)}
-        mode="edit"
-        initialValues={editingCase ?? undefined}
-        onSave={handleSaveEditCase}
-        practitioners={practitioners}
-        loadingPractitioners={loadingPractitioners}
+        isOpen={isCreateCaseOpen}
+        onClose={() => setIsCreateCaseOpen(false)}
+        onSubmit={async () => {
+          await refreshCases();
+          setIsCreateCaseOpen(false);
+          toast.success('Case created successfully');
+        }}
+        patient={patient!}
       />
     </>
   );

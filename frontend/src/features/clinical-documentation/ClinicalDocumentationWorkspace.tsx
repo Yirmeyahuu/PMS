@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Mail, History, Files } from 'lucide-react';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
-import { CaseManagementHeader } from './components/CaseManagementHeader';
+import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/ClinicalWorkspaceContext';
+import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
+import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
+import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
+import { EditClinicalNoteModal } from '@/features/clinical-template/components/EditClinicalNoteModal';
 
-export interface ClinicalWorkspaceContext {
-  selectedCaseId: number | null;
-}
-
-export const ClinicalDocumentationWorkspace = () => {
+const ClinicalWorkspaceLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { cases } = usePatientProfileContext();
-  const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
+  const { cases, patient } = usePatientProfileContext();
+  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
 
   // Auto-select case on mount or location state
   useEffect(() => {
@@ -22,70 +21,49 @@ export const ClinicalDocumentationWorkspace = () => {
     } else if (cases.length > 0 && selectedCaseId === null) {
       setSelectedCaseId(cases[0].id);
     }
-  }, [cases, location.state?.caseId, location.pathname, navigate, selectedCaseId]);
+  }, [cases, location.state?.caseId, location.pathname, navigate, selectedCaseId, setSelectedCaseId]);
 
-  const tabs = [
-    {
-      id: 'notes',
-      label: 'Clinical Notes',
-      icon: <FileText className="w-4 h-4" />,
-      path: 'notes',
-    },
-    {
-      id: 'letters',
-      label: 'Letters',
-      icon: <Mail className="w-4 h-4" />,
-      path: 'letters',
-    },
-    {
-      id: 'history',
-      label: 'History',
-      icon: <History className="w-4 h-4" />,
-      path: 'history',
-    },
-    {
-      id: 'documents',
-      label: 'Documents',
-      icon: <Files className="w-4 h-4" />,
-      path: 'documents',
-    },
-  ];
+  const handleModalClose = () => {
+    setEditorContext({ type: 'IDLE' });
+  };
+
+  const handleModalSuccess = () => {
+    setEditorContext({ type: 'IDLE' });
+    triggerRefresh();
+  };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/50">
-      <div className="px-6 pt-4 bg-white border-b border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900 mb-4">Clinical Documentation</h1>
-        <div className="flex space-x-1">
-          {tabs.map((tab) => {
-            return (
-              <NavLink
-                key={tab.id}
-                to={tab.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    isActive || location.pathname.includes(`/clinical/${tab.path}`)
-                      ? 'border-indigo-600 text-indigo-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`
-                }
-              >
-                {tab.icon}
-                {tab.label}
-              </NavLink>
-            );
-          })}
+    <div className="absolute inset-0 flex flex-col bg-slate-50/50 overflow-hidden">
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-slate-900">Clinical Documentation Workspace</h1>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <div className="h-full grid grid-cols-12 gap-4 p-4">
+          {/* Left Panel: Templates */}
+          <div className="col-span-12 md:col-span-5 lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700 flex-shrink-0">Templates</div>
+            <div className="flex-1 overflow-y-auto">
+              <WorkspaceTemplatesPanel />
+            </div>
+          </div>
+
+          {/* Right Panel: History / Documents */}
+          <div className="col-span-12 md:col-span-7 lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
+            <WorkspaceRightPanel />
+          </div>
         </div>
       </div>
-      
-      <CaseManagementHeader 
-        selectedCaseId={selectedCaseId} 
-        onSelectCase={setSelectedCaseId} 
-      />
-
-      <div className="flex-1 overflow-auto">
-        <Outlet context={{ selectedCaseId } satisfies ClinicalWorkspaceContext} />
-      </div>
     </div>
+  );
+};
+
+export const ClinicalDocumentationWorkspace = () => {
+  const location = useLocation();
+  return (
+    <ClinicalWorkspaceProvider initialCaseId={location.state?.caseId}>
+      <ClinicalWorkspaceLayout />
+    </ClinicalWorkspaceProvider>
   );
 };
 

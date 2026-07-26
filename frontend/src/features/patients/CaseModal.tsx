@@ -11,6 +11,7 @@ export interface CaseFormData {
   primaryPractitionerName: string;
   payer: PatientCasePayer;
   alertNotes: string;
+  approvedSessions?: number;
   referredBy: string;
   referralInfo: string;
   description: string;
@@ -35,6 +36,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
   const [primaryPractitionerName, setPrimaryPractitionerName] = useState(initialValues?.primary_practitioner_name ?? '');
   const [payer, setPayer] = useState<PatientCasePayer>(initialValues?.payer ?? '');
   const [alertNotes, setAlertNotes] = useState(initialValues?.alert_notes ?? '');
+  const [approvedSessions, setApprovedSessions] = useState<number | ''>(initialValues?.approved_sessions ?? '');
   const [referredBy, setReferredBy] = useState(initialValues?.referred_by ?? '');
   const [referralInfo, setReferralInfo] = useState(initialValues?.referral_info ?? '');
   const [description, setDescription] = useState(initialValues?.description ?? '');
@@ -153,15 +155,28 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
 
             <div className="space-y-3 pt-2 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-600">Referral <span className="text-gray-400 font-normal">(Optional)</span></p>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Referred By</label>
-                <input
-                  type="text"
-                  value={referredBy}
-                  onChange={(e) => setReferredBy(e.target.value)}
-                  placeholder="e.g., Dr. Smith, St. Luke's Hospital"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Approved Sessions</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={approvedSessions}
+                    onChange={(e) => setApprovedSessions(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Unlimited if blank"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Referred By</label>
+                  <input
+                    type="text"
+                    value={referredBy}
+                    onChange={(e) => setReferredBy(e.target.value)}
+                    placeholder="e.g., Dr. Smith"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Referral Notes</label>
@@ -202,7 +217,18 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                   toast.error('Case title is required');
                   return;
                 }
-                onSave({ title: title.trim(), status, primaryPractitionerId, primaryPractitionerName, payer, alertNotes, referredBy, referralInfo, description });
+                onSave({ 
+                  title: title.trim(), 
+                  status, 
+                  primaryPractitionerId, 
+                  primaryPractitionerName, 
+                  payer, 
+                  alertNotes, 
+                  approvedSessions: approvedSessions === '' ? undefined : approvedSessions,
+                  referredBy, 
+                  referralInfo, 
+                  description 
+                });
               }}
               className="px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700"
             >
