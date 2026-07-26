@@ -5,7 +5,6 @@ import {
   CreditCard, Files, CheckCircle, Clock 
 } from 'lucide-react';
 import { usePatientProfileContext } from './context/PatientProfileContext';
-import type { PatientCase } from '@/types/patient';
 import { formatDate } from './patientProfile.utils';
 
 type Tab = 'overview' | 'sessions' | 'appointments' | 'notes' | 'letters' | 'documents' | 'timeline' | 'billing';

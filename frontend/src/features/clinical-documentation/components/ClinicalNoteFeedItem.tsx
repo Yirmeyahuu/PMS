@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, Save, FileText, CheckCircle, Copy, X } from 'lucide-react';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
-import { getActiveTemplates, createNote, updateNote } from '@/features/clinical-template/clinical-templates.api';
+import { createNote, updateNote } from '@/features/clinical-template/clinical-templates.api';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
 import type { ClinicalTemplate, ClinicalNote } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
@@ -53,7 +53,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
 
   const [saving, setSaving] = useState(false);
   
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
   
@@ -61,23 +61,11 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
   
-  const [isSigned, setIsSigned] = useState(false);
-  const [amendmentReason, setAmendmentReason] = useState('');
 
   // Make all history items (signed and drafts) strictly read-only in the feed.
   // The only editable item is the new note creation block.
   const isReadOnly = !isNewNote;
 
-  // Extract categories
-  const categories = useMemo(() => {
-    const cats = new Set(templates.map(t => t.category).filter(Boolean));
-    return Array.from(cats) as string[];
-  }, [templates]);
-
-  const filteredTemplates = useMemo(() => {
-    if (!selectedCategory) return templates;
-    return templates.filter(t => t.category === selectedCategory);
-  }, [templates, selectedCategory]);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,14 +74,12 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
       if (isNewNote && initialTemplateId) {
         const tmpl = templates.find(t => t.id === initialTemplateId);
         if (tmpl && isMounted) {
-          setSelectedCategory(tmpl.category || '');
           setSelectedTemplateId(tmpl.id);
           setSelectedTemplate(tmpl);
         }
       } else if (note) {
         setSelectedAppointment(note.appointment);
         setNoteDate(note.date);
-        setIsSigned(note.is_signed);
         
         if (note.template) {
           let tmpl = templates.find(t => t.id === note.template);
@@ -109,7 +95,6 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
           }
           
           if (tmpl && isMounted) {
-            setSelectedCategory(tmpl.category || '');
             setSelectedTemplateId(tmpl.id);
             setSelectedTemplate(tmpl);
           }
@@ -162,7 +147,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
         content,
         patient_case: selectedCaseId || undefined,
         is_signed: sign,
-        amendment_reason: sign && isSigned ? amendmentReason : undefined
+        amendment_reason: undefined
       };
 
       if (isNewNote) {

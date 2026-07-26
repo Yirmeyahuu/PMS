@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Plus, Clock, FileText, CheckCircle, Search } from 'lucide-react';
 import { usePatientProfileContext } from './context/PatientProfileContext';
 import { CaseModal } from './CaseModal';
-import type { PatientCase, PatientCaseStatus } from '@/types/patient';
+import type { PatientCaseStatus } from '@/types/patient';
 import toast from 'react-hot-toast';
+import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
+import { createPatientCase } from './patientCases.api';
 
 export const PatientCasesPage = () => {
   const { patient, cases, refreshCases } = usePatientProfileContext();
@@ -13,6 +15,8 @@ export const PatientCasesPage = () => {
   const [isCreateCaseOpen, setIsCreateCaseOpen] = useState(false);
   const [filter, setFilter] = useState<'ALL' | PatientCaseStatus>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const { practitioners, loading: loadingPractitioners } = usePractitioners({});
 
   const filteredCases = useMemo(() => {
     return cases.filter(c => {
@@ -162,12 +166,32 @@ export const PatientCasesPage = () => {
       <CaseModal
         isOpen={isCreateCaseOpen}
         onClose={() => setIsCreateCaseOpen(false)}
-        onSubmit={async () => {
-          await refreshCases();
-          setIsCreateCaseOpen(false);
-          toast.success('Case created successfully');
+        mode="create"
+        onSave={async (data) => {
+          if (!patient) return;
+          try {
+            await createPatientCase({
+              patient: patient.id,
+              title: data.title,
+              description: data.description,
+              status: data.status,
+              primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
+              primary_practitioner_name: data.primaryPractitionerName,
+              payer: data.payer,
+              alert_notes: data.alertNotes,
+              referred_by: data.referredBy,
+              referral_info: data.referralInfo,
+              approved_sessions: data.approvedSessions || undefined
+            });
+            await refreshCases();
+            setIsCreateCaseOpen(false);
+            toast.success('Case created successfully');
+          } catch (error) {
+            toast.error('Failed to create case');
+          }
         }}
-        patient={patient!}
+        practitioners={practitioners}
+        loadingPractitioners={loadingPractitioners}
       />
     </>
   );

@@ -14,6 +14,7 @@ export interface CreateCaseData {
   alert_notes?: string;
   referred_by?: string;
   referral_info?: string;
+  approved_sessions?: number;
 }
 
 export interface UpdateCaseData {
@@ -26,6 +27,7 @@ export interface UpdateCaseData {
   alert_notes?: string;
   referred_by?: string;
   referral_info?: string;
+  approved_sessions?: number;
 }
 
 export const getPatientCases = async (patientId: number): Promise<PatientCase[]> => {

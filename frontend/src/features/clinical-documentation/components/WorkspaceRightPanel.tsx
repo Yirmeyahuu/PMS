@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { History, Files, Loader2, FileText, CheckCircle, ExternalLink, Copy } from 'lucide-react';
+import { History, Files, Loader2 } from 'lucide-react';
 import { getNotes, getActiveTemplates } from '@/features/clinical-template/clinical-templates.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';

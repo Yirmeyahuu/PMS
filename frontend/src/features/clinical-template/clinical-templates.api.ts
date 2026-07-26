@@ -53,11 +53,13 @@ export const getNotes = async (filters?: {
   appointment?: number;
   is_signed?: boolean;
   is_draft?: boolean;
+  patient_case?: number;
 }): Promise<ClinicalNote[]> => {
   const params = new URLSearchParams();
   if (filters?.patient) params.append('patient', String(filters.patient));
   if (filters?.practitioner) params.append('practitioner', String(filters.practitioner));
   if (filters?.appointment) params.append('appointment', String(filters.appointment));
+  if (filters?.patient_case) params.append('patient_case', String(filters.patient_case));
   if (filters?.is_signed !== undefined) params.append('is_signed', String(filters.is_signed));
   if (filters?.is_draft !== undefined) params.append('is_draft', String(filters.is_draft));
 

@@ -4,14 +4,12 @@ import { usePatientProfileContext } from '@/features/patients/context/PatientPro
 import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/ClinicalWorkspaceContext';
 import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
 import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
-import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
-import { EditClinicalNoteModal } from '@/features/clinical-template/components/EditClinicalNoteModal';
 
 const ClinicalWorkspaceLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { cases, patient } = usePatientProfileContext();
-  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
+  const { cases } = usePatientProfileContext();
+  const { selectedCaseId, setSelectedCaseId } = useClinicalWorkspace();
 
   // Auto-select case on mount or location state
   useEffect(() => {
@@ -23,14 +21,6 @@ const ClinicalWorkspaceLayout = () => {
     }
   }, [cases, location.state?.caseId, location.pathname, navigate, selectedCaseId, setSelectedCaseId]);
 
-  const handleModalClose = () => {
-    setEditorContext({ type: 'IDLE' });
-  };
-
-  const handleModalSuccess = () => {
-    setEditorContext({ type: 'IDLE' });
-    triggerRefresh();
-  };
 
   return (
     <div className="absolute inset-0 flex flex-col bg-slate-50/50 overflow-hidden">
