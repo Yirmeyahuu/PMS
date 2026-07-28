@@ -62,6 +62,9 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<number | null>(initialAppointmentId || null);
+  
+  console.log('[CreateClinicalNoteModal] initialAppointmentId:', initialAppointmentId, 'selectedAppointment:', selectedAppointment);
+
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
@@ -186,8 +189,6 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
     }
   }, [isOpen, fetchData, initialAppointmentId, preselectedTemplateId, copyFromNoteId]);
 
-  const isAppointmentMode = Boolean(initialAppointmentId);
-
   // Handle appointment selection - auto-set date from appointment
   const handleAppointmentSelect = (appointmentId: number) => {
     setSelectedAppointment(appointmentId);
@@ -198,15 +199,15 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
     }
   };
 
-  // Auto-populate date for appointment mode when appointments load
+  // Auto-populate date when an appointment is selected
   useEffect(() => {
-    if (isAppointmentMode && initialAppointmentId && appointments.length > 0) {
-      const selectedAppt = appointments.find(a => a.id === initialAppointmentId);
+    if (selectedAppointment && appointments.length > 0) {
+      const selectedAppt = appointments.find(a => a.id === selectedAppointment);
       if (selectedAppt) {
         setNoteDate(selectedAppt.date);
       }
     }
-  }, [appointments, initialAppointmentId, isAppointmentMode]);
+  }, [appointments, selectedAppointment]);
 
   const handleTemplateSelect = (template: ClinicalTemplate) => {
     setSelectedTemplate(template);
@@ -289,6 +290,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         date: noteDate,
         content,
         appointment: selectedAppointment,
+        patient_case: patientCaseId,
       };
 
       // Only add practitioner if we have a valid ID
@@ -482,23 +484,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
                       <ClipboardList className="w-4 h-4" />
                       Session
                     </label>
-                    {isAppointmentMode && selectedAppointmentDetails ? (
-                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 space-y-1">
-                        <div className="flex justify-between items-start">
-                          <p className="font-semibold text-gray-900">
-                            {formatDate(selectedAppointmentDetails.date)} — {formatTime(selectedAppointmentDetails.start_time)}
-                          </p>
-                          <span className="text-[10px] font-medium bg-sky-100 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-full">Linked</span>
-                        </div>
-                        {selectedAppointmentDetails.practitioner_name && (
-                          <p className="text-xs text-gray-500">{selectedAppointmentDetails.practitioner_name}</p>
-                        )}
-                        {selectedAppointmentDetails.service_name && (
-                          <p className="text-xs text-gray-500">{selectedAppointmentDetails.service_name}</p>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2 italic">(Linked from Appointment)</p>
-                      </div>
-                    ) : appointments.length === 0 ? (
+                    {appointments.length === 0 ? (
                       <div className="text-sm text-gray-500 py-2">
                         No sessions found for this patient.
                       </div>

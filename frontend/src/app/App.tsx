@@ -62,11 +62,11 @@ import PatientProfileLayout from '@/features/patients/PatientProfileLayout';
 import PatientProfilePage from '@/features/patients/PatientProfilePage';
 import PatientAppointmentsPage from '@/features/patients/PatientAppointmentsPage';
 import PatientCasesPage from '@/features/patients/PatientCasesPage';
-import CaseDetailsPage from '@/features/patients/CaseDetailsPage';
 import ClinicalDocumentationWorkspace from '@/features/clinical-documentation/ClinicalDocumentationWorkspace';
 import PatientUnassignedNotesPage from '@/features/patients/PatientUnassignedNotesPage';
 import { PatientCommunicationHistoryPage } from '@/features/patients/PatientCommunicationHistoryPage';
 import ClientSettings from '@/features/patients/ClientSettings';
+import { ClinicalNoteRedirect } from '@/features/clinical-documentation/components/ClinicalNoteRedirect';
 import { PatientProfile } from '@/features/patients/PatientProfile';
 import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
 import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
@@ -322,9 +322,10 @@ function App() {
             <Route index element={<Navigate to="profile" replace />} />
             <Route path="profile" element={<PatientProfilePage />} />
             <Route path="appointments" element={<PatientAppointmentsPage />} />
-            <Route path="clinical/*" element={<ClinicalDocumentationWorkspace />} />
             <Route path="cases" element={<PatientCasesPage />} />
-            <Route path="cases/:caseId" element={<CaseDetailsPage />} />
+            <Route path="clinical/*" element={<ClinicalNoteRedirect />} />
+            <Route path="cases/:caseId/clinical-documentation/*" element={<ClinicalDocumentationWorkspace />} />
+            <Route path="cases/:caseId" element={<Navigate to="clinical-documentation" replace />} />
             <Route path="unassigned-notes" element={<PatientUnassignedNotesPage />} />
             <Route path="notes" element={<Navigate to="../clinical/notes" replace />} />
             <Route path="documents" element={<Navigate to="../clinical/documents" replace />} />

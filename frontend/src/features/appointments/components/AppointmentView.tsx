@@ -1504,10 +1504,9 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       }
                       // Redirect to Clinical Documentation Workspace
                       onClose();
-                      navigate(`/patients/${appointment.patient}/clinical`, { 
+                      navigate(`/patients/${appointment.patient}/cases/${appointment.patient_case}/clinical-documentation`, { 
                         state: { 
-                          appointmentId: appointment.id,
-                          caseId: Number(appointment.patient_case)
+                          appointmentId: appointment.id
                         } 
                       });
                     } else {

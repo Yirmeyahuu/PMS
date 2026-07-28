@@ -115,3 +115,45 @@ export const formatPhoneNumber = (phone: string): string => {
   if (p3) formatted += ` ${p3}`;
   return formatted;
 };
+/**
+ * Validates a Date of Birth string (YYYY-MM-DD).
+ * Ensures the date is valid, >= 1900, and <= today.
+ */
+export const validateDOB = (dobString: string): string => {
+  if (!dobString) return 'Date of Birth is required';
+  
+  const dob = new Date(dobString);
+  if (isNaN(dob.getTime())) return 'Invalid date format';
+
+  const today = new Date();
+  const minDate = new Date('1900-01-01');
+
+  if (dob > today) return 'Date of Birth cannot be in the future';
+  if (dob < minDate) return 'Date of Birth must be after 1900';
+
+  return '';
+};
+
+/**
+ * Calculates age in years from a DOB string (YYYY-MM-DD).
+ */
+export const calculateAge = (dobString: string): number => {
+  const dob = new Date(dobString);
+  const today = new Date();
+  
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  
+  return age;
+};
+
+/**
+ * Determines if a patient is a minor (under 18).
+ */
+export const isMinorAge = (dobString: string): boolean => {
+  return calculateAge(dobString) < 18;
+};

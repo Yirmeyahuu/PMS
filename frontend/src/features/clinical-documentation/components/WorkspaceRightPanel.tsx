@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { History, Files, Loader2 } from 'lucide-react';
+import { History, Files, Loader2, FileText } from 'lucide-react';
 import { getNotes, getActiveTemplates } from '@/features/clinical-template/clinical-templates.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
@@ -11,7 +11,8 @@ import type { Appointment } from '@/types';
 export const WorkspaceRightPanel = () => {
   const { patient } = usePatientProfileContext();
   const { selectedCaseId, refreshTrigger, setEditorContext } = useClinicalWorkspace();
-  const [activeTab, setActiveTab] = useState<'history' | 'documents'>('history');
+  type Tab = 'notes' | 'letters' | 'documents' | 'history' | 'measures' | 'exercises';
+  const [activeTab, setActiveTab] = useState<Tab>('notes');
 
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
@@ -25,7 +26,7 @@ export const WorkspaceRightPanel = () => {
       const [notesData, templatesData, appointmentsData] = await Promise.all([
         getNotes({ 
           patient: patient.id, 
-          patient_case: selectedCaseId || undefined 
+          patient_case: selectedCaseId ? selectedCaseId : -1 // -1 ensures we get nothing if no case is selected, strict filtering
         }),
         getActiveTemplates(),
         getAppointments({ patient: patient.id, page_size: 100 })
@@ -57,36 +58,37 @@ export const WorkspaceRightPanel = () => {
   return (
     <div className="flex flex-col flex-1 w-full min-h-0 bg-slate-50">
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 bg-white">
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          History
-        </button>
-        <button
-          onClick={() => setActiveTab('documents')}
-          className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-            activeTab === 'documents' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <Files className="w-4 h-4" />
-          Documents
-        </button>
+      <div className="flex border-b border-slate-200 bg-white overflow-x-auto hide-scrollbar flex-shrink-0">
+        {[
+          { id: 'notes', label: 'Notes', icon: FileText },
+          { id: 'letters', label: 'Letters', icon: FileText },
+          { id: 'documents', label: 'Documents', icon: Files },
+          { id: 'history', label: 'History', icon: History },
+          { id: 'measures', label: 'Measures', icon: History },
+          { id: 'exercises', label: 'Exercises', icon: History }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as Tab)}
+            className={`flex-1 min-w-[120px] py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+              activeTab === tab.id ? 'border-sky-600 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Content Feed */}
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         {loading ? (
           <div className="flex justify-center p-8">
-            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
           </div>
-        ) : activeTab === 'history' ? (
+        ) : activeTab === 'notes' ? (
           <div className="max-w-4xl mx-auto">
-            {/* History Feed */}
+            {/* Notes Feed */}
             {notes.length === 0 ? (
               <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <History className="w-12 h-12 mx-auto mb-4 opacity-20" />

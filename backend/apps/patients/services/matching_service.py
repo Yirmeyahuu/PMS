@@ -32,7 +32,8 @@ class PatientMatchingService:
         last_name: str, 
         dob, 
         phone: str, 
-        clinic
+        clinic,
+        email: str = None
     ) -> MatchingResult:
         
         # 1. Normalize Inputs
@@ -41,6 +42,9 @@ class PatientMatchingService:
         
         # Phone normalization
         norm_phone = normalize_ph_phone(phone) if phone else ''
+        
+        # Email normalization
+        norm_email = (email or '').strip().lower()
         
         # DOB could be a string or date object; convert to string YYYY-MM-DD for comparison if needed
         dob_str = str(dob) if dob else ''
@@ -95,14 +99,22 @@ class PatientMatchingService:
                 match_count += 1
                 matched_fields.append('phone')
 
+            # Check Email
+            cand_email = (candidate.email or '').strip().lower()
+            if cand_email and norm_email and cand_email == norm_email:
+                match_count += 1
+                matched_fields.append('email')
+
             if match_count > best_match_count:
                 best_match_count = match_count
                 best_match = candidate
                 best_matched_fields = matched_fields
 
         # 4. Evaluate Rules
-        if best_match_count == 3:
-            # Rule 1: EXACT MATCH (Name, DOB, Phone all match)
+        required_exact = 4 if norm_email else 3
+        
+        if best_match_count == required_exact:
+            # Rule 1: EXACT MATCH (Name, DOB, Phone, and optionally Email all match)
             logger.info(f"[PIM] Exact Match found for {first_name} {last_name}: Reusing Patient {best_match.id}")
             return MatchingResult(
                 status=MATCH_EXACT, 
@@ -110,8 +122,8 @@ class PatientMatchingService:
                 matched_fields=best_matched_fields
             )
         
-        elif best_match_count == 2:
-            # Rule 2: POSSIBLE DUPLICATE (2 of 3 match)
+        elif best_match_count >= required_exact - 1:
+            # Rule 2: POSSIBLE DUPLICATE (misses 1 of the fields)
             logger.info(f"[PIM] Possible Duplicate detected for {first_name} {last_name}. Existing: {best_match.id}")
             return MatchingResult(
                 status=MATCH_POSSIBLE, 

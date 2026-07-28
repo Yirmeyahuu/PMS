@@ -113,17 +113,13 @@ export const createClinicConsentDocument = async (
 
 export interface PortalCheckEmailPayload {
   email: string;
+  date_of_birth: string;
 }
 
 export interface PortalCheckEmailResponse {
-  exists: boolean;
-  patient?: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    date_of_birth: string;
-    phone: string;
-  };
+  match: boolean;
+  initials?: string;
+  phone_last4?: string;
 }
 
 export const checkPortalEmail = async (

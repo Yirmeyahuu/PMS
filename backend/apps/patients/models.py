@@ -37,6 +37,7 @@ class Patient(TimeStampedModel, SoftDeleteModel):
     email       = models.EmailField()  # required — enforced at serializer and model level
     phone       = models.CharField(max_length=15, validators=[validate_ph_phone])
     address     = models.TextField(blank=True)
+    barangay    = models.CharField(max_length=100, blank=True)
     city        = models.CharField(max_length=100, blank=True)
     province    = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=10, blank=True)
@@ -365,6 +366,14 @@ class PortalBooking(TimeStampedModel):
         help_text='Date of birth collected during portal booking.',
     )
     notes              = models.TextField(blank=True)
+
+    # Minor & Extended Fields
+    patient_emergency_contact_name  = models.CharField(max_length=200, blank=True)
+    patient_emergency_contact_phone = models.CharField(max_length=15, blank=True)
+    patient_address_street          = models.TextField(blank=True)
+    patient_address_barangay        = models.CharField(max_length=100, blank=True)
+    patient_address_city            = models.CharField(max_length=100, blank=True)
+    patient_address_province        = models.CharField(max_length=100, blank=True)
 
     appointment_date = models.DateField()
     appointment_time = models.TimeField()

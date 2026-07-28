@@ -88,6 +88,13 @@ export interface BookingPayload {
   notes:                  string;
   appointment_date:       string;
   appointment_time:       string;
+  is_returning_patient?:  boolean;
+  patient_emergency_contact_name?: string;
+  patient_emergency_contact_phone?: string;
+  patient_address_street?: string;
+  patient_address_barangay?: string;
+  patient_address_city?: string;
+  patient_address_province?: string;
 }
 
 export interface BookingConfirmation {

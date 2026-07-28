@@ -38,8 +38,8 @@ export const PatientCasesPage = () => {
   };
 
   const handleCaseClick = (caseId: number) => {
-    // Navigate to the case details (we will build this in Phase 4)
-    navigate(`/patients/${patient?.id}/cases/${caseId}`);
+    // Navigate to the Clinical Documentation Workspace for this case
+    navigate(`/patients/${patient?.id}/cases/${caseId}/clinical-documentation`);
   };
 
   return (
@@ -173,9 +173,17 @@ export const PatientCasesPage = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <FileText className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Created: {new Date(c.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center justify-between gap-2 text-xs text-gray-600 mt-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Created: {new Date(c.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleCaseClick(c.id); }}
+                      className="px-3 py-1.5 bg-sky-50 text-sky-700 font-medium rounded-lg hover:bg-sky-100 transition-colors border border-sky-200"
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
               </div>

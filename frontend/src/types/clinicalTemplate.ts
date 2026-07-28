@@ -113,4 +113,5 @@ export interface CreateClinicalNoteData {
   template: number;
   date: string;
   content: Record<string, any>;
+  patient_case?: number;
 }

@@ -23,7 +23,7 @@ import type {
   BookingPayload,
 } from '../types/portal';
 import type { PatientFormData } from '../components/PatientDetailsForm';
-import { validateEmailDetailed, validatePHPhoneDetailed } from '@/utils/validation';
+import { validateEmailDetailed, validatePHPhoneDetailed, validateDOB, isMinorAge } from '@/utils/validation';
 
 // ── After branch is picked, 4-step inner flow ─────────────────────────────────
 type InnerStep = 'practitioner' | 'services' | 'datetime' | 'details';
@@ -156,23 +156,40 @@ export const PortalHome: React.FC = () => {
     if (!token || !selectedService || !selectedDate || !selectedSlot) return;
     setFormError(null);
 
-    if (!formData.first_name.trim() || !formData.last_name.trim()) {
-      setFormError('First and last name are required.'); return;
+    if (!formData.is_returning_patient) {
+      if (!formData.first_name.trim() || !formData.last_name.trim()) {
+        setFormError('First and last name are required.'); return;
+      }
+      if (!formData.phone.trim()) {
+        setFormError('Phone number is required.'); return;
+      }
+      if (!formData.phone.includes('*')) {
+        const phoneErr = validatePHPhoneDetailed(formData.phone);
+        if (phoneErr) { setFormError(phoneErr); return; }
+      }
     }
+    
     if (!formData.email.trim()) {
       setFormError('A valid email address is required.'); return;
     }
     const emailErr = validateEmailDetailed(formData.email);
     if (emailErr) { setFormError(emailErr); return; }
-    if (!formData.phone.trim()) {
-      setFormError('Phone number is required.'); return;
-    }
-    if (!formData.phone.includes('*')) {
-      const phoneErr = validatePHPhoneDetailed(formData.phone);
-      if (phoneErr) { setFormError(phoneErr); return; }
-    }
-    if (!formData.date_of_birth) {
-      setFormError('Date of birth is required.'); return;
+    const dobErr = validateDOB(formData.date_of_birth);
+    if (dobErr) { setFormError(dobErr); return; }
+
+    if (!formData.is_returning_patient && isMinorAge(formData.date_of_birth)) {
+      if (!formData.emergency_contact_name?.trim()) {
+        setFormError('Emergency Contact Name is required for minors.'); return;
+      }
+      if (!formData.emergency_contact_phone?.trim()) {
+        setFormError('Emergency Contact Number is required for minors.'); return;
+      }
+      const ecPhoneErr = validatePHPhoneDetailed(formData.emergency_contact_phone);
+      if (ecPhoneErr) { setFormError('Emergency Contact: ' + ecPhoneErr); return; }
+      
+      if (!formData.address_street?.trim() || !formData.address_barangay?.trim() || !formData.address_city?.trim() || !formData.address_province?.trim()) {
+        setFormError('Complete Address (Street, Barangay, City, Province) is required for minors.'); return;
+      }
     }
 
     const payload: BookingPayload = {
@@ -184,9 +201,16 @@ export const PortalHome: React.FC = () => {
       patient_email:         formData.email,
       patient_phone:         formData.phone,
       patient_date_of_birth: formData.date_of_birth,
-      notes:              formData.notes,
-      appointment_date:   selectedDate,
-      appointment_time:   selectedSlot,
+      notes:                 formData.notes,
+      appointment_date:      selectedDate,
+      appointment_time:      selectedSlot,
+      is_returning_patient:  formData.is_returning_patient,
+      patient_emergency_contact_name:  formData.emergency_contact_name,
+      patient_emergency_contact_phone: formData.emergency_contact_phone,
+      patient_address_street:          formData.address_street,
+      patient_address_barangay:        formData.address_barangay,
+      patient_address_city:            formData.address_city,
+      patient_address_province:        formData.address_province,
     };
 
     if (!acceptedTerms || !acceptedConsent || !signatureData) {
@@ -202,8 +226,12 @@ export const PortalHome: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const fullName = formData.is_returning_patient 
+        ? "Returning Patient" // Real name injected securely by backend
+        : `${formData.first_name} ${formData.last_name}`.trim();
+
       const consent = await createPortalConsent(token, {
-        full_name: `${formData.first_name} ${formData.last_name}`.trim(),
+        full_name: fullName,
         email: formData.email,
         consent_text: consentText,
         signature: signatureData,
@@ -217,7 +245,7 @@ export const PortalHome: React.FC = () => {
           body_snapshot: clinicConsentForm.body_content,
           signature: clinicConsentSignature,
           consent_version: `v${clinicConsentForm.id}`,
-          signer_full_name: `${formData.first_name} ${formData.last_name}`.trim(),
+          signer_full_name: fullName,
           signer_email: formData.email,
         };
         await createClinicConsentDocument(token, clinicDocPayload);
@@ -449,7 +477,7 @@ export const PortalHome: React.FC = () => {
               onOpenTerms={() => setShowTermsModal(true)}
               onOpenConsent={() => setShowConsentModal(true)}
               onOpenClinicConsent={() => setShowClinicConsentModal(true)}
-              onCheckEmail={(email) => checkPortalEmail(token!, { email })}
+              onCheckEmail={(email, dob) => checkPortalEmail(token!, { email, date_of_birth: dob })}
             />
           )}
         </div>

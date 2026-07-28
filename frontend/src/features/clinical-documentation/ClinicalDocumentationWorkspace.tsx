@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/ClinicalWorkspaceContext';
 import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
@@ -7,26 +7,37 @@ import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
 import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
 
 const ClinicalWorkspaceLayout = () => {
-  const location = useLocation();
   const navigate = useNavigate();
+  const { caseId } = useParams();
   const { cases, patient } = usePatientProfileContext();
   const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
+  const location = useLocation();
+  const state = location.state as { appointmentId?: number } | null;
 
-  // Auto-select case on mount or location state
+  const currentCase = cases.find(c => c.id === Number(caseId));
+
+  // Sync context with URL caseId
   useEffect(() => {
-    if (location.state?.caseId && cases.some((c) => c.id === location.state.caseId)) {
-      setSelectedCaseId(location.state.caseId);
-      navigate(location.pathname, { replace: true, state: {} });
-    } else if (cases.length > 0 && selectedCaseId === null) {
-      setSelectedCaseId(cases[0].id);
+    if (caseId && Number(caseId) !== selectedCaseId) {
+      setSelectedCaseId(Number(caseId));
     }
-  }, [cases, location.state?.caseId, location.pathname, navigate, selectedCaseId, setSelectedCaseId]);
+  }, [caseId, selectedCaseId, setSelectedCaseId]);
 
 
   return (
     <div className="absolute inset-0 flex flex-col bg-slate-50/50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-slate-900">Clinical Documentation Workspace</h1>
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0 flex items-center gap-2">
+        <button 
+          onClick={() => navigate(`/patients/${patient?.id}/cases`)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          Clinical Notes
+        </button>
+        <span className="text-gray-400">»</span>
+        <h1 className="text-xl font-bold text-slate-900">
+          {patient ? `${patient.first_name} ${patient.last_name}` : 'Patient'} 
+          {currentCase && <span className="text-sky-600 font-medium ml-2">({currentCase.title})</span>}
+        </h1>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -53,6 +64,7 @@ const ClinicalWorkspaceLayout = () => {
           patientId={patient.id}
           patientName={`${patient.first_name} ${patient.last_name}`}
           patientCaseId={selectedCaseId || undefined}
+          appointmentId={state?.appointmentId}
           preselectedTemplateId={editorContext.type === 'NEW_NOTE' ? editorContext.templateId : undefined}
           onSuccess={() => {
             setEditorContext({ type: 'IDLE' });
@@ -65,9 +77,9 @@ const ClinicalWorkspaceLayout = () => {
 };
 
 export const ClinicalDocumentationWorkspace = () => {
-  const location = useLocation();
+  const { caseId } = useParams();
   return (
-    <ClinicalWorkspaceProvider initialCaseId={location.state?.caseId}>
+    <ClinicalWorkspaceProvider initialCaseId={caseId ? Number(caseId) : undefined}>
       <ClinicalWorkspaceLayout />
     </ClinicalWorkspaceProvider>
   );

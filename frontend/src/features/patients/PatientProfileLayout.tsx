@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList } from 'lucide-react';
-import { Navigate, NavLink, Outlet, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { PatientProfileProvider, usePatientProfileContext } from './context/PatientProfileContext';
 
@@ -8,19 +8,26 @@ interface NavItemProps {
   label: string;
   to: string;
   icon: ReactNode;
+  activePathPattern?: string;
+  end?: boolean;
 }
 
-const NavItem = ({ label, to, icon }: NavItemProps) => {
+const NavItem = ({ label, to, icon, activePathPattern, end }: NavItemProps) => {
+  const location = useLocation();
+  const isCustomActive = activePathPattern ? new RegExp(activePathPattern).test(location.pathname) : undefined;
+
   return (
     <NavLink
       to={to}
-      className={({ isActive }) => (
-        `flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-          isActive
+      end={end}
+      className={({ isActive }) => {
+        const active = isCustomActive !== undefined ? isCustomActive : isActive;
+        return `flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+          active
             ? 'bg-sky-600 text-white shadow-sm'
             : 'text-gray-600 hover:bg-sky-50 hover:text-sky-700'
-        }`
-      )}
+        }`;
+      }}
     >
       {icon}
       <span>{label}</span>
@@ -90,12 +97,15 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                   label="Cases"
                   to={`/patients/${patientId}/cases`}
                   icon={<FolderKanban className="w-4 h-4" />}
+                  end={true}
                 />
                 <NavItem
-                  label="Clinical Documentation"
+                  label="Clinical note"
                   to={`/patients/${patientId}/clinical`}
                   icon={<ClipboardList className="w-4 h-4" />}
+                  activePathPattern="/clinical(/|-documentation)"
                 />
+
                 <NavItem
                   label="Unassigned Notes"
                   to={`/patients/${patientId}/unassigned-notes`}

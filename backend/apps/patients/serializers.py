@@ -431,6 +431,9 @@ class PortalLinkAdminSerializer(serializers.ModelSerializer):
 
 class PortalBookingCreateSerializer(serializers.ModelSerializer):
     consent_id = serializers.IntegerField(write_only=True, required=True)
+    patient_first_name = serializers.CharField(required=False, max_length=100)
+    patient_last_name = serializers.CharField(required=False, max_length=100)
+    patient_phone = serializers.CharField(required=False, max_length=20)
 
     class Meta:
         model  = PortalBooking
@@ -439,6 +442,9 @@ class PortalBookingCreateSerializer(serializers.ModelSerializer):
             'service', 'practitioner', 'branch',
             'patient_first_name', 'patient_last_name',
             'patient_email', 'patient_phone', 'patient_date_of_birth',
+            'patient_emergency_contact_name', 'patient_emergency_contact_phone',
+            'patient_address_street', 'patient_address_barangay',
+            'patient_address_city', 'patient_address_province',
             'notes', 'appointment_date', 'appointment_time',
         ]
 
@@ -459,10 +465,30 @@ class PortalBookingCreateSerializer(serializers.ModelSerializer):
 
             if attrs.get('service'):
                 # Service must be available at this clinic
-                # (Note: services might be assigned to main clinic but accessible to branches,
-                # depending on your service architecture. Assuming service.clinic_id matches
-                # or is inherited.)
                 pass
+        
+        # Minor validation
+        is_returning = self.context.get('is_returning_patient', False)
+        if not is_returning and attrs.get('patient_date_of_birth'):
+            from datetime import date
+            dob = attrs['patient_date_of_birth']
+            today = date.today()
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            
+            if age < 18:
+                missing_fields = []
+                if not attrs.get('patient_emergency_contact_name'): missing_fields.append('Emergency Contact Name')
+                if not attrs.get('patient_emergency_contact_phone'): missing_fields.append('Emergency Contact Phone')
+                if not attrs.get('patient_address_street'): missing_fields.append('Street Address')
+                if not attrs.get('patient_address_barangay'): missing_fields.append('Barangay')
+                if not attrs.get('patient_address_city'): missing_fields.append('City')
+                if not attrs.get('patient_address_province'): missing_fields.append('Province')
+                
+                if missing_fields:
+                    raise serializers.ValidationError(
+                        f"The following fields are required for minors: {', '.join(missing_fields)}"
+                    )
+
         return attrs
 
 
@@ -562,6 +588,7 @@ class PublicPatientConsentCreateSerializer(serializers.ModelSerializer):
 
 class PublicPortalCheckEmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    date_of_birth = serializers.DateField()
 
 
 # ─── Client Form Request serializers ─────────────────────────────────────────

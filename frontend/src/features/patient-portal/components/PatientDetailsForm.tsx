@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { User, Mail, Phone, FileText, Calendar, CheckCircle2, ArrowRight } from 'lucide-react';
 import { formatPHPhone } from '@/utils/phoneFormatter';
+import { validateDOB, isMinorAge } from '@/utils/validation';
+import { ShieldAlert, MapPin } from 'lucide-react';
 
 export interface PatientFormData {
   first_name:    string;
@@ -9,6 +11,15 @@ export interface PatientFormData {
   phone:         string;
   date_of_birth: string;
   notes:         string;
+  is_returning_patient?: boolean;
+  
+  // Minor fields
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  address_street?: string;
+  address_barangay?: string;
+  address_city?: string;
+  address_province?: string;
 }
 
 interface PatientDetailsFormProps {
@@ -25,9 +36,10 @@ interface PatientDetailsFormProps {
   onOpenTerms: () => void;
   onOpenConsent: () => void;
   onOpenClinicConsent: () => void;
-  onCheckEmail: (email: string) => Promise<{
-    exists: boolean;
-    patient?: { id: number; first_name: string; last_name: string; date_of_birth: string; phone: string; };
+  onCheckEmail: (email: string, dob: string) => Promise<{
+    match: boolean;
+    initials?: string;
+    phone_last4?: string;
   }>;
 }
 
@@ -62,22 +74,32 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
       setCheckError('Please enter a valid email address ending with .com (e.g. name@example.com).');
       return;
     }
+    const dobError = validateDOB(formData.date_of_birth);
+    if (dobError) {
+      setCheckError(dobError);
+      return;
+    }
     setCheckStatus('checking');
     setCheckError(null);
     try {
-      const res = await onCheckEmail(formData.email);
-      if (res.exists && res.patient) {
+      const res = await onCheckEmail(formData.email, formData.date_of_birth);
+      if (res.match) {
         setCheckStatus('found');
-        // Prefill form with returned details (phone will be masked)
+        // Inject returning patient flag and clear name fields
         onChange({
           ...formData,
-          first_name: res.patient.first_name,
-          last_name: res.patient.last_name,
-          phone: res.patient.phone,
-          date_of_birth: res.patient.date_of_birth,
-        });
+          first_name: '',
+          last_name: '',
+          phone: res.phone_last4 ? `********${res.phone_last4}` : '',
+          is_returning_patient: true,
+          _initials: res.initials, // Just for UI rendering here
+        } as any);
       } else {
         setCheckStatus('not-found');
+        onChange({
+          ...formData,
+          is_returning_patient: false,
+        });
       }
     } catch {
       setCheckError('Failed to verify email. Please try again.');
@@ -136,6 +158,30 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
           </div>
         </div>
 
+        {/* Always visible: Date of Birth */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            Date of Birth <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              id="date_of_birth"
+              name="date_of_birth"
+              type="date"
+              autoComplete="bday"
+              value={formData.date_of_birth}
+              onChange={(e) => {
+                set('date_of_birth')(e);
+                if (checkStatus !== 'idle') setCheckStatus('idle'); // Reset if they edit dob
+              }}
+              max={new Date().toISOString().split('T')[0]}
+              disabled={checkStatus === 'checking'}
+              className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100 disabled:text-gray-500 bg-gray-50 transition-colors"
+            />
+          </div>
+        </div>
+
         {/* Stage 1: Email Check Button */}
         {checkStatus === 'idle' && (
           <button
@@ -162,21 +208,23 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
             <div className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-green-900">Returning Patient Found</h3>
+                <h3 className="text-sm font-bold text-green-900">Welcome back!</h3>
                 <p className="text-sm text-green-800 mt-1">
-                  Welcome back, <strong>{formData.first_name} {formData.last_name}</strong>!
+                  Patient: <strong>{(formData as any)._initials}</strong>
                 </p>
-                <div className="mt-3 text-xs text-green-800 space-y-1">
-                  <p><strong>Date of Birth:</strong> {formData.date_of_birth}</p>
-                  <p><strong>Phone:</strong> {formData.phone}</p>
+                <div className="mt-2 text-xs text-green-800 space-y-1">
+                  <p><strong>Phone ending in:</strong> {(formData as any).phone?.replace(/\*/g, '')}</p>
                 </div>
                 <div className="mt-4 flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setCheckStatus('idle')}
+                    onClick={() => {
+                      setCheckStatus('idle');
+                      onChange({ ...formData, email: '', date_of_birth: '', is_returning_patient: false });
+                    }}
                     className="text-xs font-medium text-green-700 hover:text-green-800 underline"
                   >
-                    Use Different Email
+                    Not You? Edit Details
                   </button>
                 </div>
               </div>
@@ -251,26 +299,126 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
                 />
               </div>
             </div>
-            {/* DOB goes here to keep the grid layout */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Date of Birth <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  id="date_of_birth"
-                  name="date_of_birth"
-                  type="date"
-                  autoComplete="bday"
-                  value={formData.date_of_birth}
-                  onChange={set('date_of_birth')}
-                  max={new Date().toISOString().split('T')[0]}
-                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
-                />
+          </div>
+          
+          {/* Minor Section - conditionally rendered */}
+          {formData.date_of_birth && isMinorAge(formData.date_of_birth) && (
+            <div className="mt-8 space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="border-t border-gray-100 mb-6" />
+              
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-[#0575E6]" />
+                  Parent / Guardian Information
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Required for patients under 18 years old.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Emergency Contact Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      name="emergency_contact_name"
+                      type="text"
+                      value={formData.emergency_contact_name || ''}
+                      onChange={set('emergency_contact_name')}
+                      className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Emergency Contact Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      name="emergency_contact_phone"
+                      type="tel"
+                      value={formData.emergency_contact_phone || ''}
+                      onChange={set('emergency_contact_phone')}
+                      className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                      placeholder="(+63) 9XX XXX XXXX"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-[#0575E6]" />
+                  Address
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Please provide your complete residential address.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Street Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    name="address_street"
+                    type="text"
+                    value={formData.address_street || ''}
+                    onChange={set('address_street')}
+                    className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                    placeholder="House/Unit No., Street, Subdivision"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Barangay <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="address_barangay"
+                      type="text"
+                      value={formData.address_barangay || ''}
+                      onChange={set('address_barangay')}
+                      className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                      placeholder="Barangay"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      City/Municipality <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="address_city"
+                      type="text"
+                      value={formData.address_city || ''}
+                      onChange={set('address_city')}
+                      className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Province <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="address_province"
+                      type="text"
+                      value={formData.address_province || ''}
+                      onChange={set('address_province')}
+                      className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
+                      placeholder="Province"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           </>
         )}
 

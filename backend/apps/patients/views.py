@@ -76,7 +76,8 @@ def _confirm_portal_booking(booking, confirmed_by_user):
             last_name=booking.patient_last_name,
             dob=booking.patient_date_of_birth,
             phone=normalized_phone,
-            clinic=clinic
+            clinic=clinic,
+            email=booking.patient_email,
         )
 
         if match_result.status == MATCH_EXACT and match_result.existing_patient:
@@ -93,11 +94,12 @@ def _confirm_portal_booking(booking, confirmed_by_user):
                 gender='O',
                 email=booking.patient_email or '',
                 phone=normalized_phone,
-                address='',
-                city=clinic.city or '',
-                province=clinic.province or '',
-                emergency_contact_name='',
-                emergency_contact_phone='',
+                address=booking.patient_address_street or '',
+                barangay=booking.patient_address_barangay or '',
+                city=booking.patient_address_city or clinic.city or '',
+                province=booking.patient_address_province or clinic.province or '',
+                emergency_contact_name=booking.patient_emergency_contact_name or '',
+                emergency_contact_phone=booking.patient_emergency_contact_phone or '',
                 emergency_contact_relationship='',
                 is_active=True,
             )
@@ -1089,11 +1091,13 @@ class PublicPortalCheckEmailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         email = serializer.validated_data['email']
+        date_of_birth = serializer.validated_data['date_of_birth']
 
-        # Look for existing active patient by exact email
+        # Look for existing active patient by exact email AND DOB
         patient = Patient.objects.filter(
             clinic=portal_link.clinic,
             email__iexact=email,
+            date_of_birth=date_of_birth,
             is_deleted=False,
         ).first()
 
@@ -1103,18 +1107,20 @@ class PublicPortalCheckEmailView(APIView):
             if masked_phone and len(masked_phone) > 4:
                 masked_phone = "*" * (len(masked_phone) - 4) + masked_phone[-4:]
             
+            # Get initials
+            initials = ""
+            if patient.first_name:
+                initials += patient.first_name[0].upper() + "."
+            if patient.last_name:
+                initials += patient.last_name[0].upper() + "."
+            
             return Response({
-                "exists": True,
-                "patient": {
-                    "id": patient.id,
-                    "first_name": patient.first_name,
-                    "last_name": patient.last_name,
-                    "date_of_birth": patient.date_of_birth,
-                    "phone": masked_phone
-                }
+                "match": True,
+                "initials": initials,
+                "phone_last4": masked_phone[-4:] if masked_phone else ""
             })
         
-        return Response({"exists": False})
+        return Response({"match": False})
 
 
 class PublicPortalBookView(APIView):
@@ -1122,10 +1128,32 @@ class PublicPortalBookView(APIView):
 
     def post(self, request, token_or_slug: str):
         portal_link = _get_portal_link(token_or_slug)
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        
+        is_returning = data.get('is_returning_patient') in (True, 'true', 'True', 1, '1')
+        if is_returning:
+            email = data.get('patient_email')
+            dob = data.get('patient_date_of_birth')
+            patient = Patient.objects.filter(
+                clinic=portal_link.clinic,
+                email__iexact=email,
+                date_of_birth=dob,
+                is_deleted=False
+            ).first()
+            if patient:
+                data['patient_first_name'] = patient.first_name
+                data['patient_last_name'] = patient.last_name
+                data['patient_phone'] = patient.phone
+            else:
+                return Response({'detail': 'Patient mismatch.'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = PortalBookingCreateSerializer(
-            data=request.data,
-            context={'request': request, 'portal_link': portal_link},
+            data=data,
+            context={
+                'request': request,
+                'portal_link': portal_link,
+                'is_returning_patient': is_returning
+            },
         )
 
         if not serializer.is_valid():
