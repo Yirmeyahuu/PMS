@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { usePatientProfileContext } from './context/PatientProfileContext';
 import { formatDate } from './patientProfile.utils';
+import { CaseSessionsTab } from './components/CaseSessionsTab';
 
 type Tab = 'overview' | 'sessions' | 'appointments' | 'notes' | 'letters' | 'documents' | 'timeline' | 'billing';
 
@@ -23,7 +24,7 @@ const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export const CaseDetailsPage = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
-  const { patient, cases } = usePatientProfileContext();
+  const { patient, cases, refreshCases } = usePatientProfileContext();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const caseData = useMemo(() => {
@@ -84,12 +85,40 @@ export const CaseDetailsPage = () => {
             <CheckCircle className="w-4 h-4 text-gray-400" />
             <span>Practitioner: <strong>{caseData.primary_practitioner_name || 'Unassigned'}</strong></span>
           </div>
-          {caseData.approved_sessions !== null && (
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span>Sessions Used: <strong>{caseData.completed_sessions}</strong> / {caseData.approved_sessions}</span>
+          <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span className="font-semibold uppercase text-[10px] tracking-wider text-gray-400">Treatment Session Allocation</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                caseData.allocation_status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
+                caseData.allocation_status === 'EXHAUSTED' ? 'bg-red-100 text-red-700' :
+                'bg-sky-100 text-sky-700'
+              }`}>
+                {caseData.allocation_source} - {caseData.allocation_status}
+              </span>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-sky-600" />
+              <span className="font-medium text-gray-800">{caseData.progress_text}</span>
+            </div>
+            {!caseData.is_unlimited && caseData.approved_sessions && (
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                <div 
+                  className={`h-1.5 rounded-full transition-all ${
+                    (caseData.remaining_sessions || 0) === 0 ? 'bg-red-500' : 
+                    (caseData.remaining_sessions || 0) <= 2 ? 'bg-amber-500' : 
+                    'bg-emerald-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (caseData.completed_sessions / caseData.approved_sessions) * 100)}%` }}
+                ></div>
+              </div>
+            )}
+            {!caseData.is_unlimited && caseData.remaining_sessions !== null && (
+              <div className="flex justify-between text-[11px] text-gray-500 mt-1">
+                <span>Used: {caseData.completed_sessions}</span>
+                <span className="font-medium text-sky-700">Remaining: {caseData.remaining_sessions}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -136,9 +165,7 @@ export const CaseDetailsPage = () => {
           )}
           
           {activeTab === 'sessions' && (
-            <div className="text-center text-gray-500 py-12 bg-white rounded-xl border border-gray-200">
-              Session history feature is coming soon.
-            </div>
+            <CaseSessionsTab caseData={caseData} onUpdate={refreshCases} />
           )}
 
           {activeTab === 'appointments' && (

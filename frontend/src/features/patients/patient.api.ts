@@ -62,11 +62,26 @@ export const getPatient = async (id: number): Promise<Patient> => {
   return response.data;
 };
 
+import React from 'react';
+import toast from 'react-hot-toast';
+import { DuplicateToast } from './components/DuplicateToast';
+
 /**
  * Create new patient
  */
 export const createPatient = async (data: CreatePatientData): Promise<Patient> => {
   const response = await axiosInstance.post<Patient>('/patients/', data);
+  
+  if (response.data.possible_duplicate && response.data.possible_duplicate_id) {
+    toast.custom(
+      (t) => React.createElement(DuplicateToast, { 
+        t, 
+        duplicatePatientId: response.data.possible_duplicate_id as number
+      }), 
+      { duration: 8000 }
+    );
+  }
+  
   return response.data;
 };
 
@@ -234,3 +249,33 @@ export const getPatientActivityTimeline = async (patientId: string | number, cas
   const response = await axiosInstance.get(`/patients/${patientId}/activity_timeline/`, { params });
   return response.data;
 };
+
+// ─── Patient Merge APIs ──────────────────────────────────────────────────
+
+export interface PatientMergePreview {
+  cases: number;
+  appointments: number;
+  clinical_notes: number;
+  invoices: number;
+  attachments: number;
+  letters: number;
+  communications: number;
+}
+
+export const previewPatientMerge = async (primaryId: number, duplicateId: number): Promise<PatientMergePreview> => {
+  const response = await axiosInstance.post<PatientMergePreview>('/merge/preview/', {
+    primary_patient_id: primaryId,
+    duplicate_patient_id: duplicateId,
+  });
+  return response.data;
+};
+
+export const executePatientMerge = async (primaryId: number, duplicateId: number, reason?: string): Promise<{ detail: string; merge_id: string }> => {
+  const response = await axiosInstance.post<{ detail: string; merge_id: string }>('/merge/execute/', {
+    primary_patient_id: primaryId,
+    duplicate_patient_id: duplicateId,
+    reason: reason || '',
+  });
+  return response.data;
+};
+

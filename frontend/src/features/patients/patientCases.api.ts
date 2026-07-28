@@ -68,6 +68,11 @@ export const removeCaseSessions = async (caseId: number, amount: number): Promis
   return response.data;
 };
 
+export const resetCaseAllocation = async (caseId: number): Promise<PatientCase> => {
+  const response = await axiosInstance.post(`${BASE_URL}${caseId}/reset_allocation/`);
+  return response.data;
+};
+
 export const getCaseSessionLogs = async (caseId: number): Promise<any[]> => {
   const response = await axiosInstance.get(`${BASE_URL}${caseId}/session_logs/`);
   return response.data;

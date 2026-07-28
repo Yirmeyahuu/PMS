@@ -145,12 +145,33 @@ export const PatientCasesPage = () => {
                     <span>Practitioner: <strong>{c.primary_practitioner_name || 'Unassigned'}</strong></span>
                   </div>
                   
-                  {c.approved_sessions !== null && (
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      <span>Sessions: <strong>{c.completed_sessions}</strong> / {c.approved_sessions}</span>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-medium">{c.progress_text}</span>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        c.allocation_status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
+                        c.allocation_status === 'EXHAUSTED' ? 'bg-red-100 text-red-700' :
+                        'bg-sky-100 text-sky-700'
+                      }`}>
+                        {c.allocation_status}
+                      </span>
                     </div>
-                  )}
+                    {!c.is_unlimited && c.approved_sessions && (
+                      <div className="w-full bg-gray-100 rounded-full h-1 mt-0.5 overflow-hidden">
+                        <div 
+                          className={`h-1 rounded-full transition-all ${
+                            (c.remaining_sessions || 0) === 0 ? 'bg-red-500' : 
+                            (c.remaining_sessions || 0) <= 2 ? 'bg-amber-500' : 
+                            'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (c.completed_sessions / c.approved_sessions) * 100)}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2 text-xs text-gray-600">
                     <FileText className="w-3.5 h-3.5 text-gray-400" />

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
-import { createPortalConsent, fetchPortal, submitBooking, fetchActiveClinicConsent, createClinicConsentDocument, type ClinicConsentFormData, type ClinicConsentDocumentPayload } from '../portal.api';
+import { createPortalConsent, fetchPortal, submitBooking, fetchActiveClinicConsent, createClinicConsentDocument, checkPortalEmail, type ClinicConsentFormData, type ClinicConsentDocumentPayload } from '../portal.api';
 import { PortalSidebar }                     from '../components/PortalSidebar';
 import { BranchStep }                        from '../components/BranchStep';
 import { PractitionerStep }                  from '../components/PractitionerStep';
@@ -167,8 +167,10 @@ export const PortalHome: React.FC = () => {
     if (!formData.phone.trim()) {
       setFormError('Phone number is required.'); return;
     }
-    const phoneErr = validatePHPhoneDetailed(formData.phone);
-    if (phoneErr) { setFormError(phoneErr); return; }
+    if (!formData.phone.includes('*')) {
+      const phoneErr = validatePHPhoneDetailed(formData.phone);
+      if (phoneErr) { setFormError(phoneErr); return; }
+    }
     if (!formData.date_of_birth) {
       setFormError('Date of birth is required.'); return;
     }
@@ -226,9 +228,10 @@ export const PortalHome: React.FC = () => {
         consent_id: consent.id,
       });
       navigate(`/portal/${token}/success`, { state: { confirmation } });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFormError(
-        err.response?.data?.detail ?? 'Failed to submit booking. Please try again.',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any).response?.data?.detail ?? 'Failed to submit booking. Please try again.',
       );
     } finally {
       setSubmitting(false);
@@ -446,6 +449,7 @@ export const PortalHome: React.FC = () => {
               onOpenTerms={() => setShowTermsModal(true)}
               onOpenConsent={() => setShowConsentModal(true)}
               onOpenClinicConsent={() => setShowClinicConsentModal(true)}
+              onCheckEmail={(email) => checkPortalEmail(token!, { email })}
             />
           )}
         </div>

@@ -4,12 +4,13 @@ import { usePatientProfileContext } from '@/features/patients/context/PatientPro
 import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/ClinicalWorkspaceContext';
 import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
 import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
+import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
 
 const ClinicalWorkspaceLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { cases } = usePatientProfileContext();
-  const { selectedCaseId, setSelectedCaseId } = useClinicalWorkspace();
+  const { cases, patient } = usePatientProfileContext();
+  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
 
   // Auto-select case on mount or location state
   useEffect(() => {
@@ -44,6 +45,21 @@ const ClinicalWorkspaceLayout = () => {
           </div>
         </div>
       </div>
+
+      {patient && (
+        <CreateClinicalNoteModal
+          isOpen={editorContext.type === 'NEW_NOTE'}
+          onClose={() => setEditorContext({ type: 'IDLE' })}
+          patientId={patient.id}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          patientCaseId={selectedCaseId || undefined}
+          preselectedTemplateId={editorContext.type === 'NEW_NOTE' ? editorContext.templateId : undefined}
+          onSuccess={() => {
+            setEditorContext({ type: 'IDLE' });
+            triggerRefresh();
+          }}
+        />
+      )}
     </div>
   );
 };

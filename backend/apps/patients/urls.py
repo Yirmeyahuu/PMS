@@ -5,10 +5,12 @@ from .views import (
     ServiceCategoryViewSet, PortalServiceViewSet,
     PortalLinkViewSet, PortalBookingAdminViewSet,
     PublicPortalView, PublicPortalBookView, PublicAvailableSlotsView,
+    PublicPortalCheckEmailView,
     PublicPortalConsentCreateView, PublicClinicConsentDocumentCreateView,
     PublicClinicConsentFormView,
     PublicClientFormView, PublicClientFormVerifyView, PublicClientFormSubmitView,
     PatientCaseViewSet,
+    PatientMergePreviewView, PatientMergeExecuteView,
 )
 
 router = DefaultRouter()
@@ -22,11 +24,20 @@ router.register(r'patient-cases',      PatientCaseViewSet,       basename='patie
 
 urlpatterns = [
     path('', include(router.urls)),
+    
+    # Patient Merge APIs
+    path('merge/preview/', PatientMergePreviewView.as_view(), name='patient-merge-preview'),
+    path('merge/execute/', PatientMergeExecuteView.as_view(), name='patient-merge-execute'),
 
     path(
         'public/portal/<str:token_or_slug>/',
         PublicPortalView.as_view(),
         name='public-portal',
+    ),
+    path(
+        'public/portal/<str:token_or_slug>/check-email/',
+        PublicPortalCheckEmailView.as_view(),
+        name='public-portal-check-email',
     ),
     path(
         'public/portal/<str:token_or_slug>/book/',

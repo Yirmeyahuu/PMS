@@ -6,43 +6,40 @@ class SessionEngine:
     @staticmethod
     def get_session_stats(patient_case: PatientCase) -> dict:
         """
-        Calculate the approved, completed, remaining sessions, and progress.
-        Sessions are consumed only when an Appointment linked to this case is successfully invoiced.
+        Return session allocation stats from the SessionAllocation model.
         """
-        # Count distinct appointments directly linked to this case that have an active invoice
-        completed = Invoice.objects.filter(
-            appointment__patient_case=patient_case,
-            is_deleted=False
-        ).exclude(
-            status='CANCELLED'
-        ).values('appointment_id').distinct().count()
+        # Fallback for old data or cases without allocation yet
+        if not hasattr(patient_case, 'session_allocation'):
+            approved = patient_case.approved_sessions
+            return {
+                'approved_sessions': approved,
+                'completed_sessions': 0,
+                'remaining_sessions': None if approved is None else approved,
+                'progress_text': f"0 Sessions (Unlimited)" if approved is None else f"0 of {approved} Sessions Used",
+                'allocation_status': 'ACTIVE',
+                'is_unlimited': approved is None,
+                'allocation_source': 'MANUAL'
+            }
+
+        allocation = patient_case.session_allocation
         
-        # Include legacy appointments linked via ClinicalNote that have an active invoice
-        legacy_completed = Invoice.objects.filter(
-            appointment__clinical_notes_v2__patient_case=patient_case,
-            is_deleted=False
-        ).exclude(
-            appointment__patient_case=patient_case
-        ).exclude(
-            status='CANCELLED'
-        ).values('appointment_id').distinct().count()
-        
-        total_completed = completed + legacy_completed
-        approved = patient_case.approved_sessions
-        
-        if approved is None:
+        if allocation.is_unlimited or allocation.approved_sessions is None:
             return {
                 'approved_sessions': None,
-                'completed_sessions': total_completed,
+                'completed_sessions': allocation.used_sessions,
                 'remaining_sessions': None,
-                'progress_text': f"{total_completed} Sessions (Unlimited)"
+                'progress_text': f"{allocation.used_sessions} Sessions (Unlimited)",
+                'allocation_status': allocation.status,
+                'is_unlimited': True,
+                'allocation_source': allocation.allocation_source
             }
         
-        remaining = max(0, approved - total_completed)
-        
         return {
-            'approved_sessions': approved,
-            'completed_sessions': total_completed,
-            'remaining_sessions': remaining,
-            'progress_text': f"{total_completed} of {approved} Sessions Used"
+            'approved_sessions': allocation.approved_sessions,
+            'completed_sessions': allocation.used_sessions,
+            'remaining_sessions': allocation.remaining_sessions,
+            'progress_text': f"{allocation.used_sessions} of {allocation.approved_sessions} Sessions Used",
+            'allocation_status': allocation.status,
+            'is_unlimited': False,
+            'allocation_source': allocation.allocation_source
         }

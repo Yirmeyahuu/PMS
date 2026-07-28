@@ -13,6 +13,7 @@ interface PatientListProps {
   onEdit:       (patient: Patient) => void;
   onArchive?:   (patient: Patient) => void;
   onRestore?:   (patient: Patient) => void;
+  onMerge?:     (patient: Patient) => void;
 }
 
 export const PatientList: React.FC<PatientListProps> = ({
@@ -25,6 +26,7 @@ export const PatientList: React.FC<PatientListProps> = ({
   onEdit,
   onArchive,
   onRestore,
+  onMerge,
 }) => {
   const navigate = useNavigate();
 
@@ -158,6 +160,15 @@ export const PatientList: React.FC<PatientListProps> = ({
                           >
                             <Edit className="w-4 h-4" />
                             Edit
+                          </button>
+                        )}
+                        {!isArchived && onMerge && (
+                          <button
+                            onClick={() => onMerge(patient)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                          >
+                            <ArchiveRestore className="w-4 h-4" />
+                            Merge
                           </button>
                         )}
 

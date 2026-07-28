@@ -50,10 +50,28 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                 <p className="text-xs text-gray-500 mt-1">
                   Client ID: {loadingPatient ? '...' : patient?.patient_number ?? 'N/A'}
                 </p>
-                {patient?.is_archived && (
+                {patient?.is_archived && !patient?.is_merged && (
                   <span className="inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
                     Archived
                   </span>
+                )}
+                {patient?.is_merged && (
+                  <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-left">
+                    <p className="text-xs font-medium text-red-800 flex items-center gap-1 mb-1">
+                      <Settings className="w-3 h-3" /> Merged Profile
+                    </p>
+                    <p className="text-[11px] text-red-600 mb-2">
+                      This profile is archived and merged into another patient record.
+                    </p>
+                    {patient.merged_into && (
+                      <NavLink
+                        to={`/patients/${patient.merged_into}/profile`}
+                        className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1"
+                      >
+                        Open Primary Patient &rarr;
+                      </NavLink>
+                    )}
+                  </div>
                 )}
               </div>
 

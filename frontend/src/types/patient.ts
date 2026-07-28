@@ -32,11 +32,17 @@ export interface Patient {
   archived_at?:     string | null;
   archived_by?:     number | null;
   archived_by_name?: string | null;
+  is_merged?:       boolean;
+  merged_into?:     number | null;
+  merged_at?:       string | null;
+  merged_by?:       number | null;
   // Notification Settings
   send_email_notifications: boolean;
   sms_notifications_enabled: boolean;
   allow_push_notifications: boolean;
   data_sharing_preferences: Record<string, any>;
+  possible_duplicate?: boolean;
+  possible_duplicate_id?: number;
 }
 
 export interface IntakeForm {
@@ -90,6 +96,9 @@ export interface PatientCase {
   completed_sessions: number;
   remaining_sessions: number | null;
   progress_text: string;
+  allocation_status: 'ACTIVE' | 'EXHAUSTED' | 'UNLIMITED';
+  is_unlimited: boolean;
+  allocation_source: 'MANUAL' | 'PACKAGE' | 'HMO';
   referred_by: string;
   referral_info: string;
   created_at: string;

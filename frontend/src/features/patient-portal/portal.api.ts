@@ -110,3 +110,29 @@ export const createClinicConsentDocument = async (
   );
   return res.data;
 };
+
+export interface PortalCheckEmailPayload {
+  email: string;
+}
+
+export interface PortalCheckEmailResponse {
+  exists: boolean;
+  patient?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    date_of_birth: string;
+    phone: string;
+  };
+}
+
+export const checkPortalEmail = async (
+  token: string,
+  payload: PortalCheckEmailPayload,
+): Promise<PortalCheckEmailResponse> => {
+  const res = await publicApi.post<PortalCheckEmailResponse>(
+    `/public/portal/${token}/check-email/`,
+    payload,
+  );
+  return res.data;
+};

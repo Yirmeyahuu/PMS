@@ -4,6 +4,7 @@ import { PatientList } from './PatientList';
 import { PatientFilters } from './components/PatientFilters';
 import { PatientModal } from './components/PatientModal';
 import { PatientDetailsModal } from './components/PatientDetailsModal';
+import { MergePatientsModal } from './components/MergePatientsModal';
 import { Users, Plus, Filter, Search, Loader2, Archive, ArchiveRestore } from 'lucide-react';
 import { usePatients } from './hooks/usePatients';
 import { useCalendarSocket } from '@/features/appointments/hooks/useCalendarSocket';
@@ -40,6 +41,7 @@ export const Clients: React.FC = () => {
   const [isAddModalOpen,     setIsAddModalOpen]      = useState(false);
   const [isEditModalOpen,    setIsEditModalOpen]     = useState(false);
   const [isViewModalOpen,    setIsViewModalOpen]     = useState(false);
+  const [isMergeModalOpen,   setIsMergeModalOpen]    = useState(false);
   const [selectedPatient,    setSelectedPatient]     = useState<Patient | null>(null);
   const [currentFilters,     setCurrentFilters]      = useState<FilterOptions>({ gender: '', is_active: null });
   const [archiveConfirm,     setArchiveConfirm]      = useState<Patient | null>(null);
@@ -57,6 +59,7 @@ export const Clients: React.FC = () => {
   const handleAddClient    = () => { setSelectedPatient(null); setIsAddModalOpen(true); };
   const handleEditClient   = (patient: Patient) => { setSelectedPatient(patient); setIsEditModalOpen(true); };
   const handleViewClient   = (patient: Patient) => { setSelectedPatient(patient); setIsViewModalOpen(true); };
+  const handleMergeClient  = (patient: Patient) => { setSelectedPatient(patient); setIsMergeModalOpen(true); };
   const handleFilterClients = () => setIsFilterModalOpen(true);
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
@@ -240,6 +243,7 @@ export const Clients: React.FC = () => {
               onEdit={handleEditClient}
               onArchive={(p) => setArchiveConfirm(p)}
               onRestore={(p) => setRestoreConfirm(p)}
+              onMerge={handleMergeClient}
             />
           </div>
         )}
@@ -275,6 +279,18 @@ export const Clients: React.FC = () => {
           onClose={() => { setIsViewModalOpen(false); setSelectedPatient(null); }}
           patient={selectedPatient}
           onEdit={() => { setIsViewModalOpen(false); setIsEditModalOpen(true); }}
+        />
+
+        {/* ── Merge Patients Modal ── */}
+        <MergePatientsModal
+          isOpen={isMergeModalOpen}
+          onClose={() => { setIsMergeModalOpen(false); setSelectedPatient(null); }}
+          initialPrimaryPatient={selectedPatient}
+          onMergeSuccess={() => {
+            setIsMergeModalOpen(false);
+            setSelectedPatient(null);
+            refresh();
+          }}
         />
 
         {/* ── Archive Confirm Dialog ── */}

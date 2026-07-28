@@ -27,6 +27,7 @@ class PatientSerializer(serializers.ModelSerializer):
             'id', 'patient_number', 'created_at', 'updated_at',
             # Archive fields are set server-side via the archive/restore actions
             'is_archived', 'archived_at', 'archived_by',
+            'is_merged', 'merged_into', 'merged_at', 'merged_by',
         ]
 
     def get_age(self, obj):
@@ -104,18 +105,6 @@ class PatientSerializer(serializers.ModelSerializer):
                     )
                 if errors:
                     raise serializers.ValidationError(errors)
-
-        # Prevent duplicate emails within the same clinic.
-        email = attrs.get('email')
-        clinic = attrs.get('clinic') or (self.instance.clinic if self.instance else None)
-        if email and clinic:
-            qs = Patient.objects.filter(clinic=clinic, email__iexact=email)
-            if self.instance:
-                qs = qs.exclude(pk=self.instance.pk)
-            if qs.exists():
-                raise serializers.ValidationError(
-                    {'email': 'A patient with this email address already exists in this clinic.'}
-                )
 
         return attrs
 
@@ -571,6 +560,10 @@ class PublicPatientConsentCreateSerializer(serializers.ModelSerializer):
         return value
 
 
+class PublicPortalCheckEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
 # ─── Client Form Request serializers ─────────────────────────────────────────
 
 class ClientFormRequestSerializer(serializers.ModelSerializer):
@@ -682,6 +675,9 @@ class PatientCaseSerializer(serializers.ModelSerializer):
     completed_sessions = serializers.SerializerMethodField()
     remaining_sessions = serializers.SerializerMethodField()
     progress_text = serializers.SerializerMethodField()
+    allocation_status = serializers.SerializerMethodField()
+    is_unlimited = serializers.SerializerMethodField()
+    allocation_source = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientCase
@@ -690,9 +686,10 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             'status', 'primary_practitioner', 'primary_practitioner_name',
             'payer', 'alert_notes', 'approved_sessions',
             'completed_sessions', 'remaining_sessions', 'progress_text',
+            'allocation_status', 'is_unlimited', 'allocation_source',
             'referred_by', 'referral_info', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_sessions', 'remaining_sessions', 'progress_text']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_sessions', 'remaining_sessions', 'progress_text', 'allocation_status', 'is_unlimited', 'allocation_source']
 
     def _get_stats(self, obj):
         if not hasattr(obj, '_session_stats'):
@@ -708,6 +705,15 @@ class PatientCaseSerializer(serializers.ModelSerializer):
 
     def get_progress_text(self, obj) -> str:
         return self._get_stats(obj).get('progress_text', '')
+
+    def get_allocation_status(self, obj) -> str:
+        return self._get_stats(obj).get('allocation_status', 'ACTIVE')
+
+    def get_is_unlimited(self, obj) -> bool:
+        return self._get_stats(obj).get('is_unlimited', False)
+
+    def get_allocation_source(self, obj) -> str:
+        return self._get_stats(obj).get('allocation_source', 'MANUAL')
 
     def validate(self, attrs):
         approved = attrs.get('approved_sessions', getattr(self.instance, 'approved_sessions', None) if self.instance else None)
@@ -780,3 +786,9 @@ class PublicPatientConsentDocumentCreateSerializer(serializers.Serializer):
         if not value or not value.strip():
             raise serializers.ValidationError('Signature is required.')
         return value
+
+class PatientMergeSerializer(serializers.Serializer):
+    """Serializer for merging duplicate patient records."""
+    primary_patient_id = serializers.IntegerField(required=True)
+    duplicate_patient_id = serializers.IntegerField(required=True)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")

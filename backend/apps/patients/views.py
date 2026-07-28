@@ -23,6 +23,7 @@ from .serializers import (
     ServiceCategorySerializer, PortalServiceSerializer,
     PortalLinkPublicSerializer, PortalLinkAdminSerializer,
     PortalBookingCreateSerializer, PortalBookingResponseSerializer,
+    PublicPortalCheckEmailSerializer,
     PatientConsentSerializer, PatientConsentCreateSerializer,
     PublicPatientConsentCreateSerializer,
     PatientConsentDocumentSerializer, PatientConsentDocumentCreateSerializer,
@@ -63,26 +64,24 @@ def _confirm_portal_booking(booking, confirmed_by_user):
     normalized_phone = normalize_ph_phone(booking.patient_phone) if booking.patient_phone else ''
 
     # ── 1. Find or create Patient (race-condition-safe) ─────────────────────
-    # Uses select_for_update inside a transaction to prevent duplicate records
-    # when concurrent portal bookings arrive with the same email.
+    # Uses PatientMatchingService for intelligent duplicate detection
+    from apps.patients.services.matching_service import PatientMatchingService, MATCH_EXACT, MATCH_POSSIBLE
+    
     is_new_patient = False
     with transaction.atomic():
         patient = None
 
-        if booking.patient_email:
-            patient = Patient.objects.select_for_update().filter(
-                clinic=clinic,
-                email__iexact=booking.patient_email,
-                is_deleted=False,
-            ).first()
+        match_result = PatientMatchingService.match_patient(
+            first_name=booking.patient_first_name,
+            last_name=booking.patient_last_name,
+            dob=booking.patient_date_of_birth,
+            phone=normalized_phone,
+            clinic=clinic
+        )
 
-        if patient is None:
-            patient = Patient.objects.select_for_update().filter(
-                clinic=clinic,
-                first_name__iexact=booking.patient_first_name,
-                last_name__iexact=booking.patient_last_name,
-                is_deleted=False,
-            ).first()
+        if match_result.status == MATCH_EXACT and match_result.existing_patient:
+            # Re-fetch with select_for_update for safety
+            patient = Patient.objects.select_for_update().filter(id=match_result.existing_patient.id).first()
 
         if patient is None:
             patient = Patient.objects.create(
@@ -107,6 +106,20 @@ def _confirm_portal_booking(booking, confirmed_by_user):
                 f"Patient created from portal booking #{booking.reference_number}: "
                 f"{patient.get_full_name()} ({patient.patient_number})"
             )
+            
+            if match_result.status == MATCH_POSSIBLE and match_result.existing_patient:
+                logger.info(f"Portal Booking created possible duplicate for {patient.id}. Existing: {match_result.existing_patient.id}")
+                try:
+                    from apps.patients.models import PatientMergeLog
+                    PatientMergeLog.objects.create(
+                        primary_patient=match_result.existing_patient,
+                        duplicate_patient_id=patient.id,
+                        user=confirmed_by_user,
+                        reason=f"Possible duplicate detected during Portal Booking. Matched fields: {', '.join(match_result.matched_fields)}",
+                        payload={"matched_fields": match_result.matched_fields, "booking_ref": booking.reference_number}
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to create duplicate audit log for portal booking: {e}")
 
     # Emit real-time event so Clients list updates without a page refresh.
     if is_new_patient:
@@ -379,6 +392,56 @@ class PatientViewSet(viewsets.ModelViewSet):
         activities.sort(key=lambda x: x['date'], reverse=True)
         
         return Response(activities)
+
+    def create(self, request, *args, **kwargs):
+        from apps.patients.services.matching_service import PatientMatchingService, MATCH_EXACT, MATCH_POSSIBLE
+        from rest_framework import status
+        from rest_framework.response import Response
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        first_name = serializer.validated_data.get('first_name', '')
+        last_name = serializer.validated_data.get('last_name', '')
+        dob = serializer.validated_data.get('date_of_birth')
+        phone = serializer.validated_data.get('phone', '')
+        
+        match_result = PatientMatchingService.match_patient(
+            first_name=first_name,
+            last_name=last_name,
+            dob=dob,
+            phone=phone,
+            clinic=request.user.clinic
+        )
+        
+        if match_result.status == MATCH_EXACT and match_result.existing_patient:
+            # Rule 1: Exact match, return existing patient instead of creating new
+            existing_serializer = self.get_serializer(match_result.existing_patient)
+            return Response(existing_serializer.data, status=status.HTTP_200_OK)
+            
+        # Proceed with creation for POSSIBLE_DUPLICATE or NEW_PATIENT
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        
+        data = serializer.data
+        if match_result.status == MATCH_POSSIBLE and match_result.existing_patient:
+            data['possible_duplicate'] = True
+            data['possible_duplicate_id'] = match_result.existing_patient.id
+            
+            # Audit log Phase 8
+            try:
+                from apps.patients.models import PatientMergeLog
+                PatientMergeLog.objects.create(
+                    primary_patient=match_result.existing_patient,
+                    duplicate_patient_id=data['id'],
+                    user=request.user,
+                    reason=f"Possible duplicate detected during manual creation. Matched fields: {', '.join(match_result.matched_fields)}",
+                    payload={"matched_fields": match_result.matched_fields}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create duplicate audit log: {e}")
+            
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -1014,6 +1077,44 @@ class PublicPortalView(APIView):
         portal_link = _get_portal_link(token_or_slug)
         serializer  = PortalLinkPublicSerializer(portal_link, context={'request': request})
         return Response(serializer.data)
+
+
+class PublicPortalCheckEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, token_or_slug: str):
+        portal_link = _get_portal_link(token_or_slug)
+        serializer = PublicPortalCheckEmailSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data['email']
+
+        # Look for existing active patient by exact email
+        patient = Patient.objects.filter(
+            clinic=portal_link.clinic,
+            email__iexact=email,
+            is_deleted=False,
+        ).first()
+
+        if patient:
+            # Mask phone: e.g. "09171234567" -> "********4567"
+            masked_phone = patient.phone
+            if masked_phone and len(masked_phone) > 4:
+                masked_phone = "*" * (len(masked_phone) - 4) + masked_phone[-4:]
+            
+            return Response({
+                "exists": True,
+                "patient": {
+                    "id": patient.id,
+                    "first_name": patient.first_name,
+                    "last_name": patient.last_name,
+                    "date_of_birth": patient.date_of_birth,
+                    "phone": masked_phone
+                }
+            })
+        
+        return Response({"exists": False})
 
 
 class PublicPortalBookView(APIView):
@@ -1699,6 +1800,7 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         return self.queryset.filter(patient__clinic_id__in=all_branch_ids)
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def add_sessions(self, request, pk=None):
         patient_case = self.get_object()
         try:
@@ -1713,7 +1815,32 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
             patient_case.approved_sessions = amount
         else:
             patient_case.approved_sessions += amount
-        patient_case.save()
+        patient_case.save(update_fields=['approved_sessions'])
+
+        # Update or create SessionAllocation
+        from apps.patients.models import SessionAllocation, SessionConsumptionLog
+        allocation, created = SessionAllocation.objects.get_or_create(
+            patient_case=patient_case,
+            defaults={
+                'approved_sessions': patient_case.approved_sessions,
+                'is_unlimited': False,
+                'allocation_source': 'MANUAL',
+                'status': 'ACTIVE'
+            }
+        )
+        if not created:
+            allocation.approved_sessions = patient_case.approved_sessions
+            allocation.is_unlimited = False
+            if allocation.status == 'EXHAUSTED' and allocation.used_sessions < allocation.approved_sessions:
+                allocation.status = 'ACTIVE'
+            allocation.save(update_fields=['approved_sessions', 'is_unlimited', 'status'])
+        
+        SessionConsumptionLog.objects.create(
+            allocation=allocation,
+            created_by=request.user,
+            action='ADDED',
+            reason=f'Manually added {amount} sessions'
+        )
 
         PatientCaseSessionLog.objects.create(
             patient_case=patient_case,
@@ -1726,6 +1853,7 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(patient_case).data)
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def remove_sessions(self, request, pk=None):
         patient_case = self.get_object()
         try:
@@ -1740,7 +1868,24 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
 
         previous_limit = patient_case.approved_sessions
         patient_case.approved_sessions = max(0, patient_case.approved_sessions - amount)
-        patient_case.save()
+        patient_case.save(update_fields=['approved_sessions'])
+
+        from apps.patients.models import SessionAllocation, SessionConsumptionLog
+        try:
+            allocation = patient_case.session_allocation
+            allocation.approved_sessions = patient_case.approved_sessions
+            if allocation.used_sessions >= allocation.approved_sessions:
+                allocation.status = 'EXHAUSTED'
+            allocation.save(update_fields=['approved_sessions', 'status'])
+            
+            SessionConsumptionLog.objects.create(
+                allocation=allocation,
+                created_by=request.user,
+                action='REMOVED',
+                reason=f'Manually removed {amount} sessions'
+            )
+        except SessionAllocation.DoesNotExist:
+            pass
 
         PatientCaseSessionLog.objects.create(
             patient_case=patient_case,
@@ -1753,11 +1898,35 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(patient_case).data)
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def remove_limit(self, request, pk=None):
         patient_case = self.get_object()
         previous_limit = patient_case.approved_sessions
         patient_case.approved_sessions = None
-        patient_case.save()
+        patient_case.save(update_fields=['approved_sessions'])
+
+        from apps.patients.models import SessionAllocation, SessionConsumptionLog
+        allocation, created = SessionAllocation.objects.get_or_create(
+            patient_case=patient_case,
+            defaults={
+                'approved_sessions': None,
+                'is_unlimited': True,
+                'allocation_source': 'MANUAL',
+                'status': 'ACTIVE'
+            }
+        )
+        if not created:
+            allocation.approved_sessions = None
+            allocation.is_unlimited = True
+            allocation.status = 'ACTIVE'
+            allocation.save(update_fields=['approved_sessions', 'is_unlimited', 'status'])
+            
+        SessionConsumptionLog.objects.create(
+            allocation=allocation,
+            created_by=request.user,
+            action='ADDED',
+            reason='Removed session limit (Unlimited)'
+        )
 
         PatientCaseSessionLog.objects.create(
             patient_case=patient_case,
@@ -1769,9 +1938,106 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         )
         return Response(self.get_serializer(patient_case).data)
 
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def reset_allocation(self, request, pk=None):
+        patient_case = self.get_object()
+        
+        # Reset completely
+        previous_limit = patient_case.approved_sessions
+        patient_case.approved_sessions = 0
+        patient_case.save(update_fields=['approved_sessions'])
+        
+        from apps.patients.models import SessionAllocation, SessionConsumptionLog
+        try:
+            allocation = patient_case.session_allocation
+            allocation.approved_sessions = 0
+            allocation.used_sessions = 0
+            allocation.is_unlimited = False
+            allocation.status = 'EXHAUSTED'
+            allocation.save(update_fields=['approved_sessions', 'used_sessions', 'is_unlimited', 'status'])
+            
+            SessionConsumptionLog.objects.create(
+                allocation=allocation,
+                created_by=request.user,
+                action='REMOVED',
+                reason='Allocation fully reset'
+            )
+        except SessionAllocation.DoesNotExist:
+            pass
+
+        PatientCaseSessionLog.objects.create(
+            patient_case=patient_case,
+            user=request.user,
+            action='REMOVED_SESSIONS',
+            amount=previous_limit,
+            previous_limit=previous_limit,
+            new_limit=0
+        )
+        return Response(self.get_serializer(patient_case).data)
+
     @action(detail=True, methods=['get'])
     def session_logs(self, request, pk=None):
         patient_case = self.get_object()
         logs = patient_case.session_logs.all()
         serializer = PatientCaseSessionLogSerializer(logs, many=True)
         return Response(serializer.data)
+
+class PatientMergePreviewView(APIView):
+    """
+    Returns a preview of the records that will be transferred during a merge.
+    (Phase 4)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        from .serializers import PatientMergeSerializer
+        from .services.merge_service import PatientMergeService
+
+        serializer = PatientMergeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        primary_id = serializer.validated_data['primary_patient_id']
+        duplicate_id = serializer.validated_data['duplicate_patient_id']
+
+        try:
+            summary = PatientMergeService.preview_merge(primary_id, duplicate_id)
+            return Response(summary, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PatientMergeExecuteView(APIView):
+    """
+    Executes the enterprise merge operation, transferring all dependencies
+    and archiving the duplicate record. (Phase 3-11)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        from .serializers import PatientMergeSerializer
+        from .services.merge_service import PatientMergeService
+
+        serializer = PatientMergeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        primary_id = serializer.validated_data['primary_patient_id']
+        duplicate_id = serializer.validated_data['duplicate_patient_id']
+        reason = serializer.validated_data.get('reason', '')
+
+        try:
+            log = PatientMergeService.execute_merge(
+                primary_id=primary_id,
+                duplicate_id=duplicate_id,
+                user=request.user,
+                reason=reason
+            )
+            return Response({
+                'detail': 'Patients successfully merged.',
+                'merge_id': log.merge_id
+            }, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Fallback for unexpected errors during transaction
+            return Response({'detail': f'Merge failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -36,6 +36,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         queryset=PatientCase.objects.all(), required=False, allow_null=True
     )
     case_remaining_sessions = serializers.SerializerMethodField()
+    case_is_unlimited = serializers.SerializerMethodField()
 
     class Meta:
         model  = Appointment
@@ -44,7 +45,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'practitioner', 'practitioner_name', 'practitioner_avatar',
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
-            'appointment_type', 'patient_case', 'case_remaining_sessions',
+            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited',
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
@@ -63,7 +64,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name', 'has_invoice',
-            'patient_case', 'case_remaining_sessions',
+            'patient_case', 'case_remaining_sessions', 'case_is_unlimited',
             'created_at', 'updated_at',
         ]
 
@@ -78,11 +79,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     def get_case_remaining_sessions(self, obj) -> int | None:
         if obj.patient_case_id:
-            # Check cached from prefetch if available, otherwise hit DB
             from apps.patients.services.session_engine import SessionEngine
             stats = SessionEngine.get_session_stats(obj.patient_case)
             return stats.get('remaining_sessions')
         return None
+
+    def get_case_is_unlimited(self, obj) -> bool:
+        if obj.patient_case_id:
+            from apps.patients.services.session_engine import SessionEngine
+            stats = SessionEngine.get_session_stats(obj.patient_case)
+            return stats.get('is_unlimited', False)
+        return False
 
     def get_practitioner_avatar(self, obj) -> str | None:
         """Get practitioner avatar URL from user model with full absolute URL."""

@@ -29,6 +29,7 @@ import {
 } from '@/features/patients/patientCases.api';
 import type { PatientCase, PatientCaseStatus, PatientCasePayer } from '@/types/patient';
 import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
+import { CaseRequiredModal } from './CaseRequiredModal';
 import type { Practitioner } from '@/features/clinics/clinic.api';
 
 import { AppointmentEditForm }    from './AppointmentEditForm';
@@ -248,8 +249,9 @@ const ClinicalCaseWorkspace = React.forwardRef<
     loadingPractitioners: boolean;
     onCasesChanged:       () => void;
     onDirtyChange:        (dirty: boolean) => void;
+    onSaved:              (updated: Appointment) => void;
   }
->(({ appointment, patientCases, practitioners, loadingPractitioners, onCasesChanged, onDirtyChange }, ref) => {
+>(({ appointment, patientCases, practitioners, loadingPractitioners, onCasesChanged, onDirtyChange, onSaved }, ref) => {
   const queryClient = useQueryClient();
   const [selectedCaseId,  setSelectedCaseId]  = useState<string>(
     appointment.patient_case ? String(appointment.patient_case) : ''
@@ -277,22 +279,21 @@ const ClinicalCaseWorkspace = React.forwardRef<
     }
     setSaveError(null);
     setSavedOk(false);
-  }, [selectedCaseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCaseId, patientCases]);
 
   // Reset to the appointment's linked case (or blank) when a different appointment is opened
   useEffect(() => {
     setSelectedCaseId(appointment.patient_case ? String(appointment.patient_case) : '');
     setSaveError(null);
     setSavedOk(false);
-  }, [appointment.id]);
+  }, [appointment.id, appointment.patient_case]);
 
-  // Keep selectedCaseId valid after cases list changes (e.g. after create/delete).
-  // '' is a valid "no case" state — never auto-select a case the user didn't choose.
+  // Keep selectedCaseId valid after cases list changes, but don't wipe if loading (empty array).
   useEffect(() => {
-    if (selectedCaseId !== '' && !patientCases.some(c => String(c.id) === selectedCaseId)) {
+    if (patientCases.length > 0 && selectedCaseId !== '' && !patientCases.some(c => String(c.id) === selectedCaseId)) {
       setSelectedCaseId('');
     }
-  }, [patientCases]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [patientCases, selectedCaseId]);
 
   const isDirty = !!selectedCase && (
     editPayer      !== (selectedCase.payer      ?? '') ||
@@ -331,7 +332,8 @@ const ClinicalCaseWorkspace = React.forwardRef<
       referral_info: data.referralInfo || undefined,
     }).then(async (created) => {
       try {
-        await apiEditAppointment(appointment.id, { patient_case: created.id });
+        const updated = await apiEditAppointment(appointment.id, { patient_case: created.id });
+        onSaved(updated);
         if (onDirtyChange) onDirtyChange(true);
       } catch (err) {
         toast.error('Created case but failed to assign to appointment');
@@ -403,9 +405,10 @@ const ClinicalCaseWorkspace = React.forwardRef<
                   const newId = e.target.value;
                   setSelectedCaseId(newId);
                   try {
-                    await apiEditAppointment(appointment.id, {
+                    const updated = await apiEditAppointment(appointment.id, {
                       patient_case: newId ? parseInt(newId, 10) : null
                     });
+                    onSaved(updated);
                     if (onDirtyChange) onDirtyChange(true);
                     toast.success('Case assigned to appointment');
                   } catch (error) {
@@ -1231,6 +1234,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 }) => {
   const [activeTab,             setActiveTab]             = useState<Tab>('client');
   const [showCancelModal,       setShowCancelModal]       = useState(false);
+  const [showCaseRequiredModal, setShowCaseRequiredModal] = useState(false);
   const [showAppointmentDropdown, setShowAppointmentDropdown] = useState(false);
   const [showRecurringModal,     setShowRecurringModal]     = useState(false);
   const [casesVersion,           setCasesVersion]           = useState(0);
@@ -1458,6 +1462,16 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                 <p className="text-xs text-gray-500">{appointment.patient_name}</p>
               </div>
             </div>
+            
+            <CaseRequiredModal
+              isOpen={showCaseRequiredModal}
+              onClose={() => setShowCaseRequiredModal(false)}
+              onGoToCases={() => {
+                setShowCaseRequiredModal(false);
+                setActiveTab('client'); // The Case card is rendered in Client Information tab
+              }}
+            />
+
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1484,12 +1498,16 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     if (tab.isDropdown) {
                       setShowAppointmentDropdown(!showAppointmentDropdown);
                     } else if (tab.key === 'clinical_notes') {
+                      if (!appointment.patient_case) {
+                        setShowCaseRequiredModal(true);
+                        return;
+                      }
                       // Redirect to Clinical Documentation Workspace
                       onClose();
                       navigate(`/patients/${appointment.patient}/clinical`, { 
                         state: { 
                           appointmentId: appointment.id,
-                          caseId: appointment.patient_case ? Number(appointment.patient_case) : undefined
+                          caseId: Number(appointment.patient_case)
                         } 
                       });
                     } else {
@@ -1734,6 +1752,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     loadingPractitioners={loadingPractitioners}
                     onCasesChanged={() => setCasesVersion(v => v + 1)}
                     onDirtyChange={setCaseDirty}
+                    onSaved={handleInlineApptSaved}
                   />
 
                   {/* ── Column 3: Appointment Details ── */}

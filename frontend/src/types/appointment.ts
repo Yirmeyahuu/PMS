@@ -19,6 +19,7 @@ export interface Appointment {
 
   patient_case: number | null;
   case_remaining_sessions: number | null;
+  case_is_unlimited: boolean;
 
   status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'ARRIVED' | 'DNA';
   arrival_status: 'NO_STATUS' | 'ARRIVED' | 'DNA';

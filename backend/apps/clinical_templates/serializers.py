@@ -173,6 +173,13 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
                 except Appointment.DoesNotExist:
                     raise serializers.ValidationError({'appointment': 'Invalid appointment ID'})
             
+            # Enforce Case Requirement
+            if not appointment.patient_case:
+                raise serializers.ValidationError({'detail': 'Clinical Notes require the Appointment to be assigned to a Case.'})
+            
+            # Auto-populate patient_case from appointment
+            attrs['patient_case'] = appointment.patient_case
+
             # Auto-populate practitioner if missing
             if not attrs.get('practitioner') and hasattr(appointment, 'practitioner'):
                 attrs['practitioner'] = appointment.practitioner

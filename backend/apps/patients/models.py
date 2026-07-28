@@ -109,7 +109,33 @@ class Patient(TimeStampedModel, SoftDeleteModel):
         related_name='archived_patients',
         help_text='Staff member who archived this patient.',
     )
-
+    # Merge fields (Patient Identity Management)
+    is_merged = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Indicates this duplicate patient was merged into a primary patient.',
+    )
+    merged_into = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='merged_duplicates',
+        help_text='The primary patient this duplicate was merged into.'
+    )
+    merged_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when the patient was merged.',
+    )
+    merged_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='merged_patients',
+        help_text='Staff member who performed the merge.',
+    )
     class Meta:
         db_table = 'patients'
         ordering = ['last_name', 'first_name']
@@ -536,6 +562,110 @@ class PatientCase(TimeStampedModel):
         return f"{self.title} - {self.patient.get_full_name()}"
 
 
+class SessionAllocation(TimeStampedModel):
+    """
+    Scalable session allocation model for a PatientCase.
+    Tracks approved, used, and remaining sessions, supporting various sources like packages or HMO.
+    """
+    SOURCE_CHOICES = [
+        ('MANUAL', 'Manual'),
+        ('PACKAGE', 'Prepaid Package'),
+        ('HMO', 'HMO Approval'),
+    ]
+
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('EXHAUSTED', 'Exhausted'),
+        ('UNLIMITED', 'Unlimited'),
+    ]
+
+    patient_case = models.OneToOneField(
+        'patients.PatientCase',
+        on_delete=models.CASCADE,
+        related_name='session_allocation',
+        help_text='The case this allocation belongs to.'
+    )
+    allocation_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='MANUAL')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    
+    approved_sessions = models.IntegerField(null=True, blank=True, help_text='Total approved. Null if unlimited.')
+    used_sessions = models.IntegerField(default=0, help_text='Total used sessions based on invoices.')
+    is_unlimited = models.BooleanField(default=False, help_text='True if the allocation has no session limit.')
+
+    class Meta:
+        db_table = 'session_allocations'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Allocation for Case {self.patient_case_id} ({self.status})"
+    
+    @property
+    def remaining_sessions(self):
+        if self.is_unlimited or self.approved_sessions is None:
+            return None
+        return max(0, self.approved_sessions - self.used_sessions)
+
+
+class SessionConsumptionLog(TimeStampedModel):
+    """
+    Complete audit trail for session consumption.
+    A session is considered USED ONLY when an invoice is successfully generated.
+    """
+    ACTION_CHOICES = [
+        ('USED', 'Used'),
+        ('ADDED', 'Added'),
+        ('REMOVED', 'Removed'),
+        ('RESET', 'Reset'),
+        ('UNLIMITED_SET', 'Set to Unlimited'),
+    ]
+
+    allocation = models.ForeignKey(
+        SessionAllocation,
+        on_delete=models.CASCADE,
+        related_name='consumption_logs'
+    )
+    appointment = models.ForeignKey(
+        'appointments.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='session_logs'
+    )
+    invoice = models.ForeignKey(
+        'billing.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='session_logs'
+    )
+    practitioner = models.ForeignKey(
+        'clinics.Practitioner',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='session_logs'
+    )
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text='User who triggered the action'
+    )
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    reason = models.TextField(blank=True, help_text='Reason for manual adjustments or consumption notes')
+
+    class Meta:
+        db_table = 'session_consumption_logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['allocation', 'action']),
+        ]
+
+    def __str__(self):
+        return f"[{self.action}] Allocation {self.allocation_id}"
+
+
 class PatientCaseSessionLog(TimeStampedModel):
     """Audit log for changes to a patient case's session allocation limits."""
     
@@ -673,3 +803,60 @@ class PatientConsentDocument(TimeStampedModel):
 
     def __str__(self):
         return f"{self.signer_full_name} - {self.title} ({self.signed_at.date()})"
+
+
+class PatientMergeLog(TimeStampedModel):
+    """
+    Immutable audit log for patient merges (Phase 8).
+    Records the exact details of the merge operation for historical traceability.
+    """
+    merge_id = models.CharField(max_length=50, unique=True, editable=False)
+    
+    primary_patient = models.ForeignKey(
+        Patient,
+        on_delete=models.DO_NOTHING,  # Preserve log even if patient is later hard deleted
+        related_name='merges_as_primary',
+        help_text='The patient that survived the merge.'
+    )
+    duplicate_patient = models.ForeignKey(
+        Patient,
+        on_delete=models.DO_NOTHING,
+        related_name='merges_as_duplicate',
+        help_text='The patient that was archived/merged.'
+    )
+    
+    merged_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='patient_merges_performed'
+    )
+    
+    reason = models.TextField(help_text='Reason for merging these profiles.', blank=True)
+    
+    relationships_transferred = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Detailed JSON map of all related IDs transferred. e.g. {"appointments": [1, 2], "cases": [5]}'
+    )
+    
+    class Meta:
+        db_table = 'patient_merge_logs'
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Merge {self.merge_id}: {self.duplicate_patient_id} -> {self.primary_patient_id}"
+    
+    def save(self, *args, **kwargs):
+        if not self.merge_id:
+            from django.utils import timezone
+            from django.utils.crypto import get_random_string
+            date_str = timezone.now().strftime('%Y%m%d')
+            suffix = get_random_string(8).upper()
+            self.merge_id = f"MERGE-{date_str}-{suffix}"
+        
+        # Enforce immutability if already saved
+        if self.pk is not None:
+            raise ValueError("PatientMergeLog entries are immutable and cannot be modified.")
+            
+        super().save(*args, **kwargs)

@@ -10,7 +10,7 @@ import type { Appointment } from '@/types';
 
 export const WorkspaceRightPanel = () => {
   const { patient } = usePatientProfileContext();
-  const { selectedCaseId, refreshTrigger, setEditorContext, editorContext } = useClinicalWorkspace();
+  const { selectedCaseId, refreshTrigger, setEditorContext } = useClinicalWorkspace();
   const [activeTab, setActiveTab] = useState<'history' | 'documents'>('history');
 
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
@@ -48,9 +48,6 @@ export const WorkspaceRightPanel = () => {
     fetchData();
   }, [fetchData, refreshTrigger]);
 
-  const handleCancelNewNote = () => {
-    setEditorContext({ type: 'IDLE' });
-  };
 
   const handleRefreshFeed = () => {
     setEditorContext({ type: 'IDLE' });
@@ -89,20 +86,8 @@ export const WorkspaceRightPanel = () => {
           </div>
         ) : activeTab === 'history' ? (
           <div className="max-w-4xl mx-auto">
-            {/* Inline Creation Form */}
-            {editorContext.type === 'NEW_NOTE' && (
-              <ClinicalNoteFeedItem
-                isNewNote={true}
-                initialTemplateId={editorContext.templateId}
-                appointments={appointments}
-                templates={templates}
-                onCancelNewNote={handleCancelNewNote}
-                onRefreshFeed={handleRefreshFeed}
-              />
-            )}
-            
             {/* History Feed */}
-            {notes.length === 0 && editorContext.type !== 'NEW_NOTE' ? (
+            {notes.length === 0 ? (
               <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
                 <h3 className="text-lg font-medium text-slate-600 mb-2">No Clinical Notes Found</h3>
