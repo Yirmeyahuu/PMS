@@ -31,6 +31,7 @@ def auto_populate_package_case(appointment):
         primary_practitioner=appointment.practitioner,
         payer='PRIVATE',  # Default to private pay for packages
         approved_sessions=service.session_allocation,
+        package_cost=service.price,
     )
 
     # Update Case fields directly

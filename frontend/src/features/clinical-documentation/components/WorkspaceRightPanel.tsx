@@ -9,8 +9,8 @@ import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 
 export const WorkspaceRightPanel = () => {
-  const { patient } = usePatientProfileContext();
-  const { selectedCaseId, refreshTrigger, setEditorContext } = useClinicalWorkspace();
+  const { patient, refreshCases } = usePatientProfileContext();
+  const { selectedCaseId, refreshTrigger, triggerRefresh, setEditorContext } = useClinicalWorkspace();
   type Tab = 'notes' | 'letters' | 'documents' | 'history' | 'measures' | 'exercises';
   const [activeTab, setActiveTab] = useState<Tab>('notes');
 
@@ -58,7 +58,8 @@ export const WorkspaceRightPanel = () => {
 
   const handleRefreshFeed = () => {
     setEditorContext({ type: 'IDLE' });
-    fetchData();
+    triggerRefresh();
+    refreshCases();
   };
 
   return (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } 
 import { useNavigate } from 'react-router-dom';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
-  Receipt, Plus, Printer, AlertCircle,
+  Receipt, Plus, Printer, AlertCircle, CheckCircle2,
   RefreshCw, ChevronDown, Building2, Edit3, Trash2,
   Save, XCircle, Search, UserCircle, ClipboardList,
   ExternalLink, Repeat, List, Stethoscope, Repeat2,
@@ -987,6 +987,23 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   }
 
   if (!invoice) {
+    if (appointment.is_covered_by_package) {
+      return (
+        <div className="space-y-4">
+          <AppointmentSummary appointment={appointment} />
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-3 shadow-sm">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <p className="text-gray-900 font-medium text-center">Covered by Package</p>
+            <p className="text-sm text-gray-500 text-center mt-1 max-w-xs">
+              This appointment is covered by a prepaid package. No additional treatment invoice is required.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <AppointmentSummary appointment={appointment} />
@@ -1477,7 +1494,11 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
               { key: 'appointment', label: 'Appointment', icon: Calendar, isDropdown: true },
               { key: 'status', label: 'Status', icon: ClipboardList },
               { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
-              { key: 'invoice', label: hasInvoice ? 'View Invoice' : 'Generate Invoice', icon: Receipt },
+              { 
+                key: 'invoice', 
+                label: appointment?.is_covered_by_package ? 'Covered by Package' : (hasInvoice ? 'View Invoice' : 'Generate Invoice'), 
+                icon: Receipt 
+              },
               { key: 'communications', label: 'Communications', icon: Mailbox },
             ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
               <div key={tab.key} className="relative" ref={tab.isDropdown ? appointmentDropdownRef : null}>

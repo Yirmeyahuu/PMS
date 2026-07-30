@@ -13,6 +13,7 @@ import {
   ChevronRight,
   X,
   Check,
+  Package
 } from 'lucide-react';
 import { billingApi } from './billing.api';
 import type { 
@@ -103,7 +104,14 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
               onClick={() => onView(invoice)}
             >
               <td className="px-4 py-3 text-sm font-medium text-sky-600">
-                {invoice.invoice_number}
+                <div className="flex items-center gap-2">
+                  {invoice.invoice_number}
+                  {invoice.is_package_invoice && (
+                    <span title="Package Invoice" className="inline-flex items-center justify-center p-1 bg-purple-100 text-purple-600 rounded-md">
+                      <Package className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-3 text-sm">
                 <div>

@@ -43,6 +43,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     # Optional inline items for creation
     inline_items = InvoiceItemWriteSerializer(many=True, required=False, write_only=True)
+    is_package_invoice = serializers.SerializerMethodField()
 
     class Meta:
         model            = Invoice
@@ -50,10 +51,15 @@ class InvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'invoice_number', 'subtotal', 'total_amount',
             'amount_paid', 'balance_due', 'created_at', 'updated_at',
+            'is_package_invoice',
         ]
         extra_kwargs = {
             'inline_items': {'write_only': True},
         }
+
+    def get_is_package_invoice(self, obj) -> bool:
+        # Avoid N+1 if we prefetch package_cases, but for now simple exists() works
+        return getattr(obj, 'package_cases', obj.package_cases.all()).exists()
 
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None

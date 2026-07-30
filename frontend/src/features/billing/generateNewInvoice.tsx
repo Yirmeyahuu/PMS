@@ -16,7 +16,8 @@ import {
   Printer,
   User,
   Calendar,
-  StickyNote
+  StickyNote,
+  CheckCircle2
 } from 'lucide-react';
 import { billingApi, type ClinicService } from './billing.api';
 import { getMyClinic, type ClinicProfile } from '@/features/clinics/clinic.api';
@@ -513,6 +514,28 @@ export default function GenerateNewInvoice() {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <RefreshCw className="w-8 h-8 animate-spin text-sky-600" />
+      </div>
+    );
+  }
+
+  if (appointment?.is_covered_by_package && !existingInvoice) {
+    return (
+      <div className="h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Covered by Package</h2>
+          <p className="text-gray-500 mb-6">
+            This appointment is part of a prepaid package. No additional treatment invoice is required.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors font-medium"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     );
   }

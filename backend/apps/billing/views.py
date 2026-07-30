@@ -222,6 +222,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
                 invoice.update_totals()
 
+                # If this appointment belongs to a package case and it doesn't have a package invoice yet,
+                # designate this invoice as the Package Invoice.
+                if appt.patient_case and appt.patient_case.session_source == 'PACKAGE':
+                    if not appt.patient_case.package_invoice:
+                        appt.patient_case.package_invoice = invoice
+                        appt.patient_case.save(update_fields=['package_invoice'])
+                        logger.info("Designated invoice %s as the Package Invoice for case %s", invoice.invoice_number, appt.patient_case.id)
+
         except Exception as exc:
             logger.exception("Failed to create invoice for appointment %s: %s", appt.id, exc)
             return Response(

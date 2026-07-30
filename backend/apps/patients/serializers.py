@@ -712,8 +712,15 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             'completed_sessions', 'remaining_sessions', 'progress_text',
             'allocation_status', 'is_unlimited', 'session_source',
             'referred_by', 'referral_info', 'created_at', 'updated_at',
+            # Financial Fields
+            'package_invoice', 'package_cost', 'amount_paid',
+            'outstanding_balance', 'package_status'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_sessions', 'remaining_sessions', 'progress_text', 'allocation_status']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'completed_sessions', 
+            'remaining_sessions', 'progress_text', 'allocation_status',
+            'outstanding_balance', 'package_status'
+        ]
 
     def _get_stats(self, obj):
         if not hasattr(obj, '_session_stats'):

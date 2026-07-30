@@ -98,11 +98,18 @@ export interface PatientCase {
   progress_text: string;
   allocation_status: 'ACTIVE' | 'EXHAUSTED' | 'UNLIMITED';
   is_unlimited: boolean;
-  session_source: 'MANUAL' | 'PACKAGE' | 'HMO';
+  session_source: 'MANUAL' | 'PACKAGE';
   referred_by: string;
   referral_info: string;
   created_at: string;
   updated_at: string;
+
+  // Package Billing Fields
+  package_invoice?: number | null;
+  package_cost?: number;
+  amount_paid?: number;
+  outstanding_balance?: number;
+  package_status?: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID' | null;
 }
 
 export interface CreatePatientData {

@@ -565,10 +565,20 @@ class PatientCase(TimeStampedModel):
     referred_by = models.CharField(max_length=200, blank=True, default='')
     referral_info = models.TextField(blank=True, default='')
     
-    # Session Management Fields
     session_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='MANUAL')
     completed_sessions = models.IntegerField(default=0, help_text='Total used sessions based on invoices.')
     is_unlimited = models.BooleanField(default=False, help_text='True if the allocation has no session limit.')
+
+    # Package Billing Fields
+    package_invoice = models.ForeignKey(
+        'billing.Invoice',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='package_cases',
+        help_text='The designated Package Invoice for financial tracking.'
+    )
+    package_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Total cost of the package.')
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Total amount paid for this package.')
 
     class Meta:
         db_table = 'patient_cases'
@@ -580,6 +590,25 @@ class PatientCase(TimeStampedModel):
 
     def __str__(self):
         return f"{self.title} - {self.patient.get_full_name()}"
+
+    @property
+    def outstanding_balance(self):
+        """Returns the outstanding balance for the package."""
+        return max(0, self.package_cost - self.amount_paid)
+
+    @property
+    def package_status(self):
+        """Returns the financial status of the package."""
+        if self.session_source != 'PACKAGE':
+            return None
+        if self.package_cost <= 0:
+            return 'PAID'  # Free package or cost not set
+        if self.amount_paid >= self.package_cost:
+            return 'PAID'
+        if self.amount_paid > 0:
+            return 'PARTIALLY_PAID'
+        return 'UNPAID'
+
 
 
     @property

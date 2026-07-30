@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Plus } from 'lucide-react';
+import { History, Plus, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
@@ -257,80 +257,125 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
               </div>
             </div>
 
-            {/* Session Tracking UI */}
-            <div className="p-4 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-sky-100/50 flex flex-col gap-3 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-sky-500" />
-              
-              <div className="flex flex-col gap-4">
-                {/* Row 1: Title & Buttons */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 min-w-max">
-                    <History className="w-4 h-4 text-sky-500" />
-                    Session Tracking
-                  </h3>
-                  
-                  <div className="flex flex-wrap gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setAddSessionCaseId(selectedCase.id)}
-                      className="text-[10px] px-2 py-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 rounded-md font-medium transition-colors border border-sky-100 uppercase tracking-wide"
-                    >
-                      + Add
-                    </button>
-                    {selectedCase.approved_sessions !== null && selectedCase.approved_sessions > 0 && (
+            {/* Session Tracking & Billing UI */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Session Tracking UI */}
+              <div className="p-4 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-sky-100/50 flex flex-col gap-3 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-sky-500" />
+                
+                <div className="flex flex-col gap-4 h-full">
+                  {/* Row 1: Title & Buttons */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 min-w-max">
+                      <History className="w-4 h-4 text-sky-500" />
+                      Session Tracking
+                    </h3>
+                    
+                    <div className="flex flex-wrap gap-1.5 shrink-0">
                       <button
                         type="button"
-                        onClick={() => setRemoveSessionCaseId(selectedCase.id)}
-                        className="text-[10px] px-2 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 rounded-md font-medium transition-colors border border-orange-100 uppercase tracking-wide"
+                        onClick={() => setAddSessionCaseId(selectedCase.id)}
+                        className="text-[10px] px-2 py-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 rounded-md font-medium transition-colors border border-sky-100 uppercase tracking-wide"
                       >
-                        - Remove
+                        + Add
                       </button>
-                    )}
-                    {selectedCase.approved_sessions !== null && (
+                      {selectedCase.approved_sessions !== null && selectedCase.approved_sessions > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setRemoveSessionCaseId(selectedCase.id)}
+                          className="text-[10px] px-2 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 rounded-md font-medium transition-colors border border-orange-100 uppercase tracking-wide"
+                        >
+                          - Remove
+                        </button>
+                      )}
+                      {selectedCase.approved_sessions !== null && (
+                        <button
+                          type="button"
+                          onClick={() => setRemoveLimitCaseId(selectedCase.id)}
+                          className="text-[10px] px-2 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 rounded-md font-medium transition-colors border border-red-100 uppercase tracking-wide"
+                        >
+                          No Limit
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setRemoveLimitCaseId(selectedCase.id)}
-                        className="text-[10px] px-2 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 rounded-md font-medium transition-colors border border-red-100 uppercase tracking-wide"
+                        onClick={() => setHistoryCaseId(selectedCase.id)}
+                        className="text-[10px] px-2 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-800 rounded-md font-medium transition-colors border border-slate-200 flex items-center gap-1 uppercase tracking-wide"
                       >
-                        No Limit
+                        <History className="w-3 h-3" />
+                        Logs
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setHistoryCaseId(selectedCase.id)}
-                      className="text-[10px] px-2 py-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-800 rounded-md font-medium transition-colors border border-slate-200 flex items-center gap-1 uppercase tracking-wide"
-                    >
-                      <History className="w-3 h-3" />
-                      Logs
-                    </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Row 2: Statuses */}
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100 w-fit">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Completed</span>
-                    <span className="text-base font-bold text-gray-900 leading-none">{selectedCase.completed_sessions}</span>
+                  {/* Row 2: Statuses */}
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100 w-fit mt-auto">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Completed</span>
+                      <span className="text-base font-bold text-gray-900 leading-none">{selectedCase.completed_sessions}</span>
+                    </div>
+                    
+                    {selectedCase.approved_sessions !== null && (
+                      <>
+                        <div className="h-3 w-px bg-gray-200" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Approved</span>
+                          <span className="text-base font-bold text-gray-900 leading-none">{selectedCase.approved_sessions}</span>
+                        </div>
+                        <div className="h-3 w-px bg-gray-200" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Remaining</span>
+                          <span className={`text-base font-bold leading-none ${selectedCase.remaining_sessions === 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {selectedCase.remaining_sessions}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  
-                  {selectedCase.approved_sessions !== null && (
-                    <>
-                      <div className="h-3 w-px bg-gray-200" />
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Approved</span>
-                        <span className="text-base font-bold text-gray-900 leading-none">{selectedCase.approved_sessions}</span>
-                      </div>
-                      <div className="h-3 w-px bg-gray-200" />
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Remaining</span>
-                        <span className={`text-base font-bold leading-none ${selectedCase.remaining_sessions === 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                          {selectedCase.remaining_sessions}
-                        </span>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
+
+              {/* Package Billing UI */}
+              {selectedCase.session_source === 'PACKAGE' && (
+                <div className="p-4 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(16,185,129,0.1)] border border-emerald-100/50 flex flex-col gap-3 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+                  <div className="flex flex-col gap-4 h-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 min-w-max">
+                        <Receipt className="w-4 h-4 text-emerald-500" />
+                        Package Billing
+                      </h3>
+                      {selectedCase.package_status && (
+                        <span className={`text-[10px] px-2 py-1.5 rounded-md font-bold uppercase tracking-wide border ${
+                          selectedCase.package_status === 'PAID' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                          selectedCase.package_status === 'PARTIALLY_PAID' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {selectedCase.package_status.replace('_', ' ')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100 w-fit mt-auto">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Cost</span>
+                        <span className="text-base font-bold text-gray-900 leading-none">₱{Number(selectedCase.package_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                      </div>
+                      <div className="h-3 w-px bg-gray-200" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Paid</span>
+                        <span className="text-base font-bold text-gray-900 leading-none">₱{Number(selectedCase.amount_paid || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                      </div>
+                      <div className="h-3 w-px bg-gray-200" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Balance</span>
+                        <span className={`text-base font-bold leading-none ${Number(selectedCase.outstanding_balance) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                          ₱{Number(selectedCase.outstanding_balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (

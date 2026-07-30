@@ -9,7 +9,7 @@ import { CreateClinicalNoteModal } from '@/features/clinical-template/components
 const ClinicalWorkspaceLayout = () => {
   const navigate = useNavigate();
   const { caseId } = useParams();
-  const { cases, patient } = usePatientProfileContext();
+  const { cases, patient, refreshCases } = usePatientProfileContext();
   const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
   const location = useLocation();
   const state = location.state as { appointmentId?: number } | null;
@@ -70,6 +70,7 @@ const ClinicalWorkspaceLayout = () => {
           onSuccess={() => {
             setEditorContext({ type: 'IDLE' });
             triggerRefresh();
+            if (typeof refreshCases === 'function') refreshCases();
           }}
         />
       )}

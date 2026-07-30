@@ -31,6 +31,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     # ── Has invoice ───────────────────────────────────────────────────────────
     has_invoice = serializers.SerializerMethodField()
+    is_covered_by_package = serializers.SerializerMethodField()
     
     patient_case = serializers.PrimaryKeyRelatedField(
         queryset=PatientCase.objects.all(), required=False, allow_null=True
@@ -49,7 +50,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
-            'reminder_sent', 'reminder_sent_at', 'has_invoice',
+            'reminder_sent', 'reminder_sent_at', 'has_invoice', 'is_covered_by_package',
             'confirmation_sent', 'confirmation_sent_at', 'confirmation_status',
             'patient_reply', 'patient_reply_at',
             'dna_followup_sent', 'dna_followup_sent_at',
@@ -63,10 +64,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
-            'created_by_name', 'updated_by_name', 'has_invoice',
+            'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package',
             'patient_case', 'case_remaining_sessions', 'case_is_unlimited',
             'created_at', 'updated_at',
         ]
+
+    def get_is_covered_by_package(self, obj) -> bool:
+        """Check if this appointment is covered by an already billed package."""
+        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+            # It's considered covered if the package invoice has already been generated
+            return obj.patient_case.package_invoice_id is not None
+        return False
 
     def get_has_invoice(self, obj) -> bool:
         """Check if this appointment has a non-deleted invoice.

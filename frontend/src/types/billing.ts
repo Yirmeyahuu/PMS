@@ -145,6 +145,7 @@ export interface Invoice {
   bulk_batch:          number | null;
   created_by:          number | null;
   created_by_name:     string | null;
+  is_package_invoice?: boolean;
 
   invoice_date:        string;
   due_date:            string | null;
