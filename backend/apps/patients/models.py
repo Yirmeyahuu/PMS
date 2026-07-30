@@ -525,6 +525,12 @@ class PatientCase(TimeStampedModel):
         ('CORPORATE', 'Corporate'),
     ]
 
+    SOURCE_CHOICES = [
+        ('MANUAL', 'Manual'),
+        ('PACKAGE', 'Prepaid Package'),
+        ('HMO', 'HMO Approval'),
+    ]
+
     patient = models.ForeignKey(
         'patients.Patient',
         on_delete=models.CASCADE,
@@ -558,6 +564,11 @@ class PatientCase(TimeStampedModel):
     )
     referred_by = models.CharField(max_length=200, blank=True, default='')
     referral_info = models.TextField(blank=True, default='')
+    
+    # Session Management Fields
+    session_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='MANUAL')
+    completed_sessions = models.IntegerField(default=0, help_text='Total used sessions based on invoices.')
+    is_unlimited = models.BooleanField(default=False, help_text='True if the allocation has no session limit.')
 
     class Meta:
         db_table = 'patient_cases'
@@ -571,48 +582,11 @@ class PatientCase(TimeStampedModel):
         return f"{self.title} - {self.patient.get_full_name()}"
 
 
-class SessionAllocation(TimeStampedModel):
-    """
-    Scalable session allocation model for a PatientCase.
-    Tracks approved, used, and remaining sessions, supporting various sources like packages or HMO.
-    """
-    SOURCE_CHOICES = [
-        ('MANUAL', 'Manual'),
-        ('PACKAGE', 'Prepaid Package'),
-        ('HMO', 'HMO Approval'),
-    ]
-
-    STATUS_CHOICES = [
-        ('ACTIVE', 'Active'),
-        ('EXHAUSTED', 'Exhausted'),
-        ('UNLIMITED', 'Unlimited'),
-    ]
-
-    patient_case = models.OneToOneField(
-        'patients.PatientCase',
-        on_delete=models.CASCADE,
-        related_name='session_allocation',
-        help_text='The case this allocation belongs to.'
-    )
-    allocation_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='MANUAL')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
-    
-    approved_sessions = models.IntegerField(null=True, blank=True, help_text='Total approved. Null if unlimited.')
-    used_sessions = models.IntegerField(default=0, help_text='Total used sessions based on invoices.')
-    is_unlimited = models.BooleanField(default=False, help_text='True if the allocation has no session limit.')
-
-    class Meta:
-        db_table = 'session_allocations'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"Allocation for Case {self.patient_case_id} ({self.status})"
-    
     @property
     def remaining_sessions(self):
         if self.is_unlimited or self.approved_sessions is None:
             return None
-        return max(0, self.approved_sessions - self.used_sessions)
+        return max(0, self.approved_sessions - self.completed_sessions)
 
 
 class SessionConsumptionLog(TimeStampedModel):
@@ -628,8 +602,8 @@ class SessionConsumptionLog(TimeStampedModel):
         ('UNLIMITED_SET', 'Set to Unlimited'),
     ]
 
-    allocation = models.ForeignKey(
-        SessionAllocation,
+    patient_case = models.ForeignKey(
+        PatientCase,
         on_delete=models.CASCADE,
         related_name='consumption_logs'
     )
@@ -668,11 +642,11 @@ class SessionConsumptionLog(TimeStampedModel):
         db_table = 'session_consumption_logs'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['allocation', 'action']),
+            models.Index(fields=['patient_case', 'action']),
         ]
 
     def __str__(self):
-        return f"[{self.action}] Allocation {self.allocation_id}"
+        return f"[{self.action}] Case {self.patient_case_id}"
 
 
 class PatientCaseSessionLog(TimeStampedModel):

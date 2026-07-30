@@ -126,9 +126,17 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       }
       
       // Sort appointments by date (newest first)
-      const sortedAppointments = (appointmentsData.results || []).sort((a, b) => 
+      let sortedAppointments = (appointmentsData.results || []).sort((a: Appointment, b: Appointment) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
+      
+      // If we are in a specific Case context, only show appointments linked to this Case
+      if (patientCaseId) {
+        sortedAppointments = sortedAppointments.filter((appt: Appointment) => 
+          appt.patient_case === patientCaseId || (appt as any).patient_case_id === patientCaseId
+        );
+      }
+      
       console.log('[CreateClinicalNoteModal] sorted appointments:', sortedAppointments);
       setAppointments(sortedAppointments);
       

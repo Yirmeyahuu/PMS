@@ -61,6 +61,17 @@ class Service(TimeStampedModel, SoftDeleteModel):
         help_text='If true, patients can book this service online',
     )
 
+    # Package Support
+    is_package = models.BooleanField(
+        default=False,
+        help_text='If true, this service functions as a treatment package'
+    )
+    session_allocation = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of sessions approved when this package is booked. Required if is_package is True.'
+    )
+
     # Legacy: kept for backward compatibility with existing appointment records.
     # New services are assigned via the `discipline` field instead.
     assigned_practitioners = models.ManyToManyField(

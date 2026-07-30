@@ -4,7 +4,7 @@ from django.db import transaction
 import logging
 
 from apps.billing.models import Invoice
-from apps.patients.models import SessionAllocation, SessionConsumptionLog
+from apps.patients.models import PatientCase, SessionConsumptionLog
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 def consume_session_on_invoice_creation(sender, instance, created, **kwargs):
     """
     When an Invoice is created for an appointment linked to a PatientCase,
-    consume a session from its SessionAllocation.
+    consume a session from its PatientCase.
     """
-    if not created or not instance.appointment:
+    if not instance.appointment or instance.is_deleted or instance.status == 'CANCELLED':
         return
         
     appointment = instance.appointment
@@ -27,34 +27,18 @@ def consume_session_on_invoice_creation(sender, instance, created, **kwargs):
             
     if not patient_case:
         return
-
-    try:
-        allocation = patient_case.session_allocation
-    except SessionAllocation.DoesNotExist:
-        allocation = SessionAllocation.objects.create(
-            patient_case=patient_case,
-            approved_sessions=patient_case.approved_sessions,
-            is_unlimited=(patient_case.approved_sessions is None),
-            allocation_source='MANUAL',
-            status='ACTIVE'
-        )
         
     if SessionConsumptionLog.objects.filter(invoice=instance).exists():
         return
         
     with transaction.atomic():
-        allocation = SessionAllocation.objects.select_for_update().get(id=allocation.id)
+        patient_case = PatientCase.objects.select_for_update().get(id=patient_case.id)
         
-        allocation.used_sessions += 1
-        
-        if not allocation.is_unlimited and allocation.approved_sessions is not None:
-            if allocation.used_sessions >= allocation.approved_sessions:
-                allocation.status = 'EXHAUSTED'
-                
-        allocation.save(update_fields=['used_sessions', 'status'])
+        patient_case.completed_sessions += 1
+        patient_case.save(update_fields=['completed_sessions'])
         
         SessionConsumptionLog.objects.create(
-            allocation=allocation,
+            patient_case=patient_case,
             appointment=appointment,
             invoice=instance,
             practitioner=appointment.practitioner,
@@ -75,18 +59,48 @@ def restore_session_on_invoice_deletion(sender, instance, **kwargs):
         
     with transaction.atomic():
         for log in logs:
-            allocation = SessionAllocation.objects.select_for_update().get(id=log.allocation_id)
-            if allocation.used_sessions > 0:
-                allocation.used_sessions -= 1
-                if not allocation.is_unlimited and allocation.approved_sessions is not None:
-                    if allocation.used_sessions < allocation.approved_sessions:
-                        allocation.status = 'ACTIVE'
-                allocation.save(update_fields=['used_sessions', 'status'])
+            patient_case = PatientCase.objects.select_for_update().get(id=log.patient_case_id)
+            if patient_case.completed_sessions > 0:
+                patient_case.completed_sessions -= 1
+                patient_case.save(update_fields=['completed_sessions'])
                 
             SessionConsumptionLog.objects.create(
-                allocation=allocation,
+                patient_case=patient_case,
                 appointment=instance.appointment,
                 created_by=instance.created_by,
                 action='REMOVED',
                 reason=f'Session usage reversed due to invoice {instance.invoice_number} deletion'
             )
+
+
+@receiver(post_save, sender=Invoice)
+def restore_session_on_invoice_cancel_or_soft_delete(sender, instance, created, **kwargs):
+    """
+    If an invoice is soft-deleted or its status changes to CANCELLED,
+    restore the consumed session (if not already restored).
+    """
+    if created:
+        return
+        
+    if instance.is_deleted or instance.status == 'CANCELLED':
+        used_logs = SessionConsumptionLog.objects.filter(invoice=instance, action='USED')
+        removed_logs = SessionConsumptionLog.objects.filter(invoice=instance, action='REMOVED')
+        
+        if used_logs.exists() and not removed_logs.exists():
+            with transaction.atomic():
+                for log in used_logs:
+                    patient_case = PatientCase.objects.select_for_update().get(id=log.patient_case_id)
+                    if patient_case.completed_sessions > 0:
+                        patient_case.completed_sessions -= 1
+                        patient_case.save(update_fields=['completed_sessions'])
+                        
+                    SessionConsumptionLog.objects.create(
+                        patient_case=patient_case,
+                        appointment=instance.appointment,
+                        invoice=instance,
+                        created_by=instance.updated_by if hasattr(instance, 'updated_by') else instance.created_by,
+                        action='REMOVED',
+                        reason=f'Session usage reversed due to invoice {instance.invoice_number} being cancelled or deleted'
+                    )
+                    logger.info(f"Restored session for case via invoice {instance.invoice_number} cancellation")
+

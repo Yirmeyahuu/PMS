@@ -173,6 +173,13 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
                 except Appointment.DoesNotExist:
                     raise serializers.ValidationError({'appointment': 'Invalid appointment ID'})
             
+            # If the appointment doesn't have a case, but the request provides one, link them!
+            provided_case = attrs.get('patient_case')
+            if not appointment.patient_case and provided_case:
+                # Link the appointment to the provided case
+                appointment.patient_case = provided_case
+                appointment.save(update_fields=['patient_case'])
+                
             # Enforce Case Requirement
             if not appointment.patient_case:
                 raise serializers.ValidationError({'detail': 'Clinical Notes require the Appointment to be assigned to a Case.'})

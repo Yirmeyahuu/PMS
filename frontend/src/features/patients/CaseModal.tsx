@@ -11,7 +11,9 @@ export interface CaseFormData {
   primaryPractitionerName: string;
   payer: PatientCasePayer;
   alertNotes: string;
+  sessionSource: 'MANUAL' | 'PACKAGE' | 'HMO';
   approvedSessions?: number;
+  isUnlimited: boolean;
   referredBy: string;
   referralInfo: string;
   description: string;
@@ -36,7 +38,16 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
   const [primaryPractitionerName, setPrimaryPractitionerName] = useState(initialValues?.primary_practitioner_name ?? '');
   const [payer, setPayer] = useState<PatientCasePayer>(initialValues?.payer ?? '');
   const [alertNotes, setAlertNotes] = useState(initialValues?.alert_notes ?? '');
+  
+  // Session Management State
+  const [sessionSource, setSessionSource] = useState<'MANUAL' | 'PACKAGE' | 'HMO'>(initialValues?.session_source ?? 'MANUAL');
   const [approvedSessions, setApprovedSessions] = useState<number | ''>(initialValues?.approved_sessions ?? '');
+  const [isUnlimited, setIsUnlimited] = useState<boolean>(initialValues?.is_unlimited ?? false);
+  
+  // Progress (Read-Only for Edit mode)
+  const completedSessions = initialValues?.completed_sessions ?? 0;
+  const remainingSessions = initialValues?.remaining_sessions ?? null;
+
   const [referredBy, setReferredBy] = useState(initialValues?.referred_by ?? '');
   const [referralInfo, setReferralInfo] = useState(initialValues?.referral_info ?? '');
   const [description, setDescription] = useState(initialValues?.description ?? '');
@@ -153,31 +164,84 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
               />
             </div>
 
-            <div className="space-y-3 pt-2 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-600">Referral <span className="text-gray-400 font-normal">(Optional)</span></p>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-800">Session Management</h4>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Approved Sessions</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Session Source</label>
+                  <select
+                    value={sessionSource}
+                    onChange={(e) => setSessionSource(e.target.value as any)}
+                    disabled={mode === 'edit'}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  >
+                    <option value="MANUAL">Manual</option>
+                    <option value="PACKAGE">Prepaid Package</option>
+                    <option value="HMO">HMO Approval</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Approved Sessions</label>
                   <input
                     type="number"
                     min="0"
-                    value={approvedSessions}
+                    value={isUnlimited ? '' : approvedSessions}
                     onChange={(e) => setApprovedSessions(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="Unlimited if blank"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Referred By</label>
-                  <input
-                    type="text"
-                    value={referredBy}
-                    onChange={(e) => setReferredBy(e.target.value)}
-                    placeholder="e.g., Dr. Smith"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    disabled={isUnlimited || (mode === 'edit' && sessionSource === 'PACKAGE')}
+                    placeholder={isUnlimited ? "Unlimited" : "Enter amount"}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>
               </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="unlimited-sessions"
+                  checked={isUnlimited}
+                  onChange={(e) => {
+                    setIsUnlimited(e.target.checked);
+                    if (e.target.checked) setApprovedSessions('');
+                  }}
+                  disabled={sessionSource === 'PACKAGE'}
+                  className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500 disabled:opacity-50"
+                />
+                <label htmlFor="unlimited-sessions" className="text-sm font-medium text-gray-700">
+                  Unlimited Sessions
+                </label>
+              </div>
+
+              {mode === 'edit' && !isUnlimited && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">Completed</p>
+                    <p className="text-sm font-semibold text-gray-900">{completedSessions}</p>
+                  </div>
+                  <div className="h-8 w-px bg-gray-300"></div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium">Remaining</p>
+                    <p className="text-sm font-semibold text-gray-900">{remainingSessions ?? '—'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 pt-4 border-t border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-800">Referral <span className="text-gray-400 font-normal">(Optional)</span></h4>
+              
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Referred By</label>
+                <input
+                  type="text"
+                  value={referredBy}
+                  onChange={(e) => setReferredBy(e.target.value)}
+                  placeholder="e.g., Dr. Smith"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Referral Notes</label>
                 <textarea
@@ -224,7 +288,9 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                   primaryPractitionerName, 
                   payer, 
                   alertNotes, 
-                  approvedSessions: approvedSessions === '' ? undefined : approvedSessions,
+                  sessionSource,
+                  approvedSessions: isUnlimited ? undefined : (approvedSessions === '' ? undefined : approvedSessions),
+                  isUnlimited,
                   referredBy, 
                   referralInfo, 
                   description 

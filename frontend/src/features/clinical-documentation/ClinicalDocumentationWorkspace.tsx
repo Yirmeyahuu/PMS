@@ -59,13 +59,14 @@ const ClinicalWorkspaceLayout = () => {
 
       {patient && (
         <CreateClinicalNoteModal
-          isOpen={editorContext.type === 'NEW_NOTE'}
+          isOpen={editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE'}
           onClose={() => setEditorContext({ type: 'IDLE' })}
           patientId={patient.id}
           patientName={`${patient.first_name} ${patient.last_name}`}
           patientCaseId={selectedCaseId || undefined}
           appointmentId={state?.appointmentId}
           preselectedTemplateId={editorContext.type === 'NEW_NOTE' ? editorContext.templateId : undefined}
+          copyFromNoteId={editorContext.type === 'COPY_NOTE' ? editorContext.sourceNoteId : undefined}
           onSuccess={() => {
             setEditorContext({ type: 'IDLE' });
             triggerRefresh();

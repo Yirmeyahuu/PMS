@@ -210,7 +210,9 @@ export const PatientCasesPage = () => {
               alert_notes: data.alertNotes,
               referred_by: data.referredBy,
               referral_info: data.referralInfo,
-              approved_sessions: data.approvedSessions || undefined
+              session_source: data.sessionSource,
+              approved_sessions: data.isUnlimited ? undefined : data.approvedSessions || undefined,
+              is_unlimited: data.isUnlimited
             });
             await refreshCases();
             setIsCreateCaseOpen(false);

@@ -182,6 +182,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment.patient.home_branch = appointment.clinic
             appointment.patient.save(update_fields=['home_branch'])
 
+        # ── Auto-populate case for package services ─────────────────────────
+        from apps.patients.services.case_service import auto_populate_package_case
+        auto_populate_package_case(appointment)
+
         # ── Trigger booking confirmation (non-blocking) ───────────────────
         try:
             from apps.notifications.services.communication_service import send_booking_confirmation

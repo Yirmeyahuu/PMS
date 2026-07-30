@@ -29,7 +29,6 @@ import {
 } from '@/features/patients/patientCases.api';
 import type { PatientCase, PatientCaseStatus, PatientCasePayer } from '@/types/patient';
 import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
-import { CaseRequiredModal } from './CaseRequiredModal';
 import type { Practitioner } from '@/features/clinics/clinic.api';
 
 import { AppointmentEditForm }    from './AppointmentEditForm';
@@ -1234,7 +1233,6 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 }) => {
   const [activeTab,             setActiveTab]             = useState<Tab>('client');
   const [showCancelModal,       setShowCancelModal]       = useState(false);
-  const [showCaseRequiredModal, setShowCaseRequiredModal] = useState(false);
   const [showAppointmentDropdown, setShowAppointmentDropdown] = useState(false);
   const [showRecurringModal,     setShowRecurringModal]     = useState(false);
   const [casesVersion,           setCasesVersion]           = useState(0);
@@ -1462,15 +1460,6 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                 <p className="text-xs text-gray-500">{appointment.patient_name}</p>
               </div>
             </div>
-            
-            <CaseRequiredModal
-              isOpen={showCaseRequiredModal}
-              onClose={() => setShowCaseRequiredModal(false)}
-              onGoToCases={() => {
-                setShowCaseRequiredModal(false);
-                setActiveTab('client'); // The Case card is rendered in Client Information tab
-              }}
-            />
 
             <button
               onClick={onClose}
@@ -1498,17 +1487,9 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     if (tab.isDropdown) {
                       setShowAppointmentDropdown(!showAppointmentDropdown);
                     } else if (tab.key === 'clinical_notes') {
-                      if (!appointment.patient_case) {
-                        setShowCaseRequiredModal(true);
-                        return;
-                      }
-                      // Redirect to Clinical Documentation Workspace
+                      // Navigate to case resolution gateway
                       onClose();
-                      navigate(`/patients/${appointment.patient}/cases/${appointment.patient_case}/clinical-documentation`, { 
-                        state: { 
-                          appointmentId: appointment.id
-                        } 
-                      });
+                      navigate(`/appointments/${appointment.id}/case-resolution`);
                     } else {
                       setActiveTab(tab.key);
                       if (isEditing) cancelEdit();

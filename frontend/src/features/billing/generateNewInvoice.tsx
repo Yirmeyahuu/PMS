@@ -174,13 +174,24 @@ export default function GenerateNewInvoice() {
   useEffect(() => {
     if (!appointment || items.length > 0) return;
     
-    const appointmentType = appointment.appointment_type;
-    const matchedService = clinicServices.find(s => 
-      s.name.toLowerCase().includes(appointmentType?.toLowerCase() || '')
-    );
+    // First try to match by exact service ID if available
+    let matchedService = undefined;
+    if (appointment.service) {
+      matchedService = clinicServices.find(s => s.id === appointment.service);
+    }
+    
+    // Fallback to matching by appointment_type string
+    if (!matchedService) {
+      const appointmentType = appointment.appointment_type;
+      matchedService = clinicServices.find(s => 
+        s.name.toLowerCase().includes(appointmentType?.toLowerCase() || '')
+      );
+    }
+
+    const description = matchedService?.name || appointment.service_name || appointment.appointment_type || '';
 
     setItems([{
-      description: matchedService?.name || appointmentType || '',
+      description: description,
       quantity: 1,
       unit_price: matchedService ? Number(matchedService.price) : 0,
     }]);

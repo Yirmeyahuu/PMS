@@ -75,6 +75,7 @@ export interface CreateAppointmentData {
   chief_complaint?: string;
   notes?: string;
   patient_notes?: string;
+  patient_case?: number | null;
 }
 
 export interface PractitionerSchedule {

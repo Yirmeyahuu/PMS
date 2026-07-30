@@ -65,6 +65,7 @@ import PatientCasesPage from '@/features/patients/PatientCasesPage';
 import ClinicalDocumentationWorkspace from '@/features/clinical-documentation/ClinicalDocumentationWorkspace';
 import PatientUnassignedNotesPage from '@/features/patients/PatientUnassignedNotesPage';
 import { PatientCommunicationHistoryPage } from '@/features/patients/PatientCommunicationHistoryPage';
+import { AppointmentCaseResolution } from '@/features/appointments/components/AppointmentCaseResolution';
 import ClientSettings from '@/features/patients/ClientSettings';
 import { ClinicalNoteRedirect } from '@/features/clinical-documentation/components/ClinicalNoteRedirect';
 import { PatientProfile } from '@/features/patients/PatientProfile';
@@ -337,6 +338,8 @@ function App() {
 
           <Route path="/clinical-notes"         element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
           <Route path="/clinical-notes/:noteId" element={<ProtectedRoute><NoteEditor /></ProtectedRoute>} />
+
+          <Route path="/appointments/:appointmentId/case-resolution" element={<ProtectedRoute><AppointmentCaseResolution /></ProtectedRoute>} />
 
           <Route path="/billing/generate-invoice/:appointmentId" element={<ProtectedRoute><GenerateNewInvoice /></ProtectedRoute>} />
 

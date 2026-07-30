@@ -93,7 +93,7 @@ export const CaseDetailsPage = () => {
                 caseData.allocation_status === 'EXHAUSTED' ? 'bg-red-100 text-red-700' :
                 'bg-sky-100 text-sky-700'
               }`}>
-                {caseData.allocation_source} - {caseData.allocation_status}
+                {caseData.session_source} - {caseData.allocation_status}
               </span>
             </div>
             <div className="flex items-center gap-2">

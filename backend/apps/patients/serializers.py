@@ -699,13 +699,10 @@ class PatientCaseSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
     primary_practitioner_name = serializers.SerializerMethodField()
     
-    completed_sessions = serializers.SerializerMethodField()
     remaining_sessions = serializers.SerializerMethodField()
     progress_text = serializers.SerializerMethodField()
     allocation_status = serializers.SerializerMethodField()
-    is_unlimited = serializers.SerializerMethodField()
-    allocation_source = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = PatientCase
         fields = [
@@ -713,19 +710,16 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             'status', 'primary_practitioner', 'primary_practitioner_name',
             'payer', 'alert_notes', 'approved_sessions',
             'completed_sessions', 'remaining_sessions', 'progress_text',
-            'allocation_status', 'is_unlimited', 'allocation_source',
+            'allocation_status', 'is_unlimited', 'session_source',
             'referred_by', 'referral_info', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_sessions', 'remaining_sessions', 'progress_text', 'allocation_status', 'is_unlimited', 'allocation_source']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_sessions', 'remaining_sessions', 'progress_text', 'allocation_status']
 
     def _get_stats(self, obj):
         if not hasattr(obj, '_session_stats'):
             from apps.patients.services.session_engine import SessionEngine
             obj._session_stats = SessionEngine.get_session_stats(obj)
         return obj._session_stats
-
-    def get_completed_sessions(self, obj) -> int:
-        return self._get_stats(obj).get('completed_sessions', 0)
 
     def get_remaining_sessions(self, obj) -> int | None:
         return self._get_stats(obj).get('remaining_sessions')
@@ -736,12 +730,6 @@ class PatientCaseSerializer(serializers.ModelSerializer):
     def get_allocation_status(self, obj) -> str:
         return self._get_stats(obj).get('allocation_status', 'ACTIVE')
 
-    def get_is_unlimited(self, obj) -> bool:
-        return self._get_stats(obj).get('is_unlimited', False)
-
-    def get_allocation_source(self, obj) -> str:
-        return self._get_stats(obj).get('allocation_source', 'MANUAL')
-
     def validate(self, attrs):
         approved = attrs.get('approved_sessions', getattr(self.instance, 'approved_sessions', None) if self.instance else None)
         
@@ -749,7 +737,7 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'approved_sessions': 'Approved sessions cannot be negative.'})
             
         if self.instance and approved is not None:
-            completed = self.get_completed_sessions(self.instance)
+            completed = self.instance.completed_sessions
             if approved < completed:
                 raise serializers.ValidationError(
                     {'approved_sessions': f'Cannot reduce approved sessions below completed sessions ({completed}).'}

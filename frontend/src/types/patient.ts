@@ -98,7 +98,7 @@ export interface PatientCase {
   progress_text: string;
   allocation_status: 'ACTIVE' | 'EXHAUSTED' | 'UNLIMITED';
   is_unlimited: boolean;
-  allocation_source: 'MANUAL' | 'PACKAGE' | 'HMO';
+  session_source: 'MANUAL' | 'PACKAGE' | 'HMO';
   referred_by: string;
   referral_info: string;
   created_at: string;

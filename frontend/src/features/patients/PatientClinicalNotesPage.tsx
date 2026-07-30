@@ -283,6 +283,7 @@ export const PatientClinicalNotesPage = () => {
         onClose={() => setIsCreateNoteOpen(false)}
         patientId={patient.id}
         patientName={patient.full_name}
+        patientCaseId={createCaseId ? Number(createCaseId) : undefined}
         onSuccess={() => {
           const beforeNoteIds = new Set(clinicalNotes.map((note) => note.id));
 

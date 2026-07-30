@@ -213,6 +213,10 @@ def _confirm_portal_booking(booking, confirmed_by_user):
     booking.appointment = appointment
     booking.save(update_fields=['appointment'])
 
+    # ── 4. Auto-populate case for package services ────────────────────────
+    from apps.patients.services.case_service import auto_populate_package_case
+    auto_populate_package_case(appointment)
+
     return patient, appointment
 
 
@@ -1845,26 +1849,12 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
             patient_case.approved_sessions += amount
         patient_case.save(update_fields=['approved_sessions'])
 
-        # Update or create SessionAllocation
-        from apps.patients.models import SessionAllocation, SessionConsumptionLog
-        allocation, created = SessionAllocation.objects.get_or_create(
-            patient_case=patient_case,
-            defaults={
-                'approved_sessions': patient_case.approved_sessions,
-                'is_unlimited': False,
-                'allocation_source': 'MANUAL',
-                'status': 'ACTIVE'
-            }
-        )
-        if not created:
-            allocation.approved_sessions = patient_case.approved_sessions
-            allocation.is_unlimited = False
-            if allocation.status == 'EXHAUSTED' and allocation.used_sessions < allocation.approved_sessions:
-                allocation.status = 'ACTIVE'
-            allocation.save(update_fields=['approved_sessions', 'is_unlimited', 'status'])
-        
+        patient_case.is_unlimited = False
+        patient_case.save(update_fields=['approved_sessions', 'is_unlimited'])
+
+        from apps.patients.models import SessionConsumptionLog
         SessionConsumptionLog.objects.create(
-            allocation=allocation,
+            patient_case=patient_case,
             created_by=request.user,
             action='ADDED',
             reason=f'Manually added {amount} sessions'
@@ -1898,22 +1888,13 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         patient_case.approved_sessions = max(0, patient_case.approved_sessions - amount)
         patient_case.save(update_fields=['approved_sessions'])
 
-        from apps.patients.models import SessionAllocation, SessionConsumptionLog
-        try:
-            allocation = patient_case.session_allocation
-            allocation.approved_sessions = patient_case.approved_sessions
-            if allocation.used_sessions >= allocation.approved_sessions:
-                allocation.status = 'EXHAUSTED'
-            allocation.save(update_fields=['approved_sessions', 'status'])
-            
-            SessionConsumptionLog.objects.create(
-                allocation=allocation,
-                created_by=request.user,
-                action='REMOVED',
-                reason=f'Manually removed {amount} sessions'
-            )
-        except SessionAllocation.DoesNotExist:
-            pass
+        from apps.patients.models import SessionConsumptionLog
+        SessionConsumptionLog.objects.create(
+            patient_case=patient_case,
+            created_by=request.user,
+            action='REMOVED',
+            reason=f'Manually removed {amount} sessions'
+        )
 
         PatientCaseSessionLog.objects.create(
             patient_case=patient_case,
@@ -1931,26 +1912,12 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         patient_case = self.get_object()
         previous_limit = patient_case.approved_sessions
         patient_case.approved_sessions = None
-        patient_case.save(update_fields=['approved_sessions'])
+        patient_case.is_unlimited = True
+        patient_case.save(update_fields=['approved_sessions', 'is_unlimited'])
 
-        from apps.patients.models import SessionAllocation, SessionConsumptionLog
-        allocation, created = SessionAllocation.objects.get_or_create(
-            patient_case=patient_case,
-            defaults={
-                'approved_sessions': None,
-                'is_unlimited': True,
-                'allocation_source': 'MANUAL',
-                'status': 'ACTIVE'
-            }
-        )
-        if not created:
-            allocation.approved_sessions = None
-            allocation.is_unlimited = True
-            allocation.status = 'ACTIVE'
-            allocation.save(update_fields=['approved_sessions', 'is_unlimited', 'status'])
-            
+        from apps.patients.models import SessionConsumptionLog
         SessionConsumptionLog.objects.create(
-            allocation=allocation,
+            patient_case=patient_case,
             created_by=request.user,
             action='ADDED',
             reason='Removed session limit (Unlimited)'
@@ -1974,25 +1941,17 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         # Reset completely
         previous_limit = patient_case.approved_sessions
         patient_case.approved_sessions = 0
-        patient_case.save(update_fields=['approved_sessions'])
+        patient_case.completed_sessions = 0
+        patient_case.is_unlimited = False
+        patient_case.save(update_fields=['approved_sessions', 'completed_sessions', 'is_unlimited'])
         
-        from apps.patients.models import SessionAllocation, SessionConsumptionLog
-        try:
-            allocation = patient_case.session_allocation
-            allocation.approved_sessions = 0
-            allocation.used_sessions = 0
-            allocation.is_unlimited = False
-            allocation.status = 'EXHAUSTED'
-            allocation.save(update_fields=['approved_sessions', 'used_sessions', 'is_unlimited', 'status'])
-            
-            SessionConsumptionLog.objects.create(
-                allocation=allocation,
-                created_by=request.user,
-                action='REMOVED',
-                reason='Allocation fully reset'
-            )
-        except SessionAllocation.DoesNotExist:
-            pass
+        from apps.patients.models import SessionConsumptionLog
+        SessionConsumptionLog.objects.create(
+            patient_case=patient_case,
+            created_by=request.user,
+            action='REMOVED',
+            reason='Allocation fully reset'
+        )
 
         PatientCaseSessionLog.objects.create(
             patient_case=patient_case,

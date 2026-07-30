@@ -18,6 +18,8 @@ const EMPTY: ClinicServicePayload = {
   color_hex:        '#0D9488',
   is_active:        true,
   show_in_portal:   true,
+  is_package:       false,
+  session_allocation: null,
   discipline:       '',
 };
 
@@ -86,6 +88,8 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         color_hex:        editing.color_hex,
         is_active:        true,
         show_in_portal:   true,
+        is_package:       editing.is_package ?? false,
+        session_allocation: editing.session_allocation ?? null,
         discipline:       editing.discipline ?? '',
       });
     } else {
@@ -104,6 +108,13 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     if (parseFloat(form.price) < 0) e.price            = 'Price cannot be negative.';
     if (!/^#[0-9A-Fa-f]{6}$/.test(form.color_hex)) e.color_hex = 'Invalid hex color.';
     if (!form.discipline)           e.discipline       = 'Assigned Discipline is required.';
+    
+    if (form.is_package) {
+      if (!form.session_allocation || form.session_allocation < 1) {
+        e.session_allocation = 'Must allocate at least 1 session for a package.';
+      }
+    }
+    
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -261,6 +272,50 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               <p className="mt-0.5 text-[10px] text-gray-400">
                 All practitioners with this discipline can offer this service.
               </p>
+            )}
+          </div>
+
+          {/* ── Package Support ────────────────────────────────────────────── */}
+          <div className="pt-4 mt-2 border-t border-gray-100">
+            <div className="flex items-start gap-3">
+              <div className="flex items-center h-5">
+                <input
+                  id="is_package"
+                  type="checkbox"
+                  checked={form.is_package}
+                  onChange={(e) => {
+                    set('is_package', e.target.checked);
+                    if (!e.target.checked) set('session_allocation', null);
+                  }}
+                  className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500"
+                />
+              </div>
+              <div className="text-sm">
+                <label htmlFor="is_package" className="font-semibold text-gray-700">
+                  Is Package?
+                </label>
+                <p className="text-xs text-gray-500">
+                  If checked, this service will automatically allocate treatment sessions to a Case when booked.
+                </p>
+              </div>
+            </div>
+
+            {form.is_package && (
+              <div className="mt-4 pl-7">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Session Allocation <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.session_allocation ?? ''}
+                  onChange={(e) => set('session_allocation', parseInt(e.target.value) || null)}
+                  className={`${inputCls} w-1/2 ${errors.session_allocation ? 'border-rose-400 ring-2 ring-rose-200' : ''}`}
+                  placeholder="e.g. 6"
+                />
+                <FieldError msg={errors.session_allocation} />
+              </div>
             )}
           </div>
 

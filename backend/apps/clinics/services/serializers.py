@@ -25,6 +25,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             'price', 'image', 'image_url', 'color_hex',
             'discipline', 'discipline_label',
             'sort_order', 'is_active', 'show_in_portal',
+            'is_package', 'session_allocation',
             'assigned_practitioners',
             'created_at', 'updated_at',
         ]
@@ -83,3 +84,18 @@ class ServiceSerializer(serializers.ModelSerializer):
         if not re.match(r'^#[0-9A-Fa-f]{6}$', value):
             raise serializers.ValidationError("Enter a valid hex color e.g. #0D9488")
         return value
+
+    def validate(self, attrs):
+        # Validate package requirements
+        is_package = attrs.get('is_package', getattr(self.instance, 'is_package', False))
+        session_allocation = attrs.get('session_allocation', getattr(self.instance, 'session_allocation', None))
+
+        if is_package:
+            if not session_allocation or session_allocation < 1:
+                raise serializers.ValidationError({
+                    'session_allocation': 'Session allocation must be at least 1 for a package service.'
+                })
+        else:
+            attrs['session_allocation'] = None
+
+        return attrs

@@ -18,6 +18,7 @@ export const WorkspaceRightPanel = () => {
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!patient) return;
@@ -33,6 +34,11 @@ export const WorkspaceRightPanel = () => {
       ]);
       setNotes(notesData || []);
       setTemplates(templatesData || []);
+      
+      // Auto-expand the newest note if none is expanded
+      if (notesData && notesData.length > 0 && expandedNoteId === null) {
+        setExpandedNoteId(notesData[0].id);
+      }
       
       const sortedAppointments = (appointmentsData.results || []).sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -107,6 +113,8 @@ export const WorkspaceRightPanel = () => {
                       appointments={appointments}
                       templates={templates}
                       onRefreshFeed={handleRefreshFeed}
+                      isExpanded={expandedNoteId === note.id}
+                      onToggleExpand={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
                     />
                   </div>
                 ))}
