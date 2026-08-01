@@ -110,7 +110,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
     serializer_class = ClinicalNoteSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['patient', 'practitioner', 'date', 'is_draft', 'is_signed', 'template', 'appointment']
+    filterset_fields = ['patient', 'practitioner', 'date', 'is_draft', 'is_signed', 'template', 'appointment', 'patient_case']
     search_fields = ['patient__first_name', 'patient__last_name']
     ordering_fields = ['date', 'created_at']
     

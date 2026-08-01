@@ -20,6 +20,12 @@ def consume_session_on_note_save(sender, instance, created, **kwargs):
         
     appointment = instance.appointment
     
+    # Automatically mark the appointment as COMPLETED if it's currently in an active/pending state.
+    # This reflects the business reality that writing a clinical note means the treatment occurred.
+    if appointment.status in ['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'ARRIVED']:
+        appointment.status = 'COMPLETED'
+        appointment.save(update_fields=['status'])
+    
     # Identify the patient case (prefer explicit case link, fallback to appointment's case)
     patient_case = instance.patient_case
     if not patient_case:

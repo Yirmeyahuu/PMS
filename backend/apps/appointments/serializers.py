@@ -572,5 +572,3 @@ class CalendarNoteSerializer(serializers.ModelSerializer):
         if obj.modified_by:
             return obj.modified_by.get_full_name() or obj.modified_by.email
         return None
-
-        return instance

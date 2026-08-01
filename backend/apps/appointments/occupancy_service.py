@@ -2,7 +2,7 @@ import logging
 from datetime import date
 from typing import Dict, List
 from collections import defaultdict
-from django.db.models import Q
+from django.db.models import Q, Min
 from apps.clinics.models import Practitioner
 from apps.appointments.models import Appointment, BlockAppointment
 
@@ -128,6 +128,15 @@ def get_occupancy_stats(clinic_id: int, start_date: date, end_date: date, practi
     for appt in appt_qs:
         appts_by_date_and_prac[appt.date][appt.practitioner_id].append(appt)
 
+    # Pre-fetch historical COMPLETED appointments to determine New Clients efficiently
+    all_patient_ids = list(set(a.patient_id for a in appt_qs))
+    first_completed_qs = Appointment.objects.filter(
+        patient_id__in=all_patient_ids,
+        status='COMPLETED'
+    ).values('patient_id').annotate(first_date=Min('date'))
+    
+    first_completed_map = {item['patient_id']: item['first_date'] for item in first_completed_qs}
+
     from datetime import timedelta
     results = defaultdict(dict)
     
@@ -141,16 +150,26 @@ def get_occupancy_stats(clinic_id: int, start_date: date, end_date: date, practi
             
             p_appts = appts_by_date_and_prac[curr][p.id]
             
-            # Sum up durations for all appointments (regardless of status per user instruction)
+            # For Diary Analytics, exclude non-displayed appointments (CANCELLED) from calculations
+            displayed_appts = [a for a in p_appts if a.status != 'CANCELLED']
+            
+            # Sum up durations for all displayed appointments
             occupied_mins = 0
-            for a in p_appts:
+            for a in displayed_appts:
                 if a.start_time and a.end_time:
                     s_mins = a.start_time.hour * 60 + a.start_time.minute
                     e_mins = a.end_time.hour * 60 + a.end_time.minute
                     occupied_mins += max(0, e_mins - s_mins)
             
-            unique_patients = set(a.patient_id for a in p_appts)
-            new_patients = set(a.patient_id for a in p_appts if a.appointment_type == 'INITIAL')
+            unique_patients = set(a.patient_id for a in displayed_appts)
+            
+            new_patients_count = 0
+            for pid in unique_patients:
+                first_date = first_completed_map.get(pid)
+                # A patient is a New Client if they have no completed history,
+                # or their first completed appointment is on or after the selected Diary date.
+                if not first_date or first_date >= curr:
+                    new_patients_count += 1
             
             occupancy_pct = 0
             if avail > 0:
@@ -161,7 +180,7 @@ def get_occupancy_stats(clinic_id: int, start_date: date, end_date: date, practi
                 "occupied_minutes": occupied_mins,
                 "occupancy_pct": occupancy_pct,
                 "total_clients": len(unique_patients),
-                "new_clients": len(new_patients)
+                "new_clients": new_patients_count
             }
             
         curr += timedelta(days=1)

@@ -82,6 +82,8 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.setItem('access_token', tokens.access);
         localStorage.setItem('refresh_token', tokens.refresh);
         localStorage.setItem('user', JSON.stringify(user));
+        // Reset the inactivity timer when logging in
+        localStorage.setItem('last_activity', String(Date.now()));
         // Mark the session as active. sessionStorage is cleared automatically
         // when the browser is closed, ensuring users must log in again.
         sessionStorage.setItem('session_active', '1');
@@ -98,6 +100,7 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         localStorage.removeItem('auth-storage');
+        localStorage.removeItem('last_activity');
         sessionStorage.removeItem('session_active');
         // Clear all React Query caches to prevent cross-clinic data leakage
         queryClient.clear();
