@@ -527,3 +527,18 @@ class ClinicalNoteVersionSerializer(serializers.ModelSerializer):
                 return obj.content
         
         return None
+class GlobalClinicalNoteAuditLogSerializer(serializers.ModelSerializer):
+    """Serializer for global audit logs across the clinic"""
+    
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    practitioner_name = serializers.CharField(source='clinical_note.practitioner.user.get_full_name', read_only=True, default='')
+    patient_name = serializers.CharField(source='clinical_note.patient.get_full_name', read_only=True, default='')
+    note_date = serializers.DateField(source='clinical_note.date', read_only=True)
+    
+    class Meta:
+        model = ClinicalNoteAuditLog
+        fields = [
+            'id', 'clinical_note', 'action', 'created_at', 'ip_address', 'user_agent',
+            'user', 'user_name', 'practitioner_name', 'patient_name', 'note_date'
+        ]
+        read_only_fields = fields

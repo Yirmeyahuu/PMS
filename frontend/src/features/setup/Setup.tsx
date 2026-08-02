@@ -17,6 +17,7 @@ import { Permissions } from './pages/users/Permissions';
 import { Subscription } from './pages/account/Subscription';
 import CommunicationSettings from './pages/communication/CommunicationSettings';
 import CommunicationLogs from './pages/communication/CommunicationLogs';
+import ClinicalAuditLogs from './pages/communication/ClinicalAuditLogs';
 import { ConsentFormEditor } from './pages/practice/ConsentFormEditor';
 
 // ─── Card → Feature key mapping ───────────────────────────────────────────────
@@ -95,6 +96,7 @@ const SETUP_CARDS: SetupCard[] = [
     options: [
       { id: 'comm-settings', label: 'Settings', component: CommunicationSettings },
       { id: 'comm-logs', label: 'Logs', component: CommunicationLogs },
+      { id: 'clinical-audit', label: 'Clinical Audit', component: ClinicalAuditLogs },
     ],
   },
 ];

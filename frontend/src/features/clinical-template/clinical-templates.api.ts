@@ -212,3 +212,30 @@ export const openPrintNote = (id: number) => {
   const printUrl = `${API_URL}${BASE_URL}/notes/${id}/print_note_html/`;
   window.open(printUrl, '_blank');
 };
+export interface GlobalClinicalNoteAuditLog {
+  id: number;
+  clinical_note: number;
+  action: string;
+  created_at: string;
+  ip_address: string;
+  user_agent: string;
+  user: number | null;
+  user_name: string;
+  practitioner_name: string;
+  patient_name: string;
+  note_date: string;
+}
+
+export const getGlobalAuditLogs = async (filters?: {
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+}): Promise<GlobalClinicalNoteAuditLog[]> => {
+  const params = new URLSearchParams();
+  if (filters?.start_date) params.append('start_date', filters.start_date);
+  if (filters?.end_date) params.append('end_date', filters.end_date);
+  if (filters?.search) params.append('search', filters.search);
+  
+  const response = await axiosInstance.get(`${BASE_URL}/global-audit/?${params.toString()}`);
+  return response.data.results ?? response.data;
+};

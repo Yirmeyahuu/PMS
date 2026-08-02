@@ -626,3 +626,51 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         })
         
         return HttpResponse(html_content, content_type='text/html')
+class GlobalClinicalNoteAuditViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Global access to all Clinical Note Audit Logs in the clinic.
+    
+    Permissions:
+    - Owners/Managers/Staff: See all audit logs in the clinic.
+    - Practitioners: See only audit logs for notes they authored/own.
+    """
+    queryset = ClinicalNoteAuditLog.objects.all().select_related(
+        'user', 'clinical_note', 'clinical_note__patient', 'clinical_note__practitioner__user'
+    )
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['action', 'user', 'clinical_note__patient', 'clinical_note']
+    search_fields = ['clinical_note__patient__first_name', 'clinical_note__patient__last_name', 'user__first_name', 'user__last_name']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+    
+    def get_serializer_class(self):
+        from .serializers import GlobalClinicalNoteAuditLogSerializer
+        return GlobalClinicalNoteAuditLogSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # 1. Base filter: restrict to user's clinic (including main/branch)
+        if user.clinic:
+            main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
+            from django.db.models import Q
+            qs = self.queryset.filter(
+                Q(clinical_note__clinic=main_clinic) | Q(clinical_note__clinic__parent_clinic=main_clinic)
+            )
+        else:
+            return self.queryset.none()
+            
+        # 2. Role-based scoping: Practitioner (if not admin/staff/manager) sees only their own notes
+        if user.is_practitioner and not (user.is_admin or getattr(user, 'is_manager', False) or user.is_staff):
+            qs = qs.filter(clinical_note__practitioner__user=user)
+            
+        # 3. Optional date range filtering
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            qs = qs.filter(created_at__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_at__lte=f"{end_date} 23:59:59")
+            
+        return qs
