@@ -238,6 +238,7 @@ export const PortalHome: React.FC = () => {
       });
 
       // If clinic has an active consent form, create the clinic consent document
+      let clinicConsentDocId: number | undefined;
       if (clinicConsentForm && clinicConsentSignature) {
         const clinicDocPayload: ClinicConsentDocumentPayload = {
           title: clinicConsentForm.title,
@@ -248,12 +249,15 @@ export const PortalHome: React.FC = () => {
           signer_full_name: fullName,
           signer_email: formData.email,
         };
-        await createClinicConsentDocument(token, clinicDocPayload);
+        const clinicDocRes = await createClinicConsentDocument(token, clinicDocPayload);
+        clinicConsentDocId = clinicDocRes.id;
       }
 
       const confirmation = await submitBooking(token, {
         ...payload,
         consent_id: consent.id,
+        data_privacy_document_id: consent.document_id,
+        clinic_consent_document_id: clinicConsentDocId,
       });
       navigate(`/portal/${token}/success`, { state: { confirmation } });
     } catch (err: unknown) {

@@ -537,11 +537,61 @@ class PatientViewSet(viewsets.ModelViewSet):
         Returns all consent documents (historical snapshots) for a patient.
         """
         patient = self.get_object()
+        from django.db.models import Q
         documents = PatientConsentDocument.objects.filter(
-            patient=patient,
-        ).order_by('-signed_at')
+            Q(patient=patient) | 
+            Q(appointment__patient=patient) | 
+            Q(patient_case__patient=patient)
+        ).distinct().order_by('-signed_at')
         serializer = PatientConsentDocumentSerializer(documents, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='assign_consent_document')
+    def assign_consent_document(self, request, pk=None):
+        """
+        POST /api/patients/{id}/assign_consent_document/
+        Assigns an orphaned consent document to a patient case.
+        Requires 'document_id' and 'patient_case_id' in request data.
+        """
+        patient = self.get_object()
+        document_id = request.data.get('document_id')
+        case_id = request.data.get('patient_case_id')
+
+        if not document_id or not case_id:
+            return Response(
+                {'detail': 'document_id and patient_case_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.db.models import Q
+        document = PatientConsentDocument.objects.filter(
+            Q(patient=patient) | 
+            Q(appointment__patient=patient) | 
+            Q(patient_case__patient=patient),
+            id=document_id
+        ).first()
+
+        if not document:
+            return Response(
+                {'detail': 'Document not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        from apps.patients.models import PatientCase
+        case = PatientCase.objects.filter(id=case_id, patient=patient).first()
+        if not case:
+            return Response(
+                {'detail': 'Case not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        document.patient_case = case
+        document.save(update_fields=['patient_case'])
+        
+        return Response(
+            PatientConsentDocumentSerializer(document).data,
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=['post'], url_path='create_consent_document')
     def create_consent_document(self, request, pk=None):
@@ -567,6 +617,8 @@ class PatientViewSet(viewsets.ModelViewSet):
             signer_email=serializer.validated_data['signer_email'],
             type=serializer.validated_data.get('type', PatientConsentDocument.TYPE_CLINIC_CONSENT),
             title=serializer.validated_data.get('title', 'Clinic Consent Form'),
+            appointment_id=serializer.validated_data.get('appointment_id'),
+            patient_case_id=serializer.validated_data.get('patient_case_id'),
         )
         return Response(
             PatientConsentDocumentSerializer(document).data,
@@ -1168,6 +1220,8 @@ class PublicPortalBookView(APIView):
         service_obj = validated.get('service')
         prac_obj    = validated.get('practitioner')
         consent_id  = validated.get('consent_id')
+        dp_doc_id   = request.data.get('data_privacy_document_id')
+        cc_doc_id   = request.data.get('clinic_consent_document_id')
 
         consent = None
         if consent_id:
@@ -1217,6 +1271,18 @@ class PublicPortalBookView(APIView):
             if consent and consent.patient_id is None:
                 consent.patient = patient
                 consent.save(update_fields=['patient', 'updated_at'])
+
+            # Bind consent documents to the appointment and case
+            if dp_doc_id or cc_doc_id:
+                docs_to_update = PatientConsentDocument.objects.filter(
+                    id__in=[id_ for id_ in [dp_doc_id, cc_doc_id] if id_]
+                )
+                for doc in docs_to_update:
+                    if not doc.patient_id:
+                        doc.patient = patient
+                    doc.appointment = _appointment
+                    doc.patient_case = _appointment.patient_case
+                    doc.save(update_fields=['patient', 'appointment', 'patient_case'])
 
             logger.info(
                 f"Portal booking #{booking.reference_number} auto-confirmed "
@@ -1284,7 +1350,7 @@ class PublicPortalConsentCreateView(APIView):
 
         # Also create a PatientConsentDocument so it appears in the unified
         # consent documents list alongside Clinic Consent Forms.
-        PatientConsentDocument.objects.create(
+        document = PatientConsentDocument.objects.create(
             patient=patient,
             clinic=portal_link.clinic,
             type=PatientConsentDocument.TYPE_DATA_PRIVACY,
@@ -1298,8 +1364,11 @@ class PublicPortalConsentCreateView(APIView):
             ip_address=ip_address,
         )
 
+        response_data = PublicPatientConsentCreateSerializer(consent).data
+        response_data['document_id'] = document.id
+
         return Response(
-            PublicPatientConsentCreateSerializer(consent).data,
+            response_data,
             status=status.HTTP_201_CREATED,
         )
 

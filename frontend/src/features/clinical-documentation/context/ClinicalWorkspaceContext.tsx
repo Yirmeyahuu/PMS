@@ -1,6 +1,9 @@
 import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 
+export type WorkspaceLeftTab = 'templates' | 'letters';
+export type WorkspaceRightTab = 'history' | 'documents';
+
 export type EditorContextType = 
   | { type: 'IDLE' }
   | { type: 'NEW_NOTE', templateId: number }
@@ -20,6 +23,10 @@ export interface ClinicalWorkspaceState {
   // Trigger history/documents refresh
   refreshTrigger: number;
   triggerRefresh: () => void;
+  activeLeftTab: WorkspaceLeftTab;
+  setActiveLeftTab: (tab: WorkspaceLeftTab) => void;
+  activeRightTab: WorkspaceRightTab;
+  setActiveRightTab: (tab: WorkspaceRightTab) => void;
 }
 
 const ClinicalWorkspaceContext = createContext<ClinicalWorkspaceState | undefined>(undefined);
@@ -28,6 +35,8 @@ export const ClinicalWorkspaceProvider = ({ children, initialCaseId }: { childre
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(initialCaseId ?? null);
   const [editorContext, setEditorContext] = useState<EditorContextType>({ type: 'IDLE' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [activeLeftTab, setActiveLeftTab] = useState<WorkspaceLeftTab>('templates');
+  const [activeRightTab, setActiveRightTab] = useState<WorkspaceRightTab>('history');
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
@@ -39,6 +48,10 @@ export const ClinicalWorkspaceProvider = ({ children, initialCaseId }: { childre
       setEditorContext,
       refreshTrigger,
       triggerRefresh,
+      activeLeftTab,
+      setActiveLeftTab,
+      activeRightTab,
+      setActiveRightTab,
     }}>
       {children}
     </ClinicalWorkspaceContext.Provider>

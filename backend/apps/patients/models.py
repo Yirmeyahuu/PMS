@@ -753,6 +753,13 @@ class PatientConsentDocument(TimeStampedModel):
         blank=True,
         related_name='consent_documents',
     )
+    patient_case = models.ForeignKey(
+        'patients.PatientCase',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='consent_documents',
+    )
     clinic = models.ForeignKey(
         'clinics.Clinic',
         on_delete=models.CASCADE,

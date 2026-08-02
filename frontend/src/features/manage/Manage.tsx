@@ -17,6 +17,7 @@ import { ClinicProfile } from './pages/clinical/ClinicProfile';
 import { EmailReminder } from './pages/communications/EmailReminder';
 import { Records } from './pages/communications/Records';
 import { Notifications } from './pages/communications/Notifications';
+import { ClinicalAuditLogs } from './pages/communications/ClinicalAuditLogs';
 
 // Maps each card id to its RBAC feature key
 // 'none'  → card items locked in grid (restrictedItemIds)
@@ -72,6 +73,7 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
       { id: 'comm1', label: 'Email Reminder', path: 'comm1', component: EmailReminder },
       { id: 'comm2', label: 'Records',        path: 'comm2', component: Records },
       { id: 'comm3', label: 'Notifications',  path: 'comm3', component: Notifications },
+      { id: 'clinical-audit', label: 'Clinical Audit', path: 'clinical-audit', component: ClinicalAuditLogs },
     ],
   },
 ];

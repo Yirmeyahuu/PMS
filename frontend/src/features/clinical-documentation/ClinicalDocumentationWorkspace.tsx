@@ -4,13 +4,15 @@ import { usePatientProfileContext } from '@/features/patients/context/PatientPro
 import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/ClinicalWorkspaceContext';
 import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
 import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
+import { WorkspaceLettersPanel } from './components/WorkspaceLettersPanel';
 import { CreateClinicalNoteModal } from '@/features/clinical-template/components/CreateClinicalNoteModal';
+import { GenerateLetterModal } from './components/GenerateLetterModal';
 
 const ClinicalWorkspaceLayout = () => {
   const navigate = useNavigate();
   const { caseId } = useParams();
   const { cases, patient, refreshCases } = usePatientProfileContext();
-  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh } = useClinicalWorkspace();
+  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh, activeLeftTab, setActiveLeftTab } = useClinicalWorkspace();
   const location = useLocation();
   const state = location.state as { appointmentId?: number } | null;
 
@@ -42,16 +44,34 @@ const ClinicalWorkspaceLayout = () => {
 
       <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-4 p-4">
-          {/* Left Panel: Templates */}
+          {/* Left Panel: Templates / Letters */}
           <div className="col-span-12 md:col-span-5 lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
-            <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700 flex-shrink-0">Templates</div>
+            {/* Left Panel Tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto hide-scrollbar flex-shrink-0">
+              <button
+                onClick={() => setActiveLeftTab('templates')}
+                className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+                  activeLeftTab === 'templates' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Templates
+              </button>
+              <button
+                onClick={() => setActiveLeftTab('letters')}
+                className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+                  activeLeftTab === 'letters' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Letters
+              </button>
+            </div>
             <div className="flex-1 overflow-y-auto">
-              <WorkspaceTemplatesPanel />
+              {activeLeftTab === 'templates' ? <WorkspaceTemplatesPanel /> : <WorkspaceLettersPanel />}
             </div>
           </div>
 
-          {/* Right Panel: History / Documents */}
-          <div className="col-span-12 md:col-span-7 lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
+          {/* Right Panel: Content Feed */}
+          <div className="col-span-12 md:col-span-7 lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all">
             <WorkspaceRightPanel />
           </div>
         </div>
@@ -71,6 +91,19 @@ const ClinicalWorkspaceLayout = () => {
             setEditorContext({ type: 'IDLE' });
             triggerRefresh();
             if (typeof refreshCases === 'function') refreshCases();
+          }}
+        />
+      )}
+      {patient && editorContext.type === 'NEW_LETTER' && (
+        <GenerateLetterModal
+          patientId={patient.id}
+          preSelectedTemplateId={editorContext.templateId}
+          preSelectedCaseId={selectedCaseId || undefined}
+          appointmentId={state?.appointmentId}
+          onClose={() => setEditorContext({ type: 'IDLE' })}
+          onSuccess={() => {
+            setEditorContext({ type: 'IDLE' });
+            triggerRefresh();
           }}
         />
       )}

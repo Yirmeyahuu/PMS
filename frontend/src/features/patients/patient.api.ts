@@ -210,6 +210,8 @@ export interface PatientConsentDocumentRecord {
   patient_name?: string;
   appointment: number | null;
   appointment_id: number | null;
+  patient_case: number | null;
+  patient_case_id: number | null;
   clinic: number;
   clinic_name: string;
   type: string;
@@ -231,6 +233,31 @@ export interface PatientConsentDocumentRecord {
 export const getPatientConsentDocuments = async (patientId: number): Promise<PatientConsentDocumentRecord[]> => {
   const response = await axiosInstance.get<PatientConsentDocumentRecord[]>(
     `/patients/${patientId}/consent_documents/`,
+  );
+  return response.data;
+};
+
+export interface CreatePatientConsentDocumentPayload {
+  title: string;
+  header_snapshot: string;
+  body_snapshot: string;
+  signature: string;
+  consent_version: string;
+  signer_full_name: string;
+  signer_email: string;
+  type: string;
+  appointment_id?: number | null;
+  patient_case_id?: number | null;
+}
+
+/**
+ * Create a patient consent document manually from the workspace.
+ * POST /patients/{id}/create_consent_document/
+ */
+export const createConsentDocument = async (patientId: number, data: CreatePatientConsentDocumentPayload): Promise<PatientConsentDocumentRecord> => {
+  const response = await axiosInstance.post<PatientConsentDocumentRecord>(
+    `/patients/${patientId}/create_consent_document/`,
+    data
   );
   return response.data;
 };
@@ -279,3 +306,10 @@ export const executePatientMerge = async (primaryId: number, duplicateId: number
   return response.data;
 };
 
+export const assignConsentDocument = async (patientId: number, documentId: number, patientCaseId: number): Promise<PatientConsentDocumentRecord> => {
+  const response = await axiosInstance.post<PatientConsentDocumentRecord>(`/patients/${patientId}/assign_consent_document/`, {
+    document_id: documentId,
+    patient_case_id: patientCaseId
+  });
+  return response.data;
+};

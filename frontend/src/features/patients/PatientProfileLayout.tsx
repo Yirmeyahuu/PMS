@@ -107,7 +107,7 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                 />
 
                 <NavItem
-                  label="Unassigned Notes"
+                  label="Unassigned Notes and Letters"
                   to={`/patients/${patientId}/unassigned-notes`}
                   icon={<FileText className="w-4 h-4" />}
                 />

@@ -80,6 +80,8 @@ export interface BookingPayload {
   branch?:                number | null;
   practitioner?:          number | null;
   consent_id?:            number;
+  data_privacy_document_id?: number;
+  clinic_consent_document_id?: number;
   patient_first_name:     string;
   patient_last_name:      string;
   patient_email:          string;
@@ -133,6 +135,7 @@ export interface PortalConsentResponse {
   consent_text: string;
   signature: string;
   created_at: string;
+  document_id?: number;
 }
 
 export interface SlotsResponse {

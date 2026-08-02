@@ -239,7 +239,8 @@ export const PatientDocumentsPage = () => {
                 return (
                   <article
                     key={uniqueKey}
-                    className={`border border-gray-200 rounded-xl p-4 hover:border-${isClinic ? 'indigo' : 'sky'}-300 transition-colors`}
+                    className={`border border-gray-200 rounded-xl p-4 hover:border-${isClinic ? 'indigo' : 'sky'}-300 transition-colors cursor-pointer group`}
+                    onClick={() => setViewingAnyConsent(item)}
                   >
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-start gap-3 min-w-0">
@@ -265,7 +266,6 @@ export const PatientDocumentsPage = () => {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() => setViewingAnyConsent(item)}
                           className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${btnColor}`}
                         >
                           View
@@ -300,7 +300,8 @@ export const PatientDocumentsPage = () => {
                 return (
                   <article
                     key={req.id}
-                    className="border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap"
+                    className="border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap cursor-pointer hover:border-indigo-300 transition-colors group"
+                    onClick={() => setViewingClientForm(req)}
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
@@ -348,8 +349,7 @@ export const PatientDocumentsPage = () => {
 
                     <button
                       type="button"
-                      onClick={() => setViewingClientForm(req)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 shrink-0"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-lg transition-colors border border-indigo-200 shrink-0"
                     >
                       View
                     </button>

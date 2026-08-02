@@ -1,20 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
-import { History, Files, Loader2, FileText } from 'lucide-react';
+import { History, Loader2 } from 'lucide-react';
 import { getNotes, getActiveTemplates } from '@/features/clinical-template/clinical-templates.api';
+import { getCaseDocuments, type CaseDocument } from '../api/caseDocuments.api';
+import { getPatientConsentDocuments, type PatientConsentDocumentRecord } from '@/features/patients/patient.api';
 import { getAppointments } from '@/features/appointments/appointment.api';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { ClinicalNoteFeedItem } from './ClinicalNoteFeedItem';
+import { WorkspaceDocumentsFeed } from './WorkspaceDocumentsFeed';
 import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 
 export const WorkspaceRightPanel = () => {
   const { patient, refreshCases } = usePatientProfileContext();
-  const { selectedCaseId, refreshTrigger, triggerRefresh, setEditorContext } = useClinicalWorkspace();
-  type Tab = 'notes' | 'letters' | 'documents' | 'history' | 'measures' | 'exercises';
-  const [activeTab, setActiveTab] = useState<Tab>('notes');
+  const { selectedCaseId, refreshTrigger, triggerRefresh, setEditorContext, activeRightTab, setActiveRightTab } = useClinicalWorkspace();
 
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
+  const [documents, setDocuments] = useState<(CaseDocument | (PatientConsentDocumentRecord & { category: string, description?: string }))[]>([]);
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,15 +26,61 @@ export const WorkspaceRightPanel = () => {
     if (!patient) return;
     setLoading(true);
     try {
-      const [notesData, templatesData, appointmentsData] = await Promise.all([
+      const [notesData, docsData, consentDocsData, templatesData, appointmentsData] = await Promise.all([
         getNotes({ 
           patient: patient.id, 
-          patient_case: selectedCaseId ? selectedCaseId : -1 // -1 ensures we get nothing if no case is selected, strict filtering
+          patient_case: selectedCaseId ? selectedCaseId : -1 
         }),
+        getCaseDocuments(patient.id),
+        getPatientConsentDocuments(patient.id),
         getActiveTemplates(),
         getAppointments({ patient: patient.id, page_size: 100 })
       ]);
       setNotes(notesData || []);
+      
+      // Filter documents strictly by selected case
+      const filteredDocs = (docsData || []).filter(doc => 
+        selectedCaseId ? doc.patient_case === selectedCaseId : false
+      );
+      
+      const appointmentsList = appointmentsData.results || [];
+      const appointmentsForCase = appointmentsList.filter(
+        (appt) => appt.patient_case === selectedCaseId || (appt as any).patient_case?.id === selectedCaseId
+      );
+      const appointmentIdsForCase = new Set(appointmentsForCase.map(a => a.id));
+
+      // Filter consent docs strictly by selected case OR by an appointment that belongs to this case
+      const rawConsentDocs = (consentDocsData || []).filter(doc => {
+        if (!selectedCaseId) return false;
+        if (doc.patient_case_id === selectedCaseId || doc.patient_case === selectedCaseId) return true;
+        if (doc.appointment_id && appointmentIdsForCase.has(doc.appointment_id)) return true;
+        if (doc.appointment && appointmentIdsForCase.has(doc.appointment)) return true;
+        return false;
+      });
+
+      // Deduplicate consent docs by type and appointment (keep latest signed_at)
+      const uniqueConsentDocsMap = new Map();
+      rawConsentDocs.forEach(doc => {
+        const apptId = doc.appointment_id || doc.appointment || 'no-appt';
+        const key = `${doc.type}-${apptId}`;
+        const existing = uniqueConsentDocsMap.get(key);
+        if (!existing || new Date(doc.signed_at).getTime() > new Date(existing.signed_at).getTime()) {
+          uniqueConsentDocsMap.set(key, doc);
+        }
+      });
+      const filteredConsentDocs = Array.from(uniqueConsentDocsMap.values());
+
+      // Add consent docs mapping them to a common format
+      const mappedConsentDocs = filteredConsentDocs.map(doc => ({
+        ...doc,
+        id: `consent-${doc.id}`, // Prevent key collision with CaseDocument
+        title: doc.type === 'DATA_PRIVACY_CONSENT' ? 'Data Privacy Form' : 'Clinic Consent Form',
+        category: 'CONSENT_FORM',
+        description: null // Remove redundant description since date is already shown
+      }));
+      
+      setDocuments([...filteredDocs, ...mappedConsentDocs]);
+      
       setTemplates(templatesData || []);
       
       // Auto-expand the newest note if none is expanded
@@ -64,55 +112,51 @@ export const WorkspaceRightPanel = () => {
 
   return (
     <div className="flex flex-col flex-1 w-full min-h-0 bg-slate-50">
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 bg-white overflow-x-auto hide-scrollbar flex-shrink-0">
-        {[
-          { id: 'notes', label: 'Notes', icon: FileText },
-          { id: 'letters', label: 'Letters', icon: FileText },
-          { id: 'documents', label: 'Documents', icon: Files },
-          { id: 'history', label: 'History', icon: History },
-          { id: 'measures', label: 'Measures', icon: History },
-          { id: 'exercises', label: 'Exercises', icon: History }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as Tab)}
-            className={`flex-1 min-w-[120px] py-3 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-              activeTab === tab.id ? 'border-sky-600 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
-        ))}
+      {/* Right Panel Tabs */}
+      <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto hide-scrollbar flex-shrink-0">
+        <button
+          onClick={() => setActiveRightTab('history')}
+          className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+            activeRightTab === 'history' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          History
+        </button>
+        <button
+          onClick={() => setActiveRightTab('documents')}
+          className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+            activeRightTab === 'documents' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Documents
+        </button>
       </div>
 
-      {/* Content Feed */}
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
         {loading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
           </div>
-        ) : activeTab === 'notes' ? (
-          <div className="max-w-4xl mx-auto">
-            {/* Notes Feed */}
+        ) : activeRightTab === 'history' ? (
+          <div className="max-w-4xl mx-auto space-y-6">
             {notes.length === 0 ? (
               <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
                 <h3 className="text-lg font-medium text-slate-600 mb-2">No Clinical Notes Found</h3>
-                <p className="text-sm">Select a template from the left panel to create the first note.</p>
+                <p className="text-sm">There are no finalized or drafted clinical notes for this case.</p>
               </div>
             ) : (
-              <div className="space-y-6 relative">
+              <div className="space-y-4 pl-8 border-l-2 border-slate-200 ml-4 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
                 {notes.map((note) => (
                   <div key={note.id} className="relative">
-                    {/* Timeline Line Connector */}
+                    {/* Timeline dot */}
+                    {/* Timeline dot */}
+                    <div className="absolute -left-[41px] top-6 w-4 h-4 rounded-full bg-white border-2 border-indigo-400 shadow-sm z-10" />
                     <div className="absolute left-8 top-16 bottom-[-24px] w-0.5 bg-slate-200 -z-10 last:hidden" />
-                    
-                    <ClinicalNoteFeedItem
-                      note={note}
+                    <ClinicalNoteFeedItem 
+                      note={note} 
                       appointments={appointments}
-                      templates={templates}
+                      templates={templates} 
                       onRefreshFeed={handleRefreshFeed}
                       isExpanded={expandedNoteId === note.id}
                       onToggleExpand={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
@@ -122,12 +166,11 @@ export const WorkspaceRightPanel = () => {
               </div>
             )}
           </div>
-        ) : (
-          <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm max-w-4xl mx-auto">
-            <Files className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <h3 className="text-lg font-medium text-slate-600 mb-2">Documents Support Coming Soon</h3>
+        ) : activeRightTab === 'documents' ? (
+          <div className="max-w-4xl mx-auto">
+            <WorkspaceDocumentsFeed documents={documents} appointments={appointments} />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

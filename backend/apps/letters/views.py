@@ -130,6 +130,7 @@ class LetterViewSet(viewsets.ModelViewSet):
         patient_id = request.data.get('patient_id')
         subject = request.data.get('subject')
         patient_case_id = request.data.get('patient_case_id')
+        appointment_id = request.data.get('appointment_id')
 
         if not all([template_id, patient_id, subject]):
             return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
@@ -139,15 +140,44 @@ class LetterViewSet(viewsets.ModelViewSet):
             patient = Patient.objects.get(id=patient_id, clinic=request.user.clinic)
             practitioner = getattr(request.user, 'practitioner', None)
             
-            # 1. Render content
-            rendered_content = LetterGeneratorService.replace_variables(
-                template.content_html,
+            # Fetch Case and Appointment
+            from apps.patients.models import PatientCase
+            from apps.appointments.models import Appointment
+            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
+            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
+
+            # 1. Render content for Header, Body, Footer
+            rendered_header = LetterGeneratorService.replace_variables(
+                template.header_html or '',
                 patient=patient,
-                practitioner=practitioner
+                practitioner=practitioner,
+                patient_case=patient_case,
+                appointment=appointment
+            )
+            
+            # Use provided content_html if given, otherwise render it
+            custom_content = request.data.get('content_html')
+            if custom_content is not None:
+                rendered_content = custom_content
+            else:
+                rendered_content = LetterGeneratorService.replace_variables(
+                    template.content_html or '',
+                    patient=patient,
+                    practitioner=practitioner,
+                    patient_case=patient_case,
+                    appointment=appointment
+                )
+                
+            rendered_footer = LetterGeneratorService.replace_variables(
+                template.footer_html or '',
+                patient=patient,
+                practitioner=practitioner,
+                patient_case=patient_case,
+                appointment=appointment
             )
             
             # Optionally wrap in header/footer
-            full_html = f"{template.header_html or ''}{rendered_content}{template.footer_html or ''}"
+            full_html = f"{rendered_header}{rendered_content}{rendered_footer}"
             
             # 2. Generate PDF
             pdf_bytes = LetterGeneratorService.generate_pdf(full_html)
@@ -156,7 +186,8 @@ class LetterViewSet(viewsets.ModelViewSet):
             letter = Letter.objects.create(
                 clinic=request.user.clinic,
                 patient=patient,
-                patient_case_id=patient_case_id,
+                patient_case=patient_case,
+                appointment=appointment,
                 practitioner=practitioner,
                 template=template,
                 subject=subject,
@@ -192,6 +223,61 @@ class LetterViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Letter generation error: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def preview(self, request):
+        """
+        Returns the rendered content_html with dynamic variables replaced.
+        """
+        template_id = request.data.get('template_id')
+        patient_id = request.data.get('patient_id')
+        patient_case_id = request.data.get('patient_case_id')
+        appointment_id = request.data.get('appointment_id')
+
+        if not all([template_id, patient_id]):
+            return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            template = LetterTemplate.objects.get(id=template_id, clinic=request.user.clinic)
+            patient = Patient.objects.get(id=patient_id, clinic=request.user.clinic)
+            practitioner = getattr(request.user, 'practitioner', None)
+            
+            from apps.patients.models import PatientCase
+            from apps.appointments.models import Appointment
+            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
+            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
+
+            # Render content for Header, Body, Footer
+            rendered_header = LetterGeneratorService.replace_variables(
+                template.header_html or '',
+                patient=patient,
+                practitioner=practitioner,
+                patient_case=patient_case,
+                appointment=appointment
+            )
+            rendered_content = LetterGeneratorService.replace_variables(
+                template.content_html or '',
+                patient=patient,
+                practitioner=practitioner,
+                patient_case=patient_case,
+                appointment=appointment
+            )
+            rendered_footer = LetterGeneratorService.replace_variables(
+                template.footer_html or '',
+                patient=patient,
+                practitioner=practitioner,
+                patient_case=patient_case,
+                appointment=appointment
+            )
+            
+            # Optionally wrap in header/footer for preview display
+            full_html = f"{rendered_header}\n<br>\n{rendered_content}\n<br>\n{rendered_footer}"
+
+            return Response({'content_html': full_html})
+
+        except Exception as e:
+            logger.error(f"Letter preview error: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])

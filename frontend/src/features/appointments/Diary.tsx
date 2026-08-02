@@ -80,6 +80,12 @@ export const Diary: React.FC = () => {
   const [calendarReadyDate, setCalendarReadyDate] = useState<Date | null>(null);
   const [isCalendarLive, setIsCalendarLive] = useState(false);
 
+  // Mini calendar display offset (in months relative to currentDate).
+  // 0 = show currentDate's month. Incremented/decremented by the mini-cal
+  // Previous/Next month controls. Reset to 0 on any main Diary navigation so
+  // the mini calendar re-locks to the Diary's active month automatically.
+  const [miniCalendarOffset, setMiniCalendarOffset] = useState(0);
+
   // ── Admin Compare Mode State ────────────────────────────────────────────────
   const [compareMode, setCompareMode] = useState(false);
   const [comparePractitioners, setComparePractitioners] = useState<[number | string | null, number | string | null]>([null, null]);
@@ -212,6 +218,49 @@ export const Diary: React.FC = () => {
     }
   }, [practitioners, selectedPractitioner, cachedOwnId]);
 
+  // ── Practitioner preference restore (Correction #017 extension) ──────────
+  // Restores the user's last manually-selected practitioner for the active
+  // branch.  Declared AFTER the auto-select effect above so it executes last
+  // in React's commit order, ensuring the persisted choice always wins over
+  // the automatic default when practitioners finish loading.
+  //
+  // Storage key: diary_practitioner_<userId>_<branchId>  (user+branch scoped)
+  // Value: JSON-serialised practitioner id, or null for "Show All"
+  useEffect(() => {
+    if (!user?.id || selectedClinicBranch === null || practitioners.length === 0) return;
+
+    const key = `diary_practitioner_${user.id}_${selectedClinicBranch}`;
+    const raw = localStorage.getItem(key);
+
+    // No saved preference for this branch — let the auto-select default stand.
+    if (raw === null) return;
+
+    let savedId: number | string | null;
+    try {
+      savedId = JSON.parse(raw);
+    } catch {
+      // Corrupt entry — remove and fall back to default.
+      localStorage.removeItem(key);
+      return;
+    }
+
+    if (savedId === null) {
+      // User explicitly saved "Show All".
+      setSelectedPractitioner(null);
+      return;
+    }
+
+    // Validate: practitioner must still be accessible in the current list.
+    const isValid = practitioners.some(p => String(p.id) === String(savedId));
+    if (isValid) {
+      setSelectedPractitioner(savedId as number | string);
+    } else {
+      // Practitioner removed / deactivated — clean up stale entry.
+      localStorage.removeItem(key);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [practitioners, selectedClinicBranch, user?.id]);
+
   // ── Route / State Protection Guard ───────────────────────────────────────────
   // Since "All Branches" is removed, ensure selectedClinicBranch is never null
   // once branches are loaded.
@@ -320,6 +369,7 @@ export const Diary: React.FC = () => {
   );
 
   const handlePrevious = useCallback(() => {
+    setMiniCalendarOffset(0); // re-lock mini cal to Diary's new month
     setCurrentDate(prev => {
       if (view === 'day') return subDays(prev, 1);
       if (view === 'week') return subWeeks(prev, 1);
@@ -328,6 +378,7 @@ export const Diary: React.FC = () => {
   }, [view]);
 
   const handleNext = useCallback(() => {
+    setMiniCalendarOffset(0); // re-lock mini cal to Diary's new month
     setCurrentDate(prev => {
       if (view === 'day') return addDays(prev, 1);
       if (view === 'week') return addWeeks(prev, 1);
@@ -335,7 +386,10 @@ export const Diary: React.FC = () => {
     });
   }, [view]);
 
-  const handleToday = useCallback(() => setCurrentDate(new Date()), []);
+  const handleToday = useCallback(() => {
+    setCurrentDate(new Date());
+    setMiniCalendarOffset(0); // re-lock mini cal to today's month
+  }, []);
 
   const handleDateChange = useCallback((date: Date) => {
     setCurrentDate(date);
@@ -352,6 +406,13 @@ export const Diary: React.FC = () => {
   const handlePractitionerSelect = (practitionerId: number | string | null) => {
     setSelectedPractitioner(practitionerId);
     setShowFilterDropdown(false);
+    // Persist the user's manual selection (user-specific, branch-specific).
+    // Only called from the UI — never from auto-select effects — so we never
+    // accidentally persist a loading-time default as the user's preference.
+    if (user?.id && selectedClinicBranch !== null) {
+      const key = `diary_practitioner_${user.id}_${selectedClinicBranch}`;
+      localStorage.setItem(key, JSON.stringify(practitionerId));
+    }
   };
 
   const handleClinicBranchSelect = (branchId: number) => {
@@ -406,12 +467,28 @@ export const Diary: React.FC = () => {
     return format(currentDate, 'MMMM yyyy');
   }, [view, currentDate]);
 
-  const currentMonth = new Date();
-  const nextMonth = addMonths(currentMonth, 1);
+  // ── Mini Calendar derived display months ─────────────────────────────────
+  // Always derived from currentDate (the Diary's source of truth) + offset.
+  // This is the fix for the synchronization bug: previously these were
+  // hardcoded to new Date() (today) and never updated on Diary navigation.
+  const miniCalendarDate     = addMonths(currentDate, miniCalendarOffset);
+  const miniCalendarDateNext = addMonths(currentDate, miniCalendarOffset + 1);
 
+  // ── Mini Calendar date selection ──────────────────────────────────────────
+  // View-aware: Day View → navigate to exact date; Week View → navigate to
+  // the date (Calendar will render the containing week); Month View →
+  // switch to Day View for that date (preserving existing behavior).
   const handleMiniCalendarSelect = (date: Date) => {
     setCurrentDate(date);
-    setView('day');
+    setMiniCalendarOffset(0); // re-lock mini cal to the selected date's month
+    if (view === 'month') {
+      setView('day');
+      // Entering Day View: clear practitioner filter for non-own practitioners
+      // (preserves the existing Month→Day transition behaviour exactly).
+      if (selectedClinicBranch !== null && !cachedOwnId) setSelectedPractitioner(null);
+    }
+    // Day View: setCurrentDate already navigates to the exact day.
+    // Week View: setCurrentDate moves the anchor; Calendar renders that week.
   };
 
 
@@ -681,27 +758,48 @@ export const Diary: React.FC = () => {
 
           {/* Left Sidebar */}
           <div className="w-40 flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
-            {/* Current Month Mini Calendar */}
+
+            {/* ── Mini Calendar Month Navigation ── */}
+            <div className="flex items-center justify-between px-2 pt-2 pb-0">
+              <button
+                onClick={() => setMiniCalendarOffset(prev => prev - 1)}
+                className="p-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                title="Previous month"
+              >
+                <ChevronLeft className="w-3 h-3" />
+              </button>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider select-none">
+                {format(miniCalendarDate, 'MMM yyyy')}
+              </span>
+              <button
+                onClick={() => setMiniCalendarOffset(prev => prev + 1)}
+                className="p-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                title="Next month"
+              >
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Primary Mini Calendar — derived from currentDate + offset */}
             <div className="p-2 border-b border-gray-200">
-              <h3 className="text-[11px] font-semibold text-gray-700 mb-1.5 text-center uppercase tracking-wider">
-                {format(currentMonth, 'MMM yyyy')}
-              </h3>
               <MiniCalendar
-                date={currentMonth}
+                date={miniCalendarDate}
                 selectedDate={currentDate}
                 onDateSelect={handleMiniCalendarSelect}
+                view={view}
               />
             </div>
 
-            {/* Next Month Mini Calendar */}
+            {/* Secondary Mini Calendar — always one month ahead of primary */}
             <div className="p-2 border-b border-gray-200">
               <h3 className="text-[11px] font-semibold text-gray-700 mb-1.5 text-center uppercase tracking-wider">
-                {format(nextMonth, 'MMM yyyy')}
+                {format(miniCalendarDateNext, 'MMM yyyy')}
               </h3>
               <MiniCalendar
-                date={nextMonth}
+                date={miniCalendarDateNext}
                 selectedDate={currentDate}
                 onDateSelect={handleMiniCalendarSelect}
+                view={view}
               />
             </div>
 
@@ -1245,13 +1343,31 @@ interface MiniCalendarProps {
   date: Date;
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
+  view?: CalendarView;
 }
 
-const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateSelect }) => {
-  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-  const monthEnd   = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const startDay   = (monthStart.getDay() + 6) % 7;
+const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateSelect, view }) => {
+  const monthStart  = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthEnd    = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const startDay    = (monthStart.getDay() + 6) % 7; // Monday = 0
   const daysInMonth = monthEnd.getDate();
+
+  // ── Week-range for Week View highlighting ──────────────────────────────────
+  // Compute Mon–Sun span of selectedDate so we can subtly highlight the
+  // active week in the mini calendar when the Diary is in Week View.
+  const selWeekStart = useMemo(() => {
+    const d = new Date(selectedDate);
+    const dow = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+    d.setDate(d.getDate() - dow);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [selectedDate]);
+  const selWeekEnd = useMemo(() => {
+    const d = new Date(selWeekStart);
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [selWeekStart]);
 
   const weeks: (number | null)[][] = [];
   let days: (number | null)[] = [];
@@ -1279,7 +1395,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateS
         <div key={wi} className="grid grid-cols-7 gap-0.5 mb-1">
           {week.map((day, di) => {
             if (day === null) return <div key={di} className="aspect-square" />;
-            const dayDate  = new Date(date.getFullYear(), date.getMonth(), day);
+            const dayDate = new Date(date.getFullYear(), date.getMonth(), day);
             const isSelected =
               selectedDate.getDate() === day &&
               selectedDate.getMonth() === date.getMonth() &&
@@ -1288,6 +1404,11 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateS
               new Date().getDate() === day &&
               new Date().getMonth() === date.getMonth() &&
               new Date().getFullYear() === date.getFullYear();
+            // Highlight days that fall within the Diary's active week (Week View only)
+            const isInSelectedWeek =
+              view === 'week' &&
+              dayDate >= selWeekStart &&
+              dayDate <= selWeekEnd;
             return (
               <button
                 key={di}
@@ -1296,7 +1417,8 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateS
                   aspect-square flex items-center justify-center rounded transition-all hover:bg-gray-100
                   ${isSelected ? 'bg-care-blue text-white hover:bg-care-blue/90' : ''}
                   ${isToday && !isSelected ? 'bg-care-blue/10 text-care-blue font-semibold' : ''}
-                  ${!isSelected && !isToday ? 'text-gray-700' : ''}
+                  ${isInSelectedWeek && !isSelected ? 'bg-care-blue/5 text-care-blue' : ''}
+                  ${!isSelected && !isToday && !isInSelectedWeek ? 'text-gray-700' : ''}
                 `}
               >
                 {day}
@@ -1307,4 +1429,4 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateS
       ))}
     </div>
   );
-};  
+};

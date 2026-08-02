@@ -431,6 +431,8 @@ class PortalLinkAdminSerializer(serializers.ModelSerializer):
 
 class PortalBookingCreateSerializer(serializers.ModelSerializer):
     consent_id = serializers.IntegerField(write_only=True, required=True)
+    data_privacy_document_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    clinic_consent_document_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     patient_first_name = serializers.CharField(required=False, max_length=100)
     patient_last_name = serializers.CharField(required=False, max_length=100)
     patient_phone = serializers.CharField(required=False, max_length=20)
@@ -438,7 +440,7 @@ class PortalBookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = PortalBooking
         fields = [
-            'consent_id',
+            'consent_id', 'data_privacy_document_id', 'clinic_consent_document_id',
             'service', 'practitioner', 'branch',
             'patient_first_name', 'patient_last_name',
             'patient_email', 'patient_phone', 'patient_date_of_birth',
@@ -449,7 +451,10 @@ class PortalBookingCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        # We pop them here so they don't break the PortalBooking model save
         validated_data.pop('consent_id', None)
+        validated_data.pop('data_privacy_document_id', None)
+        validated_data.pop('clinic_consent_document_id', None)
         return super().create(validated_data)
 
     def validate_service(self, value):
@@ -761,22 +766,27 @@ class PatientConsentDocumentSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
     clinic_name = serializers.CharField(source='clinic.name', read_only=True)
     appointment_id = serializers.IntegerField(source='appointment.id', read_only=True, allow_null=True)
+    patient_case_id = serializers.IntegerField(source='patient_case.id', read_only=True, allow_null=True)
 
     class Meta:
         model = PatientConsentDocument
         fields = [
             'id', 'patient', 'patient_name', 'appointment', 'appointment_id',
+            'patient_case', 'patient_case_id',
             'clinic', 'clinic_name', 'type', 'title',
             'header_snapshot', 'body_snapshot',
             'signature', 'signed_at', 'consent_version',
             'signer_full_name', 'signer_email',
             'created_at',
         ]
-        read_only_fields = ['id', 'created_at', 'patient_name', 'clinic_name', 'appointment_id']
+        read_only_fields = ['id', 'created_at', 'patient_name', 'clinic_name']
 
 
 class PatientConsentDocumentCreateSerializer(serializers.ModelSerializer):
     """Used to create a new patient consent document (snapshot)."""
+
+    appointment_id = serializers.IntegerField(required=False, allow_null=True)
+    patient_case_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = PatientConsentDocument
@@ -784,7 +794,7 @@ class PatientConsentDocumentCreateSerializer(serializers.ModelSerializer):
             'title', 'header_snapshot', 'body_snapshot',
             'signature', 'signed_at', 'consent_version',
             'signer_full_name', 'signer_email',
-            'type',
+            'type', 'appointment_id', 'patient_case_id',
         ]
 
     def validate_signature(self, value: str):

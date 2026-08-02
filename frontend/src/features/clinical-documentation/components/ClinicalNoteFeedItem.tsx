@@ -224,7 +224,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
                   setEditorContext({ type: 'COPY_NOTE', sourceNoteId: note.id });
                 }}
                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                title="Copy Note"
+                title="Copy to Current Notes"
               >
                 <Copy className="w-4 h-4" />
               </button>

@@ -22,7 +22,7 @@ class LetterTemplate(TimeStampedModel, SoftDeleteModel):
         ('REPORT', 'Clinical Report'),
         ('GENERAL', 'General Letter'),
         ('MEDICAL_CERT', 'Medical Certificate'),
-        ('CUSTOM', 'Custom'),
+        # Custom categories can be arbitrary strings now
     ]
 
     clinic = models.ForeignKey(
@@ -42,8 +42,7 @@ class LetterTemplate(TimeStampedModel, SoftDeleteModel):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
     category = models.CharField(
-        max_length=20,
-        choices=CATEGORY_CHOICES,
+        max_length=50,
         default='GENERAL',
     )
 

@@ -71,6 +71,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   const [saving, setSaving] = useState(false);
   const [previousNote, setPreviousNote] = useState<ClinicalNote | null>(null);
   const [allNotes, setAllNotes] = useState<ClinicalNote[]>([]);
+  const [allDrafts, setAllDrafts] = useState<ClinicalNote[]>([]);
   const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
@@ -101,25 +102,29 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       const [templatesData, appointmentsData, notesData, casesData] = await Promise.all([
         getActiveTemplates(),
         getAppointments({ patient: patientId, page_size: 100 }),
-        getNotes({ patient: patientId, is_draft: false }),
+        getNotes({ patient: patientId }),
         getPatientCases(patientId),
       ]);
       
+      const signedNotes = (notesData || []).filter(n => n.is_signed || !n.is_draft);
+      const drafts = (notesData || []).filter(n => !n.is_signed || n.is_draft);
+      
       setTemplates(templatesData);
       setPatientCases(casesData);
-      setAllNotes(notesData || []);
+      setAllNotes(signedNotes);
+      setAllDrafts(drafts);
       
       // Grab the most recent signed note for the copy feature
-      if (notesData && notesData.length > 0) {
+      if (signedNotes && signedNotes.length > 0) {
         if (patientCaseId) {
           // Look for note in the same case first (check DB fields and local storage links)
-          const caseNote = notesData.find(n => {
+          const caseNote = signedNotes.find(n => {
             if (n.patient_case === patientCaseId || n.patient_case_id === patientCaseId) return true;
             return false;
           });
-          setPreviousNote(caseNote || notesData[0]);
+          setPreviousNote(caseNote || signedNotes[0]);
         } else {
-          setPreviousNote(notesData[0]);
+          setPreviousNote(signedNotes[0]);
         }
       } else {
         setPreviousNote(null);
@@ -277,6 +282,17 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       return;
     }
 
+    // Check for existing draft in the selected appointment
+    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
+    if (existingDraft) {
+      const confirmReplace = window.confirm(
+        'A draft note already exists for this session. Do you want to replace it with this new note?'
+      );
+      if (!confirmReplace) {
+        return; // Abort save if user declines
+      }
+    }
+
     setSaving(true);
     try {
       // Get practitioner from selected appointment
@@ -308,9 +324,17 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
 
       console.log('[ClinicalNote Create] Incoming Request:', JSON.stringify(noteData, null, 2));
 
-      await createNote(noteData);
-      console.log('[CreateClinicalNoteModal] Note created successfully!');
-      toast.success('Clinical note created successfully');
+      if (existingDraft) {
+        const { updateNote } = await import('../clinical-templates.api');
+        await updateNote(existingDraft.id, noteData);
+        console.log('[CreateClinicalNoteModal] Existing draft updated successfully!');
+        toast.success('Clinical note updated successfully');
+      } else {
+        await createNote(noteData);
+        console.log('[CreateClinicalNoteModal] Note created successfully!');
+        toast.success('Clinical note created successfully');
+      }
+      
       console.log('[CreateClinicalNoteModal] Calling onSuccess callback...');
       onSuccess?.();
       console.log('[CreateClinicalNoteModal] Closing modal...');

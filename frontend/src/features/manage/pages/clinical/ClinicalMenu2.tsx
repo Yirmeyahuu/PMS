@@ -3,7 +3,11 @@ import { FileText, Plus } from 'lucide-react';
 import { useTemplates } from '@/features/clinical-template/hooks/useTemplates';
 import { TemplateList } from '@/features/clinical-template/components/TemplateList';
 import { TemplateFormModal } from '@/features/clinical-template/components/TemplateFormModal';
+import { LetterTemplateList } from '@/features/manage/pages/clinical/components/LetterTemplateList';
+import { LetterTemplateFormModal } from '@/features/manage/pages/clinical/components/LetterTemplateFormModal';
+import { useLetterTemplates } from '@/features/manage/pages/clinical/hooks/useLetterTemplates';
 import type { ClinicalTemplate } from '@/types/clinicalTemplate';
+import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
 
 export const ClinicalMenu2: React.FC = () => {
   const {
@@ -16,12 +20,31 @@ export const ClinicalMenu2: React.FC = () => {
     createVersion,
   } = useTemplates();
 
+  const {
+    templates: letterTemplates,
+    loading: letterLoading,
+    saving: letterSaving,
+    createTemplate: createLetterTemplate,
+    updateTemplate: updateLetterTemplate,
+    archiveTemplate: archiveLetterTemplate,
+  } = useLetterTemplates();
+
+  const [activeTab, setActiveTab] = useState<'notes' | 'letters'>('notes');
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ClinicalTemplate | null>(null);
 
+  const [letterModalOpen, setLetterModalOpen] = useState(false);
+  const [editingLetterTemplate, setEditingLetterTemplate] = useState<LetterTemplate | null>(null);
+
   const handleOpenCreate = () => {
-    setEditingTemplate(null);
-    setModalOpen(true);
+    if (activeTab === 'notes') {
+      setEditingTemplate(null);
+      setModalOpen(true);
+    } else {
+      setEditingLetterTemplate(null);
+      setLetterModalOpen(true);
+    }
   };
 
   const handleOpenEdit = (template: ClinicalTemplate) => {
@@ -40,6 +63,25 @@ export const ClinicalMenu2: React.FC = () => {
   const handleArchive = async (template: ClinicalTemplate) => {
     if (window.confirm(`Archive "${template.name}"? It will no longer be available for new notes.`)) {
       await archiveTemplate(template.id);
+    }
+  };
+
+  const handleEditLetter = (template: LetterTemplate) => {
+    setEditingLetterTemplate(template);
+    setLetterModalOpen(true);
+  };
+
+  const handleSaveLetter = async (data: Partial<LetterTemplate>) => {
+    if (editingLetterTemplate) {
+      await updateLetterTemplate(editingLetterTemplate.id, data);
+    } else {
+      await createLetterTemplate(data);
+    }
+  };
+
+  const handleArchiveLetter = async (template: LetterTemplate) => {
+    if (window.confirm(`Archive Letter Template "${template.name}"?`)) {
+      await archiveLetterTemplate(template.id);
     }
   };
 
@@ -71,6 +113,26 @@ export const ClinicalMenu2: React.FC = () => {
               Build and manage reusable documentation templates
             </p>
           </div>
+        </div>
+        
+        {/* Toggle Tabs */}
+        <div className="flex bg-gray-100 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('notes')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'notes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Note Templates
+          </button>
+          <button
+            onClick={() => setActiveTab('letters')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'letters' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Letter Templates
+          </button>
         </div>
 
         <button
@@ -124,13 +186,22 @@ export const ClinicalMenu2: React.FC = () => {
 
       {/* Template List */}
       <div className="flex-1 overflow-hidden mx-6 mb-6 bg-white rounded-2xl border border-gray-200 shadow-sm">
-        <TemplateList
-          templates={templates}
-          loading={loading}
-          onEdit={handleOpenEdit}
-          onArchive={handleArchive}
-          onCreateVersion={handleCreateVersion}
-        />
+        {activeTab === 'notes' ? (
+          <TemplateList
+            templates={templates}
+            loading={loading}
+            onEdit={handleOpenEdit}
+            onArchive={handleArchive}
+            onCreateVersion={handleCreateVersion}
+          />
+        ) : (
+          <LetterTemplateList
+            templates={letterTemplates}
+            loading={letterLoading}
+            onEdit={handleEditLetter}
+            onArchive={handleArchiveLetter}
+          />
+        )}
       </div>
 
       {/* Template Form Modal */}
@@ -143,6 +214,17 @@ export const ClinicalMenu2: React.FC = () => {
         }}
         onSave={handleSave}
         saving={saving}
+      />
+
+      <LetterTemplateFormModal
+        isOpen={letterModalOpen}
+        template={editingLetterTemplate}
+        onClose={() => {
+          setLetterModalOpen(false);
+          setEditingLetterTemplate(null);
+        }}
+        onSave={handleSaveLetter}
+        saving={letterSaving}
       />
     </div>
   );
