@@ -81,17 +81,17 @@ export const AppointmentCaseResolution: React.FC = () => {
         primary_practitioner_name: data.primaryPractitionerName || undefined,
         payer: data.payer || undefined,
         alert_notes: data.alertNotes || undefined,
-        approved_sessions: data.approvedSessions, 
+        approved_sessions: data.approvedSessions,
         referred_by: data.referredBy || undefined,
         referral_info: data.referralInfo || undefined,
       });
 
       // 2. Link to appointment
       await updateAppointment(appointment.id, { patient_case: newCase.id });
-      
+
       toast.success('Case created and assigned successfully');
       setShowCreateModal(false);
-      
+
       // 3. Navigate to Clinical Documentation
       navigate(`/patients/${appointment.patient}/cases/${newCase.id}/clinical-documentation`, {
         state: { appointmentId: appointment.id },
@@ -108,7 +108,7 @@ export const AppointmentCaseResolution: React.FC = () => {
     try {
       await updateAppointment(appointment.id, { patient_case: caseId });
       toast.success('Case assigned successfully');
-      
+
       // Navigate to Clinical Documentation
       navigate(`/patients/${appointment.patient}/cases/${caseId}/clinical-documentation`, {
         state: { appointmentId: appointment.id },
@@ -129,19 +129,19 @@ export const AppointmentCaseResolution: React.FC = () => {
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">
         <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
           <div className="bg-amber-50 border-b border-amber-100 p-6 flex flex-col items-center text-center relative">
-            <button 
+            <button
               onClick={() => {
                 if (window.history.length > 2) {
                   navigate(-1);
                 } else {
                   navigate('/diary');
                 }
-              }} 
+              }}
               className="absolute left-6 top-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-full transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            
+
             <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mb-4 text-amber-600 shadow-sm border border-amber-200">
               <AlertTriangle className="w-7 h-7" />
             </div>
@@ -187,14 +187,14 @@ export const AppointmentCaseResolution: React.FC = () => {
               <div className="animate-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-900">Select Case for {appointment.patient_name}</h3>
-                  <button 
+                  <button
                     onClick={() => setShowAssignList(false)}
                     className="text-sm text-sky-600 hover:text-sky-700 font-medium px-2 py-1 hover:bg-sky-50 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                 </div>
-                
+
                 {loadingCases ? (
                   <div className="py-8 text-center text-slate-500 flex flex-col items-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600 mb-2"></div>

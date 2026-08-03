@@ -19,6 +19,7 @@ from .serializers import (
 from .services.password_service import PasswordService
 from .services.email_service import EmailService
 from .services import otp_service
+from .services import login_throttle_service
 from .utils.generators import generate_verification_code
 from apps.clinics.models import Clinic, Practitioner
 from apps.common.permissions import IsAdminOrStaffOnly, HasFeaturePermission
@@ -359,14 +360,24 @@ class AuthViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        ip = login_throttle_service.get_client_ip(request)
+        if login_throttle_service.is_throttled(ip, email):
+            return Response(
+                {'detail': 'Too many login attempts. Please wait a few minutes before trying again.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         user = authenticate(request=request, email=email, password=password)
         
         if not user:
             logger.warning(f"Failed login attempt for: {email}")
+            login_throttle_service.record_failed_attempt(ip, email)
             return Response(
                 {'detail': 'Invalid email or password'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+        
+        login_throttle_service.reset_failed_attempts(ip, email)
         
         if not user.is_active:
             return Response(
