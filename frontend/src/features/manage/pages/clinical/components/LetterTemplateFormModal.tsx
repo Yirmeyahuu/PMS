@@ -10,25 +10,25 @@ const AVAILABLE_VARIABLES = [
   { label: 'Patient Email', value: '{{patient.email}}' },
   { label: 'Patient Phone', value: '{{patient.phone}}' },
   { label: 'Patient Address', value: '{{patient.address}}' },
-  
+
   { label: 'Practitioner First Name', value: '{{practitioner.first_name}}' },
   { label: 'Practitioner Last Name', value: '{{practitioner.last_name}}' },
   { label: 'Practitioner Full Name', value: '{{practitioner.full_name}}' },
   { label: 'Practitioner Title', value: '{{practitioner.title}}' },
-  
+
   { label: 'Clinic Name', value: '{{clinic.name}}' },
   { label: 'Clinic Address', value: '{{clinic.address}}' },
   { label: 'Clinic Phone', value: '{{clinic.phone}}' },
   { label: 'Clinic Email', value: '{{clinic.email}}' },
-  
+
   { label: 'Appointment Date', value: '{{appointment.date}}' },
   { label: 'Appointment Time', value: '{{appointment.time}}' },
   { label: 'Appointment Type', value: '{{appointment.type}}' },
-  
+
   { label: 'Case Name', value: '{{case.name}}' },
   { label: 'Case Number', value: '{{case.number}}' },
   { label: 'Case Start Date', value: '{{case.start_date}}' },
-  
+
   { label: 'Current Date', value: '{{date.today}}' },
   { label: 'Current Time', value: '{{time.now}}' },
 ];
@@ -59,7 +59,7 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
   });
 
   const [categoryType, setCategoryType] = useState<string>('GENERAL');
-  
+
   const PREDEFINED_CATEGORIES = ['GENERAL', 'REFERRAL', 'REPORT', 'MEDICAL_CERT'];
 
   const headerRef = useRef<HTMLTextAreaElement>(null);
@@ -69,13 +69,13 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
 
   const insertVariable = (variable: string) => {
     if (!activeRef.current) return;
-    
+
     const textarea = activeRef.current;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = text.substring(0, start) + variable + text.substring(end);
-    
+
     // Update formData based on which ref is active
     if (activeRef === headerRef) {
       setFormData(prev => ({ ...prev, header_html: newText }));
@@ -84,7 +84,7 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
     } else if (activeRef === footerRef) {
       setFormData(prev => ({ ...prev, footer_html: newText }));
     }
-    
+
     // Restore cursor position slightly after render
     setTimeout(() => {
       textarea.focus();
@@ -126,8 +126,8 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
+      <div
+        className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -144,7 +144,7 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
               <p className="text-sm text-gray-500">Configure your letter template format</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-colors"
           >
@@ -208,7 +208,7 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
                     <option value="MEDICAL_CERT">Medical Certificate</option>
                     <option value="CUSTOM">Custom</option>
                   </select>
-                  
+
                   {categoryType === 'CUSTOM' && (
                     <input
                       type="text"
