@@ -143,9 +143,9 @@ export const RightSidebarBookmarks: React.FC = () => {
           isLoading={isLoading}
           isLoadingMore={isLoadingMore}
           hasMore={hasMore}
-          markRead={markRead}
-          markAllRead={markAllRead}
-          loadMore={loadMore}
+          onMarkRead={markRead}
+          onMarkAllRead={markAllRead}
+          onLoadMore={loadMore}
         />
       )}
     </>
