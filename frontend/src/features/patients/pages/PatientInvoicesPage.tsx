@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Receipt, 
-  Search, 
-  Loader2,
+import {
+  Receipt,
+  Search,
   ChevronLeft,
   ChevronRight,
   X
@@ -75,7 +74,7 @@ export const PatientInvoicesPage: React.FC = () => {
     }
   };
 
-  const handleEditInvoice = (invoice: Invoice) => {
+  const handleEditInvoice = () => {
     toast('Editing invoices is not yet implemented.', { icon: 'ℹ️' });
   };
 
@@ -111,10 +110,10 @@ export const PatientInvoicesPage: React.FC = () => {
   };
 
   const handlePaymentSubmit = async (
-    invoiceId: number, 
-    amount: number, 
-    paymentMethod: PaymentMethod, 
-    paymentDate: string, 
+    invoiceId: number,
+    amount: number,
+    paymentMethod: PaymentMethod,
+    paymentDate: string,
     reference?: string,
     bankName?: string
   ) => {
@@ -133,7 +132,7 @@ export const PatientInvoicesPage: React.FC = () => {
 
   const handleConfirmDelete = async () => {
     if (!invoiceToDelete) return;
-    
+
     try {
       await billingApi.deleteInvoice(invoiceToDelete.id);
       toast.success('Invoice deleted successfully');
@@ -279,7 +278,7 @@ export const PatientInvoicesPage: React.FC = () => {
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Invoice</h3>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to delete invoice <strong>{invoiceToDelete.invoice_number}</strong>? 
+                Are you sure you want to delete invoice <strong>{invoiceToDelete.invoice_number}</strong>?
                 This action cannot be undone.
               </p>
               <div className="flex justify-end gap-3">
@@ -311,7 +310,7 @@ export const PatientInvoicesPage: React.FC = () => {
           invoiceId={invoiceToEmail.id}
           invoiceNumber={invoiceToEmail.invoice_number}
           patientName={invoiceToEmail.patient_name || ''}
-          patientEmail={''} 
+          patientEmail={''}
           appointmentDate={invoiceToEmail.invoice_date || ''}
           appointmentType={invoiceToEmail.appointment ? 'Appointment' : 'Service'}
         />
