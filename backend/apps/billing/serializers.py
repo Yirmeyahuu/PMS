@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.appointments.models import Appointment
 from apps.clinics.models import Clinic
 from apps.patients.models import Patient
-from .models import Invoice, InvoiceItem, Payment, Service, InvoiceBatch, AgeingDebtEntry
+from .models import Invoice, InvoiceItem, InvoiceVersion, InvoiceAuditLog, Payment, Service, InvoiceBatch, AgeingDebtEntry
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
@@ -25,14 +25,18 @@ class InvoiceItemWriteSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     patient_name     = serializers.CharField(source='patient.get_full_name', read_only=True)
     patient_number   = serializers.CharField(source='patient.patient_number', read_only=True)
+    patient_email    = serializers.CharField(source='patient.email', read_only=True)
     clinic_name      = serializers.CharField(source='clinic.name',            read_only=True)
     created_by_name  = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
     status_display   = serializers.CharField(source='get_status_display',     read_only=True)
     items            = InvoiceItemSerializer(many=True, read_only=True)
     payments         = serializers.SerializerMethodField()
 
-    appointment_date       = serializers.DateField(source='appointment.date',       read_only=True, allow_null=True)
-    appointment_start_time = serializers.TimeField(source='appointment.start_time', read_only=True, allow_null=True)
+    appointment_date              = serializers.DateField(source='appointment.date',                                         read_only=True, allow_null=True)
+    appointment_start_time        = serializers.TimeField(source='appointment.start_time',                                   read_only=True, allow_null=True)
+    appointment_practitioner_name = serializers.SerializerMethodField()
+    appointment_service_name      = serializers.SerializerMethodField()
 
     # Not required in the request body — set by perform_create or passed explicitly
     clinic  = serializers.PrimaryKeyRelatedField(queryset=Clinic.objects.all(),      required=False)
@@ -51,7 +55,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'invoice_number', 'subtotal', 'total_amount',
             'amount_paid', 'balance_due', 'created_at', 'updated_at',
-            'is_package_invoice',
+            'is_package_invoice', 'version_number',
         ]
         extra_kwargs = {
             'inline_items': {'write_only': True},
@@ -64,9 +68,26 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None
 
+    def get_modified_by_name(self, obj) -> str | None:
+        return obj.modified_by.get_full_name() if obj.modified_by else None
+
     def get_payments(self, obj):
         qs = obj.payments.all().order_by('-payment_date')
         return PaymentSerializer(qs, many=True).data
+
+    def get_appointment_practitioner_name(self, obj) -> str | None:
+        if obj.appointment and obj.appointment.practitioner:
+            user = obj.appointment.practitioner.user
+            return user.get_full_name() if user else None
+        return None
+
+    def get_appointment_service_name(self, obj) -> str | None:
+        if obj.appointment and obj.appointment.service:
+            return obj.appointment.service.name
+        # fallback to legacy appointment_type display
+        if obj.appointment:
+            return obj.appointment.get_appointment_type_display()
+        return None
 
 
 class InvoiceCreateSerializer(serializers.Serializer):
@@ -98,8 +119,49 @@ class InvoiceCreateSerializer(serializers.Serializer):
         return value
 
 
+class InvoiceVersionSerializer(serializers.ModelSerializer):
+    """Read-only serializer for a single invoice version snapshot."""
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = InvoiceVersion
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj) -> str | None:
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+
+class InvoiceCreateVersionSerializer(serializers.Serializer):
+    """Payload for creating a new invoice version (edit action)."""
+    invoice_date     = serializers.DateField(required=False)
+    due_date         = serializers.DateField(required=False, allow_null=True)
+    discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    tax_percent      = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    notes            = serializers.CharField(required=False, allow_blank=True)
+    terms_conditions = serializers.CharField(required=False, allow_blank=True)
+    philhealth_coverage = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    hmo_coverage        = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    items = InvoiceItemWriteSerializer(many=True, required=False)
+
+
+class InvoiceAuditLogSerializer(serializers.ModelSerializer):
+    """Read-only serializer for invoice audit trail."""
+    user_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model  = InvoiceAuditLog
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_user_name(self, obj) -> str | None:
+        return obj.user.get_full_name() if obj.user else None
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     invoice_number   = serializers.CharField(source='invoice.invoice_number', read_only=True)
+
     received_by_name = serializers.SerializerMethodField()
 
     class Meta:

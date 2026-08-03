@@ -101,6 +101,13 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         blank=True,
         related_name='created_billing_invoices',
     )
+    modified_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modified_billing_invoices',
+    )
 
     invoice_number = models.CharField(max_length=50, unique=True, editable=False)
     invoice_date   = models.DateField()
@@ -132,6 +139,12 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
 
     notes            = models.TextField(blank=True)
     terms_conditions = models.TextField(blank=True)
+
+    # ── Versioning ────────────────────────────────────────────────────────────
+    version_number = models.PositiveIntegerField(
+        default=1,
+        help_text='Current version number; increments with each edit.'
+    )
 
     class Meta:
         db_table = 'invoices'
@@ -171,7 +184,7 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         paid         = Decimal(str(self.amount_paid or 0))
         philhealth   = Decimal(str(self.philhealth_coverage or 0))
         hmo          = Decimal(str(self.hmo_coverage or 0))
-        self.balance_due = max(total - paid - philhealth - hmo, Decimal('0'))
+        self.balance_due = total - paid - philhealth - hmo
 
         # ── Auto-update status ONLY based on THIS invoice's payment ───────────
         # Only auto-transition DRAFT/PENDING — never touch CANCELLED/OVERDUE
@@ -253,6 +266,59 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         )
         # Refresh local instance to match DB
         self.refresh_from_db()
+
+    def create_version_snapshot(self, user, change_summary, version_number=None, ip_address=None):
+        """Create an immutable InvoiceVersion snapshot for the given invoice state."""
+        if version_number is None:
+            self.version_number += 1
+            self.save(update_fields=['version_number'])
+            version_number = self.version_number
+
+        items_snapshot = [
+            {
+                'description':      item.description,
+                'quantity':         str(item.quantity),
+                'unit_price':       str(item.unit_price),
+                'discount_percent': str(item.discount_percent),
+                'tax_percent':      str(item.tax_percent),
+                'total':            str(item.total),
+                'service_code':     item.service_code,
+            }
+            for item in self.items.all()
+        ]
+        InvoiceVersion.objects.create(
+            invoice          = self,
+            version_number   = version_number,
+            invoice_date     = self.invoice_date,
+            due_date         = self.due_date,
+            status           = self.status,
+            subtotal         = self.subtotal,
+            discount_amount  = self.discount_amount,
+            discount_percent = self.discount_percent,
+            tax_amount       = self.tax_amount,
+            tax_percent      = self.tax_percent,
+            total_amount     = self.total_amount,
+            amount_paid      = self.amount_paid,
+            balance_due      = self.balance_due,
+            philhealth_coverage = getattr(self, 'philhealth_coverage', 0),
+            hmo_coverage        = getattr(self, 'hmo_coverage', 0),
+            notes            = self.notes,
+            terms_conditions = getattr(self, 'terms_conditions', ''),
+            payment_method   = self.payment_method,
+            payment_notes    = self.payment_notes,
+            items_snapshot   = items_snapshot,
+            created_by       = user,
+            change_summary   = change_summary,
+        )
+
+        InvoiceAuditLog.objects.create(
+            invoice    = self,
+            user       = user,
+            action     = 'UPDATED' if version_number > 1 else 'CREATED',
+            version    = version_number,
+            changes    = change_summary,
+            ip_address = ip_address or '127.0.0.1',
+        )
 
 
 class InvoiceItem(TimeStampedModel):
@@ -397,6 +463,119 @@ class Payment(TimeStampedModel):
             invoice.recalculate_amount_paid()
         except Invoice.DoesNotExist:
             pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Invoice Versioning
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceVersion(TimeStampedModel):
+    """
+    Immutable snapshots of Invoice state for full audit history.
+    Mirrors the ClinicalNoteVersion pattern.
+    """
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.CASCADE,
+        related_name='versions',
+    )
+    version_number = models.PositiveIntegerField()
+
+    # ── Snapshot of editable invoice fields ───────────────────────────────────
+    invoice_date      = models.DateField()
+    due_date          = models.DateField(null=True, blank=True)
+    status            = models.CharField(max_length=20)
+    subtotal          = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount   = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_percent  = models.DecimalField(max_digits=5,  decimal_places=2, default=0)
+    tax_amount        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_percent       = models.DecimalField(max_digits=5,  decimal_places=2, default=0)
+    total_amount      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    amount_paid       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    balance_due       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    philhealth_coverage = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    hmo_coverage        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    notes             = models.TextField(blank=True)
+    terms_conditions  = models.TextField(blank=True)
+    payment_method    = models.CharField(max_length=50, blank=True)
+    payment_notes     = models.TextField(blank=True)
+
+    # ── Snapshot of line items as JSON ────────────────────────────────────────
+    items_snapshot = models.JSONField(
+        default=list,
+        help_text='Snapshot of all line items at this version.'
+    )
+
+    # ── Audit fields ──────────────────────────────────────────────────────────
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_invoice_versions',
+    )
+    change_summary = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Dict of changed fields: {field: {from: old, to: new}}'
+    )
+
+    class Meta:
+        db_table = 'invoice_versions'
+        ordering = ['-version_number']
+        indexes  = [
+            models.Index(fields=['invoice', 'version_number']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['invoice', 'version_number'],
+                name='unique_invoice_version',
+            )
+        ]
+
+    def __str__(self):
+        return f"Version {self.version_number} of Invoice {self.invoice.invoice_number}"
+
+
+class InvoiceAuditLog(TimeStampedModel):
+    """
+    Immutable audit trail for invoice actions.
+    Mirrors ClinicalNoteAuditLog pattern.
+    """
+    ACTION_CHOICES = [
+        ('CREATED', 'Invoice Created'),
+        ('UPDATED', 'Invoice Updated (new version)'),
+        ('VIEWED',  'Invoice Viewed'),
+        ('PRINTED', 'Invoice Printed'),
+        ('EMAILED', 'Invoice Emailed'),
+        ('DELETED', 'Invoice Deleted'),
+        ('PAYMENT', 'Payment Added'),
+    ]
+
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.CASCADE,
+        related_name='audit_logs',
+    )
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='invoice_audit_logs',
+    )
+    action    = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    version   = models.PositiveIntegerField(null=True, blank=True, help_text='Version number this action relates to.')
+    changes   = models.JSONField(default=dict, blank=True, help_text='Field-level changes for UPDATED actions.')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'invoice_audit_logs'
+        ordering = ['-created_at']
+        indexes  = [
+            models.Index(fields=['invoice', 'action', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.action} — Invoice {self.invoice.invoice_number} by {self.user}"
 
 
 class Service(TimeStampedModel):

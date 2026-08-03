@@ -15,7 +15,7 @@ from apps.appointments.models import Appointment
 from .authentication import QueryParamJWTAuthentication
 from .bulk_invoice_service import preview_bulk_invoice, run_bulk_invoice
 from .filters import AppointmentPrintFilter, InvoiceBatchFilter, InvoiceFilter
-from .models import Invoice, InvoiceItem, InvoiceBatch, InvoicePrintSettings, Payment, Service, AgeingDebtEntry
+from .models import Invoice, InvoiceItem, InvoiceBatch, InvoicePrintSettings, InvoiceVersion, InvoiceAuditLog, Payment, Service, AgeingDebtEntry
 from .print_service import build_print_payload
 from .serializers import (
     AgeingDebtEntrySerializer,
@@ -25,6 +25,9 @@ from .serializers import (
     BulkInvoiceRequestSerializer,
     InvoiceBatchSerializer,
     InvoiceCreateSerializer,
+    InvoiceCreateVersionSerializer,
+    InvoiceVersionSerializer,
+    InvoiceAuditLogSerializer,
     InvoiceItemSerializer,
     InvoiceSerializer,
     PaymentSerializer,
@@ -45,8 +48,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     lookup_value_regex = r'[0-9]+'
 
     queryset = Invoice.objects.filter(is_deleted=False).select_related(
-        'clinic', 'patient', 'appointment', 'created_by', 'bulk_batch',
-    ).prefetch_related('items', 'payments')
+        'clinic', 'patient', 'appointment',
+        'appointment__practitioner', 'appointment__practitioner__user',
+        'appointment__service',
+        'created_by', 'modified_by', 'bulk_batch',
+    ).prefetch_related('items', 'payments', 'versions')
 
     serializer_class   = InvoiceSerializer
     permission_classes = [IsAuthenticated]
@@ -105,10 +111,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             instance.update_totals()
             instance.refresh_from_db()
 
+        # ── Create initial version snapshot ─────────────────────────────────────────
+        instance.create_version_snapshot(
+            user=self.request.user, 
+            version_number=1, 
+            change_summary={},
+            ip_address=self.request.META.get('REMOTE_ADDR')
+        )
+
         logger.info(
             "Invoice %s created for appointment %s by %s",
             instance.invoice_number, instance.appointment_id, self.request.user.email,
         )
+
+    # ── Helpers ──────────────────────────────────────────────────────────────────
+
+    def _get_client_ip(self):
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return self.request.META.get('REMOTE_ADDR')
 
     # ── Create invoice from appointment ───────────────────────────────────────
     @action(
@@ -288,10 +310,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         payment_method    = request.data.get('payment_method', 'CASH')
         payment_reference = request.data.get('payment_reference', '')
 
+        old_status = invoice.status
         # Use scoped DB update — guarantees only this invoice row is modified
         invoice.mark_paid(
             payment_method    = payment_method,
             payment_reference = payment_reference,
+        )
+
+        invoice.create_version_snapshot(
+            user=request.user,
+            change_summary={'status': {'from': old_status, 'to': 'PAID'}},
+            ip_address=self._get_client_ip(),
         )
 
         logger.info(
@@ -320,6 +349,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        old_status = invoice.status
         if new_status == 'PAID':
             invoice.mark_paid(
                 payment_method    = request.data.get('payment_method', 'CASH'),
@@ -328,6 +358,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         else:
             # Scoped update — only this invoice's row
             Invoice.objects.filter(pk=invoice.pk).update(status=new_status)
+            invoice.refresh_from_db()
+
+        invoice.create_version_snapshot(
+            user=request.user,
+            change_summary={'status': {'from': old_status, 'to': new_status}},
+            ip_address=self._get_client_ip(),
+        )
 
         logger.info(
             "Invoice %s (pk=%s) status → %s by %s",
@@ -336,6 +373,116 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         fresh = Invoice.objects.get(pk=invoice.pk)
         return Response(InvoiceSerializer(fresh).data)
+
+    # ── List version history ───────────────────────────────────────────────────
+    @action(detail=True, methods=['get'], url_path='versions', url_name='versions')
+    def versions(self, request, pk=None):
+        """
+        GET /api/invoices/{id}/versions/
+        Returns all immutable snapshots for this invoice ordered newest-first.
+        """
+        invoice = self.get_object()
+        qs = InvoiceVersion.objects.filter(invoice=invoice).order_by('-version_number')
+        serializer = InvoiceVersionSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    # ── Create new invoice version (Edit Invoice) ─────────────────────────────
+    @action(detail=True, methods=['post'], url_path='create-version', url_name='create-version')
+    def create_version(self, request, pk=None):
+        """
+        POST /api/invoices/{id}/create-version/
+
+        Creates a new immutable version of the invoice, preserving the previous
+        version snapshot. Updates the live invoice with the submitted changes.
+        The appointment and patient relationships are NEVER changed.
+
+        Business rules enforced server-side:
+        - Editing is allowed on ALL statuses (DRAFT, PENDING, PAID, etc.).
+        - Payment records are NOT touched.
+        - Version number is auto-incremented atomically.
+        - Previous version snapshot is preserved.
+        """
+        ser = InvoiceCreateVersionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        with transaction.atomic():
+            # Lock the invoice row to prevent race conditions
+            invoice = Invoice.objects.select_for_update().get(pk=pk, is_deleted=False)
+
+            next_version = invoice.version_number + 1
+
+            # ── Compute change summary (field-level diff) ─────────────────────
+            TRACKED_FIELDS = [
+                'invoice_date', 'due_date', 'discount_percent', 'tax_percent',
+                'notes', 'terms_conditions', 'philhealth_coverage', 'hmo_coverage',
+            ]
+            change_summary = {}
+            for field in TRACKED_FIELDS:
+                if field in data:
+                    old_val = str(getattr(invoice, field) or '')
+                    new_val = str(data[field] or '')
+                    if old_val != new_val:
+                        change_summary[field] = {'from': old_val, 'to': new_val}
+
+            # Detect line item changes
+            if 'items' in data:
+                change_summary['items'] = {'from': 'previous line items', 'to': 'updated line items'}
+
+            # ── Apply field updates to the live Invoice record ─────────────────
+            for field in TRACKED_FIELDS:
+                if field in data:
+                    setattr(invoice, field, data[field])
+
+            invoice.modified_by    = request.user
+            invoice.version_number = next_version
+            invoice.save()
+
+            # ── Replace line items if provided ────────────────────────────────
+            if 'items' in data and data['items'] is not None:
+                invoice.items.all().delete()
+                for item_data in data['items']:
+                    InvoiceItem.objects.create(
+                        invoice          = invoice,
+                        description      = item_data.get('description', ''),
+                        quantity         = item_data.get('quantity', 1),
+                        unit_price       = Decimal(str(item_data.get('unit_price', 0))),
+                        discount_percent = Decimal(str(item_data.get('discount_percent', 0))),
+                        tax_percent      = Decimal(str(item_data.get('tax_percent', 0))),
+                        service_code     = item_data.get('service_code', ''),
+                    )
+                invoice.update_totals()
+
+            invoice.refresh_from_db()
+
+            # ── Create immutable version snapshot ─────────────────────────────
+            invoice.create_version_snapshot(
+                user=request.user,
+                change_summary=change_summary,
+                version_number=next_version,
+                ip_address=self._get_client_ip(),
+            )
+
+        logger.info(
+            "Invoice %s (pk=%s) new version %s created by %s",
+            invoice.invoice_number, invoice.pk, next_version, request.user.email,
+        )
+
+        fresh = Invoice.objects.select_related(
+            'clinic', 'patient', 'appointment',
+            'appointment__practitioner', 'appointment__practitioner__user',
+            'appointment__service',
+            'created_by', 'modified_by',
+        ).prefetch_related('items', 'payments', 'versions').get(pk=invoice.pk)
+        return Response(InvoiceSerializer(fresh).data)
+
+    # ── Invoice audit log ─────────────────────────────────────────────────────
+    @action(detail=True, methods=['get'], url_path='audit-log', url_name='audit-log')
+    def audit_log(self, request, pk=None):
+        """GET /api/invoices/{id}/audit-log/"""
+        invoice = self.get_object()
+        qs = InvoiceAuditLog.objects.filter(invoice=invoice).order_by('-created_at')
+        return Response(InvoiceAuditLogSerializer(qs, many=True).data)
 
     # ── Add line item ─────────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], url_path='add-item', url_name='add-item')
@@ -859,8 +1006,44 @@ class PaymentViewSet(viewsets.ModelViewSet):
         all_branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
         return self.queryset.filter(invoice__clinic_id__in=all_branch_ids)
 
+    def _get_client_ip(self):
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return self.request.META.get('REMOTE_ADDR')
+
     def perform_create(self, serializer):
-        serializer.save(received_by=self.request.user)
+        payment = serializer.save(received_by=self.request.user)
+        invoice = payment.invoice
+        invoice.refresh_from_db()
+        invoice.create_version_snapshot(
+            user=self.request.user,
+            change_summary={
+                'payment_added': {
+                    'amount': str(payment.amount),
+                    'method': payment.payment_method
+                }
+            },
+            ip_address=self._get_client_ip(),
+        )
+
+    def perform_destroy(self, instance):
+        invoice = instance.invoice
+        amount = str(instance.amount)
+        method = instance.payment_method
+        instance.delete()
+        
+        invoice.refresh_from_db()
+        invoice.create_version_snapshot(
+            user=self.request.user,
+            change_summary={
+                'payment_removed': {
+                    'amount': amount,
+                    'method': method
+                }
+            },
+            ip_address=self._get_client_ip(),
+        )
 
 
 # ── Ageing Debt Entry ─────────────────────────────────────────────────────────

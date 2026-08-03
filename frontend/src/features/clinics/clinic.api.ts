@@ -38,6 +38,7 @@ export interface Practitioner {
   role?:              'PRACTITIONER' | 'STAFF';
   roles?:             string[];
   discipline?:        string | null;
+  avatar_url?:        string | null;
 }
 
 export interface PractitionersResponse {

@@ -141,6 +141,7 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
 class PractitionerSerializer(serializers.ModelSerializer):
     user_name  = serializers.CharField(source='user.get_full_name', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    avatar_url = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
 
     class Meta:
@@ -150,6 +151,15 @@ class PractitionerSerializer(serializers.ModelSerializer):
 
     def get_availability(self, obj):
         return obj.availability
+
+    def get_avatar_url(self, obj):
+        request = self.context.get('request')
+        if obj.user and getattr(obj.user, 'avatar', None):
+            if request and hasattr(obj.user.avatar, 'url'):
+                return request.build_absolute_uri(obj.user.avatar.url)
+            elif hasattr(obj.user.avatar, 'url'):
+                return obj.user.avatar.url
+        return None
 
     def validate_duty_days(self, value):
         valid_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

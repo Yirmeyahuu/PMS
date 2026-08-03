@@ -10,7 +10,7 @@ import { billingApi } from '@/features/billing/billing.api';
 import type { Invoice, PaymentMethod } from '@/types/billing';
 import toast from 'react-hot-toast';
 import { usePatientProfileContext } from '../context/PatientProfileContext';
-import { InvoiceList, InvoiceDetailModal, AddPaymentModal } from '@/features/billing/Invoices';
+import { InvoiceList, InvoiceDetailModal, AddPaymentModal, PrintInvoiceModal } from '@/features/billing/Invoices';
 import { SendInvoiceEmailModal } from '../components/SendInvoiceEmailModal';
 
 export const PatientInvoicesPage: React.FC = () => {
@@ -74,8 +74,9 @@ export const PatientInvoicesPage: React.FC = () => {
     }
   };
 
-  const handleEditInvoice = () => {
-    toast('Editing invoices is not yet implemented.', { icon: 'ℹ️' });
+  const handleInvoiceUpdated = (updatedInvoice: Invoice) => {
+    setSelectedInvoice(updatedInvoice);
+    setInvoices((prev) => prev.map((inv) => inv.id === updatedInvoice.id ? updatedInvoice : inv));
   };
 
   const handleDeleteInvoice = (invoice: Invoice) => {
@@ -83,8 +84,12 @@ export const PatientInvoicesPage: React.FC = () => {
     setShowDeleteConfirm(true);
   };
 
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+
   const handlePrintInvoice = (invoice: Invoice) => {
-    window.open(`/api/invoices/${invoice.id}/print/`, '_blank');
+    setInvoiceToPrint(invoice);
+    setShowPrintModal(true);
   };
 
   const handleSendEmail = (invoice: Invoice) => {
@@ -214,7 +219,7 @@ export const PatientInvoicesPage: React.FC = () => {
           invoices={invoices}
           isLoading={isLoading}
           onView={handleViewInvoice}
-          onEdit={handleEditInvoice}
+          onEdit={handleViewInvoice}
           onDelete={handleDeleteInvoice}
           onPrint={handlePrintInvoice}
           onSendEmail={handleSendEmail}
@@ -259,6 +264,8 @@ export const PatientInvoicesPage: React.FC = () => {
         onAddPayment={handleAddPayment}
         onMarkPaid={handleMarkPaid}
         onSendEmail={handleSendEmail}
+        onPrint={handlePrintInvoice}
+        onInvoiceUpdated={handleInvoiceUpdated}
       />
 
       <AddPaymentModal
@@ -310,9 +317,20 @@ export const PatientInvoicesPage: React.FC = () => {
           invoiceId={invoiceToEmail.id}
           invoiceNumber={invoiceToEmail.invoice_number}
           patientName={invoiceToEmail.patient_name || ''}
-          patientEmail={''}
+          patientEmail={invoiceToEmail.patient_email || ''}
           appointmentDate={invoiceToEmail.invoice_date || ''}
           appointmentType={invoiceToEmail.appointment ? 'Appointment' : 'Service'}
+        />
+      )}
+
+      {showPrintModal && invoiceToPrint && (
+        <PrintInvoiceModal
+          isOpen={showPrintModal}
+          onClose={() => {
+            setShowPrintModal(false);
+            setInvoiceToPrint(null);
+          }}
+          invoice={invoiceToPrint}
         />
       )}
     </div>

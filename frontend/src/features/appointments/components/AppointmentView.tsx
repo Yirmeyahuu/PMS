@@ -34,6 +34,8 @@ import type { Practitioner } from '@/features/clinics/clinic.api';
 import { AppointmentEditForm }    from './AppointmentEditForm';
 import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
+import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
+import { PrintInvoiceModal } from '@/features/billing/components/PrintInvoiceModal';
 import { ServiceSelector }         from './ServiceSelector';
 import {
   createRecurringAppointments,
@@ -872,6 +874,9 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   const [editDueDate, setEditDueDate] = useState('');
   const [pickerIdx,   setPickerIdx]   = useState<number | null>(null);
   const [saveError,   setSaveError]   = useState<string | null>(null);
+  
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const { data: invoice, isLoading, error: fetchError, refetch } = useQuery<Invoice | null>({
     queryKey: ['appointment-invoice', appointment.id],
@@ -1164,7 +1169,8 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_STATUS_STYLES[invoice.status] ?? ''}`}>{invoice.status_display}</span>
           {canEdit && <button onClick={startEditing} className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"><Edit3 className="w-3.5 h-3.5" />Edit</button>}
           <button onClick={() => navigate(`/clients/${appointment.patient}`)} className="flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 transition-colors"><FileText className="w-3.5 h-3.5" />View Full Invoice</button>
-          <button onClick={() => billingApi.print(invoice.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"><Printer className="w-3.5 h-3.5" />Print</button>
+          <button onClick={() => setShowEmailModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"><Mail className="w-3.5 h-3.5" />Email</button>
+          <button onClick={() => setShowPrintModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"><Printer className="w-3.5 h-3.5" />Print</button>
           <button onClick={() => refetch()} className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"><RefreshCw className="w-3.5 h-3.5" /></button>
         </div>
       </div>
@@ -1234,6 +1240,27 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <p className="text-xs font-semibold text-amber-700 mb-1">Notes</p>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
         </div>
+      )}
+
+      {showEmailModal && (
+        <SendInvoiceEmailModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          invoiceId={invoice.id}
+          invoiceNumber={invoice.invoice_number}
+          patientName={appointment.patient_name}
+          patientEmail={appointment.patient_email || ''}
+          appointmentDate={appointment.date}
+          appointmentType={appointment.appointment_type || 'Appointment'}
+        />
+      )}
+
+      {showPrintModal && (
+        <PrintInvoiceModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          invoice={invoice}
+        />
       )}
     </div>
   );

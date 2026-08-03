@@ -9,6 +9,7 @@ interface EmailSuggestion {
   name: string;
   email: string;
   role: string;
+  avatarUrl?: string | null;
 }
 
 interface SendInvoiceEmailModalProps {
@@ -69,6 +70,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
           name: p.name,
           email: p.email,
           role: p.role || 'PRACTITIONER',
+          avatarUrl: p.avatar_url,
         }));
 
         // Fetch staff/admin users
@@ -77,6 +79,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
           first_name: string;
           last_name: string;
           role: string;
+          avatar_url?: string;
         }
         const usersResponse = await axiosInstance.get('/users/');
         const users = usersResponse.data.results || usersResponse.data;
@@ -86,6 +89,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
             name: `${u.first_name} ${u.last_name}`,
             email: u.email,
             role: u.role,
+            avatarUrl: u.avatar_url,
           }));
 
         // Fetch active contacts with emails
@@ -327,9 +331,18 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
                         className="w-full flex items-start gap-2 px-3 py-2 hover:bg-sky-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
                         type="button"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{suggestion.email}</p>
+                        <div className="flex-1 min-w-0 flex items-center gap-3">
+                          {suggestion.avatarUrl ? (
+                            <img src={suggestion.avatarUrl} alt={suggestion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-100" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {suggestion.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{suggestion.email}</p>
+                          </div>
                         </div>
                         <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded whitespace-nowrap ml-2">
                           {suggestion.role}

@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Check,
   Package,
   Mail
 } from 'lucide-react';
@@ -26,6 +25,10 @@ import type {
 import toast from 'react-hot-toast';
 import { PHILIPPINE_BANKS, requiresBankSelection } from '@/data/philippineBanks';
 import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
+import { PrintInvoiceModal } from './components/PrintInvoiceModal';
+import { InvoiceHistoryPanel } from './components/InvoiceHistoryPanel';
+import { InvoiceDetailModal } from './components/InvoiceDetailModal';
+export { InvoiceDetailModal };
 
 // Status badge colors
 const statusColors: Record<InvoiceStatus, string> = {
@@ -139,7 +142,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({
               </td>
               <td className="px-4 py-3 text-sm text-right">
                 <span className={parseFloat(invoice.balance_due) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                  ₱{parseFloat(invoice.balance_due).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                  {parseFloat(invoice.balance_due) < 0 ? '-' : ''}₱{Math.abs(parseFloat(invoice.balance_due)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </span>
               </td>
               <td className="px-4 py-3">
@@ -183,228 +186,6 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Invoice Detail Modal
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface InvoiceDetailModalProps {
-  invoice: Invoice | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onAddPayment: (invoice: Invoice) => void;
-  onMarkPaid: (invoice: Invoice) => void;
-  onSendEmail: (invoice: Invoice) => void;
-}
-
-export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
-  invoice,
-  onClose,
-  onAddPayment,
-  onMarkPaid,
-  onSendEmail,
-}) => {
-  if (!invoice) return null;
-
-  const handlePrint = () => {
-    billingApi.print(invoice.id);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-        
-        <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Invoice Details</h2>
-              <p className="text-sm text-gray-500">{invoice.invoice_number}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onSendEmail(invoice)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Mail className="w-4 h-4" />
-                Send Email
-              </button>
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-              <button
-                onClick={onClose}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
-            {/* Patient & Status */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="text-xs text-gray-500 uppercase">Patient</label>
-                <p className="text-sm font-medium text-gray-900">{invoice.patient_name}</p>
-                <p className="text-xs text-gray-500">{invoice.patient_number}</p>
-              </div>
-              <div className="text-right">
-                <label className="text-xs text-gray-500 uppercase">Status</label>
-                <div className="mt-1">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[invoice.status as InvoiceStatus]}`}>
-                    {invoice.status_display}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="text-xs text-gray-500 uppercase">Invoice Date</label>
-                <p className="text-sm text-gray-900">
-                  {new Date(invoice.invoice_date).toLocaleDateString()}
-                </p>
-              </div>
-              {invoice.due_date && (
-                <div className="text-right">
-                  <label className="text-xs text-gray-500 uppercase">Due Date</label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(invoice.due_date).toLocaleDateString()}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Line Items */}
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Line Items</h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">Description</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-500">Qty</th>
-                      <th className="text-right px-3 py-2 font-medium text-gray-500">Unit Price</th>
-                      <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {invoice.items?.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-3 py-2 text-gray-900">{item.description}</td>
-                        <td className="px-3 py-2 text-center text-gray-600">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-gray-600">
-                          ₱{parseFloat(item.unit_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-900 font-medium">
-                          ₱{parseFloat(item.total).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Totals */}
-            <div className="border-t border-gray-200 pt-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="text-gray-900">₱{parseFloat(invoice.subtotal).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                </div>
-                {parseFloat(invoice.discount_amount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Discount ({invoice.discount_percent}%)</span>
-                    <span className="text-red-600">-₱{parseFloat(invoice.discount_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                {parseFloat(invoice.tax_amount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax ({invoice.tax_percent}%)</span>
-                    <span className="text-gray-900">₱{parseFloat(invoice.tax_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
-                  <span>Total</span>
-                  <span>₱{parseFloat(invoice.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Amount Paid</span>
-                  <span className="text-emerald-600">-₱{parseFloat(invoice.amount_paid).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold">
-                  <span>Balance Due</span>
-                  <span className={parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-emerald-600'}>
-                    ₱{parseFloat(invoice.balance_due).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Payments */}
-            {invoice.payments && invoice.payments.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Payment History</h3>
-                <div className="space-y-2">
-                  {invoice.payments.map((payment) => (
-                    <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{payment.receipt_number}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(payment.payment_date).toLocaleDateString()} • {paymentMethodLabels[payment.payment_method as PaymentMethod]}
-                        </p>
-                      </div>
-                      <span className="text-sm font-medium text-emerald-600">
-                        ₱{parseFloat(payment.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {parseFloat(invoice.balance_due) > 0 && invoice.status !== 'PAID' && (
-              <>
-                <button
-                  onClick={() => onAddPayment(invoice)}
-                  className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  Add Payment
-                </button>
-                <button
-                  onClick={() => onMarkPaid(invoice)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                >
-                  <Check className="w-4 h-4" />
-                  Mark as Paid
-                </button>
-              </>
-            )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Add Payment Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -417,6 +198,7 @@ interface AddPaymentModalProps {
 
 export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
   invoice,
+  isOpen,
   onClose,
   onSubmit,
 }) => {
@@ -429,11 +211,12 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 
   useEffect(() => {
     if (invoice) {
-      setAmount(invoice.balance_due);
+      const bal = parseFloat(invoice.balance_due);
+      setAmount(bal > 0 ? invoice.balance_due : '');
     }
   }, [invoice]);
 
-  if (!invoice) return null;
+  if (!isOpen || !invoice) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,8 +267,8 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Balance Due</label>
-              <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium text-red-600">
-                ₱{parseFloat(invoice.balance_due).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+              <div className={`px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {parseFloat(invoice.balance_due) < 0 ? '-' : ''}₱{Math.abs(parseFloat(invoice.balance_due)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </div>
             </div>
 
@@ -674,8 +457,12 @@ export const Invoices: React.FC = () => {
     setShowDeleteConfirm(true);
   };
 
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
+
   const handlePrintInvoice = (invoice: Invoice) => {
-    billingApi.print(invoice.id);
+    setInvoiceToPrint(invoice);
+    setShowPrintModal(true);
   };
 
   const handleSendEmail = (invoice: Invoice) => {
@@ -914,6 +701,7 @@ export const Invoices: React.FC = () => {
         onAddPayment={handleAddPayment}
         onMarkPaid={handleMarkPaid}
         onSendEmail={handleSendEmail}
+        onPrint={handlePrintInvoice}
       />
 
       {/* Add Payment Modal */}
@@ -969,13 +757,26 @@ export const Invoices: React.FC = () => {
           invoiceId={invoiceToEmail.id}
           invoiceNumber={invoiceToEmail.invoice_number}
           patientName={invoiceToEmail.patient_name || ''}
-          patientEmail={''} 
+          patientEmail={invoiceToEmail.patient_email || ''} 
           appointmentDate={invoiceToEmail.invoice_date || ''}
           appointmentType={invoiceToEmail.appointment ? 'Appointment' : 'Service'}
+        />
+      )}
+
+      {/* Print Modal */}
+      {showPrintModal && invoiceToPrint && (
+        <PrintInvoiceModal
+          isOpen={showPrintModal}
+          onClose={() => {
+            setShowPrintModal(false);
+            setInvoiceToPrint(null);
+          }}
+          invoice={invoiceToPrint}
         />
       )}
     </DashboardLayout>
   );
 };
 
+export { PrintInvoiceModal, InvoiceHistoryPanel };
 export default Invoices;

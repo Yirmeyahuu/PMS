@@ -4,6 +4,7 @@ export interface Appointment {
   branch_id:  number | null;
   patient:    number;
   patient_name: string;
+  patient_email?: string;
   practitioner:      number | null;
   practitioner_name: string | null;
   practitioner_avatar: string | null;

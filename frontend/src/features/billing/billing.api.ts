@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import type { Invoice, InvoiceItem, Payment, InvoiceStats } from '@/types/billing';
+import type { Invoice, InvoiceItem, Payment, InvoiceStats, InvoiceVersion, InvoiceAuditLog, CreateInvoiceVersionPayload } from '@/types/billing';
 
 interface PaginatedResponse<T> {
   count: number;
@@ -51,6 +51,24 @@ export const billingApi = {
   /** GET /api/invoices/{id}/ */
   getInvoice: async (id: number): Promise<Invoice> => {
     const { data } = await axiosInstance.get(`/invoices/${id}/`);
+    return data;
+  },
+
+  /** GET /api/invoices/{id}/versions/ — list all version snapshots */
+  getInvoiceVersions: async (id: number): Promise<InvoiceVersion[]> => {
+    const { data } = await axiosInstance.get(`/invoices/${id}/versions/`);
+    return data;
+  },
+
+  /** POST /api/invoices/{id}/create-version/ — create new version (edit) */
+  createInvoiceVersion: async (id: number, payload: CreateInvoiceVersionPayload): Promise<Invoice> => {
+    const { data } = await axiosInstance.post(`/invoices/${id}/create-version/`, payload);
+    return data;
+  },
+
+  /** GET /api/invoices/{id}/audit-log/ — fetch audit trail */
+  getInvoiceAuditLog: async (id: number): Promise<InvoiceAuditLog[]> => {
+    const { data } = await axiosInstance.get(`/invoices/${id}/audit-log/`);
     return data;
   },
 

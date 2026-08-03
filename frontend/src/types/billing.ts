@@ -138,13 +138,19 @@ export interface Invoice {
   clinic_name:         string;
   patient:             number;
   patient_name:        string;
+  patient_email?:      string;
   patient_number:      string;
   appointment:         number | null;
   appointment_date:    string | null;
   appointment_start_time: string | null;
+  appointment_practitioner_name: string | null;
+  appointment_service_name:      string | null;
   bulk_batch:          number | null;
   created_by:          number | null;
   created_by_name:     string | null;
+  modified_by:         number | null;
+  modified_by_name:    string | null;
+  version_number:      number;
   is_package_invoice?: boolean;
 
   invoice_date:        string;
@@ -292,4 +298,68 @@ export interface PaginatedResponse<T> {
   next:     string | null;
   previous: string | null;
   results:  T[];
+}
+
+// ── Invoice Versioning & Audit ────────────────────────────────────────────────
+
+export interface InvoiceVersion {
+  id:               number;
+  invoice:          number;
+  version_number:   number;
+  invoice_date:     string;
+  due_date:         string | null;
+  status:           InvoiceStatus;
+  subtotal:         string;
+  discount_amount:  string;
+  discount_percent: string;
+  tax_amount:       string;
+  tax_percent:      string;
+  total_amount:     string;
+  amount_paid:      string;
+  balance_due:      string;
+  philhealth_coverage: string;
+  hmo_coverage:        string;
+  notes:            string;
+  terms_conditions: string;
+  payment_method:   string;
+  payment_notes:    string;
+  items_snapshot:   {
+    description:      string;
+    quantity:         string;
+    unit_price:       string;
+    discount_percent: string;
+    tax_percent:      string;
+    total:            string;
+    service_code:     string;
+  }[];
+  created_by:       number | null;
+  created_by_name:  string | null;
+  change_summary:   Record<string, { from: string; to: string }>;
+  created_at:       string;
+  updated_at:       string;
+}
+
+export interface InvoiceAuditLog {
+  id:             number;
+  invoice:        number;
+  user:           number | null;
+  user_name:      string | null;
+  action:         string;
+  action_display: string;
+  version:        number | null;
+  changes:        Record<string, { from: string; to: string }>;
+  ip_address:     string | null;
+  created_at:     string;
+}
+
+export interface CreateInvoiceVersionPayload {
+  invoice_date?:        string;
+  due_date?:            string | null;
+  discount_percent?:    number;
+  tax_percent?:         number;
+  notes?:               string;
+  terms_conditions?:    string;
+  philhealth_coverage?: number;
+  hmo_coverage?:        number;
+  items?:               CreateInvoiceItemPayload[];
 }

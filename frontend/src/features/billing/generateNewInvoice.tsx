@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { 
-  Save, 
-  X, 
-  Plus, 
-  Trash2, 
+import {
+  Save,
+  X,
+  Plus,
+  Trash2,
   RefreshCw,
   ArrowLeft,
   Calculator,
@@ -25,9 +25,9 @@ import { productApi } from '@/features/setup/pages/items/services/inventory.api'
 import type { ProductListItem, StockAdjustmentPayload, CreateProductPayload } from '@/types/inventory';
 import { ProductFormModal } from '@/features/setup/pages/items/components/ProductFormModal';
 import { Package } from 'lucide-react';
-import type { 
-  Invoice, 
-  PaymentMethod 
+import type {
+  Invoice,
+  PaymentMethod
 } from '@/types/billing';
 import axiosInstance from '@/lib/axios';
 import type { Appointment } from '@/types/appointment';
@@ -174,17 +174,17 @@ export default function GenerateNewInvoice() {
   // Auto-populate appointment type as first invoice item
   useEffect(() => {
     if (!appointment || items.length > 0) return;
-    
+
     // First try to match by exact service ID if available
     let matchedService = undefined;
     if (appointment.service) {
       matchedService = clinicServices.find(s => s.id === appointment.service);
     }
-    
+
     // Fallback to matching by appointment_type string
     if (!matchedService) {
       const appointmentType = appointment.appointment_type;
-      matchedService = clinicServices.find(s => 
+      matchedService = clinicServices.find(s =>
         s.name.toLowerCase().includes(appointmentType?.toLowerCase() || '')
       );
     }
@@ -201,7 +201,7 @@ export default function GenerateNewInvoice() {
   // Load existing invoice items when editing
   useEffect(() => {
     if (!existingInvoice || !appointment) return;
-    
+
     if (existingInvoice.items && existingInvoice.items.length > 0) {
       setItems(existingInvoice.items.map(item => ({
         id: item.id,
@@ -269,9 +269,14 @@ export default function GenerateNewInvoice() {
     appointment: appointment?.id ?? null,
     appointment_date: appointment?.date ?? null,
     appointment_start_time: appointment?.start_time ?? null,
+    appointment_practitioner_name: null,
+    appointment_service_name: null,
     bulk_batch: null,
     created_by: null,
     created_by_name: null,
+    modified_by: null,
+    modified_by_name: null,
+    version_number: existingInvoice?.version_number ?? 1,
     invoice_date: invoiceDate,
     due_date: dueDate || null,
     status: totalPaid >= totalAmount && totalAmount > 0 ? 'PAID' : totalPaid > 0 ? 'PARTIALLY_PAID' : 'DRAFT',
@@ -392,7 +397,7 @@ export default function GenerateNewInvoice() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!appointmentId) throw new Error('No appointment ID');
-      
+
       if (existingInvoice) {
         const keepIds = new Set(items.filter(i => i.id).map(i => i.id!));
         const toDelete = existingInvoice.items.filter(i => !keepIds.has(i.id));
@@ -558,7 +563,7 @@ export default function GenerateNewInvoice() {
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => navigate(-1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -608,7 +613,7 @@ export default function GenerateNewInvoice() {
       {/* Main Content - 1440px optimized layout */}
       <div className="flex-1 overflow-hidden p-6">
         <div className="h-full grid grid-cols-12 gap-6">
-          
+
           {/* LEFT COLUMN - 7 cols */}
           <div className="col-span-7 space-y-4 overflow-y-auto pr-2">
             {/* Client Information Section */}
@@ -617,7 +622,7 @@ export default function GenerateNewInvoice() {
                 <User className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Client Information</h2>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Patient Name</label>
@@ -664,7 +669,7 @@ export default function GenerateNewInvoice() {
                 <FileText className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Invoice Details</h2>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Invoice Date</label>
@@ -728,142 +733,141 @@ export default function GenerateNewInvoice() {
                         : null;
 
                       return (
-                      <tr key={index} className="border-b border-gray-100">
-                        <td className="py-1.5 px-2 w-[30%]">
-                          <div className="relative" ref={isDropdownOpen ? dropdownRef : undefined}>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={item.description}
-                                onChange={(e) => {
-                                  handleUpdateItem(index, 'description', e.target.value);
-                                  setInventoryDropdownIndex(index);
-                                }}
-                                onFocus={() => setInventoryDropdownIndex(index)}
-                                placeholder="Type description..."
-                                className="w-full px-2 py-1.5 pr-7 text-xs border border-gray-200 rounded-lg"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setInventoryDropdownIndex(isDropdownOpen ? null : index)}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-sky-600 transition-colors"
-                                title="Select from inventory"
-                              >
-                                <Package className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            {linkedProduct && (
-                              <div className={`mt-0.5 text-[10px] flex items-center gap-1 ${
-                                Number(linkedProduct.quantity_in_stock) < item.quantity
-                                  ? 'text-red-500'
-                                  : 'text-gray-400'
-                              }`}>
-                                <Package className="w-2.5 h-2.5" />
-                                Stock: {Number(linkedProduct.quantity_in_stock).toLocaleString()} {linkedProduct.unit.toLowerCase()}
-                                {Number(linkedProduct.quantity_in_stock) < item.quantity && (
-                                  <span className="text-red-500 font-medium"> (insufficient)</span>
-                                )}
+                        <tr key={index} className="border-b border-gray-100">
+                          <td className="py-1.5 px-2 w-[30%]">
+                            <div className="relative" ref={isDropdownOpen ? dropdownRef : undefined}>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={item.description}
+                                  onChange={(e) => {
+                                    handleUpdateItem(index, 'description', e.target.value);
+                                    setInventoryDropdownIndex(index);
+                                  }}
+                                  onFocus={() => setInventoryDropdownIndex(index)}
+                                  placeholder="Type description..."
+                                  className="w-full px-2 py-1.5 pr-7 text-xs border border-gray-200 rounded-lg"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setInventoryDropdownIndex(isDropdownOpen ? null : index)}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-sky-600 transition-colors"
+                                  title="Select from inventory"
+                                >
+                                  <Package className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-                            )}
-                            {isDropdownOpen && (
-                              <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                                <div className="px-2 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50">
-                                  Inventory Items
-                                </div>
-                                <div className="max-h-40 overflow-y-auto">
-                                  {filteredProducts.length > 0 ? filteredProducts.map((p) => (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-sky-50 flex items-center justify-between gap-2 transition-colors"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        handleSelectInventoryItem(index, p);
-                                      }}
-                                    >
-                                      <span className="truncate text-gray-700">{p.name}</span>
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-[10px] text-gray-400">{Number(p.quantity_in_stock).toLocaleString()} {p.unit.toLowerCase()}</span>
-                                        <span className="text-[11px] text-gray-400 whitespace-nowrap">₱{Number(p.selling_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                      </div>
-                                    </button>
-                                  )) : (
-                                    <div className="px-2 py-2 text-xs text-gray-400">
-                                      {query.length > 0 ? 'No matching inventory items' : 'Start typing to search…'}
-                                    </div>
+                              {linkedProduct && (
+                                <div className={`mt-0.5 text-[10px] flex items-center gap-1 ${Number(linkedProduct.quantity_in_stock) < item.quantity
+                                    ? 'text-red-500'
+                                    : 'text-gray-400'
+                                  }`}>
+                                  <Package className="w-2.5 h-2.5" />
+                                  Stock: {Number(linkedProduct.quantity_in_stock).toLocaleString()} {linkedProduct.unit.toLowerCase()}
+                                  {Number(linkedProduct.quantity_in_stock) < item.quantity && (
+                                    <span className="text-red-500 font-medium"> (insufficient)</span>
                                   )}
                                 </div>
-                                <div className="border-t border-gray-100">
-                                  <button
-                                    type="button"
-                                    className="w-full text-left px-2 py-1.5 text-xs text-teal-600 hover:bg-teal-50 flex items-center gap-1.5 font-medium transition-colors"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      setCreateItemTargetIndex(index);
-                                      setShowCreateItemModal(true);
-                                      setInventoryDropdownIndex(null);
-                                    }}
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    Add New Item
-                                  </button>
+                              )}
+                              {isDropdownOpen && (
+                                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                                  <div className="px-2 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50">
+                                    Inventory Items
+                                  </div>
+                                  <div className="max-h-40 overflow-y-auto">
+                                    {filteredProducts.length > 0 ? filteredProducts.map((p) => (
+                                      <button
+                                        key={p.id}
+                                        type="button"
+                                        className="w-full text-left px-2 py-1.5 text-xs hover:bg-sky-50 flex items-center justify-between gap-2 transition-colors"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          handleSelectInventoryItem(index, p);
+                                        }}
+                                      >
+                                        <span className="truncate text-gray-700">{p.name}</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="text-[10px] text-gray-400">{Number(p.quantity_in_stock).toLocaleString()} {p.unit.toLowerCase()}</span>
+                                          <span className="text-[11px] text-gray-400 whitespace-nowrap">₱{Number(p.selling_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                      </button>
+                                    )) : (
+                                      <div className="px-2 py-2 text-xs text-gray-400">
+                                        {query.length > 0 ? 'No matching inventory items' : 'Start typing to search…'}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="border-t border-gray-100">
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 text-xs text-teal-600 hover:bg-teal-50 flex items-center gap-1.5 font-medium transition-colors"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setCreateItemTargetIndex(index);
+                                        setShowCreateItemModal(true);
+                                        setInventoryDropdownIndex(null);
+                                      }}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      Add New Item
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2 w-[14%]">
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateItem(index, 'quantity', Number(e.target.value))}
-                            min="1"
-                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 w-[18%]">
-                          <input
-                            type="number"
-                            value={item.unit_price}
-                            onChange={(e) => handleUpdateItem(index, 'unit_price', Number(e.target.value))}
-                            min="0"
-                            step="0.01"
-                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-right"
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 w-[12%]">
-                          <input
-                            type="number"
-                            value={item.discount_percent || 0}
-                            onChange={(e) => handleUpdateItem(index, 'discount_percent', Number(e.target.value))}
-                            min="0"
-                            max="100"
-                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 w-[12%]">
-                          <input
-                            type="number"
-                            value={item.tax_percent || 0}
-                            onChange={(e) => handleUpdateItem(index, 'tax_percent', Number(e.target.value))}
-                            min="0"
-                            max="100"
-                            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 text-right text-xs font-medium text-gray-900 w-[14%]">
-                          ₱{calculateItemTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <button
-                            onClick={() => handleRemoveItem(index)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-1.5 px-2 w-[14%]">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateItem(index, 'quantity', Number(e.target.value))}
+                              min="1"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 w-[18%]">
+                            <input
+                              type="number"
+                              value={item.unit_price}
+                              onChange={(e) => handleUpdateItem(index, 'unit_price', Number(e.target.value))}
+                              min="0"
+                              step="0.01"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-right"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 w-[12%]">
+                            <input
+                              type="number"
+                              value={item.discount_percent || 0}
+                              onChange={(e) => handleUpdateItem(index, 'discount_percent', Number(e.target.value))}
+                              min="0"
+                              max="100"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 w-[12%]">
+                            <input
+                              type="number"
+                              value={item.tax_percent || 0}
+                              onChange={(e) => handleUpdateItem(index, 'tax_percent', Number(e.target.value))}
+                              min="0"
+                              max="100"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 text-right text-xs font-medium text-gray-900 w-[14%]">
+                            ₱{calculateItemTotal(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <button
+                              onClick={() => handleRemoveItem(index)}
+                              className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
                     })}
                     {items.length === 0 && (
                       <tr>
