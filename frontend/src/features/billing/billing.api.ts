@@ -12,6 +12,7 @@ interface InvoiceFilters {
   status?: string;
   date_from?: string;
   date_to?: string;
+  patient?: number;
   patient_name?: string;
   clinic?: number;
   appointment?: number;

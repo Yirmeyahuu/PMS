@@ -60,7 +60,8 @@ import { Setup }          from '@/features/setup/Setup';
 import { Profile }        from '@/features/profile/Profile';
 import PatientProfileLayout from '@/features/patients/PatientProfileLayout';
 import PatientProfilePage from '@/features/patients/PatientProfilePage';
-import PatientAppointmentsPage from '@/features/patients/PatientAppointmentsPage';
+import { PatientAppointmentsPage } from '@/features/patients/PatientAppointmentsPage';
+import PatientInvoicesPage from '@/features/patients/pages/PatientInvoicesPage';
 import PatientCasesPage from '@/features/patients/PatientCasesPage';
 import ClinicalDocumentationWorkspace from '@/features/clinical-documentation/ClinicalDocumentationWorkspace';
 import PatientUnassignedNotesPage from '@/features/patients/PatientUnassignedNotesPage';
@@ -327,6 +328,7 @@ function App() {
             <Route path="clinical/*" element={<ClinicalNoteRedirect />} />
             <Route path="cases/:caseId/clinical-documentation/*" element={<ClinicalDocumentationWorkspace />} />
             <Route path="cases/:caseId" element={<Navigate to="clinical-documentation" replace />} />
+            <Route path="invoices" element={<PatientInvoicesPage />} />
             <Route path="unassigned-notes" element={<PatientUnassignedNotesPage />} />
             <Route path="notes" element={<Navigate to="../clinical/notes" replace />} />
             <Route path="documents" element={<Navigate to="../clinical/documents" replace />} />

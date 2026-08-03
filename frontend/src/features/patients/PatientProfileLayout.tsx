@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList } from 'lucide-react';
+import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList, Receipt } from 'lucide-react';
 import { Navigate, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { PatientProfileProvider, usePatientProfileContext } from './context/PatientProfileContext';
@@ -104,6 +104,11 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                   to={`/patients/${patientId}/clinical`}
                   icon={<ClipboardList className="w-4 h-4" />}
                   activePathPattern="/clinical(/|-documentation)"
+                />
+                <NavItem
+                  label="Invoices"
+                  to={`/patients/${patientId}/invoices`}
+                  icon={<Receipt className="w-4 h-4" />}
                 />
 
                 <NavItem

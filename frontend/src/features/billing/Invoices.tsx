@@ -59,7 +59,7 @@ interface InvoiceListProps {
   onSendEmail: (invoice: Invoice) => void;
 }
 
-const InvoiceList: React.FC<InvoiceListProps> = ({
+export const InvoiceList: React.FC<InvoiceListProps> = ({
   invoices,
   isLoading,
   onView,
@@ -195,7 +195,7 @@ interface InvoiceDetailModalProps {
   onSendEmail: (invoice: Invoice) => void;
 }
 
-const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
+export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   invoice,
   onClose,
   onAddPayment,
@@ -415,7 +415,7 @@ interface AddPaymentModalProps {
   onSubmit: (invoiceId: number, amount: number, paymentMethod: PaymentMethod, paymentDate: string, reference?: string, bankName?: string) => Promise<void>;
 }
 
-const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
+export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
   invoice,
   onClose,
   onSubmit,

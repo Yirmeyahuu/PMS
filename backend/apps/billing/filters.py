@@ -38,6 +38,7 @@ class InvoiceFilter(django_filters.FilterSet):
     date_from      = django_filters.DateFilter(field_name='invoice_date', lookup_expr='gte')
     date_to        = django_filters.DateFilter(field_name='invoice_date', lookup_expr='lte')
     clinic         = django_filters.NumberFilter(field_name='clinic__id')
+    patient        = django_filters.NumberFilter(field_name='patient__id')
     patient_name   = django_filters.CharFilter(method='filter_patient_name')
     status         = django_filters.MultipleChoiceFilter(choices=Invoice.STATUS_CHOICES)
     appointment    = django_filters.NumberFilter(field_name='appointment__id')
@@ -50,7 +51,7 @@ class InvoiceFilter(django_filters.FilterSet):
 
     class Meta:
         model  = Invoice
-        fields = ['date_from', 'date_to', 'clinic', 'status', 'patient_name', 'bulk_batch', 'appointment']
+        fields = ['date_from', 'date_to', 'clinic', 'status', 'patient', 'patient_name', 'bulk_batch', 'appointment']
 
 
 class InvoiceBatchFilter(django_filters.FilterSet):
