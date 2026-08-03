@@ -20,7 +20,7 @@ export const WorkspaceRightPanel = () => {
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<number>>(new Set());
 
   const fetchData = useCallback(async () => {
     if (!patient) return;
@@ -84,8 +84,8 @@ export const WorkspaceRightPanel = () => {
       setTemplates(templatesData || []);
       
       // Auto-expand the newest note if none is expanded
-      if (notesData && notesData.length > 0 && expandedNoteId === null) {
-        setExpandedNoteId(notesData[0].id);
+      if (notesData && notesData.length > 0 && expandedNoteIds.size === 0) {
+        setExpandedNoteIds(new Set([notesData[0].id]));
       }
       
       const sortedAppointments = (appointmentsData.results || []).sort((a, b) => 
@@ -146,24 +146,49 @@ export const WorkspaceRightPanel = () => {
                 <p className="text-sm">There are no finalized or drafted clinical notes for this case.</p>
               </div>
             ) : (
-              <div className="space-y-4 pl-8 border-l-2 border-slate-200 ml-4 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
-                {notes.map((note) => (
-                  <div key={note.id} className="relative">
-                    {/* Timeline dot */}
-                    {/* Timeline dot */}
-                    <div className="absolute -left-[41px] top-6 w-4 h-4 rounded-full bg-white border-2 border-indigo-400 shadow-sm z-10" />
-                    <div className="absolute left-8 top-16 bottom-[-24px] w-0.5 bg-slate-200 -z-10 last:hidden" />
-                    <ClinicalNoteFeedItem 
-                      note={note} 
-                      appointments={appointments}
-                      templates={templates} 
-                      onRefreshFeed={handleRefreshFeed}
-                      isExpanded={expandedNoteId === note.id}
-                      onToggleExpand={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
-                    />
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="flex justify-end gap-2 mb-4">
+                  <button
+                    onClick={() => setExpandedNoteIds(new Set(notes.map(n => n.id)))}
+                    className="text-xs font-medium text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Expand all Notes
+                  </button>
+                  <button
+                    onClick={() => setExpandedNoteIds(new Set())}
+                    className="text-xs font-medium text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Collapse all Notes
+                  </button>
+                </div>
+                <div className="space-y-4 pl-8 border-l-2 border-slate-200 ml-4 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
+                  {notes.map((note) => (
+                    <div key={note.id} className="relative">
+                      {/* Timeline dot */}
+                      <div className="absolute -left-[41px] top-6 w-4 h-4 rounded-full bg-white border-2 border-indigo-400 shadow-sm z-10" />
+                      <div className="absolute left-8 top-16 bottom-[-24px] w-0.5 bg-slate-200 -z-10 last:hidden" />
+                      <ClinicalNoteFeedItem 
+                        note={note} 
+                        appointments={appointments}
+                        templates={templates} 
+                        onRefreshFeed={handleRefreshFeed}
+                        isExpanded={expandedNoteIds.has(note.id)}
+                        onToggleExpand={() => {
+                          setExpandedNoteIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(note.id)) {
+                              next.delete(note.id);
+                            } else {
+                              next.add(note.id);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         ) : activeRightTab === 'documents' ? (

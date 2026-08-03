@@ -208,8 +208,9 @@ export const sendClinicalNoteEmail = async (
 };
 
 export const openPrintNote = (id: number) => {
+  const token = localStorage.getItem('access_token') || '';
   const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
-  const printUrl = `${API_URL}${BASE_URL}/notes/${id}/print_note_html/`;
+  const printUrl = `${API_URL}${BASE_URL}/notes/${id}/print_note_html/?token=${encodeURIComponent(token)}`;
   window.open(printUrl, '_blank');
 };
 export interface GlobalClinicalNoteAuditLog {

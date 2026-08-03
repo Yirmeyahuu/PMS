@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, FileText, CheckCircle, Copy, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Save, FileText, CheckCircle, Copy, X, ChevronDown, ChevronRight, Printer, Mail } from 'lucide-react';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { createNote, updateNote } from '@/features/clinical-template/clinical-templates.api';
+import { SendNoteEmailModal } from './SendNoteEmailModal';
+import { PrintNoteModal } from './PrintNoteModal';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
+import { useQuery } from '@tanstack/react-query';
+import { getMyClinic } from '@/features/clinics/clinic.api';
 import type { ClinicalTemplate, ClinicalNote } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
@@ -57,6 +61,10 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
 
   const [saving, setSaving] = useState(false);
   
+  const { data: clinicProfile } = useQuery({
+    queryKey: ['myClinic'],
+    queryFn: getMyClinic,
+  });
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
@@ -64,6 +72,8 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
   const [selectedAppointment, setSelectedAppointment] = useState<number | null>(null);
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   
 
   // Make all history items (signed and drafts) strictly read-only in the feed.
@@ -178,6 +188,9 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
 
   return (
     <div className={`mb-8 rounded-xl bg-white shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] overflow-hidden transition-all ${isNewNote ? 'border-2 border-indigo-400 ring-4 ring-indigo-400/10' : 'border border-slate-200'}`}>
+      {/* Malasakit Branding Border */}
+      <div className="border-t-[6px] border-transparent bg-primary-gradient"></div>
+
       {/* FEED ITEM HEADER */}
       <div className={`p-6 border-b flex-shrink-0 ${isNewNote ? 'bg-indigo-50/40 border-indigo-100' : 'bg-slate-50 border-slate-200'}`}>
         
@@ -190,7 +203,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             {practitionerAvatar ? (
               <img src={practitionerAvatar} alt={practitionerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm ring-2 ring-white" />
             ) : (
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm ring-2 ring-white text-lg">
+              <div className="w-11 h-11 rounded-full bg-primary-gradient flex items-center justify-center text-white font-bold border border-white shadow-sm ring-2 ring-white text-lg">
                 {practitionerName.charAt(0)}
               </div>
             )}
@@ -218,16 +231,38 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             )}
             
             {!isNewNote && note && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditorContext({ type: 'COPY_NOTE', sourceNoteId: note.id });
-                }}
-                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                title="Copy to Current Notes"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
+              <>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPrintModal(true);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                  title="Print Note"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEmailModal(true);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                  title="Send via Email"
+                >
+                  <Mail className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditorContext({ type: 'COPY_NOTE', sourceNoteId: note.id });
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                  title="Copy to Current Notes"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </>
             )}
             {isNewNote && (
               <button 
@@ -366,6 +401,33 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
           <span>Generated by Malasakit Systems</span>
           {note?.is_signed && note.signed_at && <span>Signed on {formatDate(note.signed_at)}</span>}
         </div>
+      )}
+      
+      {/* Modals */}
+      {showPrintModal && note && (
+        <PrintNoteModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          note={note}
+          template={selectedTemplate}
+          appointment={appointments.find(a => a.id === note.appointment)}
+          patientName={patient ? `${patient.first_name} ${patient.last_name}` : ''}
+          clinicName={clinicProfile?.name}
+          clinicLogoUrl={clinicProfile?.logo_url ?? undefined}
+        />
+      )}
+      {showEmailModal && note && (
+        <SendNoteEmailModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          note={note}
+          template={selectedTemplate}
+          appointment={appointments.find(a => a.id === note.appointment)}
+          patientName={patient ? `${patient.first_name} ${patient.last_name}` : ''}
+          patientEmail={patient?.email || ''}
+          clinicName={clinicProfile?.name}
+          clinicLogoUrl={clinicProfile?.logo_url ?? undefined}
+        />
       )}
     </div>
   );

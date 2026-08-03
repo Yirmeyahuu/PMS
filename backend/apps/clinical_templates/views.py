@@ -15,6 +15,7 @@ from .serializers import (
 from .permissions import (
     IsAdminOrReadOnly, IsSameClinic, IsPractitionerOrAdmin, CanEditClinicalNote
 )
+from apps.billing.authentication import QueryParamJWTAuthentication
 
 
 class ClinicalTemplateViewSet(viewsets.ModelViewSet):
@@ -607,7 +608,11 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         
         return Response(response_data)
     
-    @action(detail=True, methods=['get'])
+    @action(
+        detail=True, 
+        methods=['get'],
+        authentication_classes=[QueryParamJWTAuthentication],
+    )
     def print_note_html(self, request, pk=None):
         """
         Get rendered HTML version of clinical note for printing.
