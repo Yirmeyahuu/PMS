@@ -52,12 +52,12 @@ const fmtQty = (qty: string | number) => {
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  DRAFT:          { bg: 'bg-gray-100',   text: 'text-gray-600',    border: 'border-gray-300' },
-  PENDING:        { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-300' },
-  PAID:           { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' },
-  PARTIALLY_PAID: { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-300' },
-  OVERDUE:        { bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-300' },
-  CANCELLED:      { bg: 'bg-gray-100',   text: 'text-gray-500',    border: 'border-gray-300' },
+  DRAFT: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
+  PAID: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' },
+  PARTIALLY_PAID: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+  OVERDUE: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300' },
+  CANCELLED: { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -367,9 +367,8 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
               <div className="flex justify-between px-4 py-3 border-t-2 border-gray-200">
                 <span className="font-bold text-sm text-gray-800">Balance Due</span>
                 <span
-                  className={`font-bold text-base ${
-                    balanceDue <= 0 ? 'text-emerald-600' : 'text-red-600'
-                  }`}
+                  className={`font-bold text-base ${balanceDue <= 0 ? 'text-emerald-600' : 'text-red-600'
+                    }`}
                 >
                   {fmt(invoice.balance_due, currencySymbol)}
                 </span>
@@ -453,9 +452,9 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
         </div>
 
         {/* ═══════════ MALASAKIT BRANDING ═══════════ */}
-          <div className="px-8 pb-4">
-            <DocumentFooter />
-          </div>
+        <div className="px-8 pb-4">
+          <DocumentFooter />
+        </div>
 
         {/* ═══════════ CURVED FOOTER ═══════════ */}
         <div className="relative overflow-hidden rounded-b-2xl print:rounded-none mt-auto">

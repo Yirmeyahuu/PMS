@@ -13,7 +13,8 @@ import {
   ChevronRight,
   X,
   Check,
-  Package
+  Package,
+  Mail
 } from 'lucide-react';
 import { billingApi } from './billing.api';
 import type { 
@@ -24,6 +25,7 @@ import type {
 } from '@/types/billing';
 import toast from 'react-hot-toast';
 import { PHILIPPINE_BANKS, requiresBankSelection } from '@/data/philippineBanks';
+import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
 
 // Status badge colors
 const statusColors: Record<InvoiceStatus, string> = {
@@ -54,6 +56,7 @@ interface InvoiceListProps {
   onEdit: (invoice: Invoice) => void;
   onDelete: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
+  onSendEmail: (invoice: Invoice) => void;
 }
 
 const InvoiceList: React.FC<InvoiceListProps> = ({
@@ -63,6 +66,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
   onEdit,
   onDelete,
   onPrint,
+  onSendEmail,
 }) => {
   if (isLoading) {
     return (
@@ -148,6 +152,13 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                     <Printer className="w-4 h-4" />
                   </button>
                   <button
+                    onClick={() => onSendEmail(invoice)}
+                    className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                    title="Send Email"
+                  >
+                    <Mail className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => onEdit(invoice)}
                     className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                     title="Edit"
@@ -181,6 +192,7 @@ interface InvoiceDetailModalProps {
   onClose: () => void;
   onAddPayment: (invoice: Invoice) => void;
   onMarkPaid: (invoice: Invoice) => void;
+  onSendEmail: (invoice: Invoice) => void;
 }
 
 const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
@@ -188,6 +200,7 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   onClose,
   onAddPayment,
   onMarkPaid,
+  onSendEmail,
 }) => {
   if (!invoice) return null;
 
@@ -208,6 +221,13 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               <p className="text-sm text-gray-500">{invoice.invoice_number}</p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => onSendEmail(invoice)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                Send Email
+              </button>
               <button
                 onClick={handlePrint}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -585,6 +605,8 @@ export const Invoices: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [invoiceToEmail, setInvoiceToEmail] = useState<Invoice | null>(null);
 
   // Fetch invoices
   const fetchInvoices = async () => {
@@ -654,6 +676,11 @@ export const Invoices: React.FC = () => {
 
   const handlePrintInvoice = (invoice: Invoice) => {
     billingApi.print(invoice.id);
+  };
+
+  const handleSendEmail = (invoice: Invoice) => {
+    setInvoiceToEmail(invoice);
+    setShowEmailModal(true);
   };
 
   const handleAddPayment = (invoice: Invoice) => {
@@ -844,6 +871,7 @@ export const Invoices: React.FC = () => {
             onEdit={handleEditInvoice}
             onDelete={handleDeleteInvoice}
             onPrint={handlePrintInvoice}
+            onSendEmail={handleSendEmail}
           />
         </div>
 
@@ -885,6 +913,7 @@ export const Invoices: React.FC = () => {
         }}
         onAddPayment={handleAddPayment}
         onMarkPaid={handleMarkPaid}
+        onSendEmail={handleSendEmail}
       />
 
       {/* Add Payment Modal */}
@@ -927,6 +956,23 @@ export const Invoices: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && invoiceToEmail && (
+        <SendInvoiceEmailModal
+          isOpen={showEmailModal}
+          onClose={() => {
+            setShowEmailModal(false);
+            setInvoiceToEmail(null);
+          }}
+          invoiceId={invoiceToEmail.id}
+          invoiceNumber={invoiceToEmail.invoice_number}
+          patientName={invoiceToEmail.patient_name || ''}
+          patientEmail={''} 
+          appointmentDate={invoiceToEmail.invoice_date || ''}
+          appointmentType={invoiceToEmail.appointment ? 'Appointment' : 'Service'}
+        />
       )}
     </DashboardLayout>
   );

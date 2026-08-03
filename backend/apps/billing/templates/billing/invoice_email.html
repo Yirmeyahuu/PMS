@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ invoice.invoice_number }}</title>
+    <style>
+        /* ── Reset & Base ─────────────────────────────────────────────────── */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        @page {
+            size: A4;
+            margin: 0;
+            @bottom-center {
+                content: "";
+            }
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #374151; /* gray-700 */
+            background: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .invoice-container {
+            width: 100%;
+            height: 297mm;
+            position: relative;
+            overflow: hidden;
+            background-color: #fff;
+        }
+
+        /* ── Header ───────────────────────────────────────────────────────── */
+        .header {
+            background-color: #0284c7; /* Darker blue matching the preview */
+            padding: 40px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            display: table;
+            width: 100%;
+            border-bottom: none;
+        }
+
+        /* Large circular shape on the right (lighter blue) */
+        .header-bg-shape-right {
+            position: absolute;
+            right: -10%;
+            top: -20%;
+            width: 50%;
+            height: 140%;
+            border-radius: 50%;
+            background-color: #0ea5e9; 
+            z-index: 1;
+        }
+
+        /* Large circular shape on the left (darker blue) */
+        .header-bg-shape-left {
+            position: absolute;
+            left: -10%;
+            top: -20%;
+            width: 40%;
+            height: 140%;
+            border-radius: 50%;
+            background-color: #0369a1; 
+            z-index: 1;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 10;
+            display: table-row;
+        }
+
+        .header-left {
+            display: table-cell;
+            vertical-align: top;
+            width: 60%;
+        }
+
+        .header-right {
+            display: table-cell;
+            vertical-align: top;
+            width: 40%;
+            text-align: right;
+            padding-top: 10px;
+        }
+
+        .logo-img {
+            max-width: 72px;
+            max-height: 72px;
+            border-radius: 50%;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 16px;
+            background-color: #fff;
+            border: 2px solid #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .clinic-text {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .clinic-name {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+
+        .clinic-address {
+            font-size: 11px;
+            color: #e0f2fe;
+            margin-bottom: 4px;
+        }
+
+        .clinic-contact p {
+            font-size: 11px;
+            color: #e0f2fe;
+            margin-bottom: 2px;
+        }
+        
+        /* Inline SVG icons for header */
+        .icon-svg {
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 6px;
+            margin-bottom: 2px;
+            width: 12px;
+            height: 12px;
+        }
+
+        /* Header Right Side */
+        .invoice-title {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .invoice-number {
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            font-family: monospace;
+            letter-spacing: 0.5px;
+            color: #e0f2fe;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background-color: #fff;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-DRAFT          { color: #4b5563; }
+        .status-PENDING        { color: #b45309; }
+        .status-PAID           { color: #059669; }
+        .status-PARTIALLY_PAID { color: #0284c7; }
+        .status-OVERDUE        { color: #dc2626; }
+
+        /* ── Body ─────────────────────────────────────────────────────────── */
+        .body-content {
+            padding: 40px;
+            z-index: 10;
+            position: relative;
+        }
+
+        /* 3-Column Info Grid */
+        .info-grid {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-spacing: 16px 0;
+            margin-left: -16px;
+            margin-bottom: 32px;
+        }
+
+        .info-col {
+            display: table-cell;
+            background-color: #fff; /* White background matching preview */
+            border: 1px solid #f3f4f6; /* Subtle light gray border */
+            border-radius: 12px; /* Smoother corners */
+            padding: 16px 20px;
+            vertical-align: top;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+        }
+
+        .info-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #0284c7;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .info-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+
+        .info-text {
+            font-size: 11px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        /* Info Row Table */
+        .details-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 4px 0;
+        }
+        .details-label {
+            color: #6b7280;
+        }
+        .details-value {
+            color: #111827;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        /* ── Tables ───────────────────────────────────────────────────────── */
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #0284c7;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Removed table-wrapper border to match preview */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 32px;
+        }
+
+        .data-table th {
+            background-color: #0ea5e9; /* Lighter blue for headers */
+            color: white;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Rounded corners for the header row */
+        .data-table th:first-child {
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+        }
+        .data-table th:last-child {
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        .data-table td {
+            padding: 16px;
+            color: #111827;
+            border-bottom: 1px solid #f3f4f6; /* Only bottom border on rows */
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .text-center { text-align: center !important; }
+        .text-right { text-align: right !important; }
+        .font-bold { font-weight: 700 !important; }
+        .font-semibold { font-weight: 600 !important; }
+
+        /* ── Totals ───────────────────────────────────────────────────────── */
+        .totals-container {
+            width: 100%;
+            display: table;
+            margin-bottom: 40px;
+        }
+        
+        .totals-spacer {
+            display: table-cell;
+            width: 55%;
+        }
+
+        .totals-box {
+            display: table-cell;
+            width: 45%;
+            vertical-align: top;
+        }
+
+        .totals-table-wrapper {
+            border: 1px solid #f3f4f6; /* Outer border exclusively for totals */
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .totals-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .totals-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .totals-label {
+            color: #4b5563;
+        }
+
+        .totals-value {
+            font-weight: 700;
+            color: #111827;
+            text-align: right;
+        }
+
+        .totals-table tr.total-row td {
+            background-color: #0ea5e9; /* Light blue solid row */
+            color: white;
+            font-weight: 700;
+        }
+        
+        .totals-table tr.total-row td.totals-value {
+            color: white;
+        }
+
+        .text-green { color: #059669 !important; }
+        .text-red { color: #dc2626 !important; }
+
+        /* ── Branding ─────────────────────────────────────────────────────── */
+        .branding-divider {
+            border: 0;
+            border-top: 1px solid #f3f4f6;
+            margin: 0 0 24px 0;
+        }
+        
+        .branding-container {
+            text-align: center;
+        }
+
+        /* SVG based styling for Malasakit text to mimic the logo */
+        .branding-logo-text {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .branding-logo-icon {
+            color: #0ea5e9;
+            margin-right: 4px;
+        }
+
+        .branding-text {
+            font-size: 9px;
+            color: #9ca3af;
+        }
+
+        /* ── Footer ───────────────────────────────────────────────────────── */
+        .footer-wrapper {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+        }
+
+        .footer {
+            background-color: #0ea5e9; /* Match header solid blue */
+            padding: 32px 40px 24px 40px;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .footer-bg-circle-1 {
+            position: absolute;
+            left: -40px;
+            bottom: -80px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.08); /* Faint white circle */
+            z-index: 1;
+        }
+
+        .footer-bg-circle-2 {
+            position: absolute;
+            left: -80px;
+            bottom: -20px;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.05); /* Faint white circle */
+            z-index: 1;
+        }
+
+        .footer-content {
+            position: relative;
+            z-index: 10;
+        }
+
+        .footer-contact {
+            margin-bottom: 16px;
+            font-size: 11px;
+            font-weight: 500;
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+        }
+        
+        .footer-contact span {
+            display: inline-block;
+            margin: 0 12px;
+        }
+
+        .footer-msg {
+            font-size: 10px;
+            line-height: 1.6;
+            max-width: 650px;
+            margin: 0 auto 16px auto;
+            color: #e0f2fe;
+        }
+        
+        .footer-next-appt {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6ee7b7; /* emerald-300 */
+            margin-bottom: 12px;
+        }
+
+        .footer-generated {
+            font-size: 9px;
+            color: #bae6fd; /* sky-200 */
+        }
+        
+    </style>
+</head>
+<body>
+
+<div class="invoice-container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-bg-shape-left"></div>
+        <div class="header-bg-shape-right"></div>
+        <div class="header-content">
+            <div class="header-left">
+                {% if settings.show_logo and settings.logo_url %}
+                    <img src="{{ settings.logo_url }}" alt="Clinic Logo" class="logo-img">
+                {% endif %}
+                <div class="clinic-text">
+                    <div class="clinic-name">{{ clinic_display_name }}</div>
+                    {% with addr=settings.clinic_address|default:invoice.clinic.address phone=settings.clinic_phone|default:invoice.clinic.phone email=settings.clinic_email|default:invoice.clinic.email website=settings.clinic_website|default:invoice.clinic.website tin=settings.tin_number|default:invoice.clinic.tin %}
+                        {% if addr %}<div class="clinic-address">{{ addr }}</div>{% endif %}
+                        <div class="clinic-contact">
+                            {% if phone %}
+                            <p>
+                                <!-- Phone SVG -->
+                                <svg class="icon-svg" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"></path></svg>
+                                {{ phone }}
+                            </p>
+                            {% endif %}
+                            {% if email %}
+                            <p>
+                                <!-- Email SVG -->
+                                <svg class="icon-svg" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                                {{ email }}
+                            </p>
+                            {% endif %}
+                            {% if website %}
+                            <p>
+                                <!-- Globe SVG -->
+                                <svg class="icon-svg" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clip-rule="evenodd"></path></svg>
+                                {{ website }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    {% endwith %}
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-number">{{ invoice.invoice_number }}</div>
+                <div class="status-badge status-{{ invoice.status }}">
+                    {{ invoice.get_status_display }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="body-content">
+        
+        <!-- 3-Column Info Grid -->
+        <div class="info-grid">
+            <!-- Bill From -->
+            <div class="info-col">
+                <div class="info-title">Bill From</div>
+                <div class="info-name">{{ clinic_display_name }}</div>
+                <div class="info-text">
+                    {% with addr=settings.clinic_address|default:invoice.clinic.address phone=settings.clinic_phone|default:invoice.clinic.phone email=settings.clinic_email|default:invoice.clinic.email tin=settings.tin_number|default:invoice.clinic.tin %}
+                        {% if addr %}{{ addr }}<br>{% endif %}
+                        {% if phone %}{{ phone }}<br>{% endif %}
+                        {% if email %}{{ email }}<br>{% endif %}
+                        {% if tin %}TIN: {{ tin }}{% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+            
+            <!-- Bill To -->
+            <div class="info-col">
+                <div class="info-title">Bill To</div>
+                <div class="info-name">{{ invoice.patient.get_full_name }}</div>
+                <div class="info-text">
+                    {% if invoice.patient.patient_number %}Patient #: {{ invoice.patient.patient_number }}{% endif %}
+                </div>
+            </div>
+
+            <!-- Invoice Details -->
+            <div class="info-col">
+                <div class="info-title">Invoice Details</div>
+                <table class="details-table">
+                    <tr>
+                        <td class="details-label">Invoice Date</td>
+                        <td class="details-value">{{ invoice.invoice_date|date:date_format }}</td>
+                    </tr>
+                    {% if invoice.due_date %}
+                    <tr>
+                        <td class="details-label">Due Date</td>
+                        <td class="details-value">{{ invoice.due_date|date:date_format }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if invoice.appointment %}
+                    <tr>
+                        <td class="details-label">Appointment</td>
+                        <td class="details-value">{{ invoice.appointment.date|date:date_format }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="section-title">Services / Items</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%">#</th>
+                    <th>Description</th>
+                    <th class="text-center" style="width: 10%">Qty</th>
+                    <th class="text-right" style="width: 20%">Price</th>
+                    <th class="text-right" style="width: 20%">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td style="color:#6b7280;">{{ forloop.counter }}</td>
+                    <td class="font-semibold">{{ item.description }}</td>
+                    <td class="text-center">{{ item.quantity|floatformat:"-2" }}</td>
+                    <td class="text-right" style="color:#6b7280;">{{ currency }}{{ item.unit_price }}</td>
+                    <td class="text-right font-bold">{{ currency }}{{ item.total }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center" style="padding: 16px; color: #9ca3af;">No items</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Totals Block (Right Aligned via Table) -->
+        <div class="totals-container">
+            <div class="totals-spacer"></div>
+            <div class="totals-box">
+                <div class="totals-table-wrapper">
+                    <table class="totals-table">
+                        <tr>
+                            <td class="totals-label">Subtotal</td>
+                            <td class="totals-value">{{ currency }}{{ computed_subtotal }}</td>
+                        </tr>
+                        {% if invoice.discount_amount > 0 %}
+                        <tr>
+                            <td class="totals-label">Discount {% if invoice.discount_percent > 0 %}({{ invoice.discount_percent }}%){% endif %}</td>
+                            <td class="totals-value text-red">-{{ currency }}{{ invoice.discount_amount }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if invoice.tax_amount > 0 %}
+                        <tr>
+                            <td class="totals-label">Tax / GST {% if invoice.tax_percent > 0 %}({{ invoice.tax_percent }}%){% endif %}</td>
+                            <td class="totals-value">{{ currency }}{{ invoice.tax_amount }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if invoice.philhealth_coverage > 0 %}
+                        <tr>
+                            <td class="totals-label">PhilHealth</td>
+                            <td class="totals-value text-green">-{{ currency }}{{ invoice.philhealth_coverage }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if invoice.hmo_coverage > 0 %}
+                        <tr>
+                            <td class="totals-label">HMO Coverage</td>
+                            <td class="totals-value text-green">-{{ currency }}{{ invoice.hmo_coverage }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        <!-- Solid Blue Total Row -->
+                        <tr class="total-row">
+                            <td class="font-bold">Total Amount</td>
+                            <td class="totals-value">{{ currency }}{{ computed_total }}</td>
+                        </tr>
+        
+                        {% if invoice.amount_paid > 0 %}
+                        <tr>
+                            <td class="totals-label">Amount Paid</td>
+                            <td class="totals-value text-green">{{ currency }}{{ invoice.amount_paid }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        <tr>
+                            <td class="totals-label font-bold" style="color:#111827;">Balance Due</td>
+                            {% if computed_balance_due > 0 %}
+                                <td class="totals-value text-red">{{ currency }}{{ computed_balance_due }}</td>
+                            {% else %}
+                                <td class="totals-value text-green">{{ currency }}0.00</td>
+                            {% endif %}
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment History -->
+        {% if payments %}
+        <div class="section-title">Payment History</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width:25%">Receipt #</th>
+                    <th style="width:25%">Date</th>
+                    <th style="width:20%">Method</th>
+                    <th style="width:15%">Reference</th>
+                    <th class="text-right" style="width:15%">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td class="font-semibold" style="color:#4b5563;">{{ p.receipt_number }}</td>
+                    <td>{{ p.payment_date|date:date_format }}</td>
+                    <td>{{ p.payment_method }}</td>
+                    <td style="color:#6b7280;">{{ p.reference_number|default:"—" }}</td>
+                    <td class="text-right font-bold">{{ currency }}{{ p.amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        
+        <!-- Footer Branding (Malasakit) positioned at bottom of body content -->
+        <hr class="branding-divider">
+        <div class="branding-container">
+            <div class="branding-logo-text">
+                <span class="branding-logo-icon">M</span>alasakit
+            </div>
+            <p class="branding-text">Powered by Malasakit Medical Systems</p>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer-wrapper">
+        <div class="footer">
+            <div class="footer-bg-circle-1"></div>
+            <div class="footer-bg-circle-2"></div>
+            
+            <div class="footer-content">
+                <div class="footer-contact">
+                    {% with phone=settings.clinic_phone|default:invoice.clinic.phone email=settings.clinic_email|default:invoice.clinic.email website=settings.clinic_website|default:invoice.clinic.website %}
+                        {% if phone %}
+                        <span>
+                            <svg class="icon-svg" style="color:#e0f2fe;" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"></path></svg>
+                            {{ phone }}
+                        </span>
+                        {% endif %}
+                        {% if email %}
+                        <span>
+                            <svg class="icon-svg" style="color:#e0f2fe;" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                            {{ email }}
+                        </span>
+                        {% endif %}
+                        {% if website %}
+                        <span>
+                            <svg class="icon-svg" style="color:#e0f2fe;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clip-rule="evenodd"></path></svg>
+                            {{ website }}
+                        </span>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                <div class="footer-msg">
+                    Thank you for choosing {{ clinic_display_name|default:"our clinic" }}. We sincerely appreciate the opportunity to provide you with our clinic services. Please contact us if you have any questions regarding this invoice. Kindly settle this invoice within 30 days. We look forward to seeing you again at your next appointment.
+                </div>
+                {% if invoice.appointment %}
+                <div class="footer-next-appt">
+                    Next Appointment: {{ invoice.appointment.date|date:date_format }} {% if invoice.appointment.start_time %}{{ invoice.appointment.start_time }}{% endif %}
+                </div>
+                {% endif %}
+                <div class="footer-generated">
+                    Generated on {% now "F j, Y" %} at {% now "g:i A" %} · {{ clinic_display_name }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

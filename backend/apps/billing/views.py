@@ -395,6 +395,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
         clinic_display_name = print_settings.clinic_name or invoice.clinic.name
 
+        if not print_settings.logo_url and invoice.clinic and invoice.clinic.logo:
+            print_settings.logo_url = request.build_absolute_uri(invoice.clinic.logo.url)
+
         date_format = print_settings.date_format or '%B %d, %Y'
         django_date_format_map = {
             '%B %d, %Y': 'F j, Y',
@@ -675,6 +678,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
                     print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
                     clinic_display_name = print_settings.clinic_name or invoice.clinic.name
+
+                    if not print_settings.logo_url and invoice.clinic and invoice.clinic.logo:
+                        print_settings.logo_url = request.build_absolute_uri(invoice.clinic.logo.url)
 
                     date_format = print_settings.date_format or '%B %d, %Y'
                     template_date_format = 'F j, Y'

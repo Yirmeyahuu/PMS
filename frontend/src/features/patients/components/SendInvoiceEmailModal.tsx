@@ -1,11 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Mail, Loader2, FileText, CheckCircle, AlertCircle } from 'lucide-react';
-import { createRoot } from 'react-dom/client';
-import html2canvas from 'html2canvas-pro';
-import { jsPDF } from 'jspdf';
-import { PMSInvoiceTemplate } from '@/components/invoices/PMSInvoiceTemplate';
-import type { InvoiceClinicInfo, NextAppointmentInfo } from '@/components/invoices/PMSInvoiceTemplate';
-import type { Invoice } from '@/types/billing';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Mail, Loader2, AlertCircle } from 'lucide-react';
 import { useClinicSettings } from '@/hooks/useClinicSettings';
 import { getPractitioners } from '@/features/clinics/clinic.api';
 import { getContacts } from '@/features/contacts/contact.api';
@@ -26,9 +20,6 @@ interface SendInvoiceEmailModalProps {
   patientEmail: string;
   appointmentDate: string;
   appointmentType: string;
-  invoice?: Invoice;
-  clinic?: InvoiceClinicInfo;
-  nextAppointment?: NextAppointmentInfo | null;
 }
 
 export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
@@ -40,9 +31,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   patientEmail,
   appointmentDate,
   appointmentType,
-  invoice,
-  clinic,
-  nextAppointment,
 }) => {
   const [emails, setEmails] = useState<string[]>([patientEmail]);
   const [emailInput, setEmailInput] = useState('');
@@ -58,8 +46,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const { emailEnabled } = useClinicSettings();
 
   // Email suggestions state
@@ -68,102 +54,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-
-  // Auto-generate PDF from PMSInvoiceTemplate on mount
-  const generatePdf = useCallback(async () => {
-    if (!invoice) return;
-    setIsGeneratingPdf(true);
-    try {
-      // A4 dimensions at 96 DPI
-      const A4_WIDTH_PX = 794;  // 210mm
-      const A4_HEIGHT_PX = 1122; // 297mm
-
-      // Create an offscreen container at exact A4 width
-      const container = document.createElement('div');
-      container.style.position = 'fixed';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = `${A4_WIDTH_PX}px`;
-      container.style.minHeight = `${A4_HEIGHT_PX}px`;
-      container.style.background = 'white';
-      container.style.zIndex = '-1';
-      container.style.overflow = 'hidden';
-      document.body.appendChild(container);
-
-      // Render the template into the offscreen container
-      const root = createRoot(container);
-      await new Promise<void>((resolve) => {
-        root.render(
-          <PMSInvoiceTemplate
-            invoice={invoice}
-            clinic={clinic}
-            showPaymentHistory={true}
-            nextAppointment={nextAppointment}
-            className="!max-w-none"
-          />
-        );
-        // Wait for render + images to load
-        setTimeout(resolve, 1000);
-      });
-
-      // Force the inner template to fill the full container width
-      const templateEl = container.firstElementChild as HTMLElement;
-      if (templateEl) {
-        templateEl.style.maxWidth = 'none';
-        templateEl.style.width = '100%';
-      }
-
-      // Capture to canvas at exact A4 width with optimized scale
-      const captureHeight = Math.max(container.scrollHeight, A4_HEIGHT_PX);
-      const canvas = await html2canvas(container, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: A4_WIDTH_PX,
-        height: captureHeight,
-        windowWidth: A4_WIDTH_PX,
-      });
-
-      // Convert to PDF with JPEG compression for smaller file size
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = 210;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      // If content exceeds one page, scale to fit single page
-      const maxHeight = 297;
-      if (pdfHeight > maxHeight) {
-        // Scale to fit height, but always stretch to full width
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, maxHeight);
-      } else {
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      }
-
-      // Convert to File
-      const pdfBlob = pdf.output('blob');
-      const pdfFile = new File([pdfBlob], `Invoice_${invoiceNumber}.pdf`, {
-        type: 'application/pdf',
-      });
-
-      setAttachment(pdfFile);
-
-      // Cleanup
-      root.unmount();
-      document.body.removeChild(container);
-    } catch (err) {
-      console.error('Failed to generate PDF:', err);
-      setErrorMessage('Failed to auto-generate invoice PDF. Please try again.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  }, [invoice, clinic, nextAppointment, invoiceNumber]);
-
-  useEffect(() => {
-    if (isOpen && invoice) {
-      generatePdf();
-    }
-  }, [isOpen, invoice, generatePdf]);
 
   // Fetch email suggestions on modal open
   useEffect(() => {
@@ -223,9 +113,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
 
     fetchEmailSuggestions();
 
-    return () => {
-      cancelled = true;
-    };
   }, [isOpen]);
 
   // Close suggestions when clicking outside
@@ -306,11 +193,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
       formData.append('subject', subject);
       formData.append('body', body);
 
-      // If user attached a file, include it
-      if (attachment) {
-        formData.append('attachment', attachment);
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoiceId}/send-email/`,
         {
@@ -331,7 +213,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
       setTimeout(() => {
         onClose();
         setSuccessMessage('');
-        setAttachment(null);
       }, 2000);
     } catch (err: unknown) {
       const error = err as Error;
@@ -481,35 +362,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none"
               />
             </div>
-
-            {/* Auto-generated PDF Attachment */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-gray-600">Attachment</label>
-              
-              {isGeneratingPdf && (
-                <div className="flex items-center gap-3 p-3 bg-sky-50 border border-sky-200 rounded-lg">
-                  <Loader2 className="w-4 h-4 text-sky-600 animate-spin flex-shrink-0" />
-                  <span className="text-sm text-sky-700">Generating invoice PDF...</span>
-                </div>
-              )}
-
-              {!isGeneratingPdf && attachment && (
-                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <FileText className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  <span className="text-sm text-green-700 truncate">{attachment.name}</span>
-                  <span className="text-xs text-green-500 flex-shrink-0">
-                    ({(attachment.size / 1024).toFixed(1)} KB)
-                  </span>
-                </div>
-              )}
-
-              {!isGeneratingPdf && !attachment && !invoice && (
-                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <span className="text-sm text-amber-700">Invoice data not available for PDF generation.</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Footer */}
@@ -522,9 +374,8 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
             </button>
             <button
               onClick={handleSend}
-              disabled={isSending || isGeneratingPdf || !emailEnabled}
-              title={!emailEnabled ? 'Email notifications are currently disabled in Clinic Settings.' : undefined}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSending || emails.length === 0 || !emailEnabled}
+              className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:hover:bg-sky-600 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
             >
               {isSending ? (
                 <>
@@ -534,7 +385,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
               ) : (
                 <>
                   <Mail className="w-4 h-4" />
-                  Send Email
+                  Send Invoice
                 </>
               )}
             </button>

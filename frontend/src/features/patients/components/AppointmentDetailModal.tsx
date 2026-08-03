@@ -453,9 +453,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
           patientEmail={patientEmail || ''}
           appointmentDate={formatDate(appointment.date)}
           appointmentType={APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
-          invoice={invoices[0]}
-          clinic={clinicInfo}
-          nextAppointment={nextAppointment}
         />
       )}
     </>
