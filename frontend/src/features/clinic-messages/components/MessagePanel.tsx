@@ -70,20 +70,21 @@ export const MessagePanel = ({ currentUserId, onClose, onUnreadChange }: Props) 
         onClick={onClose}
       />
 
-      {/* Modal — centered */}
+      {/* Panel container */}
       <div
         className="
-          fixed inset-0 z-50 flex items-center justify-center p-4
+          fixed top-1/2 right-[48px] -translate-y-1/2 z-50 flex items-center pr-4
           pointer-events-none
         "
       >
         <div
           className="
             pointer-events-auto
-            w-full max-w-4xl h-[600px]
+            w-[800px] max-w-[calc(100vw-100px)] h-[80vh] max-h-[800px]
             bg-white rounded-2xl shadow-2xl
             flex flex-col overflow-hidden
             border border-gray-200
+            animate-in fade-in slide-in-from-right-[100%] duration-300
           "
           onClick={e => e.stopPropagation()}
         >

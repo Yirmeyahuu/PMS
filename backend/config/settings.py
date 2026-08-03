@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'apps.messages',
     'apps.subscriptions',
     'apps.letters',
+    'apps.support',
 ]
 
 # ── Django Channels ───────────────────────────────────────────────────────────

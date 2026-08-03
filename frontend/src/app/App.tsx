@@ -70,12 +70,12 @@ import { AppointmentCaseResolution } from '@/features/appointments/components/Ap
 import ClientSettings from '@/features/patients/ClientSettings';
 import { ClinicalNoteRedirect } from '@/features/clinical-documentation/components/ClinicalNoteRedirect';
 import { PatientProfile } from '@/features/patients/PatientProfile';
-import { ClinicMessages } from '@/features/clinic-messages/ClinicMessages';
 import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
 import { GenerateNewInvoice } from '@/features/billing/generateNewInvoice';
-import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { RightSidebarBookmarks } from '@/components/layout/RightSidebarBookmarks';
 import { FloatingNotificationsContainer } from '@/features/notifications/components/FloatingNotificationsContainer';
 import { FeatureAccessGuard } from '@/components/auth/FeatureAccessGuard';
+import { FloatingSupportButton } from '@/features/support';
 
 // ── NEW: Clinic Setup ─────────────────────────────────────────────────────────
 import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
@@ -83,19 +83,12 @@ import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
 // ─── Routes where internal components should NOT appear ────────────────────────────
 const PUBLIC_PATHS = ['/login', '/register', '/portal', '/clinic-setup', '/book', '/client-form', '/public', '/user-manual'];
 
-const ClinicMessagesGuard = () => {
-  const location = useLocation();
-  const isHidden = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
-  if (isHidden) return null;
-  return <ClinicMessages />;
-};
-
-const NotificationBellGuard = () => {
+const CommunicationBookmarksGuard = () => {
   const { isAuthenticated } = useAuthStore();
   const location            = useLocation();
   const isPublicPage        = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
   if (!isAuthenticated || isPublicPage) return null;
-  return <NotificationBell />;
+  return <RightSidebarBookmarks />;
 };
 
 const FloatingNotificationsGuard = () => {
@@ -103,6 +96,14 @@ const FloatingNotificationsGuard = () => {
   const isPublicPage = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
   if (isPublicPage) return null;
   return <FloatingNotificationsContainer />;
+};
+
+const FloatingSupportGuard = () => {
+  const { isAuthenticated } = useAuthStore();
+  const location = useLocation();
+  const isPublicPage = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
+  if (!isAuthenticated || isPublicPage) return null;
+  return <FloatingSupportButton />;
 };
 
 const GlobalLogoutModal = () => {
@@ -352,9 +353,9 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        <ClinicMessagesGuard />
-        <NotificationBellGuard />
+        <CommunicationBookmarksGuard />
         <FloatingNotificationsGuard />
+        <FloatingSupportGuard />
         <GlobalLogoutModal />
         <SessionGuard />
         <Analytics />

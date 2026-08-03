@@ -94,11 +94,11 @@ export const NotificationPanel: React.FC<Props> = ({
     <div
       ref={panelRef}
       className="
-        fixed bottom-20 right-32 z-50
-        w-95
+        fixed top-1/2 right-[56px] -translate-y-1/2 z-50
+        w-95 max-h-[80vh]
         bg-white rounded-2xl shadow-2xl border border-gray-200
         flex flex-col overflow-hidden
-        animate-in fade-in slide-in-from-bottom-2 duration-200
+        animate-in fade-in slide-in-from-right-[100%] duration-300
       "
     >
       {/* ── Gradient accent bar ─────────────────────────────────────────────── */}
