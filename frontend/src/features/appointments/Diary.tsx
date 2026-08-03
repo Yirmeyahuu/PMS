@@ -40,6 +40,10 @@ export const Diary: React.FC = () => {
   }, [isRestrictedPractitioner, user?.manager_branches]);
   // ── Rebook Mode ──────────────────────────────────────────────────
   const { rebookMode, rebookData, startRebook, exitRebook } = useRebookMode();
+  // Guard against rapid double-clicks creating duplicate appointments
+  const isRebooking = useRef(false);
+  // Visible loading state while the API request is in-flight
+  const [isRebookingInProgress, setIsRebookingInProgress] = useState(false);
 
   // Change body cursor to crosshair while in rebook mode
   useEffect(() => {
@@ -609,34 +613,63 @@ export const Diary: React.FC = () => {
     date: Date; hour: number; minutes: number; practitionerId?: number | null;
   }) => {
     if (!rebookData || !user) return;
+    // Prevent rapid double-clicks from creating duplicate appointments
+    if (isRebooking.current) return;
+    isRebooking.current = true;
+    setIsRebookingInProgress(true);
+
     const { hour, minutes } = slot;
     const endTotalMins = hour * 60 + minutes + rebookData.duration_minutes;
     const endH = Math.floor(endTotalMins / 60);
     const endM = endTotalMins % 60;
+    const timeLabel = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+    // appointment_type must be one of the backend's valid enum codes.
+    // If the original appointment stored a service name (e.g. "OT Consultation")
+    // instead of a valid code, fall back to 'INITIAL' to avoid a 400 error.
+    const VALID_APPOINTMENT_TYPES = ['INITIAL', 'FOLLOW_UP', 'THERAPY', 'ASSESSMENT'];
+    const safeAppointmentType = VALID_APPOINTMENT_TYPES.includes(rebookData.appointment_type)
+      ? rebookData.appointment_type
+      : 'INITIAL';
+
     const data: CreateAppointmentData = {
       clinic:           rebookData.clinic,
       patient:          rebookData.patient,
       practitioner:     slot.practitionerId ?? rebookData.practitioner ?? undefined,
       service:          rebookData.service ?? undefined,
-      appointment_type: rebookData.appointment_type,
+      appointment_type: safeAppointmentType,
       date:             format(slot.date, 'yyyy-MM-dd'),
-      start_time:       `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+      start_time:       timeLabel,
       end_time:         `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
       duration_minutes: rebookData.duration_minutes,
       chief_complaint:  rebookData.chief_complaint,
       notes:            rebookData.notes,
       patient_notes:    rebookData.patient_notes,
+      // Inherit case from original appointment (null if original had none)
+      patient_case:     rebookData.patient_case ?? undefined,
     };
+
+    // Show a loading toast while the API call is in-flight
+    const loadingToastId = toast.loading(`Rebooking for ${format(slot.date, 'MMM d')} at ${timeLabel}…`);
+
     try {
       await createAppointment(data);
-      setAppointmentRefreshKey(prev => prev + 1);
-      toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`);
+      // Exit rebook mode and trigger Diary refresh first —
+      // the loading toast stays visible while the calendar re-fetches.
       exitRebook();
+      setAppointmentRefreshKey(prev => prev + 1);
+      // Dismiss the loading toast then immediately show the success confirmation.
+      toast.dismiss(loadingToastId);
+      toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${timeLabel}`);
     } catch (err: unknown) {
+      toast.dismiss(loadingToastId);
       const detail = err && typeof err === 'object' && 'response' in err
         ? (err as any).response?.data
         : undefined;
       toast.error(typeof detail === 'object' ? JSON.stringify(detail) : (detail ?? 'Failed to rebook appointment'));
+    } finally {
+      isRebooking.current = false;
+      setIsRebookingInProgress(false);
     }
   };
 
@@ -1314,23 +1347,44 @@ export const Diary: React.FC = () => {
 
       {/* ── Rebook Mode floating banner ── */}
       {rebookMode && rebookData && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10000 flex items-center gap-3 bg-emerald-700 text-white px-5 py-3 rounded-full shadow-2xl border border-emerald-500 select-none animate-fade-in">
-          <span className="text-lg">🔁</span>
-          <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-sm">{rebookData.patient_name}</span>
-            <span className="text-xs text-emerald-200">
-              {rebookData.service_name
-                ? `${rebookData.service_name} · ${rebookData.duration_minutes} min`
-                : `${rebookData.duration_minutes} min`}
-              {' · '}Click a slot to rebook · ESC to cancel
-            </span>
-          </div>
-          <button
-            onClick={exitRebook}
-            className="ml-2 px-3 py-1 rounded-full bg-white text-emerald-800 text-xs font-bold hover:bg-emerald-50 transition-colors"
-          >
-            Done
-          </button>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-10000 flex items-center gap-3 px-5 py-3 rounded-full shadow-2xl border select-none animate-fade-in transition-colors duration-200 ${
+          isRebookingInProgress
+            ? 'bg-slate-700 border-slate-500 text-white'
+            : 'bg-emerald-700 border-emerald-500 text-white'
+        }`}>
+          {isRebookingInProgress ? (
+            /* Loading state — spinner while API call is in-flight */
+            <>
+              <svg className="w-5 h-5 animate-spin text-white shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              <div className="flex flex-col leading-tight">
+                <span className="font-semibold text-sm">Creating appointment…</span>
+                <span className="text-xs text-slate-300">Please wait</span>
+              </div>
+            </>
+          ) : (
+            /* Idle rebook mode — waiting for user to click a slot */
+            <>
+              <span className="text-lg">🔁</span>
+              <div className="flex flex-col leading-tight">
+                <span className="font-semibold text-sm">{rebookData.patient_name}</span>
+                <span className="text-xs text-emerald-200">
+                  {rebookData.service_name
+                    ? `${rebookData.service_name} · ${rebookData.duration_minutes} min`
+                    : `${rebookData.duration_minutes} min`}
+                  {' · '}Click a slot to rebook
+                </span>
+              </div>
+              <button
+                onClick={exitRebook}
+                className="ml-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-medium hover:bg-white/30 transition-colors"
+              >
+                Cancel (ESC)
+              </button>
+            </>
+          )}
         </div>
       )}
     </DashboardLayout>

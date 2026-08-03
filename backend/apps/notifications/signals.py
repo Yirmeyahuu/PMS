@@ -22,21 +22,7 @@ def connect_signals():
         notify_new_client,
     )
 
-    # ── 1. Diary Appointment created / confirmed ──────────────────────────────
-    @receiver(post_save, sender=Appointment, weak=False)
-    def on_appointment_saved(sender, instance, created, **kwargs):
-        if created:
-            notify_new_booking(instance)
-            return
-
-        if instance.status == 'CONFIRMED':
-            from apps.notifications.models import Notification
-            already_notified = Notification.objects.filter(
-                appointment=instance,
-                notification_type='NEW_BOOKING',
-            ).exists()
-            if not already_notified:
-                notify_new_booking(instance)
+    # ── 1. Diary Appointment created / confirmed (REMOVED as per user request) ──
 
     # ── 2. Portal Booking submitted by patient ────────────────────────────────
     @receiver(post_save, sender=PortalBooking, weak=False)

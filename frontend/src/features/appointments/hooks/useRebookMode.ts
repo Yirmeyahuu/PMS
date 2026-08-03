@@ -11,6 +11,8 @@ export interface RebookData {
   chief_complaint:  string;
   notes:            string;
   patient_notes:    string;
+  /** Inherited from original appointment — null if original had no case */
+  patient_case:     number | null;
   // Display helpers
   patient_name:  string;
   service_name:  string | null;
@@ -35,6 +37,8 @@ export const useRebookMode = () => {
       chief_complaint:  appointment.chief_complaint,
       notes:            appointment.notes,
       patient_notes:    appointment.patient_notes,
+      // Inherit case from original — if null, the new appointment has no case either
+      patient_case:     appointment.patient_case,
       patient_name:     appointment.patient_name,
       service_name:     appointment.service_name,
     });
