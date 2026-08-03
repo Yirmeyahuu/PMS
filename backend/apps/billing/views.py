@@ -235,6 +235,19 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                             appt.id, appt.appointment_type, unit_price,
                         )
 
+                    is_covered_by_package = False
+                    if appt.patient_case and appt.patient_case.session_source == 'PACKAGE':
+                        if appt.patient_case.package_invoice:
+                            approved = appt.patient_case.approved_sessions or 0
+                            completed = appt.patient_case.completed_sessions or 0
+                            if appt.patient_case.is_unlimited or (approved - completed > 0):
+                                is_covered_by_package = True
+                                
+                    if is_covered_by_package:
+                        unit_price = Decimal('0')
+                        description = f"{description} (Covered by Package)"
+                        logger.info("Session %s covered by package allocation for case %s", appt.id, appt.patient_case.id)
+
                     InvoiceItem.objects.create(
                         invoice     = invoice,
                         description = description,
