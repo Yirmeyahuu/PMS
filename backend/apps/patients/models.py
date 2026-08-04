@@ -814,6 +814,15 @@ class PatientConsentDocument(TimeStampedModel):
     class Meta:
         db_table = 'patient_consent_documents'
         ordering = ['-signed_at']
+        verbose_name = 'Patient Consent Document'
+        verbose_name_plural = 'Patient Consent Documents'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['patient_case', 'type'],
+                name='unique_consent_per_case_type',
+                condition=models.Q(patient_case__isnull=False)
+            )
+        ]
         indexes = [
             models.Index(fields=['patient', 'type']),
             models.Index(fields=['clinic', 'signed_at']),

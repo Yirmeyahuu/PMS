@@ -787,6 +787,7 @@ class PatientConsentDocumentCreateSerializer(serializers.ModelSerializer):
 
     appointment_id = serializers.IntegerField(required=False, allow_null=True)
     patient_case_id = serializers.IntegerField(required=False, allow_null=True)
+    signed_at = serializers.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         model = PatientConsentDocument

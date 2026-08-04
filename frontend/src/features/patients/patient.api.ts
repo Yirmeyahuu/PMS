@@ -248,6 +248,7 @@ export interface CreatePatientConsentDocumentPayload {
   type: string;
   appointment_id?: number | null;
   patient_case_id?: number | null;
+  signed_at?: string;
 }
 
 /**

@@ -1,11 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, FileText, Plus, Navigation } from 'lucide-react';
 import { getActiveLetterTemplates, type LetterTemplate } from '../api/letterTemplates.api';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, FileCheck } from 'lucide-react';
-import { createConsentDocument } from '@/features/patients/patient.api';
+import { 
+  createConsentDocument, 
+  getPatientConsentDocuments,
+  type PatientConsentDocumentRecord 
+} from '@/features/patients/patient.api';
+import { getActiveClinicConsentForm, type ClinicConsentFormResponse } from '@/features/clinics/clinic.api';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
+import { ConsentFormModal } from '@/features/patient-portal/components/ConsentFormModal';
+import { ClinicConsentFormViewer } from '@/features/patient-portal/components/ClinicConsentFormViewer';
+import { ViewConsentFormModal } from '@/features/patients/components/ViewConsentFormModal';
+import toast from 'react-hot-toast';
 
 export const WorkspaceLettersPanel = () => {
   const [templates, setTemplates] = useState<LetterTemplate[]>([]);
@@ -14,23 +23,55 @@ export const WorkspaceLettersPanel = () => {
   const { setEditorContext, selectedCaseId, triggerRefresh } = useClinicalWorkspace();
   const navigate = useNavigate();
   const { patient } = usePatientProfileContext();
-  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const [patientDocuments, setPatientDocuments] = useState<PatientConsentDocumentRecord[]>([]);
+  const [activeCcfConfig, setActiveCcfConfig] = useState<ClinicConsentFormResponse | null>(null);
+  const [ccfConfigLoading, setCcfConfigLoading] = useState(true);
+
+  // Modals state
+  const [isDpfModalOpen, setIsDpfModalOpen] = useState(false);
+  const [isCcfModalOpen, setIsCcfModalOpen] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<PatientConsentDocumentRecord | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const fetchTemplates = async () => {
+    const fetchData = async () => {
       try {
-        const data = await getActiveLetterTemplates();
-        if (!cancelled) setTemplates(data);
+        const [templateData, ccfConfigData] = await Promise.all([
+          getActiveLetterTemplates(),
+          getActiveClinicConsentForm().catch(() => null)
+        ]);
+        if (!cancelled) {
+          setTemplates(templateData);
+          setActiveCcfConfig(ccfConfigData);
+          setCcfConfigLoading(false);
+        }
       } catch (err) {
-        console.error('Failed to fetch templates', err);
+        console.error('Failed to fetch initial letters data', err);
+        if (!cancelled) setCcfConfigLoading(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    fetchTemplates();
+    fetchData();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!patient || !selectedCaseId) return;
+    let cancelled = false;
+    getPatientConsentDocuments(patient.id)
+      .then(docs => {
+        if (!cancelled) {
+          setPatientDocuments(docs.filter(d => d.patient_case_id === selectedCaseId));
+        }
+      })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [patient, selectedCaseId]);
+
+  const existingDpf = useMemo(() => patientDocuments.find(d => d.type === 'DATA_PRIVACY_CONSENT'), [patientDocuments]);
+  const existingCcf = useMemo(() => patientDocuments.find(d => d.type === 'CLINIC_CONSENT'), [patientDocuments]);
 
   const filteredTemplates = templates.filter(t => 
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,39 +80,30 @@ export const WorkspaceLettersPanel = () => {
 
   const categories = Array.from(new Set(filteredTemplates.map(t => t.category).filter(Boolean)));
 
-  const handleGenerateConsent = async (type: string, title: string) => {
-    if (!patient || !selectedCaseId) {
-      alert("Please select a case and ensure patient is loaded.");
-      return;
-    }
-    
-    // Simplistic manual generation prompt for signature
-    const signature = prompt(`Please enter patient signature name to generate ${title}:`, patient.first_name + ' ' + patient.last_name);
-    if (!signature) return;
-
+  const handleSaveConsent = async (type: string, title: string, signature: string, text: string, headerHtml: string = '') => {
+    if (!patient || !selectedCaseId) return;
     try {
-      setIsGenerating(true);
-      await createConsentDocument(patient.id, {
+      const newDoc = await createConsentDocument(patient.id, {
         title,
-        header_snapshot: '',
-        body_snapshot: `Manual generation of ${title} for ${patient.first_name} ${patient.last_name}`,
+        header_snapshot: headerHtml,
+        body_snapshot: text,
         signature,
-        consent_version: 'v1.0 (Manual)',
-        signer_full_name: signature,
+        consent_version: 'v1.0',
+        signer_full_name: patient.first_name + ' ' + patient.last_name,
         signer_email: patient.email || 'no-email@example.com',
         type,
         patient_case_id: selectedCaseId,
-        // Optional appointment_id could be added if we tracked the active appointment
       });
+      setPatientDocuments(prev => [newDoc, ...prev]);
       triggerRefresh();
-      alert(`${title} generated successfully.`);
-    } catch (err) {
+      toast.success(`${title} generated successfully.`);
+    } catch (err: any) {
       console.error('Failed to create consent document', err);
-      alert("Failed to generate document.");
-    } finally {
-      setIsGenerating(false);
+      toast.error(err.response?.data?.error || "Failed to generate document.");
     }
   };
+
+
 
   if (loading) {
     return (
@@ -128,10 +160,17 @@ export const WorkspaceLettersPanel = () => {
             <div className="h-px flex-1 bg-slate-200/60" />
           </div>
           <div className="space-y-1">
+            {/* DPF Button */}
             <button
-              onClick={() => handleGenerateConsent('DATA_PRIVACY_CONSENT', 'Data Privacy Form')}
-              disabled={isGenerating}
-              className="w-full flex items-center gap-3 p-2 rounded-lg text-left hover:bg-indigo-50 group transition-colors disabled:opacity-50"
+              onClick={() => {
+                if (!patient || !selectedCaseId) {
+                  toast.error("Please select a case and ensure patient is loaded.");
+                  return;
+                }
+                if (existingDpf) setViewingDocument(existingDpf);
+                else setIsDpfModalOpen(true);
+              }}
+              className="w-full flex items-center gap-3 p-2 rounded-lg text-left hover:bg-indigo-50 group transition-colors"
             >
               <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
                 <ShieldCheck className="w-4 h-4 text-indigo-600" />
@@ -140,15 +179,25 @@ export const WorkspaceLettersPanel = () => {
                 <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-900 truncate">
                   Data Privacy Form
                 </p>
-                <p className="text-xs text-slate-500 truncate">Generate manual consent form</p>
+                <p className={`text-xs truncate ${existingDpf ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+                  {existingDpf ? '✓ Completed' : 'Not completed'}
+                </p>
               </div>
               <Plus className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-500 transition-all" />
             </button>
 
+            {/* CCF Button */}
             <button
-              onClick={() => handleGenerateConsent('CLINIC_CONSENT', 'Clinic Consent Form')}
-              disabled={isGenerating}
-              className="w-full flex items-center gap-3 p-2 rounded-lg text-left hover:bg-indigo-50 group transition-colors disabled:opacity-50"
+              onClick={() => {
+                if (!patient || !selectedCaseId) {
+                  toast.error("Please select a case and ensure patient is loaded.");
+                  return;
+                }
+                if (existingCcf) setViewingDocument(existingCcf);
+                else setIsCcfModalOpen(true);
+              }}
+              disabled={!activeCcfConfig && !existingCcf}
+              className="w-full flex items-center gap-3 p-2 rounded-lg text-left hover:bg-indigo-50 group transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
             >
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                 <FileCheck className="w-4 h-4 text-emerald-600" />
@@ -157,7 +206,9 @@ export const WorkspaceLettersPanel = () => {
                 <p className="text-sm font-medium text-slate-700 group-hover:text-emerald-900 truncate">
                   Clinic Consent Form
                 </p>
-                <p className="text-xs text-slate-500 truncate">Generate manual consent form</p>
+                <p className={`text-xs truncate ${existingCcf ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+                  {existingCcf ? '✓ Completed' : (!activeCcfConfig && !ccfConfigLoading ? 'Not configured' : 'Not completed')}
+                </p>
               </div>
               <Plus className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-500 transition-all" />
             </button>
@@ -213,6 +264,39 @@ export const WorkspaceLettersPanel = () => {
           </div>
         ))}
       </div>
+
+      {patient && (
+        <ConsentFormModal 
+          isOpen={isDpfModalOpen}
+          patientFullName={patient.first_name + ' ' + patient.last_name}
+          patientEmail={patient.email || ''}
+          onClose={() => setIsDpfModalOpen(false)}
+          onSigned={(sig, text) => handleSaveConsent('DATA_PRIVACY_CONSENT', 'Data Privacy Consent Form', sig, text)}
+        />
+      )}
+
+      {patient && activeCcfConfig && (
+        <ClinicConsentFormViewer
+          isOpen={isCcfModalOpen}
+          clinicName={activeCcfConfig.clinic_name || 'Clinic'}
+          title={activeCcfConfig.title}
+          headerContent={activeCcfConfig.header_content}
+          bodyContent={activeCcfConfig.body_content}
+          patientFullName={patient.first_name + ' ' + patient.last_name}
+          patientEmail={patient.email || ''}
+          onClose={() => setIsCcfModalOpen(false)}
+          onSigned={(sig) => handleSaveConsent('CLINIC_CONSENT', activeCcfConfig.title, sig, activeCcfConfig.body_content, activeCcfConfig.header_content)}
+        />
+      )}
+
+      {viewingDocument && (
+        <ViewConsentFormModal
+          isOpen={!!viewingDocument}
+          consent={viewingDocument}
+          onClose={() => setViewingDocument(null)}
+          onSendEmail={() => toast('Email functionality not yet linked in workspace', { icon: 'ℹ️' })}
+        />
+      )}
     </div>
   );
 };

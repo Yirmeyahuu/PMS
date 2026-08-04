@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import { DocumentFooter } from '@/components/DocumentFooter';
 import { SignaturePad, type SignaturePadRef } from '@/components/SignaturePad';
+import { getMyClinic } from '@/features/clinics/clinic.api';
 
 interface ConsentFormModalProps {
   isOpen: boolean;
@@ -22,6 +23,18 @@ export const ConsentFormModal: React.FC<ConsentFormModalProps> = ({
 }) => {
   const signaturePadRef = useRef<SignaturePadRef>(null);
   const [hasSignature, setHasSignature] = useState(false);
+  const [fetchedClinicName, setFetchedClinicName] = useState<string>('');
+  const [fetchedClinicLogo, setFetchedClinicLogo] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getMyClinic()
+      .then((p) => {
+        setFetchedClinicName(p.name);
+        setFetchedClinicLogo(p.logo_url ?? undefined);
+      })
+      .catch(() => {});
+  }, [isOpen]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -57,9 +70,23 @@ export const ConsentFormModal: React.FC<ConsentFormModalProps> = ({
 
         <div className="p-4">
           <div className="w-[816px] h-[1056px] max-w-full bg-white border border-gray-200 rounded-xl p-8 mx-auto">
-            <header className="mb-6 text-center">
-              <p className="text-sm font-semibold text-gray-700">Clinic Compliance Document</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">Patient Data Privacy Consent Form</h3>
+            <header className="mb-6">
+              {/* Clinic Branding */}
+              <div className="flex items-center gap-4 mb-6 border-b-2 border-sky-600 pb-4">
+                {fetchedClinicLogo ? (
+                  <img src={fetchedClinicLogo} alt={fetchedClinicName || 'Clinic'} className="h-12 object-contain" />
+                ) : null}
+                {fetchedClinicName && (
+                  <h2 className="text-xl font-bold text-sky-700 m-0">
+                    {fetchedClinicName}
+                  </h2>
+                )}
+              </div>
+              
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-700">Clinic Compliance Document</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2">Patient Data Privacy Consent Form</h3>
+              </div>
             </header>
 
             <section className="grid grid-cols-2 gap-4 mb-6 text-sm">

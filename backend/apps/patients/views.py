@@ -603,7 +603,19 @@ class PatientViewSet(viewsets.ModelViewSet):
 
         serializer = PatientConsentDocumentCreateSerializer(data=request.data)
         if not serializer.is_valid():
+            print("VALIDATION ERRORS:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        patient_case_id = serializer.validated_data.get('patient_case_id')
+        doc_type = serializer.validated_data.get('type', PatientConsentDocument.TYPE_CLINIC_CONSENT)
+        
+        # Enforce ONE form per type per case
+        if patient_case_id:
+            if PatientConsentDocument.objects.filter(patient_case_id=patient_case_id, type=doc_type).exists():
+                return Response(
+                    {'error': f'A {doc_type} already exists for this case.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         document = PatientConsentDocument.objects.create(
             patient=patient,
