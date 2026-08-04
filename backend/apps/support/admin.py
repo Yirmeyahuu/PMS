@@ -93,9 +93,32 @@ class UserFeedbackAdmin(admin.ModelAdmin):
 
 @admin.register(UserFeedbackAttachment)
 class UserFeedbackAttachmentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'feedback', 'original_filename', 'mime_type', 'uploaded_by', 'created_at')
+    list_display = ('id', 'feedback', 'file_preview_thumbnail', 'original_filename', 'mime_type', 'uploaded_by', 'created_at')
     search_fields = ('original_filename', 'feedback__title', 'uploaded_by__email')
     list_filter = ('mime_type', 'created_at')
+    readonly_fields = ('file_preview',)
+
+    def file_preview_thumbnail(self, obj):
+        if obj.file and obj.mime_type.startswith('image/'):
+            return format_html(
+                '<a href="{0}" target="_blank"><img src="{0}" width="50" height="50" style="object-fit: cover; border-radius: 4px;" /></a>',
+                obj.file.url
+            )
+        elif obj.file:
+            return format_html('<a href="{0}" target="_blank">View File</a>', obj.file.url)
+        return "No File"
+    file_preview_thumbnail.short_description = 'Preview'
+    
+    def file_preview(self, obj):
+        if obj.file and obj.mime_type.startswith('image/'):
+            return format_html(
+                '<a href="{0}" target="_blank"><img src="{0}" width="300" style="object-fit: contain;" /></a>',
+                obj.file.url
+            )
+        elif obj.file:
+            return format_html('<a href="{0}" target="_blank">Download File</a>', obj.file.url)
+        return "No Preview"
+    file_preview.short_description = 'Large Preview'
 
 
 @admin.register(UserFeedbackComment)
