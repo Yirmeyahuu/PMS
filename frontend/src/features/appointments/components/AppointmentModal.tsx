@@ -64,6 +64,17 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
   const [loadingCases, setLoadingCases] = useState(false);
   const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
+  const [isCreatingInlineCase, setIsCreatingInlineCase] = useState(false);
+  const [inlineCaseData, setInlineCaseData] = useState({
+    title: '',
+    status: 'OPEN' as any,
+    payer: '' as any,
+    sessionSource: 'MANUAL' as 'MANUAL' | 'PACKAGE' | 'HMO',
+    approvedSessions: '' as number | '',
+    isUnlimited: false,
+    referredBy: '',
+    referralInfo: '',
+  });
 
   const [formData, setFormData] = useState<FormData>({
     patient: '',
@@ -217,7 +228,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   const handleCaseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (e.target.value === '__create__') {
-      setShowCreateCaseModal(true);
+      setIsCreatingInlineCase(true);
+      setFormData(prev => ({ ...prev, patient_case: '' }));
       return;
     }
     handleSelectChange(e);
@@ -249,7 +261,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!formData.patient) errs.patient = 'Please select a patient.';
-    if (!formData.patient_case) errs.patient_case = 'Please assign this appointment to a case.';
+    if (isCreatingInlineCase) {
+      if (!inlineCaseData.title.trim()) errs.patient_case = 'Please enter a case title.';
+    } else {
+      if (!formData.patient_case) errs.patient_case = 'Please assign this appointment to a case.';
+    }
     if (!formData.service) errs.service = 'Please select a service / appointment type.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -279,10 +295,35 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         ?? selectedClinicBranchId                   // active diary tab branch
         ?? user.clinic;                             // user's clinic fallback
 
+      let finalCaseId = Number(formData.patient_case);
+
+      if (isCreatingInlineCase) {
+        try {
+          const savedCase = await createPatientCase({
+            patient: Number(formData.patient),
+            title: inlineCaseData.title,
+            status: inlineCaseData.status,
+            primary_practitioner: formData.practitioner ? Number(formData.practitioner) : undefined,
+            payer: inlineCaseData.payer || undefined,
+            session_source: inlineCaseData.sessionSource,
+            approved_sessions: inlineCaseData.isUnlimited ? undefined : (inlineCaseData.approvedSessions || undefined),
+            is_unlimited: inlineCaseData.isUnlimited,
+            referred_by: inlineCaseData.referredBy || undefined,
+            referral_info: inlineCaseData.referralInfo || undefined,
+          });
+          setPatientCases(prev => [...prev, savedCase]);
+          finalCaseId = savedCase.id;
+        } catch (err: any) {
+          toast.error(err.response?.data?.error || 'Failed to create case');
+          setSaving(false);
+          return;
+        }
+      }
+
       const data: CreateAppointmentData = {
         clinic: clinicId,
         patient: Number(formData.patient),
-        patient_case: Number(formData.patient_case),
+        patient_case: finalCaseId,
         service: Number(formData.service),
         ...(formData.practitioner && { practitioner: Number(formData.practitioner) }),
         appointment_type: 'INITIAL',
@@ -486,6 +527,65 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                           </div>
                         </div>
                       </div>
+                    ) : isCreatingInlineCase ? (
+                      <div className="bg-sky-100 border border-sky-200 rounded-xl p-4 space-y-4 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-gray-900">Create New Case</h4>
+                          <button type="button" onClick={() => setIsCreatingInlineCase(false)} className="text-xs font-medium text-gray-500 hover:text-gray-700">Cancel</button>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Case Title <span className="text-red-500">*</span></label>
+                          <input type="text" value={inlineCaseData.title} onChange={e => setInlineCaseData({...inlineCaseData, title: e.target.value})} className={`${inputBase} ${errors.patient_case ? inputError : ''}`} placeholder="e.g. Low Back Pain" />
+                          {errors.patient_case && <p className="mt-1 text-xs text-red-600">{errors.patient_case}</p>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                            <select value={inlineCaseData.status} onChange={e => setInlineCaseData({...inlineCaseData, status: e.target.value})} className={inputBase}>
+                              <option value="OPEN">Open</option>
+                              <option value="MONITORING">Monitoring</option>
+                              <option value="DISCHARGED">Discharged</option>
+                              <option value="CLOSED">Closed</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Payer</label>
+                            <select value={inlineCaseData.payer} onChange={e => setInlineCaseData({...inlineCaseData, payer: e.target.value})} className={inputBase}>
+                              <option value="">Self-Pay</option>
+                              <option value="HMO">HMO / Insurance</option>
+                              <option value="CORPORATE">Corporate</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Session Source</label>
+                            <select value={inlineCaseData.sessionSource} onChange={e => setInlineCaseData({...inlineCaseData, sessionSource: e.target.value as any})} className={inputBase}>
+                              <option value="MANUAL">Manual Setup</option>
+                              <option value="PACKAGE">Package/Bundle</option>
+                              <option value="HMO">HMO Covered</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Approved Sessions</label>
+                            <input type="number" disabled={inlineCaseData.isUnlimited} value={inlineCaseData.approvedSessions} onChange={e => setInlineCaseData({...inlineCaseData, approvedSessions: e.target.value ? Number(e.target.value) : ''})} className={inputBase} min={1} placeholder={inlineCaseData.isUnlimited ? 'Unlimited' : ''} />
+                            <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
+                              <input type="checkbox" checked={inlineCaseData.isUnlimited} onChange={e => setInlineCaseData({...inlineCaseData, isUnlimited: e.target.checked})} className="rounded border-gray-300 text-sky-600 focus:ring-sky-500" />
+                              <span className="text-xs text-gray-600">Unlimited sessions</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Referred By</label>
+                            <input type="text" value={inlineCaseData.referredBy} onChange={e => setInlineCaseData({...inlineCaseData, referredBy: e.target.value})} className={inputBase} placeholder="Doctor Name" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Referral Info</label>
+                            <input type="text" value={inlineCaseData.referralInfo} onChange={e => setInlineCaseData({...inlineCaseData, referralInfo: e.target.value})} className={inputBase} placeholder="Hospital/Clinic" />
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <div className="relative">
@@ -661,21 +761,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         />
       )}
 
-      {/* ── Inline Create Case ── */}
-      {showCreateCaseModal && formData.patient && (
-        <CaseModal
-          key="create-case"
-          isOpen={showCreateCaseModal}
-          onClose={() => setShowCreateCaseModal(false)}
-          mode="create"
-          initialValues={{
-            primary_practitioner: formData.practitioner ? Number(formData.practitioner) : null,
-          }}
-          onSave={handleCreateCase}
-          practitioners={practitioners}
-          loadingPractitioners={loadingPractitioners}
-        />
-      )}
+
     </>
   );
 };
