@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList, Receipt } from 'lucide-react';
 import { Navigate, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
+import { ClinicalNoteNavItem } from './components/ClinicalNoteNavItem';
 import { PatientProfileProvider, usePatientProfileContext } from './context/PatientProfileContext';
 
 interface NavItemProps {
@@ -99,12 +100,7 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                   icon={<FolderKanban className="w-4 h-4" />}
                   end={true}
                 />
-                <NavItem
-                  label="Clinical note"
-                  to={`/patients/${patientId}/clinical`}
-                  icon={<ClipboardList className="w-4 h-4" />}
-                  activePathPattern="/clinical(/|-documentation)"
-                />
+                <ClinicalNoteNavItem />
                 <NavItem
                   label="Invoices"
                   to={`/patients/${patientId}/invoices`}
