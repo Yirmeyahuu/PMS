@@ -159,7 +159,7 @@ export const WorkspaceLettersPanel = () => {
             </h4>
             <div className="h-px flex-1 bg-slate-200/60" />
           </div>
-          <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-2">
             {/* DPF Button */}
             <button
               onClick={() => {
@@ -229,7 +229,7 @@ export const WorkspaceLettersPanel = () => {
               </h4>
               <div className="h-px flex-1 bg-slate-200/60" />
             </div>
-            <div className="space-y-1">
+            <div className="grid grid-cols-2 gap-2">
               {filteredTemplates
                 .filter(t => t.category === category)
                 .map(template => (
@@ -242,13 +242,13 @@ export const WorkspaceLettersPanel = () => {
                       }
                       setEditorContext({ type: 'NEW_LETTER', templateId: template.id });
                     }}
-                    className="w-full flex items-center gap-3 p-2 rounded-lg text-left hover:bg-indigo-50 group transition-colors"
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left bg-emerald-50/50 hover:bg-emerald-100/50 border border-emerald-100 hover:border-emerald-200 group transition-all"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100/50 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
-                      <FileText className="w-4 h-4 text-indigo-600" />
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100/50 flex items-center justify-center shrink-0 group-hover:bg-emerald-200/50 transition-colors">
+                      <FileText className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-900 truncate">
+                      <p className="text-sm font-medium text-slate-700 group-hover:text-emerald-900 truncate">
                         {template.name}
                       </p>
                       {template.description && (
@@ -257,7 +257,7 @@ export const WorkspaceLettersPanel = () => {
                         </p>
                       )}
                     </div>
-                    <Plus className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-500 transition-all" />
+                    <Plus className="w-4 h-4 text-emerald-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-600 transition-all" />
                   </button>
                 ))}
             </div>

@@ -176,8 +176,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        validated_data.pop('is_rebook', None)
-        return super().create(validated_data)
+        is_rebook = validated_data.pop('is_rebook', False)
+        instance = super().create(validated_data)
+        instance._is_rebook = is_rebook
+        return instance
 
 
 # ── NEW: Restricted edit serializer ──────────────────────────────────────────

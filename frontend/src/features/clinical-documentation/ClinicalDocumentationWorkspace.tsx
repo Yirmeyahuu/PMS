@@ -29,7 +29,7 @@ const ClinicalWorkspaceLayout = () => {
   const isEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE';
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-slate-50/50 overflow-hidden">
+    <div className="h-[calc(100vh-88px)] w-full flex flex-col bg-slate-50/50 overflow-hidden rounded-2xl">
       <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0 flex items-center gap-2">
         <button 
           onClick={() => navigate(`/patients/${patient?.id}/cases`)}
@@ -44,10 +44,10 @@ const ClinicalWorkspaceLayout = () => {
         </h1>
       </div>
 
-      <div className="flex-1 min-h-0">
-        <div className="h-full grid grid-cols-12 gap-4 p-4">
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4 p-4">
           {/* Left Panel: Templates / Letters / Editor */}
-          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-8 lg:col-span-9' : 'md:col-span-4 lg:col-span-3'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
+          <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             {isEditorActive ? (
               <ClinicalNoteEditor />
             ) : (
@@ -79,7 +79,7 @@ const ClinicalWorkspaceLayout = () => {
           </div>
 
           {/* Right Panel: Content Feed */}
-          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-4 lg:col-span-3' : 'md:col-span-8 lg:col-span-9'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
+          <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             <WorkspaceRightPanel />
           </div>
         </div>

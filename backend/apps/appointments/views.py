@@ -183,8 +183,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment.patient.save(update_fields=['home_branch'])
 
         # ── Auto-populate case for package services ─────────────────────────
-        from apps.patients.services.case_service import auto_populate_package_case
-        auto_populate_package_case(appointment)
+        if not getattr(appointment, '_is_rebook', False):
+            from apps.patients.services.case_service import auto_populate_package_case
+            auto_populate_package_case(appointment)
 
         # ── Trigger booking confirmation (non-blocking) ───────────────────
         try:
