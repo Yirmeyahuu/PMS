@@ -1900,7 +1900,7 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
     serializer_class = PatientCaseSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['patient', 'status']
+    filterset_fields = ['patient', 'status', 'is_archived']
     ordering_fields = ['created_at', '-created_at']
 
     def get_queryset(self):
@@ -2050,6 +2050,69 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         logs = patient_case.session_logs.all()
         serializer = PatientCaseSessionLogSerializer(logs, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        case = self.get_object()
+        case.is_archived = True
+        case.save(update_fields=['is_archived'])
+        return Response({'status': 'archived'})
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        case = self.get_object()
+        case.is_archived = False
+        case.save(update_fields=['is_archived'])
+        return Response({'status': 'restored'})
+
+    @action(detail=True, methods=['get'])
+    def deletion_impact(self, request, pk=None):
+        case = self.get_object()
+        return Response({
+            'appointments': case.case_appointments.count() if hasattr(case, 'case_appointments') else 0,
+            'notes': case.clinical_notes.count() if hasattr(case, 'clinical_notes') else 0,
+            'letters': case.letters.count() if hasattr(case, 'letters') else 0,
+            'documents': case.documents.count() if hasattr(case, 'documents') else 0,
+            'invoices': case.package_cases.count() if hasattr(case, 'package_cases') else (1 if case.package_invoice else 0),
+            'completed_sessions': case.completed_sessions,
+            'remaining_sessions': case.approved_sessions - case.completed_sessions if case.approved_sessions else 0
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        user = request.user
+        if not user.role in ['OWNER', 'MANAGER']:
+            return Response({'detail': 'You do not have permission to permanently delete cases.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        case = self.get_object()
+        
+        with transaction.atomic():
+            # 1. Delete associated appointments
+            if hasattr(case, 'case_appointments'):
+                case.case_appointments.all().delete()
+                
+            # 2. Delete clinical notes
+            if hasattr(case, 'clinical_notes'):
+                case.clinical_notes.all().delete()
+                
+            # 3. Delete letters
+            if hasattr(case, 'letters'):
+                case.letters.all().delete()
+                
+            # 4. Delete documents
+            if hasattr(case, 'documents'):
+                case.documents.all().delete()
+                
+            if hasattr(case, 'consent_documents'):
+                case.consent_documents.all().delete()
+                
+            # 5. Delete invoices
+            if case.package_invoice:
+                case.package_invoice.delete()
+                
+            # Now delete the case itself
+            case.delete()
+            
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class PatientMergePreviewView(APIView):
     """

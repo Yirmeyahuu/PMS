@@ -138,6 +138,10 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
             print(f'[ClinicalNoteViewSet] After clinic/branch filter: {queryset.count()}')
         else:
             queryset = self.queryset.none()
+            
+        # Filter out notes belonging to archived cases
+        from django.db.models import Q
+        queryset = queryset.filter(Q(patient_case__isnull=True) | Q(patient_case__is_archived=False))
         
         # Practitioners see only their own notes
         if user.is_practitioner and not user.is_admin:

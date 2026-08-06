@@ -568,6 +568,7 @@ class PatientCase(TimeStampedModel):
     session_source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='MANUAL')
     completed_sessions = models.IntegerField(default=0, help_text='Total used sessions based on invoices.')
     is_unlimited = models.BooleanField(default=False, help_text='True if the allocation has no session limit.')
+    is_archived = models.BooleanField(default=False, help_text='True if the case is soft-deleted.')
 
     # Package Billing Fields
     package_invoice = models.ForeignKey(

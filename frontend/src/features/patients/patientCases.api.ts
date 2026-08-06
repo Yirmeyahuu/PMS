@@ -34,8 +34,11 @@ export interface UpdateCaseData {
   is_unlimited?: boolean;
 }
 
-export const getPatientCases = async (patientId: number): Promise<PatientCase[]> => {
-  const response = await axiosInstance.get(`${BASE_URL}?patient=${patientId}`);
+export const getPatientCases = async (patientId: number, isArchived?: boolean): Promise<PatientCase[]> => {
+  const url = isArchived !== undefined 
+    ? `${BASE_URL}?patient=${patientId}&is_archived=${isArchived}`
+    : `${BASE_URL}?patient=${patientId}`;
+  const response = await axiosInstance.get(url);
   return response.data.results ?? response.data;
 };
 
@@ -51,6 +54,19 @@ export const updatePatientCase = async (caseId: number, data: UpdateCaseData): P
 
 export const deletePatientCase = async (caseId: number): Promise<void> => {
   await axiosInstance.delete(`${BASE_URL}${caseId}/`);
+};
+
+export const archivePatientCase = async (caseId: number): Promise<void> => {
+  await axiosInstance.post(`${BASE_URL}${caseId}/archive/`);
+};
+
+export const restorePatientCase = async (caseId: number): Promise<void> => {
+  await axiosInstance.post(`${BASE_URL}${caseId}/restore/`);
+};
+
+export const getCaseDeletionImpact = async (caseId: number): Promise<any> => {
+  const response = await axiosInstance.get(`${BASE_URL}${caseId}/deletion_impact/`);
+  return response.data;
 };
 
 export const assignNoteToCase = async (noteId: number, caseId: number): Promise<void> => {

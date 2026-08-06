@@ -61,6 +61,7 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
     fetchPractitioners();
   }, []);
 
+  const activeCases = useMemo(() => cases.filter(c => !c.is_archived), [cases]);
   const selectedCase = useMemo(() => cases.find(c => c.id === selectedCaseId), [cases, selectedCaseId]);
 
   // Case CRUD Actions
@@ -157,7 +158,7 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
     }
   };
 
-  if (cases.length === 0) {
+  if (activeCases.length === 0) {
     return (
       <div className="bg-white p-6 border-b border-slate-200">
         <div className="flex items-center justify-between">
@@ -197,7 +198,7 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
             onChange={(e) => onSelectCase(Number(e.target.value))}
             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
           >
-            {cases.map((c) => (
+            {activeCases.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title}
               </option>

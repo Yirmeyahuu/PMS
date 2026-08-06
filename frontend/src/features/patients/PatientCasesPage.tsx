@@ -7,6 +7,9 @@ import type { PatientCaseStatus } from '@/types/patient';
 import toast from 'react-hot-toast';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { createPatientCase } from './patientCases.api';
+import { ArchiveCaseModal } from './ArchiveCaseModal';
+import { HardDeleteCaseModal } from './HardDeleteCaseModal';
+import { restorePatientCase } from './patientCases.api';
 
 export const PatientCasesPage = () => {
   const { patient, cases, refreshCases } = usePatientProfileContext();
@@ -15,17 +18,31 @@ export const PatientCasesPage = () => {
   const [isCreateCaseOpen, setIsCreateCaseOpen] = useState(false);
   const [filter, setFilter] = useState<'ALL' | PatientCaseStatus>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
+  
+  const [caseToEdit, setCaseToEdit] = useState<any>(null);
+  const [isEditCaseOpen, setIsEditCaseOpen] = useState(false);
+  
+  const [caseToArchive, setCaseToArchive] = useState<any>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  
+  const [caseToHardDelete, setCaseToHardDelete] = useState<any>(null);
+  const [isHardDeleteOpen, setIsHardDeleteOpen] = useState(false);
   
   const { practitioners, loading: loadingPractitioners } = usePractitioners({});
 
   const filteredCases = useMemo(() => {
     return cases.filter(c => {
+      const isArchived = Boolean(c.is_archived);
+      if (viewMode === 'ACTIVE' && isArchived) return false;
+      if (viewMode === 'ARCHIVED' && !isArchived) return false;
+      
       const matchesFilter = filter === 'ALL' || c.status === filter;
       const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             c.description?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesFilter && matchesSearch;
     });
-  }, [cases, filter, searchQuery]);
+  }, [cases, filter, searchQuery, viewMode]);
 
   const getStatusColor = (status: PatientCaseStatus) => {
     switch (status) {
@@ -54,13 +71,29 @@ export const PatientCasesPage = () => {
                 {patient?.full_name || 'Patient'} • {cases.length} total cases
               </p>
             </div>
-            <button
-              onClick={() => setIsCreateCaseOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-xl hover:bg-sky-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Case
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-100 p-1 rounded-xl flex items-center mr-2">
+                <button 
+                  onClick={() => setViewMode('ACTIVE')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${viewMode === 'ACTIVE' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Active Cases
+                </button>
+                <button 
+                  onClick={() => setViewMode('ARCHIVED')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${viewMode === 'ARCHIVED' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Archived
+                </button>
+              </div>
+              <button
+                onClick={() => setIsCreateCaseOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-xl hover:bg-sky-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                New Case
+              </button>
+            </div>
           </div>
         </div>
 
@@ -104,11 +137,17 @@ export const PatientCasesPage = () => {
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <FolderKanban className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No cases found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">
+              {viewMode === 'ARCHIVED' ? 'No Archived cases found' : 'No cases found'}
+            </h3>
             <p className="text-gray-500 text-sm mb-4">
-              {searchQuery ? 'Try adjusting your filters or search query.' : 'Create a new case to start tracking episodes of care.'}
+              {searchQuery 
+                ? 'Try adjusting your filters or search query.' 
+                : viewMode === 'ARCHIVED'
+                  ? 'There are no archived cases for this patient.'
+                  : 'Create a new case to start tracking episodes of care.'}
             </p>
-            {!searchQuery && filter === 'ALL' && (
+            {!searchQuery && filter === 'ALL' && viewMode === 'ACTIVE' && (
               <button
                 onClick={() => setIsCreateCaseOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-sky-50 text-sky-700 text-sm font-medium rounded-xl hover:bg-sky-100 transition-colors"
@@ -178,12 +217,54 @@ export const PatientCasesPage = () => {
                       <FileText className="w-3.5 h-3.5 text-gray-400" />
                       <span>Created: {new Date(c.created_at).toLocaleDateString()}</span>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleCaseClick(c.id); }}
-                      className="px-3 py-1.5 bg-sky-50 text-sky-700 font-medium rounded-lg hover:bg-sky-100 transition-colors border border-sky-200"
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {viewMode === 'ACTIVE' ? (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCaseToEdit(c); setIsEditCaseOpen(true); }}
+                            className="px-3 py-1.5 text-gray-600 font-medium rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCaseToArchive(c); setIsArchiveOpen(true); }}
+                            className="px-3 py-1.5 text-amber-700 font-medium rounded-lg hover:bg-amber-50 transition-colors border border-amber-200"
+                          >
+                            Archive
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCaseClick(c.id); }}
+                            className="px-3 py-1.5 bg-sky-50 text-sky-700 font-medium rounded-lg hover:bg-sky-100 transition-colors border border-sky-200"
+                          >
+                            View
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={async (e) => { 
+                              e.stopPropagation(); 
+                              try {
+                                await restorePatientCase(c.id);
+                                toast.success('Case restored successfully');
+                                await refreshCases();
+                              } catch(error) {
+                                toast.error('Failed to restore case');
+                              }
+                            }}
+                            className="px-3 py-1.5 text-emerald-700 font-medium rounded-lg hover:bg-emerald-50 transition-colors border border-emerald-200"
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCaseToHardDelete(c); setIsHardDeleteOpen(true); }}
+                            className="px-3 py-1.5 text-red-700 font-medium rounded-lg hover:bg-red-50 transition-colors border border-red-200"
+                          >
+                            Delete Permanently
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -223,6 +304,52 @@ export const PatientCasesPage = () => {
         }}
         practitioners={practitioners}
         loadingPractitioners={loadingPractitioners}
+      />
+      <CaseModal
+        isOpen={isEditCaseOpen}
+        onClose={() => { setIsEditCaseOpen(false); setCaseToEdit(null); }}
+        mode="edit"
+        initialValues={caseToEdit || undefined}
+        onSave={async (data) => {
+          if (!patient || !caseToEdit) return;
+          try {
+            const { updatePatientCase } = await import('./patientCases.api');
+            await updatePatientCase(caseToEdit.id, {
+              title: data.title,
+              description: data.description,
+              status: data.status,
+              primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
+              primary_practitioner_name: data.primaryPractitionerName,
+              payer: data.payer,
+              alert_notes: data.alertNotes,
+              referred_by: data.referredBy,
+              referral_info: data.referralInfo,
+              session_source: data.sessionSource,
+              approved_sessions: data.isUnlimited ? undefined : data.approvedSessions || undefined,
+              is_unlimited: data.isUnlimited
+            });
+            await refreshCases();
+            setIsEditCaseOpen(false);
+            setCaseToEdit(null);
+            toast.success('Case updated successfully');
+          } catch (error: any) {
+            toast.error(error.response?.data?.approved_sessions?.[0] || 'Failed to update case');
+          }
+        }}
+        practitioners={practitioners}
+        loadingPractitioners={loadingPractitioners}
+      />
+      <ArchiveCaseModal
+        isOpen={isArchiveOpen}
+        onClose={() => { setIsArchiveOpen(false); setCaseToArchive(null); }}
+        caseObj={caseToArchive}
+        onSuccess={refreshCases}
+      />
+      <HardDeleteCaseModal
+        isOpen={isHardDeleteOpen}
+        onClose={() => { setIsHardDeleteOpen(false); setCaseToHardDelete(null); }}
+        caseObj={caseToHardDelete}
+        onSuccess={refreshCases}
       />
     </>
   );

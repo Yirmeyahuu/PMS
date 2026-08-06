@@ -719,13 +719,21 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             'referred_by', 'referral_info', 'created_at', 'updated_at',
             # Financial Fields
             'package_invoice', 'package_cost', 'amount_paid',
-            'outstanding_balance', 'package_status'
+            'outstanding_balance', 'package_status', 'is_archived'
         ]
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'completed_sessions', 
             'remaining_sessions', 'progress_text', 'allocation_status',
-            'outstanding_balance', 'package_status'
+            'outstanding_balance', 'package_status', 'is_archived'
         ]
+
+    def validate_approved_sessions(self, value):
+        if self.instance and value is not None:
+            if value < self.instance.completed_sessions:
+                raise serializers.ValidationError(
+                    f"Approved sessions ({value}) cannot be less than completed sessions ({self.instance.completed_sessions})."
+                )
+        return value
 
     def _get_stats(self, obj):
         if not hasattr(obj, '_session_stats'):

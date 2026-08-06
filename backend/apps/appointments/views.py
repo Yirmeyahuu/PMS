@@ -100,6 +100,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             main_clinic.get_all_branches().values_list('id', flat=True)
         )
         queryset = queryset.filter(clinic_id__in=all_branch_ids)
+        
+        # Filter out appointments belonging to archived cases
+        from django.db.models import Q
+        queryset = queryset.filter(Q(patient_case__isnull=True) | Q(patient_case__is_archived=False))
 
         # Exclude archived patients
         queryset = queryset.filter(patient__is_archived=False)

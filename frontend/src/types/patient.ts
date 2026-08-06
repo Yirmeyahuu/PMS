@@ -104,12 +104,12 @@ export interface PatientCase {
   created_at: string;
   updated_at: string;
 
-  // Package Billing Fields
   package_invoice?: number | null;
   package_cost?: number;
   amount_paid?: number;
   outstanding_balance?: number;
   package_status?: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID' | null;
+  is_archived: boolean;
 }
 
 export interface CreatePatientData {

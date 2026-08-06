@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, X, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Practitioner } from '@/features/clinics/clinic.api';
@@ -52,7 +52,26 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
   const [referralInfo, setReferralInfo] = useState(initialValues?.referral_info ?? '');
   const [description, setDescription] = useState(initialValues?.description ?? '');
 
+
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(initialValues?.title ?? '');
+      setStatus(initialValues?.status ?? 'OPEN');
+      setPrimaryPractitionerId(initialValues?.primary_practitioner ? String(initialValues.primary_practitioner) : '');
+      setPrimaryPractitionerName(initialValues?.primary_practitioner_name ?? '');
+      setPayer(initialValues?.payer ?? '');
+      setAlertNotes(initialValues?.alert_notes ?? '');
+      setSessionSource(initialValues?.session_source ?? 'MANUAL');
+      setApprovedSessions(initialValues?.approved_sessions ?? '');
+      setIsUnlimited(initialValues?.is_unlimited ?? false);
+      setReferredBy(initialValues?.referred_by ?? '');
+      setReferralInfo(initialValues?.referral_info ?? '');
+      setDescription(initialValues?.description ?? '');
+    }
+  }, [isOpen, initialValues]);
+
   const handlePractitionerChange = (id: string) => {
+
     setPrimaryPractitionerId(id);
     const found = practitioners.find((p) => String(p.id) === id);
     setPrimaryPractitionerName(found?.name ?? '');
