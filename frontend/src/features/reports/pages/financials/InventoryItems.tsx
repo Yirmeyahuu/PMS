@@ -170,7 +170,7 @@ export const InventoryItems: React.FC = () => {
     <div className="flex-1 overflow-y-auto px-6 py-5">
 
       {/* ── Filters Bar ── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-3 mb-5 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
 
           {/* Category filter */}
@@ -205,7 +205,7 @@ export const InventoryItems: React.FC = () => {
           <button
             onClick={runReport}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
           >
             {isLoading
               ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Running...</>
@@ -247,7 +247,7 @@ export const InventoryItems: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <StatCard
               label="Total Inventory Value"
               value={formatPeso(data.summary.total_inventory_value)}
@@ -288,7 +288,7 @@ export const InventoryItems: React.FC = () => {
               <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
                 <h3 className="text-sm font-semibold text-gray-700">Value by Category</h3>
               </div>
-              <div className="p-4 flex flex-wrap gap-3">
+              <div className="p-3 flex flex-wrap gap-3">
                 {data.category_breakdown.map((c) => (
                   <div
                     key={c.category}
@@ -377,7 +377,7 @@ export const InventoryItems: React.FC = () => {
           </p>
           <button
             onClick={runReport}
-            className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors"
           >
             Run Report
           </button>

@@ -137,7 +137,7 @@ export const RevenueReport: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard label="Total Revenue" value={formatPeso(data.summary.total_revenue)} color="text-green-700" bg="bg-green-50" border="border-green-200" icon={<TrendingUp className="w-5 h-5 text-green-600" />} />
             <StatCard label="Total Paid" value={formatPeso(data.summary.total_paid)} color="text-blue-700" bg="bg-blue-50" border="border-blue-200" icon={<CheckCircle className="w-5 h-5 text-blue-600" />} />
             <StatCard label="Outstanding" value={formatPeso(data.summary.total_balance)} color="text-orange-700" bg="bg-orange-50" border="border-orange-200" icon={<DollarSign className="w-5 h-5 text-orange-600" />} />

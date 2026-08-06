@@ -6,6 +6,8 @@ export interface DashboardStats {
   };
   todayBookings: number;
   todayNewClients: number;
+  todayExistingClients: number;
+  todayTotalClients: number;
   todayCancellations: number;
   todayConfirmed?: number;
   todayDeclined?: number;

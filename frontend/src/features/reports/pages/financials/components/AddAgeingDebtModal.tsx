@@ -109,7 +109,7 @@ export const AddAgeingDebtModal: React.FC<AddAgeingDebtModalProps> = ({
       />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-lg pointer-events-auto"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -131,7 +131,7 @@ export const AddAgeingDebtModal: React.FC<AddAgeingDebtModalProps> = ({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Patient / Client <span className="text-red-500">*</span>

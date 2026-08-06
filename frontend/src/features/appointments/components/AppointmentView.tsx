@@ -121,7 +121,7 @@ const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointmen
     ?? appointment.appointment_type;
 
   return (
-    <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
+    <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 space-y-3">
       <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide">
         Appointment Summary
       </p>
@@ -218,7 +218,7 @@ const ServicePicker: React.FC<{
             className="w-full text-left px-3 py-2 hover:bg-sky-50 transition-colors flex items-center justify-between gap-2"
           >
             <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{svc.name}</p>
+              <p className="text-xs font-semibold text-gray-800 truncate">{svc.name}</p>
               {svc.description && (
                 <p className="text-xs text-gray-400 truncate">{svc.description}</p>
               )}
@@ -378,7 +378,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
 
   return (
     <>
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Stethoscope className="w-4 h-4 text-sky-600 shrink-0" />
@@ -388,7 +388,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
         {/* Appointment practitioner row */}
         <div className="pb-3 border-b border-gray-100">
           <p className="text-xs text-gray-500 mb-0.5">Primary Practitioner</p>
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-xs font-semibold text-gray-900">
             {appointment.practitioner_name || <span className="text-gray-400 italic font-normal">Unassigned</span>}
           </p>
         </div>
@@ -711,7 +711,7 @@ const InlineAppointmentCard = React.forwardRef<
   const fieldCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white text-gray-800 disabled:bg-gray-50 disabled:text-gray-400';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4">
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
         <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Appointment Details</h3>
@@ -1038,7 +1038,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <button 
             onClick={() => navigate(`/billing/generate-invoice/${appointment.id}`)}
             disabled={createMutation.isPending}
-            className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium">
+            className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-semibold">
             {createMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {createMutation.isPending ? 'Generating…' : 'Generate Invoice'}
           </button>
@@ -1211,7 +1211,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           </table>
         </div>
       )}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
         {[
           { label: 'Subtotal', value: invoice.subtotal },
           { label: 'Discount', value: invoice.discount_amount },
@@ -1479,13 +1479,13 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
         onClick={isEditing ? undefined : onClose}
       />
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 pointer-events-none">
         <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                 isCancelled ? 'bg-red-100' : 'bg-sky-600'
@@ -1543,7 +1543,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       if (isEditing) cancelEdit();
                     }
                   }}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${
                     activeTab === tab.key
                       ? 'border-sky-500 text-sky-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -1670,7 +1670,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                               <Mail className="w-3 h-3 text-gray-400" />
                               <p className="text-xs text-gray-500">Email</p>
                             </div>
-                            <p className="text-sm font-medium text-gray-900 truncate">{patient.email}</p>
+                            <p className="text-xs font-semibold text-gray-900 truncate">{patient.email}</p>
                           </div>
                         )}
 
@@ -1681,7 +1681,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                               <Phone className="w-3 h-3 text-gray-400" />
                               <p className="text-xs text-gray-500">Phone</p>
                             </div>
-                            <p className="text-sm font-medium text-gray-900">{patient.phone}</p>
+                            <p className="text-xs font-semibold text-gray-900">{patient.phone}</p>
                           </div>
                         )}
 
@@ -1689,7 +1689,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                         {patient.gender && (
                           <div className="pt-1 border-t border-gray-100">
                             <p className="text-xs text-gray-500 mb-0.5">Gender</p>
-                            <p className="text-sm font-medium text-gray-900">{patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Other'}</p>
+                            <p className="text-xs font-semibold text-gray-900">{patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Other'}</p>
                           </div>
                         )}
 
@@ -1697,7 +1697,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                         {patient.date_of_birth && (
                           <div className="pt-1 border-t border-gray-100">
                             <p className="text-xs text-gray-500 mb-0.5">Date of Birth</p>
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-xs font-semibold text-gray-900">
                               {format(new Date(patient.date_of_birth), 'MMM d, yyyy')} ({patient.age} yrs)
                             </p>
                           </div>
@@ -1710,7 +1710,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                               <Home className="w-3 h-3 text-gray-400" />
                               <p className="text-xs text-gray-500">Address</p>
                             </div>
-                            <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                            <p className="text-xs font-semibold text-gray-900 line-clamp-2">
                               {patient.city && patient.province
                                 ? `${patient.address}, ${patient.city}, ${patient.province}`
                                 : patient.address}
@@ -1724,14 +1724,14 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                               <ShieldCheck className="w-3 h-3 text-gray-400" />
                               <p className="text-xs text-gray-500">PhilHealth</p>
                             </div>
-                            <p className="text-sm font-medium text-gray-900">{patient.philhealth_number}</p>
+                            <p className="text-xs font-semibold text-gray-900">{patient.philhealth_number}</p>
                           </div>
                         )}
 
                         {patient.medical_conditions && (
                           <div className="pt-1 border-t border-gray-100">
                             <p className="text-xs text-gray-500 mb-0.5">Medical Conditions</p>
-                            <p className="text-sm font-medium text-gray-900 line-clamp-3">{patient.medical_conditions}</p>
+                            <p className="text-xs font-semibold text-gray-900 line-clamp-3">{patient.medical_conditions}</p>
                           </div>
                         )}
 
@@ -1741,7 +1741,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                               <AlertTriangle className="w-3 h-3 text-amber-400" />
                               <p className="text-xs text-gray-500">Allergies</p>
                             </div>
-                            <p className="text-sm font-medium text-gray-900 line-clamp-3">{patient.allergies}</p>
+                            <p className="text-xs font-semibold text-gray-900 line-clamp-3">{patient.allergies}</p>
                           </div>
                         )}
                       </div>
@@ -1750,7 +1750,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                         {/* Fallback to appointment.patient_name */}
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Patient Name</p>
-                          <p className="text-sm font-medium text-gray-900">{appointment.patient_name}</p>
+                          <p className="text-xs font-semibold text-gray-900">{appointment.patient_name}</p>
                         </div>
                         <div className="pt-4 text-xs text-gray-400 italic">
                           Additional details unavailable
@@ -1816,7 +1816,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
               <div className="space-y-4">
 
                 {isCancelled && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-1">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
                     <div className="flex items-center gap-2">
                       <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       <p className="text-sm font-semibold text-red-700">This appointment has been cancelled.</p>
@@ -1862,12 +1862,12 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                           {typeLabel}
                         </span>
                       ) : (
-                        <span className="text-sm font-medium text-gray-600">{typeLabel}</span>
+                        <span className="text-xs font-semibold text-gray-600">{typeLabel}</span>
                       )}
                     </div>
 
-                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-sky-600 flex-shrink-0" />
                           <div>
@@ -1895,14 +1895,14 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="border border-gray-200 rounded-xl p-4">
+                      <div className="border border-gray-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <User className="w-4 h-4 text-sky-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Patient</span>
                         </div>
                         <p className="text-sm font-semibold text-gray-900">{appointment.patient_name}</p>
                       </div>
-                      <div className="border border-gray-200 rounded-xl p-4">
+                      <div className="border border-gray-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <User className="w-4 h-4 text-sky-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Practitioner</span>
@@ -1916,7 +1916,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     </div>
 
                     {appointment.location_name && (
-                      <div className="border border-gray-200 rounded-xl p-4">
+                      <div className="border border-gray-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <MapPin className="w-4 h-4 text-sky-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Location</span>
@@ -1926,7 +1926,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     )}
 
                     {appointment.chief_complaint ? (
-                      <div className="border border-gray-200 rounded-xl p-4">
+                      <div className="border border-gray-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <FileText className="w-4 h-4 text-sky-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Chief Complaint</span>
@@ -1935,14 +1935,14 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       </div>
                     ) : (
                       !isTerminal && (
-                        <div className="border border-dashed border-gray-200 rounded-xl p-4 text-center">
+                        <div className="border border-dashed border-gray-200 rounded-xl p-3 text-center">
                           <p className="text-xs text-gray-400">No chief complaint recorded.</p>
                         </div>
                       )
                     )}
 
                     {appointment.notes ? (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <FileText className="w-4 h-4 text-amber-600" />
                           <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Internal Notes</span>
@@ -1953,7 +1953,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     ) : null}
 
                     {appointment.patient_notes ? (
-                      <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                      <div className="bg-sky-50 border border-sky-200 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <FileText className="w-4 h-4 text-sky-600" />
                           <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">Patient Notes</span>
@@ -1963,7 +1963,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       </div>
                     ) : null}
 
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
                       {[
                         { label: 'Created by', value: appointment.created_by_name || 'Unknown' },
                         { label: 'Created at', value: format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a') },
@@ -1987,7 +1987,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
             {/* ── Status Tab ── */}
             {activeTab === 'status' && (
               <div className="space-y-4">
-                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                <div className="bg-sky-50 border border-sky-200 rounded-xl p-3">
                   <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-3">
                     Appointment Status
                   </p>
@@ -2040,21 +2040,21 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Created By</span>
-                      <span className="text-sm font-medium text-gray-800">{appointment.created_by_name || 'Unknown'}</span>
+                      <span className="text-xs font-semibold text-gray-800">{appointment.created_by_name || 'Unknown'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Created At</span>
-                      <span className="text-sm font-medium text-gray-800">{format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a')}</span>
+                      <span className="text-xs font-semibold text-gray-800">{format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a')}</span>
                     </div>
                     {appointment.updated_by_name && (
                       <>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">Last Updated By</span>
-                          <span className="text-sm font-medium text-gray-800">{appointment.updated_by_name}</span>
+                          <span className="text-xs font-semibold text-gray-800">{appointment.updated_by_name}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">Updated At</span>
-                          <span className="text-sm font-medium text-gray-800">{format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a')}</span>
+                          <span className="text-xs font-semibold text-gray-800">{format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a')}</span>
                         </div>
                       </>
                     )}
@@ -2062,7 +2062,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                 </div>
                 {/* ── DNA Banner ── */}
                 {isDNA && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       <p className="text-sm font-semibold text-red-700">Did Not Arrive (DNA)</p>
@@ -2090,7 +2090,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                   </div>
                 )}
                 {isCancelled && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       <p className="text-sm font-semibold text-red-700">This appointment has been cancelled.</p>
@@ -2110,7 +2110,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
 
                 {/* ── Communication History for this appointment ── */}
                 {appointment.dna_followup_sent && (
-                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                       Communication History
                     </p>
@@ -2147,16 +2147,16 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
 
             {/* ── Communications Tab ── */}
             {activeTab === 'communications' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 
                 {/* Manual Staff Actions */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
                   <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
                     Appointment Status
                   </h4>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-xs font-semibold text-gray-900">
                         {appointment.confirmation_status === 'CONFIRMED' ? 'Confirmed' : 
                          appointment.confirmation_status === 'DECLINED' ? 'Declined' : 'Awaiting Confirmation'}
                       </p>
@@ -2208,7 +2208,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                 </div>
 
                 {/* Communication Timeline */}
-                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+                <div className="bg-sky-50 border border-sky-200 rounded-xl p-3">
                   <p className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-4">
                     Communication Log
                   </p>
@@ -2222,7 +2222,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                   ) : (
                     <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-sky-200 before:to-transparent">
                       {communicationLogs.map((log: any, idx: number) => (
-                        <div key={log.id || idx} className="relative flex items-start gap-4">
+                        <div key={log.id || idx} className="relative flex items-start gap-3">
                           <div className="absolute left-0 md:left-1/2 w-5 h-5 rounded-full bg-white border-2 border-sky-400 -translate-x-2 md:-translate-x-2.5 mt-1" />
                           <div className="pl-6 md:pl-0 w-full">
                             <div className="bg-white rounded-lg p-3 shadow-sm border border-sky-100">

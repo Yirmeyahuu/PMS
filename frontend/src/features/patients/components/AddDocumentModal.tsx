@@ -32,7 +32,7 @@ export const AddDocumentModal: React.FC<AddDocumentModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-sm overflow-hidden"
+        className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-sm overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

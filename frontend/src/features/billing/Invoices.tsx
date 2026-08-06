@@ -93,14 +93,14 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({
       <table className="w-full">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Invoice #</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Patient</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Date</th>
-            <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Status</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Total</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Paid</th>
-            <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Balance</th>
-            <th className="text-center text-xs font-medium text-gray-500 uppercase px-4 py-3">Actions</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase px-3 py-2">Invoice #</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase px-3 py-2">Patient</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase px-3 py-2">Date</th>
+            <th className="text-left text-xs font-medium text-gray-500 uppercase px-3 py-2">Status</th>
+            <th className="text-right text-xs font-medium text-gray-500 uppercase px-3 py-2">Total</th>
+            <th className="text-right text-xs font-medium text-gray-500 uppercase px-3 py-2">Paid</th>
+            <th className="text-right text-xs font-medium text-gray-500 uppercase px-3 py-2">Balance</th>
+            <th className="text-center text-xs font-medium text-gray-500 uppercase px-3 py-2">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -110,7 +110,7 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({
               className="hover:bg-gray-50 transition-colors cursor-pointer"
               onClick={() => onView(invoice)}
             >
-              <td className="px-4 py-3 text-sm font-medium text-sky-600">
+              <td className="px-3 py-2 text-xs font-semibold text-sky-600">
                 <div className="flex items-center gap-2">
                   {invoice.invoice_number}
                   {invoice.is_package_invoice && (
@@ -120,32 +120,32 @@ export const InvoiceList: React.FC<InvoiceListProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm">
+              <td className="px-3 py-2 text-sm">
                 <div>
                   <div className="font-medium text-gray-900">{invoice.patient_name}</div>
                   <div className="text-xs text-gray-500">{invoice.patient_number}</div>
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
+              <td className="px-3 py-2 text-sm text-gray-600">
                 {new Date(invoice.invoice_date).toLocaleDateString()}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColors[invoice.status as InvoiceStatus]}`}>
                   {invoice.status_display}
                 </span>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+              <td className="px-3 py-2 text-sm text-gray-900 text-right font-medium">
                 ₱{parseFloat(invoice.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </td>
-              <td className="px-4 py-3 text-sm text-emerald-600 text-right">
+              <td className="px-3 py-2 text-sm text-emerald-600 text-right">
                 ₱{parseFloat(invoice.amount_paid).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </td>
-              <td className="px-4 py-3 text-sm text-right">
+              <td className="px-3 py-2 text-sm text-right">
                 <span className={parseFloat(invoice.balance_due) > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
                   {parseFloat(invoice.balance_due) < 0 ? '-' : ''}₱{Math.abs(parseFloat(invoice.balance_due)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </span>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2">
                 <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => onPrint(invoice)}
@@ -243,11 +243,11 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-3">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         
         <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">
             <h2 className="text-lg font-bold text-gray-900">Add Payment</h2>
             <button
               onClick={onClose}
@@ -257,23 +257,23 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Invoice</label>
               <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm">
                 {invoice.invoice_number} — {invoice.patient_name}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Balance Due</label>
-              <div className={`px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Balance Due</label>
+              <div className={`px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                 {parseFloat(invoice.balance_due) < 0 ? '-' : ''}₱{Math.abs(parseFloat(invoice.balance_due)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Amount</label>
               <input
                 type="number"
                 step="0.01"
@@ -286,7 +286,7 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Method</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => {
@@ -304,7 +304,7 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
 
             {showBankSelector && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bank / Card Issuer</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Bank / Card Issuer</label>
                 <select
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
@@ -321,7 +321,7 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Date</label>
               <input
                 type="date"
                 value={paymentDate}
@@ -332,7 +332,7 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number (Optional)</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Reference Number (Optional)</label>
               <input
                 type="text"
                 value={reference}
@@ -538,7 +538,7 @@ export const Invoices: React.FC = () => {
     <DashboardLayout>
       <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-5">
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
               <Receipt className="w-5 h-5 text-white" />
@@ -554,27 +554,27 @@ export const Invoices: React.FC = () => {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="flex-shrink-0 px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="flex-shrink-0 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Invoiced</div>
                 <div className="text-xl font-bold text-gray-900">
                   ₱{stats.total_invoiced.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Paid</div>
                 <div className="text-xl font-bold text-emerald-600">
                   ₱{stats.total_paid.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Balance</div>
                 <div className="text-xl font-bold text-red-600">
                   ₱{stats.total_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Invoices</div>
                 <div className="text-xl font-bold text-gray-900">{stats.count}</div>
               </div>
@@ -583,8 +583,8 @@ export const Invoices: React.FC = () => {
         )}
 
         {/* Filters */}
-        <div className="flex-shrink-0 px-6 py-4 bg-white border-b border-gray-200">
-          <div className="flex items-center gap-4">
+        <div className="flex-shrink-0 px-4 py-2.5 bg-white border-b border-gray-200">
+          <div className="flex items-center gap-3">
             {/* Search */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -664,7 +664,7 @@ export const Invoices: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-white">
+          <div className="flex-shrink-0 px-4 py-2.5 border-t border-gray-200 bg-white">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-500">
                 Page {page} of {totalPages}
@@ -718,10 +718,10 @@ export const Invoices: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && invoiceToDelete && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex min-h-full items-center justify-center p-3">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteConfirm(false)} />
             
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-4">
               <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Invoice</h3>
               <p className="text-gray-600 mb-6">
                 Are you sure you want to delete invoice <strong>{invoiceToDelete.invoice_number}</strong>? 

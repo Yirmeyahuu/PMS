@@ -132,7 +132,7 @@ export const WorkspaceRightPanel = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
         {loading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
@@ -161,12 +161,12 @@ export const WorkspaceRightPanel = () => {
                     Collapse all Notes
                   </button>
                 </div>
-                <div className="space-y-4 pl-8 border-l-2 border-slate-200 ml-4 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
+                <div className="space-y-3 pl-6 border-l-2 border-slate-200 ml-3 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
                   {notes.map((note) => (
                     <div key={note.id} className="relative">
                       {/* Timeline dot */}
-                      <div className="absolute -left-[41px] top-6 w-4 h-4 rounded-full bg-white border-2 border-indigo-400 shadow-sm z-10" />
-                      <div className="absolute left-8 top-16 bottom-[-24px] w-0.5 bg-slate-200 -z-10 last:hidden" />
+                      <div className="absolute -left-[33px] top-6 w-4 h-4 rounded-full bg-white border-2 border-indigo-400 shadow-sm z-10" />
+                      <div className="absolute left-6 top-16 bottom-[-24px] w-0.5 bg-slate-200 -z-10 last:hidden" />
                       <ClinicalNoteFeedItem 
                         note={note} 
                         appointments={appointments}

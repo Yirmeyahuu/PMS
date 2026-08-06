@@ -22,7 +22,7 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
     >
       {/* Modal Card */}
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-fadeIn"
+        className="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-5 animate-fadeIn"
         onClick={e => e.stopPropagation()}
       >
         {/* Close Button */}

@@ -198,7 +198,7 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+          className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* Top accent */}
@@ -232,7 +232,7 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
 
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-            <div className="px-6 py-5 space-y-6">
+            <div className="px-6 py-5 space-y-4">
 
               {/* General error */}
               {errors.general && (

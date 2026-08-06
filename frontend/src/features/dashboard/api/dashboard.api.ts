@@ -9,6 +9,10 @@ export interface DashboardMetricsResponse {
   today_declined?:     number;
   today_awaiting?:     number;
   today_occupancy_pct: number;
+  today_total_clients: number;
+  today_new_clients:   number;
+  today_existing_clients: number;
+  today_cancellations: number;
   month_revenue:       number;
   active_patients:     number;
   pending_invoices:    number;

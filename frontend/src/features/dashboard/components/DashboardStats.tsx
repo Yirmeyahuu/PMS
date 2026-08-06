@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Calendar, UserPlus, XCircle, CheckCircle } from 'lucide-react';
+import { Users, Calendar, XCircle, CheckCircle } from 'lucide-react';
 import type { DashboardStats as StatsType } from '../types/dashboard.types';
 
 interface DashboardStatsProps {
@@ -37,11 +37,11 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
       trend: 'normal'
     },
     {
-      id: 'newClients',
-      title: "Today's New Clients",
-      value: stats.todayNewClients.toString(),
-      subtitle: 'First-time patients',
-      icon: UserPlus,
+      id: 'clients',
+      title: "Today's Clients",
+      value: (stats.todayTotalClients || 0).toString(),
+      subtitle: `${stats.todayNewClients || 0} New · ${stats.todayExistingClients || 0} Existing`,
+      icon: Users,
       gradient: 'from-purple-500 to-purple-600',
       bgColor: 'bg-purple-50',
       iconColor: 'text-purple-600',
@@ -78,8 +78,8 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 animate-pulse min-h-[160px]">
-            <div className="h-10 w-10 bg-gray-200 rounded-xl mb-3"></div>
+          <div key={i} className="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4 animate-pulse min-h-[120px]">
+            <div className="h-8 w-8 bg-gray-200 rounded-xl mb-3"></div>
             <div className="h-3 bg-gray-200 rounded w-2/3 mb-2"></div>
             <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
             <div className="h-3 bg-gray-200 rounded w-3/4"></div>
@@ -98,15 +98,15 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
             key={card.id}
             className={`
               bg-white rounded-2xl border border-gray-100 
-              p-4 sm:p-5 hover:shadow-md shadow-sm transition-all duration-300 group 
-              flex flex-col justify-between overflow-hidden min-h-[160px]
+              p-3 sm:p-4 hover:shadow-md shadow-sm transition-all duration-300 group 
+              flex flex-col justify-between overflow-hidden min-h-[120px]
             `}
           >
             {/* Top Section: Icon + Badge */}
             <div className="flex items-start justify-between mb-3 flex-shrink-0">
               {/* Icon */}
-              <div className={`${card.bgColor} w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}>
-                <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
+              <div className={`${card.bgColor} w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}>
+                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${card.iconColor}`} />
               </div>
 
               {/* Trend Indicator */}
@@ -128,7 +128,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
               {/* Value */}
               <p 
                 className={`
-                  text-2xl sm:text-3xl lg:text-4xl font-bold 
+                  text-xl sm:text-2xl lg:text-3xl font-bold 
                   bg-gradient-to-r ${card.gradient} bg-clip-text text-transparent 
                   mb-1 leading-tight truncate
                 `}

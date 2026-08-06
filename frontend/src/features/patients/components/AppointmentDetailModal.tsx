@@ -215,7 +215,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className={`bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] pointer-events-auto flex flex-col overflow-hidden transition-all ${
+          className={`bg-white rounded-xl shadow-2xl w-full max-h-[90vh] pointer-events-auto flex flex-col overflow-hidden transition-all ${
             activeTab === 'invoice' ? 'max-w-4xl' : 'max-w-2xl'
           }`}
           onClick={(e) => e.stopPropagation()}
@@ -378,7 +378,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                   </div>
                 ) : !appointment.has_invoice ? (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
                       <Receipt className="w-7 h-7 text-gray-300" />
                     </div>
                     <p className="text-sm font-medium text-gray-500">No Invoice generated yet</p>
@@ -419,7 +419,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
                       <Receipt className="w-7 h-7 text-gray-300" />
                     </div>
                     <p className="text-sm font-medium text-gray-500">No Invoice found</p>

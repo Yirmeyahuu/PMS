@@ -84,7 +84,7 @@ export const ViewConsentFormModal: React.FC<ViewConsentFormModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-225 max-h-[95vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-225 max-h-[95vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Toolbar ── */}
@@ -124,7 +124,7 @@ export const ViewConsentFormModal: React.FC<ViewConsentFormModalProps> = ({
         </div>
 
         {/* ── Document ── */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+        <div className="flex-1 overflow-y-auto bg-gray-100 p-5">
           <div className="flex justify-center">
             {/* Shadow wrapper gives the paper feel */}
             <div className="shadow-2xl rounded-sm" ref={printRef}>

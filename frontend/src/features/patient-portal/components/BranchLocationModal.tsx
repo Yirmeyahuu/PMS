@@ -68,7 +68,7 @@ export const BranchLocationModal: React.FC<Props> = ({ branch, isOpen, onClose }
     >
       {/* Modal panel */}
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -117,7 +117,7 @@ export const BranchLocationModal: React.FC<Props> = ({ branch, isOpen, onClose }
           ) : (
             /* No coordinates saved */
             <div className="h-96 flex flex-col items-center justify-center gap-3 text-center px-8 bg-gray-50">
-              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
                 <MapPin className="w-7 h-7 text-gray-300" />
               </div>
               <p className="text-sm font-medium text-gray-500">No pinned location yet</p>

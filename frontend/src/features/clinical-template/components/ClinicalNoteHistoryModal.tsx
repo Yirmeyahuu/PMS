@@ -80,7 +80,7 @@ export const ClinicalNoteHistoryModal: React.FC<ClinicalNoteHistoryModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -109,7 +109,7 @@ export const ClinicalNoteHistoryModal: React.FC<ClinicalNoteHistoryModalProps> =
                 <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
               </div>
             ) : history.length === 0 ? (
-              <div className="p-6 text-center text-gray-500 text-sm">
+              <div className="p-5 text-center text-gray-500 text-sm">
                 No version history found.
               </div>
             ) : (
@@ -142,9 +142,9 @@ export const ClinicalNoteHistoryModal: React.FC<ClinicalNoteHistoryModalProps> =
           </div>
 
           {/* Main Content - Selected Version View */}
-          <div className="flex-1 overflow-y-auto bg-white p-6">
+          <div className="flex-1 overflow-y-auto bg-white p-5">
             {selectedVersion ? (
-              <div className="max-w-3xl mx-auto space-y-6">
+              <div className="max-w-3xl mx-auto space-y-4">
                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-start gap-4">
                   <div className="bg-white p-2 rounded-lg shadow-sm border border-indigo-100">
                     <Calendar className="w-5 h-5 text-indigo-600" />
@@ -167,7 +167,7 @@ export const ClinicalNoteHistoryModal: React.FC<ClinicalNoteHistoryModalProps> =
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-xl p-6 relative">
+                <div className="border border-gray-200 rounded-xl p-5 relative">
                   <div className="absolute top-0 right-0 bg-gray-100 text-gray-500 px-3 py-1 rounded-bl-lg rounded-tr-xl text-xs font-medium border-b border-l border-gray-200">
                     READ ONLY
                   </div>

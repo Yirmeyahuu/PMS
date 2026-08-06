@@ -15,6 +15,10 @@ export const ClinicalAuditLogs: React.FC = () => {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // History Modal State
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
@@ -23,17 +27,20 @@ export const ClinicalAuditLogs: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, page]);
 
-  const fetchLogs = async (overrideSearch?: string) => {
+  const fetchLogs = async (overrideSearch?: string, overridePage?: number) => {
     setLoading(true);
     try {
       const data = await getGlobalAuditLogs({
         start_date: startDate,
         end_date: endDate,
-        search: overrideSearch !== undefined ? overrideSearch : search
+        search: overrideSearch !== undefined ? overrideSearch : search,
+        page: overridePage !== undefined ? overridePage : page,
+        page_size: 12
       });
-      setLogs(data);
+      setLogs(data.results);
+      setTotalCount(data.count);
     } catch (err) {
       console.error('Failed to load audit logs:', err);
       toast.error('Failed to load audit logs');
@@ -44,7 +51,13 @@ export const ClinicalAuditLogs: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchLogs();
+    setPage(1);
+    fetchLogs(search, 1);
+  };
+
+  const handleDateChange = (setter: React.Dispatch<React.SetStateAction<string>>, value: string) => {
+    setPage(1);
+    setter(value);
   };
 
   const formatDate = (dateStr: string) => {
@@ -94,10 +107,10 @@ export const ClinicalAuditLogs: React.FC = () => {
     <div className="h-full flex flex-col bg-white overflow-hidden rounded-lg shadow-sm border border-gray-200">
       
       {/* ─── Header & Filters ─── */}
-      <div className="p-6 border-b border-gray-200 bg-gray-50/50">
+      <div className="p-4 border-b border-gray-200 bg-gray-50/50">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Clinical Note Audit Logs</h2>
         
-        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -114,20 +127,20 @@ export const ClinicalAuditLogs: React.FC = () => {
               type="date"
               className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => handleDateChange(setStartDate, e.target.value)}
             />
-            <span className="text-gray-400">to</span>
+            <span className="text-gray-500">to</span>
             <input
               type="date"
               className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => handleDateChange(setEndDate, e.target.value)}
             />
           </div>
 
           <button
             type="submit"
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
           >
             Filter
           </button>
@@ -151,41 +164,41 @@ export const ClinicalAuditLogs: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Note Date</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Note Date</th>
+                  <th scope="col" className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(log.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getActionColor(log.action)}`}>
                         {log.action}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">{log.user_name || 'System'}</span>
+                        <span className="text-xs font-semibold text-gray-900">{log.user_name || 'System'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className="text-sm text-gray-900">{log.patient_name}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-2 text-gray-500">
                         <Calendar className="w-4 h-4" />
                         <span className="text-sm">{formatNoteDate(log.note_date)}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-right text-xs font-semibold">
                       <button
                         onClick={() => handleViewHistory(log.clinical_note)}
                         disabled={loadingHistoryId === log.clinical_note}
@@ -204,6 +217,29 @@ export const ClinicalAuditLogs: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {/* Pagination Controls */}
+        {!loading && logs.length > 0 && Math.ceil(totalCount / 12) > 1 && (
+          <div className="p-3 border-t border-gray-200 bg-white flex items-center justify-center gap-4">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="px-4 py-2 border border-gray-300 text-xs font-semibold rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-700">
+              Page <span className="font-medium">{page}</span> of <span className="font-medium">{Math.ceil(totalCount / 12)}</span>
+            </span>
+            <button
+              disabled={page * 12 >= totalCount}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-4 py-2 border border-gray-300 text-xs font-semibold rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>

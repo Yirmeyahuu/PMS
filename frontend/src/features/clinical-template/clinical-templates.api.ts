@@ -227,16 +227,37 @@ export interface GlobalClinicalNoteAuditLog {
   note_date: string;
 }
 
+export interface PaginatedAuditLogResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: GlobalClinicalNoteAuditLog[];
+}
+
 export const getGlobalAuditLogs = async (filters?: {
   start_date?: string;
   end_date?: string;
   search?: string;
-}): Promise<GlobalClinicalNoteAuditLog[]> => {
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedAuditLogResponse> => {
   const params = new URLSearchParams();
   if (filters?.start_date) params.append('start_date', filters.start_date);
   if (filters?.end_date) params.append('end_date', filters.end_date);
   if (filters?.search) params.append('search', filters.search);
+  if (filters?.page) params.append('page', filters.page.toString());
+  if (filters?.page_size) params.append('page_size', filters.page_size.toString());
   
   const response = await axiosInstance.get(`${BASE_URL}/global-audit/?${params.toString()}`);
-  return response.data.results ?? response.data;
+  
+  if (response.data && response.data.results) {
+    return response.data;
+  }
+  
+  return {
+    count: Array.isArray(response.data) ? response.data.length : 0,
+    next: null,
+    previous: null,
+    results: Array.isArray(response.data) ? response.data : [],
+  };
 };

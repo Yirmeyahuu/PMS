@@ -94,18 +94,19 @@ p, span, li, div,
 }
 
 /* Component Primitives */
-@layer components {  .card-base {
-    @apply rounded-3xl bg-white shadow-sm border border-gray-100;
+@layer components {  
+  .card-base {
+    @apply rounded-2xl bg-white shadow-sm border border-gray-100;
   }
   .btn-primary {
-    @apply text-white rounded-2xl hover:opacity-95 transition-all;
+    @apply text-white rounded-xl hover:opacity-95 transition-all;
     background: linear-gradient(to right, #0575E6, #5CDB95);
   }
   .btn-secondary {
-    @apply border border-trust-harbor text-trust-harbor bg-white rounded-2xl hover:bg-clinical-cloud transition-all;
+    @apply border border-trust-harbor text-trust-harbor bg-white rounded-xl hover:bg-clinical-cloud transition-all;
   }
   .input-base {
-    @apply rounded-2xl border border-gray-200 bg-white focus:ring-2 focus:ring-care-blue focus:border-care-blue transition-all;
+    @apply rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-care-blue focus:border-care-blue transition-all;
   }
 }
 

@@ -162,7 +162,7 @@ export const AccountCreditsReport: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard label="Total Accounts" value={String(data.summary.total_accounts)} color="text-blue-700" bg="bg-blue-50" border="border-blue-200" icon={<Users className="w-5 h-5 text-blue-600" />} />
             <StatCard label="Total Invoiced" value={formatPeso(data.summary.total_credit_created)} color="text-purple-700" bg="bg-purple-50" border="border-purple-200" icon={<DollarSign className="w-5 h-5 text-purple-600" />} />
             <StatCard label="Total Paid" value={formatPeso(data.summary.total_credit_used)} color="text-green-700" bg="bg-green-50" border="border-green-200" icon={<CreditCard className="w-5 h-5 text-green-600" />} />

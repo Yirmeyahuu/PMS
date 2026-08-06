@@ -631,6 +631,13 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         })
         
         return HttpResponse(html_content, content_type='text/html')
+from rest_framework.pagination import PageNumberPagination
+
+class AuditLogPagination(PageNumberPagination):
+    page_size = 12
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class GlobalClinicalNoteAuditViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Global access to all Clinical Note Audit Logs in the clinic.
@@ -643,6 +650,7 @@ class GlobalClinicalNoteAuditViewSet(viewsets.ReadOnlyModelViewSet):
         'user', 'clinical_note', 'clinical_note__patient', 'clinical_note__practitioner__user'
     )
     permission_classes = [IsAuthenticated]
+    pagination_class = AuditLogPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['action', 'user', 'clinical_note__patient', 'clinical_note']
     search_fields = ['clinical_note__patient__first_name', 'clinical_note__patient__last_name', 'user__first_name', 'user__last_name']

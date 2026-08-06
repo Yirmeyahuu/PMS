@@ -9,6 +9,7 @@ import { AddEventModal } from './components/AddEventModal';
 import { AddNoteModal } from './components/AddNoteModal';
 import { SelectOptionModal } from './components/SelectOptionModal';
 import { AppointmentModal } from './components/AppointmentModal';
+import { ConfirmRebookContinue } from './components/ConfirmRebookContinue';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
@@ -44,6 +45,7 @@ export const Diary: React.FC = () => {
   const isRebooking = useRef(false);
   // Visible loading state while the API request is in-flight
   const [isRebookingInProgress, setIsRebookingInProgress] = useState(false);
+  const [showRebookContinueModal, setShowRebookContinueModal] = useState(false);
 
   // Change body cursor to crosshair while in rebook mode
   useEffect(() => {
@@ -623,6 +625,10 @@ export const Diary: React.FC = () => {
     const endH = Math.floor(endTotalMins / 60);
     const endM = endTotalMins % 60;
     const timeLabel = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    
+    const dummyDate = new Date();
+    dummyDate.setHours(hour, minutes, 0, 0);
+    const displayTime = format(dummyDate, 'h:mm a');
 
     // appointment_type must be one of the backend's valid enum codes.
     // If the original appointment stored a service name (e.g. "OT Consultation")
@@ -647,20 +653,22 @@ export const Diary: React.FC = () => {
       patient_notes:    rebookData.patient_notes,
       // Inherit case from original appointment (null if original had none)
       patient_case:     rebookData.patient_case ?? undefined,
+      is_rebook:        true,
     };
 
     // Show a loading toast while the API call is in-flight
-    const loadingToastId = toast.loading(`Rebooking for ${format(slot.date, 'MMM d')} at ${timeLabel}…`);
+    const loadingToastId = toast.loading(`Rebooking for ${format(slot.date, 'MMM d')} at ${displayTime}…`);
 
     try {
       await createAppointment(data);
-      // Exit rebook mode and trigger Diary refresh first —
-      // the loading toast stays visible while the calendar re-fetches.
-      exitRebook();
       setAppointmentRefreshKey(prev => prev + 1);
-      // Dismiss the loading toast then immediately show the success confirmation.
       toast.dismiss(loadingToastId);
-      toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${timeLabel}`);
+      toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${displayTime}`);
+
+      // Delay slightly to let the toast render, then show the custom modal
+      setTimeout(() => {
+        setShowRebookContinueModal(true);
+      }, 50);
     } catch (err: unknown) {
       toast.dismiss(loadingToastId);
       const detail = err && typeof err === 'object' && 'response' in err
@@ -1386,6 +1394,19 @@ export const Diary: React.FC = () => {
             </>
           )}
         </div>
+      )}
+
+      {/* ── Rebook Continue Modal ── */}
+      {showRebookContinueModal && rebookData && (
+        <ConfirmRebookContinue
+          isOpen={showRebookContinueModal}
+          patientName={rebookData.patient_name}
+          onContinue={() => setShowRebookContinueModal(false)}
+          onClose={() => {
+            setShowRebookContinueModal(false);
+            exitRebook();
+          }}
+        />
       )}
     </DashboardLayout>
   );

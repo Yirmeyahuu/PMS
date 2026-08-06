@@ -118,7 +118,7 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
     >
       {/* ── Colour header strip ── */}
       <div
-        className={`px-4 py-3 ${!cardBackground ? statusColors.bg : ''}`}
+        className={`px-3 py-2 ${!cardBackground ? statusColors.bg : ''}`}
         style={cardBackground ? { backgroundColor: cardBackground } : undefined}
       >
         <div className="flex items-start justify-between gap-2">
@@ -162,7 +162,7 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
       </div>
 
       {/* ── Body ── */}
-      <div className="px-4 py-2 divide-y divide-gray-100">
+      <div className="px-3 py-1.5 divide-y divide-gray-100">
 
         {/* Date & Time */}
         <Row
@@ -342,7 +342,7 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
       </div>
 
       {/* ── Subtle footer tip ── */}
-      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+      <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
         <p className="text-[10px] text-gray-400 text-center">Click card to open full details</p>
       </div>
     </div>,

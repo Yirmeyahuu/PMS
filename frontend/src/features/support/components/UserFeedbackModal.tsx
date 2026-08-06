@@ -112,7 +112,7 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
-        <div className="flex justify-between items-center p-6 border-b">
+        <div className="flex justify-between items-center p-5 border-b">
           <h2 className="text-xl font-semibold text-gray-800">Submit Feedback & Reports</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,7 +121,7 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>

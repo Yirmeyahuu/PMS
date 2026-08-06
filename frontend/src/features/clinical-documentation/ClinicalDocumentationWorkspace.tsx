@@ -47,7 +47,7 @@ const ClinicalWorkspaceLayout = () => {
       <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-4 p-4">
           {/* Left Panel: Templates / Letters / Editor */}
-          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-7 lg:col-span-8' : 'md:col-span-5 lg:col-span-4'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
+          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-8 lg:col-span-9' : 'md:col-span-4 lg:col-span-3'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
             {isEditorActive ? (
               <ClinicalNoteEditor />
             ) : (
@@ -79,7 +79,7 @@ const ClinicalWorkspaceLayout = () => {
           </div>
 
           {/* Right Panel: Content Feed */}
-          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-5 lg:col-span-4' : 'md:col-span-7 lg:col-span-8'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
+          <div className={`col-span-12 ${isEditorActive ? 'md:col-span-4 lg:col-span-3' : 'md:col-span-8 lg:col-span-9'} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
             <WorkspaceRightPanel />
           </div>
         </div>

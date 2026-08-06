@@ -36,6 +36,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_case = serializers.PrimaryKeyRelatedField(
         queryset=PatientCase.objects.all(), required=False, allow_null=True
     )
+    is_rebook = serializers.BooleanField(write_only=True, required=False, default=False)
     case_remaining_sessions = serializers.SerializerMethodField()
     case_is_unlimited = serializers.SerializerMethodField()
 
@@ -54,6 +55,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'confirmation_sent', 'confirmation_sent_at', 'confirmation_status',
             'patient_reply', 'patient_reply_at',
             'dna_followup_sent', 'dna_followup_sent_at',
+            'is_rebook',
             'created_by', 'created_by_name',
             'updated_by', 'updated_by_name',
             'cancelled_by', 'cancellation_reason', 'cancelled_at',
@@ -65,7 +67,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package',
-            'patient_case', 'case_remaining_sessions', 'case_is_unlimited',
+            'case_remaining_sessions', 'case_is_unlimited',
             'created_at', 'updated_at',
         ]
 
@@ -157,7 +159,25 @@ class AppointmentSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {'service': 'This service does not belong to your clinic.'}
                     )
+
+        # Enforce case assignment for new internal appointments
+        if self.instance is None:
+            # Check if this serializer is being used in a context that requires a case.
+            # Online booking creates PortalBooking directly, so this serializer is mainly for internal creation.
+            patient_case = data.get('patient_case')
+            is_rebook = data.get('is_rebook', False)
+            if not patient_case and not is_rebook:
+                raise serializers.ValidationError({"patient_case": "A case must be selected when creating an appointment."})
+            
+            patient = data.get('patient')
+            if patient and patient_case and patient_case.patient_id != patient.id:
+                raise serializers.ValidationError({"patient_case": "The selected case does not belong to the selected patient."})
+
         return data
+
+    def create(self, validated_data):
+        validated_data.pop('is_rebook', None)
+        return super().create(validated_data)
 
 
 # ── NEW: Restricted edit serializer ──────────────────────────────────────────

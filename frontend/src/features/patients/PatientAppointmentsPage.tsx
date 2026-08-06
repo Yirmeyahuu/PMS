@@ -71,10 +71,10 @@ const APPOINTMENT_STATUS_CARD_STYLES: Record<string, CardStatusStyle> = {
     badgeColor: '#1D4ED8',
   },
   CANCELLED: {
-    borderLeft: '4px solid #6B7280',
-    background: '#F9FAFB',
-    badgeBg: '#F3F4F6',
-    badgeColor: '#374151',
+    borderLeft: '4px solid #DC2626',
+    background: '#FEF2F2',
+    badgeBg: '#FEE2E2',
+    badgeColor: '#B91C1C',
   },
   NO_SHOW: {
     borderLeft: '4px solid #6B7280',
@@ -188,7 +188,9 @@ const AppointmentRow = ({
               : cardStyle
                 ? 'border-transparent'
                 : 'bg-white border-gray-200'
-            : 'border-gray-200 opacity-60'
+            : cardStyle
+              ? 'border-transparent opacity-80'
+              : 'bg-white border-gray-200 opacity-60'
         }`}
         style={cardInlineStyle}
       >

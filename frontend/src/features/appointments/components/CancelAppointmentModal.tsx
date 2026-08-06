@@ -80,7 +80,7 @@ export const CancelAppointmentModal: React.FC<CancelAppointmentModalProps> = ({
       {/* Modal — z-index above AppointmentView (z-50) */}
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto overflow-hidden"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-md pointer-events-auto overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}

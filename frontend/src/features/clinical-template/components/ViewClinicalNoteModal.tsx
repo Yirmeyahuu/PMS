@@ -158,7 +158,7 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -232,13 +232,13 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
             </div>
           ) : note ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Status Banner - Only show signed status */}
               {note.is_signed && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">

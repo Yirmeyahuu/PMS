@@ -201,7 +201,7 @@ function SkeletonItem() {
 // ── Empty States ───────────────────────────────────────────────────────────
 function EmptyThread() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center">
+    <div className="flex flex-col items-center justify-center h-full gap-3 px-8 text-center">
       <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
         <Inbox className="w-6 h-6 text-gray-400" />
       </div>
@@ -318,7 +318,7 @@ function ThreadView({ log }: { log: CommunicationLogEntry }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 bg-white border-b border-gray-100 shrink-0">
+      <div className="px-4 py-2.5 bg-white border-b border-gray-100 shrink-0">
         <div className="flex items-start gap-3.5">
           <Avatar name={log.patient_name || '?'} size="lg" />
           <div className="flex-1 min-w-0">
@@ -406,7 +406,7 @@ function ThreadView({ log }: { log: CommunicationLogEntry }) {
                 <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.replied_at)}</span>
               )}
             </div>
-            <div className={`ml-8 rounded-xl border p-4 ${
+            <div className={`ml-8 rounded-xl border p-3 ${
               confirmed ? 'bg-emerald-50 border-emerald-200'
               : declined ? 'bg-red-50 border-red-200'
               : 'bg-gray-50 border-gray-200'

@@ -34,7 +34,7 @@ export const UncompletedNotesTable: React.FC<UncompletedNotesTableProps> = ({ no
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 h-full flex flex-col">
+      <div className="bg-white rounded-2xl border-2 border-gray-200 p-4 h-full flex flex-col">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
           <div className="space-y-3">
@@ -50,7 +50,7 @@ export const UncompletedNotesTable: React.FC<UncompletedNotesTableProps> = ({ no
   return (
     <div className="bg-white rounded-2xl border-2 border-gray-200 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden">
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 p-6 border-b border-gray-200">
+      <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-1">

@@ -1941,6 +1941,7 @@ class PublicRebookingLinkView(APIView):
             patient=link.patient,
             practitioner=original.practitioner,
             service=original.service,
+            patient_case=original.patient_case,
             appointment_type=original.appointment_type,
             status='SCHEDULED',
             date=new_date,

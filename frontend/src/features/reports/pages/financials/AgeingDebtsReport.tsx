@@ -275,7 +275,7 @@ export const AgeingDebtsReport: React.FC = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <StatCard
               label="Total Outstanding"
               value={formatPeso(data.summary.total_outstanding)}
@@ -318,7 +318,7 @@ export const AgeingDebtsReport: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <StatCard
               label="90+ Days"
               value={formatPeso(bt?.['90_plus'] ?? 0)}

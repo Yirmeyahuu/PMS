@@ -53,8 +53,8 @@ export const PreviewPreviousNoteModal: React.FC<PreviewPreviousNoteModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm sm:p-6">
-      <div className="flex flex-col w-full max-w-4xl max-h-full bg-white shadow-2xl rounded-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm sm:p-5">
+      <div className="flex flex-col w-full max-w-4xl max-h-full bg-white shadow-2xl rounded-xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export const PreviewPreviousNoteModal: React.FC<PreviewPreviousNoteModalProps> =
 
         {/* Content */}
         <div className="flex-1 px-6 py-6 overflow-y-auto custom-scrollbar bg-gray-50/50">
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-4">
             
             {/* Metadata Card */}
             <div className="p-4 bg-white border border-gray-200 rounded-xl">
@@ -159,7 +159,7 @@ export const PreviewPreviousNoteModal: React.FC<PreviewPreviousNoteModalProps> =
             </div>
 
             {/* Read-only Content Preview */}
-            <div className="p-6 bg-white border border-gray-200 shadow-sm rounded-xl">
+            <div className="p-5 bg-white border border-gray-200 shadow-sm rounded-xl">
               {templateStructure && templateStructure.sections ? (
                 <div className="pointer-events-none opacity-90">
                   <DynamicFormRenderer

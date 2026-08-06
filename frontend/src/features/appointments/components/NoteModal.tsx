@@ -117,7 +117,7 @@ export const NoteModal: React.FC<NoteModalProps> = ({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-md pointer-events-auto"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -141,7 +141,7 @@ export const NoteModal: React.FC<NoteModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
+          <div className="p-5 space-y-4">
             {/* Editable Message */}
             <div className={`border rounded-xl p-4 transition-colors ${editing ? 'border-orange-400 bg-white' : 'border-orange-200 bg-orange-50'}`}>
               <div className="flex items-start justify-between gap-2 mb-2">

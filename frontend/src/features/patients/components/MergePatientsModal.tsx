@@ -134,7 +134,7 @@ export function MergePatientsModal({ isOpen, onClose, initialPrimaryPatient, onM
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1100] transition-opacity" onClick={handleClose} />
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] pointer-events-auto flex flex-col"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] pointer-events-auto flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -155,9 +155,9 @@ export function MergePatientsModal({ isOpen, onClose, initialPrimaryPatient, onM
             </button>
           </div>
 
-          <div className="p-6 overflow-visible flex-1 relative z-10">
+          <div className="p-5 overflow-visible flex-1 relative z-10">
             {step === 1 && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Primary Patient Selection */}
                 <div className="space-y-3 p-4 border rounded-lg bg-blue-50/50">
                   <h3 className="font-semibold text-blue-900 flex items-center gap-2 text-sm">
@@ -254,7 +254,7 @@ export function MergePatientsModal({ isOpen, onClose, initialPrimaryPatient, onM
             )}
 
             {step === 2 && previewData && primaryPatient && duplicatePatient && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="bg-yellow-50 text-yellow-900 border border-yellow-200 p-4 rounded-lg flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
                   <div>

@@ -75,7 +75,7 @@ export const CommunicationTable: React.FC<CommunicationTableProps> = ({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="divide-y divide-gray-50">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="px-6 py-4 animate-pulse flex items-center gap-4">
+            <div key={i} className="px-4 py-2.5 animate-pulse flex items-center gap-3">
               <div className="h-4 bg-gray-100 rounded w-32" />
               <div className="h-4 bg-gray-100 rounded w-40 flex-1" />
               <div className="h-4 bg-gray-100 rounded w-24" />
@@ -212,7 +212,7 @@ export const CommunicationTable: React.FC<CommunicationTableProps> = ({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-6 py-3.5 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
           <p className="text-xs text-gray-500">
             Showing <span className="font-semibold text-gray-700">{from}–{to}</span> of{' '}
             <span className="font-semibold text-gray-700">{total}</span> records

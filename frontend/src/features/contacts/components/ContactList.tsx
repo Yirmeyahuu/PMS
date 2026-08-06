@@ -77,22 +77,22 @@ export const ContactList: React.FC<ContactListProps> = ({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">
                     Company ID
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">
                     Full Name
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">
                     Type
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">
                     Email
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">
                     Phone
                   </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                  <th className="px-4 py-2.5 text-center text-sm font-semibold text-gray-700">
                     Actions
                   </th>
                 </tr>
@@ -103,10 +103,10 @@ export const ContactList: React.FC<ContactListProps> = ({
                     key={contact.id}
                     className="hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-2.5 text-sm text-gray-600">
                       {contact.contact_number}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-r from-sky-500 to-sky-600 rounded-full flex items-center justify-center text-white font-semibold relative">
                           {contact.first_name.charAt(0)}
@@ -116,7 +116,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                           )}
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <div className="text-xs font-semibold text-gray-900 flex items-center gap-2">
                             {contact.full_name}
                           </div>
                           {contact.organization_name && (
@@ -132,7 +132,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-2.5">
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getContactTypeColor(
                           contact.contact_type
@@ -141,13 +141,13 @@ export const ContactList: React.FC<ContactListProps> = ({
                         {contact.contact_type_display}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-2.5 text-sm text-gray-600">
                       {contact.email || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-2.5 text-sm text-gray-600">
                       {contact.phone}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center justify-center gap-2">
                         {onTogglePreferred && (
                           <button
@@ -168,14 +168,14 @@ export const ContactList: React.FC<ContactListProps> = ({
                         )}
                         <button
                           onClick={() => onView(contact)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           View
                         </button>
                         <button
                           onClick={() => onEdit(contact)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                           Edit
@@ -192,7 +192,7 @@ export const ContactList: React.FC<ContactListProps> = ({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex-shrink-0 bg-white border-t border-gray-200 px-6 py-4">
+        <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-2.5">
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={() => onPageChange(currentPage - 1)}

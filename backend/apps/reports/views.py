@@ -789,6 +789,27 @@ class ReportViewSet(viewsets.ModelViewSet):
                 
         today_occupancy_pct = min(100.0, float(total_occ / total_avail * 100)) if total_avail > 0 else 0.0
 
+        # Accurately calculate Global New / Existing Clients exactly as Diary does
+        displayed_appts = today_appointments.exclude(status='CANCELLED')
+        unique_patients = set(displayed_appts.values_list('patient_id', flat=True))
+        
+        new_patients_count = 0
+        if unique_patients:
+            from django.db.models import Min
+            first_completed_qs = Appointment.objects.filter(
+                patient_id__in=unique_patients,
+                status='COMPLETED'
+            ).values('patient_id').annotate(first_date=Min('date'))
+            first_completed_map = {item['patient_id']: item['first_date'] for item in first_completed_qs}
+            
+            for pid in unique_patients:
+                first_date = first_completed_map.get(pid)
+                if not first_date or first_date >= today:
+                    new_patients_count += 1
+                    
+        total_patients_count = len(unique_patients)
+        existing_patients_count = total_patients_count - new_patients_count
+
         metrics = {
             'today_appointments': today_appointments.count(),
             'today_completed':    today_appointments.filter(status='COMPLETED').count(),
@@ -799,6 +820,12 @@ class ReportViewSet(viewsets.ModelViewSet):
             'today_declined':     today_appointments.filter(confirmation_status='DECLINED').count(),
             'today_awaiting':     today_appointments.filter(confirmation_status='PENDING').count(),
             'today_occupancy_pct': today_occupancy_pct,
+            'today_total_clients': total_patients_count,
+            'today_new_clients': new_patients_count,
+            'today_existing_clients': existing_patients_count,
+            'today_cancellations': Appointment.objects.filter(
+                clinic_id__in=all_branch_ids, cancelled_at__date=today, is_deleted=False
+            ).count(),
             'month_revenue':     float(month_revenue),
             'active_patients':   Patient.objects.filter(
                 clinic=clinic, is_active=True, is_deleted=False

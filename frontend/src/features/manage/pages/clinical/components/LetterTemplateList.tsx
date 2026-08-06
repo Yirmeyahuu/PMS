@@ -38,16 +38,16 @@ export const LetterTemplateList: React.FC<LetterTemplateListProps> = ({
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-6 py-4 text-sm font-semibold text-gray-900">Name</th>
-            <th className="px-6 py-4 text-sm font-semibold text-gray-900">Category</th>
-            <th className="px-6 py-4 text-sm font-semibold text-gray-900">Status</th>
-            <th className="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Actions</th>
+            <th className="px-4 py-2.5 text-sm font-semibold text-gray-900">Name</th>
+            <th className="px-4 py-2.5 text-sm font-semibold text-gray-900">Category</th>
+            <th className="px-4 py-2.5 text-sm font-semibold text-gray-900">Status</th>
+            <th className="px-4 py-2.5 text-sm font-semibold text-gray-900 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {templates.map((template) => (
             <tr key={template.id} className="hover:bg-gray-50/50 transition-colors">
-              <td className="px-6 py-4">
+              <td className="px-4 py-2.5">
                 <div>
                   <p className="font-medium text-gray-900">{template.name}</p>
                   {template.description && (
@@ -55,12 +55,12 @@ export const LetterTemplateList: React.FC<LetterTemplateListProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2.5">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                   {template.category || 'Uncategorized'}
                 </span>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2.5">
                 {template.is_active ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
                     <CheckCircle className="w-3.5 h-3.5" />
@@ -73,7 +73,7 @@ export const LetterTemplateList: React.FC<LetterTemplateListProps> = ({
                   </span>
                 )}
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2.5">
                 <div className="flex items-center justify-end gap-3">
                   <button
                     onClick={() => onEdit(template)}

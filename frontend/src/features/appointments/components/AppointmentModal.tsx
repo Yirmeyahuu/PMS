@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  X, Calendar, Clock, Timer, User, FileText,
-  AlertCircle, UserPlus, Stethoscope, Building2, Lock,
+  X, Calendar, Clock, Timer, User, FileText, FolderKanban,
+  AlertCircle, UserPlus, Stethoscope, Building2, Lock, Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getPatients, createPatient } from '@/features/patients/patient.api';
+import { getPatientCases, createPatientCase } from '@/features/patients/patientCases.api';
+import type { PatientCase } from '@/types/patient';
 import { PatientModal } from '@/features/patients/components/PatientModal';
+import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
 import { createAppointment } from '../appointment.api';
-import { ServiceSelector } from './ServiceSelector';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';   // ← ADD
@@ -16,27 +18,28 @@ import type { Patient, CreateAppointmentData, CreatePatientData, Appointment } f
 import toast from 'react-hot-toast';
 
 interface AppointmentModalProps {
-  isOpen:                  boolean;
-  onClose:                 () => void;
-  onCreated?:              (appointment: Appointment) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated?: (appointment: Appointment) => void;
   selectedSlot: {
-    date:     Date;
-    time:     string;
-    hour:     number;
-    minutes:  number;
+    date: Date;
+    time: string;
+    hour: number;
+    minutes: number;
     duration: number;
   } | null;
-  selectedClinicBranchId?:  number | null;
+  selectedClinicBranchId?: number | null;
   /** Pre-select the practitioner from the active calendar filter. The user can still change it. */
-  defaultPractitionerId?:   number | null;
+  defaultPractitionerId?: number | null;
   /** Pre-select the patient from SelectOptionModal search. */
-  defaultPatientId?:       number | null;
+  defaultPatientId?: number | null;
 }
 
 interface FormData {
-  patient:      number | '';
+  patient: number | '';
+  patient_case: number | '';
   practitioner: number | '';
-  service:      number | '';
+  service: number | '';
 }
 
 export const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -50,19 +53,23 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 }) => {
   const { user } = useAuthStore();
 
-  const [patients,        setPatients]        = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
-  const [saving,          setSaving]          = useState(false);
-  const [errors,          setErrors]          = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPatientModal, setShowPatientModal] = useState(false);
-  const [chiefComplaint,  setChiefComplaint]  = useState('');
-  const [notes,           setNotes]           = useState('');
-  const [patientNotes,    setPatientNotes]    = useState('');
+  const [chiefComplaint, setChiefComplaint] = useState('');
+  const [notes, setNotes] = useState('');
+  const [patientNotes, setPatientNotes] = useState('');
+  const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
+  const [loadingCases, setLoadingCases] = useState(false);
+  const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
-    patient:      '',
+    patient: '',
+    patient_case: '',
     practitioner: '',
-    service:      '',
+    service: '',
   });
 
   // Filter practitioners by selected branch
@@ -103,7 +110,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return allServices.filter(s => s.discipline === effectiveDiscipline);
   }, [allServices, effectiveDiscipline]);
 
-  const selectedService   = filteredServices.find(s => s.id === Number(formData.service));
+  const selectedService = filteredServices.find(s => s.id === Number(formData.service));
   const effectiveDuration = selectedService?.duration_minutes ?? selectedSlot?.duration ?? 60;
 
   // Resolve branch name for display
@@ -122,13 +129,19 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     [isPractitionerLocked, practitioners, defaultPractitionerId],
   );
 
+  const selectedPatientObj = useMemo(
+    () => patients.find(p => p.id == formData.patient) ?? null,
+    [patients, formData.patient]
+  );
+
   useEffect(() => {
     if (isOpen) {
       loadPatients();
       setFormData({
-        patient:      defaultPatientId ?? '',
+        patient: defaultPatientId ?? '',
+        patient_case: '',
         practitioner: defaultPractitionerId ?? '',
-        service:      '',
+        service: '',
       });
       setChiefComplaint('');
       setNotes('');
@@ -156,6 +169,28 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    const fetchCases = async () => {
+      if (!formData.patient) {
+        setPatientCases([]);
+        setFormData(prev => ({ ...prev, patient_case: '' }));
+        return;
+      }
+      setLoadingCases(true);
+      try {
+        const cases = await getPatientCases(Number(formData.patient));
+        const activeCases = cases.filter(c => c.status !== 'DISCHARGED');
+        setPatientCases(activeCases);
+        setFormData(prev => ({ ...prev, patient_case: '' }));
+      } catch (err) {
+        toast.error('Failed to load patient cases');
+      } finally {
+        setLoadingCases(false);
+      }
+    };
+    fetchCases();
+  }, [formData.patient]);
+
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     const parsedValue = value === '' ? '' : Number(value);
@@ -180,9 +215,41 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
+  const handleCaseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === '__create__') {
+      setShowCreateCaseModal(true);
+      return;
+    }
+    handleSelectChange(e);
+  };
+
+  const handleCreateCase = async (data: CaseFormData) => {
+    try {
+      const savedCase = await createPatientCase({
+        patient: Number(formData.patient),
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
+        primary_practitioner_name: data.primaryPractitionerName || undefined,
+        payer: data.payer || undefined,
+        alert_notes: data.alertNotes || undefined,
+        approved_sessions: data.approvedSessions,
+      });
+      setPatientCases(prev => [...prev, savedCase]);
+      setFormData(prev => ({ ...prev, patient_case: savedCase.id }));
+      if (errors.patient_case) setErrors(prev => ({ ...prev, patient_case: '' }));
+      setShowCreateCaseModal(false);
+      toast.success('Case created successfully!');
+    } catch (err) {
+      toast.error('Failed to create case');
+    }
+  };
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!formData.patient) errs.patient = 'Please select a patient.';
+    if (!formData.patient_case) errs.patient_case = 'Please assign this appointment to a case.';
     if (!formData.service) errs.service = 'Please select a service / appointment type.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -197,8 +264,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       const startH = selectedSlot.hour;
       const startM = selectedSlot.minutes;
       const endMin = startH * 60 + startM + effectiveDuration;
-      const endH   = Math.floor(endMin / 60);
-      const endMm  = endMin % 60;
+      const endH = Math.floor(endMin / 60);
+      const endMm = endMin % 60;
 
       // ── Derive clinic/branch from selected practitioner first,
       //    then fall back to the active diary branch tab,
@@ -213,18 +280,19 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
         ?? user.clinic;                             // user's clinic fallback
 
       const data: CreateAppointmentData = {
-        clinic:           clinicId,
-        patient:          Number(formData.patient),
-        service:          Number(formData.service),
+        clinic: clinicId,
+        patient: Number(formData.patient),
+        patient_case: Number(formData.patient_case),
+        service: Number(formData.service),
         ...(formData.practitioner && { practitioner: Number(formData.practitioner) }),
         appointment_type: 'INITIAL',
-        date:             format(selectedSlot.date, 'yyyy-MM-dd'),
-        start_time:       `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
-        end_time:         `${String(endH).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`,
+        date: format(selectedSlot.date, 'yyyy-MM-dd'),
+        start_time: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
+        end_time: `${String(endH).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`,
         duration_minutes: effectiveDuration,
-        chief_complaint:  chiefComplaint,
+        chief_complaint: chiefComplaint,
         notes,
-        patient_notes:    patientNotes,
+        patient_notes: patientNotes,
       };
 
       const created = await createAppointment(data);
@@ -243,7 +311,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   };
 
   const handleClose = () => {
-    setFormData({ patient: '', practitioner: '', service: '' });
+    setFormData({ patient: '', patient_case: '', practitioner: '', service: '' });
     setChiefComplaint('');
     setNotes('');
     setPatientNotes('');
@@ -268,8 +336,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return `${h12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
   };
   const endMin = selectedSlot.hour * 60 + selectedSlot.minutes + effectiveDuration;
-  const endH   = Math.floor(endMin / 60);
-  const endMm  = endMin % 60;
+  const endH = Math.floor(endMin / 60);
+  const endMm = endMin % 60;
 
   const fmtDuration = (min: number) => {
     if (min < 60) return `${min} min`;
@@ -278,7 +346,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return m === 0 ? `${h}h` : `${h}h ${m}m`;
   };
 
-  const inputBase  = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent';
+  const inputBase = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent';
   const inputError = 'border-red-300 bg-red-50';
 
   return (
@@ -290,7 +358,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}
@@ -300,7 +368,9 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-900">New Appointment</h2>
+                <h2 className="text-base font-bold text-gray-900">
+                  {selectedPatientObj ? `${selectedPatientObj.full_name} >> Creating Appointment` : 'Creating Appointment'}
+                </h2>
                 <p className="text-xs text-gray-500">
                   {selectedBranchName
                     ? <>Scheduling at <span className="font-semibold text-sky-600">{selectedBranchName}</span></>
@@ -344,152 +414,211 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 )}
               </div>
 
-              {/* ── Service ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Service / Consultation Type <span className="text-red-500">*</span>
-                </label>
-                {filteredServices.length === 0 && !loadingServices ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800 mb-1">No services configured</p>
-                        <p className="text-xs text-amber-700">Ask an admin to add clinic services under <strong>Setup → Clinic Services</strong>.</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <ServiceSelector
-                    services={filteredServices}
-                    value={formData.service}
-                    onChange={(id) => {
-                      setFormData(prev => ({ ...prev, service: id }));
-                      if (errors.service) setErrors(prev => ({ ...prev, service: '' }));
-                    }}
-                    loading={loadingServices}
-                    error={errors.service}
-                  />
-                )}
-              </div>
-
-              {/* ── Patient ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Patient / Client <span className="text-red-500">*</span>
-                </label>
-                {loadingPatients ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
-                  </div>
-                ) : patients.length === 0 ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800 mb-1">No patients found</p>
-                        <p className="text-xs text-amber-700 mb-3">Create a patient before scheduling an appointment.</p>
-                        <button type="button" onClick={handleCreatePatient} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
-                          <UserPlus className="w-3.5 h-3.5" />
-                          Create New Patient
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <select name="patient" value={formData.patient} onChange={handleSelectChange} className={`${inputBase} pl-9 ${errors.patient ? inputError : ''}`}>
-                        <option value="">Select a patient…</option>
-                        {patients.map(p => (
-                          <option key={p.id} value={p.id}>{p.full_name} — {p.patient_number}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {errors.patient && <p className="mt-1 text-xs text-red-600">{errors.patient}</p>}
-                    <button type="button" onClick={handleCreatePatient} className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium">
-                      <UserPlus className="w-3.5 h-3.5" />
-                      Create new patient
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* ── Practitioner ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Assigned Practitioner
-                  {isPractitionerLocked ? (
-                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-sky-600">
-                      <Lock className="w-3 h-3" />
-                      Auto-assigned from filter
-                    </span>
-                  ) : (
-                    <span className="ml-2 text-xs font-normal text-gray-400">Select to Assign</span>
-                  )}
-                </label>
-                {loadingPractitioners ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
-                  </div>
-                ) : isPractitionerLocked && lockedPractitioner ? (
-                  /* ── Read-only display when auto-filled from calendar filter ── */
-                  <div className="relative flex items-center gap-3 px-3 py-2.5 bg-sky-50 border border-sky-200 rounded-lg">
-                    <Stethoscope className="w-4 h-4 text-sky-500 shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-sky-900">
-                      {lockedPractitioner.name}
-                      {lockedPractitioner.specialization && (
-                        <span className="ml-1 font-normal text-sky-600">— {lockedPractitioner.specialization}</span>
+              {/* ── 2-Column Grid ── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* ── Left Column ── */}
+                <div className="space-y-5">
+                  {/* ── Patient ── */}
+                  {!defaultPatientId && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Patient / Client <span className="text-red-500">*</span>
+                      </label>
+                      {loadingPatients ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
+                        </div>
+                      ) : patients.length === 0 ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-semibold text-amber-800 mb-1">No patients found</p>
+                              <p className="text-xs text-amber-700 mb-3">Create a patient before scheduling an appointment.</p>
+                              <button type="button" onClick={handleCreatePatient} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Create New Patient
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <select name="patient" value={formData.patient} onChange={handleSelectChange} className={`${inputBase} pl-9 ${errors.patient ? inputError : ''}`}>
+                              <option value="">Select a patient…</option>
+                              {patients.map(p => (
+                                <option key={p.id} value={p.id}>{p.full_name} — {p.patient_number}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {errors.patient && <p className="mt-1 text-xs text-red-600">{errors.patient}</p>}
+                          <button type="button" onClick={handleCreatePatient} className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-medium">
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Create new patient
+                          </button>
+                        </>
                       )}
-                    </span>
-                    <Lock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select name="practitioner" value={formData.practitioner} onChange={handleSelectChange} className={`${inputBase} pl-9`}>
-                      <option value="">Unassigned</option>
-                      {bookablePractitioners.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}{p.specialization && ` — ${p.specialization}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <p className="mt-1 text-xs text-gray-400">
-                  {isPractitionerLocked
-                    ? 'Practitioner is set by the active calendar filter.'
-                    : bookablePractitioners.length === 0
-                      ? selectedClinicBranchId
-                        ? 'No practitioners assigned to this branch.'
-                        : 'No practitioners available. Contact admin to add practitioners.'
-                      : 'Select a practitioner or leave unassigned to assign later.'}
-                </p>
-              </div>
+                    </div>
+                  )}
 
-              {/* ── Chief Complaint ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Chief Complaint</label>
-                <textarea value={chiefComplaint} onChange={e => setChiefComplaint(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Primary reason for visit…" />
-              </div>
+                  {/* ── Case (Required) ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Assigned Case <span className="text-red-500">*</span>
+                    </label>
+                    {!formData.patient ? (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-500">
+                        Please select a patient first to view their cases.
+                      </div>
+                    ) : loadingCases ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
+                      </div>
+                    ) : patientCases.length === 0 ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800 mb-1">No active cases found</p>
+                            <p className="text-xs text-amber-700">This patient must have an active case to book an appointment.</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <FolderKanban className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <select name="patient_case" value={formData.patient_case} onChange={handleCaseChange} className={`${inputBase} pl-9 ${errors.patient_case ? inputError : ''}`}>
+                            <option value="">Select a case…</option>
+                            {patientCases.map(c => (
+                              <option key={c.id} value={c.id}>{c.title} — {c.status}</option>
+                            ))}
+                            <option value="__create__">+ Create New Case</option>
+                          </select>
+                        </div>
+                        {errors.patient_case && <p className="mt-1 text-xs text-red-600">{errors.patient_case}</p>}
+                      </>
+                    )}
+                  </div>
 
-              {/* ── Internal Notes ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Internal Notes <span className="ml-2 text-xs font-normal text-gray-400">(Staff only)</span>
-                </label>
-                <div className="relative">
-                  <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${inputBase} pl-9 resize-none`} placeholder="Internal notes for staff…" />
+                  {/* ── Service ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Service / Consultation Type <span className="text-red-500">*</span>
+                    </label>
+                    {filteredServices.length === 0 && !loadingServices ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800 mb-1">No services configured</p>
+                            <p className="text-xs text-amber-700">Ask an admin to add clinic services under <strong>Setup → Clinic Services</strong>.</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select
+                          name="service"
+                          value={formData.service}
+                          onChange={handleSelectChange}
+                          className={`${inputBase} pl-9 ${errors.service ? inputError : ''}`}
+                        >
+                          <option value="">— Select a service —</option>
+                          {filteredServices.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                              {s.duration_minutes ? ` (${fmtDuration(s.duration_minutes)})` : ''}
+                              {s.price && parseFloat(s.price) > 0 ? ` - ₱${parseFloat(s.price).toLocaleString()}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* ── Patient Notes ── */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Patient Notes <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
-                </label>
-                <textarea value={patientNotes} onChange={e => setPatientNotes(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Notes for patient…" />
+                {/* ── Right Column ── */}
+                <div className="space-y-5">
+                  {/* ── Practitioner ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Assigned Practitioner
+                      {isPractitionerLocked ? (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-sky-600">
+                          <Lock className="w-3 h-3" />
+                          Auto-assigned from filter
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-xs font-normal text-gray-400">Select to Assign</span>
+                      )}
+                    </label>
+                    {loadingPractitioners ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
+                      </div>
+                    ) : isPractitionerLocked && lockedPractitioner ? (
+                      /* ── Read-only display when auto-filled from calendar filter ── */
+                      <div className="relative flex items-center gap-3 px-3 py-2.5 bg-sky-50 border border-sky-200 rounded-lg">
+                        <Stethoscope className="w-4 h-4 text-sky-500 shrink-0" />
+                        <span className="flex-1 text-sm font-medium text-sky-900">
+                          {lockedPractitioner.name}
+                          {lockedPractitioner.specialization && (
+                            <span className="ml-1 font-normal text-sky-600">— {lockedPractitioner.specialization}</span>
+                          )}
+                        </span>
+                        <Lock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select name="practitioner" value={formData.practitioner} onChange={handleSelectChange} className={`${inputBase} pl-9`}>
+                          <option value="">Unassigned</option>
+                          {bookablePractitioners.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}{p.specialization && ` — ${p.specialization}`}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-gray-400">
+                      {isPractitionerLocked
+                        ? 'Practitioner is set by the active calendar filter.'
+                        : bookablePractitioners.length === 0
+                          ? selectedClinicBranchId
+                            ? 'No practitioners assigned to this branch.'
+                            : 'No practitioners available. Contact admin to add practitioners.'
+                          : 'Select a practitioner or leave unassigned to assign later.'}
+                    </p>
+                  </div>
+
+                  {/* ── Chief Complaint ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Chief Complaint</label>
+                    <textarea value={chiefComplaint} onChange={e => setChiefComplaint(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Primary reason for visit…" />
+                  </div>
+
+                  {/* ── Internal Notes ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Internal Notes <span className="ml-2 text-xs font-normal text-gray-400">(Staff only)</span>
+                    </label>
+                    <div className="relative">
+                      <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${inputBase} pl-9 resize-none`} placeholder="Internal notes for staff…" />
+                    </div>
+                  </div>
+
+                  {/* ── Patient Notes ── */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Patient Notes <span className="ml-2 text-xs font-normal text-gray-400">(Visible to patient)</span>
+                    </label>
+                    <textarea value={patientNotes} onChange={e => setPatientNotes(e.target.value)} rows={2} className={`${inputBase} resize-none`} placeholder="Notes for patient…" />
+                  </div>
+                </div>
               </div>
 
               {user && (
@@ -529,6 +658,22 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
           onClose={() => setShowPatientModal(false)}
           onSave={handlePatientSave}
           mode="create"
+        />
+      )}
+
+      {/* ── Inline Create Case ── */}
+      {showCreateCaseModal && formData.patient && (
+        <CaseModal
+          key="create-case"
+          isOpen={showCreateCaseModal}
+          onClose={() => setShowCreateCaseModal(false)}
+          mode="create"
+          initialValues={{
+            primary_practitioner: formData.practitioner ? Number(formData.practitioner) : null,
+          }}
+          onSave={handleCreateCase}
+          practitioners={practitioners}
+          loadingPractitioners={loadingPractitioners}
         />
       )}
     </>

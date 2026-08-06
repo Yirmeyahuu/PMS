@@ -564,7 +564,7 @@ export const BulkFinancialReport: React.FC = () => {
         <div className="mt-6 flex flex-col items-center gap-5 max-w-xl mx-auto">
 
           {/* Header */}
-          <div className="w-full bg-primary-gradient rounded-2xl p-6 text-white shadow-lg">
+          <div className="w-full bg-primary-gradient rounded-2xl p-4 text-white shadow-lg">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
                 <LayoutTemplate className="w-6 h-6 text-white" />

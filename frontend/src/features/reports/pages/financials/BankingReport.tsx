@@ -170,7 +170,7 @@ export const BankingReport: React.FC = () => {
         isLoading={isLoading}
         extra={
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Method</label>
+            <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">Method</label>
             <select
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
@@ -202,7 +202,7 @@ export const BankingReport: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
               label="Grand Total"
               value={formatPeso(data.summary.grand_total)}

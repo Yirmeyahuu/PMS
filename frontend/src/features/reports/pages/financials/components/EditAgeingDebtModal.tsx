@@ -199,7 +199,7 @@ export const EditAgeingDebtModal: React.FC<EditAgeingDebtModalProps> = ({
       />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
@@ -224,7 +224,7 @@ export const EditAgeingDebtModal: React.FC<EditAgeingDebtModalProps> = ({
           </div>
 
           {!showPaymentForm ? (
-            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+            <form onSubmit={handleUpdate} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
@@ -407,7 +407,7 @@ export const EditAgeingDebtModal: React.FC<EditAgeingDebtModalProps> = ({
               </div>
             </form>
           ) : (
-            <form onSubmit={handleRecordPayment} className="p-6 space-y-4">
+            <form onSubmit={handleRecordPayment} className="p-5 space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                 <p className="text-sm font-medium text-green-800">Record Payment</p>
                 <p className="text-xs text-green-600 mt-1">

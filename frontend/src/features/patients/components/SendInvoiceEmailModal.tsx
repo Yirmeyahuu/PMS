@@ -233,7 +233,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto overflow-hidden"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-lg pointer-events-auto overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -257,7 +257,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
+          <div className="p-5 space-y-4">
             {/* Success Message */}
             {successMessage && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">

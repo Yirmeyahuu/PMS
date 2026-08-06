@@ -46,11 +46,11 @@ export const ViewLetterModal: React.FC<ViewLetterModalProps> = ({ isOpen, onClos
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div 
-        className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50/50 shrink-0">
           <div className="flex-1">
             {isEditing ? (
               <input 
@@ -118,7 +118,7 @@ export const ViewLetterModal: React.FC<ViewLetterModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-5">
           {isEditing ? (
             <textarea
               className="w-full h-full min-h-[400px] p-4 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y whitespace-pre-wrap font-mono text-sm"

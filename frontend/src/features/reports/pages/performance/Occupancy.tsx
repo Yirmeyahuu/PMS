@@ -81,9 +81,9 @@ const DrillDownModal: React.FC<{
   }, [startDate, endDate, practitioner]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Drill-down</p>
             <h3 className="text-lg font-bold text-gray-900">{practitioner.practitioner_name} — Appointments</h3>
@@ -249,7 +249,7 @@ export const Occupancy: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex flex-wrap items-end gap-3">
+      <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2.5 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1 w-full max-w-[180px]">
           <label className="text-xs font-medium text-gray-600">Date Range</label>
           <select
@@ -320,7 +320,7 @@ export const Occupancy: React.FC = () => {
         <button
           onClick={run}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
         >
           {isLoading ? (
             <><Loader2 className="w-4 h-4 animate-spin" />Running...</>
@@ -333,7 +333,7 @@ export const Occupancy: React.FC = () => {
           <button
             onClick={handlePrint}
             disabled={isPrinting}
-            className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors ml-auto"
+            className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors ml-auto"
           >
             {isPrinting ? (
               <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
@@ -466,7 +466,7 @@ export const Occupancy: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               {/* Branch Chart */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
@@ -526,7 +526,7 @@ export const Occupancy: React.FC = () => {
                   })()}
                 </div>
               )}
-              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded bg-gray-300" />
                   <span className="text-xs text-gray-500">Scheduled</span>

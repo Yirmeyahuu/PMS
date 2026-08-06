@@ -36,7 +36,7 @@ export const RemoveLimitModal: React.FC<RemoveLimitModalProps> = ({
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" onClick={!isSaving ? onClose : undefined} />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
-        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl pointer-events-auto overflow-hidden">
+        <div className="w-full max-w-sm bg-white rounded-xl shadow-xl pointer-events-auto overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">

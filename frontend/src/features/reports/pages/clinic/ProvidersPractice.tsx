@@ -72,7 +72,7 @@ export const ProvidersPractice: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+      <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2.5">
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
@@ -319,7 +319,7 @@ export const ProvidersPractice: React.FC = () => {
             </div>
 
             {/* ── Revenue Bar Chart ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
               {/* Revenue per provider */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue per Provider</h3>
@@ -426,7 +426,7 @@ export const ProvidersPractice: React.FC = () => {
                       );
                     })}
                     {/* Legend */}
-                    <div className="flex items-center gap-4 pt-1">
+                    <div className="flex items-center gap-3 pt-1">
                       <span className="flex items-center gap-1.5 text-xs text-gray-500">
                         <span className="w-3 h-3 rounded bg-teal-400 inline-block" />
                         Completed

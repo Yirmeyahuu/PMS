@@ -71,7 +71,7 @@ export const StockAdjustModal: React.FC<Props> = ({
 
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Top accent */}
@@ -106,7 +106,7 @@ export const StockAdjustModal: React.FC<Props> = ({
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
                   Current Stock
                 </p>
-                <p className="text-2xl font-bold text-gray-900 leading-tight">
+                <p className="text-xl font-bold text-gray-900 leading-tight">
                   {currentStock.toLocaleString()}
                   <span className="text-sm font-medium text-gray-400 ml-1">{product.unit}</span>
                 </p>

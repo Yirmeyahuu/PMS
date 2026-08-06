@@ -127,7 +127,7 @@ export const GenerateLetterModal = ({
             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
             <div className="flex gap-4">
               <div className="w-1/3">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Letter Template *</label>

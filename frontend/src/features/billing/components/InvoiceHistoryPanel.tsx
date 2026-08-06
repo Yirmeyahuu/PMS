@@ -30,7 +30,7 @@ const VersionDetailView: React.FC<VersionDetailProps> = ({ version, currentVersi
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-3">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl">
           {/* Header */}
@@ -62,7 +62,7 @@ const VersionDetailView: React.FC<VersionDetailProps> = ({ version, currentVersi
           <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
             {/* Change Summary */}
             {Object.keys(version.change_summary || {}).length > 0 && (
-              <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                 <h4 className="text-xs font-bold text-amber-800 uppercase mb-2">Changes from previous version</h4>
                 <div className="space-y-1.5">
                   {Object.entries(version.change_summary).map(([field, diff]) => {
@@ -91,7 +91,7 @@ const VersionDetailView: React.FC<VersionDetailProps> = ({ version, currentVersi
             )}
 
             {/* Status & Dates */}
-            <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="grid grid-cols-3 gap-3 mb-5">
               <div>
                 <label className="text-xs text-gray-500 uppercase">Status</label>
                 <div className="mt-1">
@@ -102,14 +102,14 @@ const VersionDetailView: React.FC<VersionDetailProps> = ({ version, currentVersi
               </div>
               <div>
                 <label className="text-xs text-gray-500 uppercase">Invoice Date</label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
+                <p className="text-xs font-semibold text-gray-900 mt-1">
                   {new Date(version.invoice_date).toLocaleDateString('en-PH')}
                 </p>
               </div>
               {version.due_date && (
                 <div>
                   <label className="text-xs text-gray-500 uppercase">Due Date</label>
-                  <p className="text-sm font-medium text-gray-900 mt-1">
+                  <p className="text-xs font-semibold text-gray-900 mt-1">
                     {new Date(version.due_date).toLocaleDateString('en-PH')}
                   </p>
                 </div>
@@ -245,7 +245,7 @@ export const InvoiceHistoryPanel: React.FC<InvoiceHistoryPanelProps> = ({ invoic
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-xs font-semibold text-gray-900">
                             Version {v.version_number}
                           </span>
                           {isCurrent && (

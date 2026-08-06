@@ -133,10 +133,10 @@ export const PrintNoteModal: React.FC<PrintNoteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-5">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative w-full max-w-4xl bg-slate-100 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+      <div className="relative w-full max-w-4xl bg-slate-100 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
         {/* Header */}
         <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-sm z-10">
           <div className="flex items-center gap-3">
@@ -176,7 +176,7 @@ export const PrintNoteModal: React.FC<PrintNoteModalProps> = ({
         </div>
 
         {/* Content (Preview) */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-100/80">
+        <div className="flex-1 overflow-y-auto p-5 bg-slate-100/80">
           <div className="max-w-[800px] mx-auto shadow-xl ring-1 ring-slate-900/5">
             <ClinicalNotePrintTemplate
               note={note}

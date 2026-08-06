@@ -120,10 +120,10 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-3">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-        <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl">
+        <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
             <div>
@@ -150,7 +150,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({
 
           <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 max-h-[78vh] overflow-y-auto">
             {/* Dates */}
-            <div className="grid grid-cols-2 gap-4 mb-5">
+            <div className="grid grid-cols-2 gap-3 mb-5">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Invoice Date</label>
                 <input
@@ -323,7 +323,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-5 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-5 py-2 bg-sky-600 text-white text-xs font-semibold rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors"
               >
                 {isSubmitting
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>

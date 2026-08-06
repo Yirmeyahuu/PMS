@@ -81,14 +81,14 @@ export const PatientList: React.FC<PatientListProps> = ({
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Client ID</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Full Name</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Birthday</th>
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">Client ID</th>
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">Full Name</th>
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">Email</th>
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">Birthday</th>
                   {isArchived && (
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Archived</th>
+                    <th className="px-4 py-2.5 text-left text-sm font-semibold text-gray-700">Archived</th>
                   )}
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-4 py-2.5 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -97,9 +97,9 @@ export const PatientList: React.FC<PatientListProps> = ({
                     key={patient.id}
                     className={`transition-colors ${isArchived ? 'bg-amber-50/30 hover:bg-amber-50' : 'hover:bg-gray-50'}`}
                   >
-                    <td className="px-6 py-4 text-sm text-gray-600">{patient.patient_number}</td>
+                    <td className="px-4 py-2.5 text-sm text-gray-600">{patient.patient_number}</td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold shrink-0 ${
                           isArchived
@@ -110,7 +110,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{patient.full_name}</span>
+                            <span className="text-xs font-semibold text-gray-900">{patient.full_name}</span>
                             {isArchived && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full border border-amber-200">
                                 <Archive className="w-3 h-3" />
@@ -123,11 +123,11 @@ export const PatientList: React.FC<PatientListProps> = ({
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-sm text-gray-600">{patient.email || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(patient.date_of_birth)}</td>
+                    <td className="px-4 py-2.5 text-sm text-gray-600">{patient.email || '-'}</td>
+                    <td className="px-4 py-2.5 text-sm text-gray-600">{formatDate(patient.date_of_birth)}</td>
 
                     {isArchived && (
-                      <td className="px-6 py-4 text-xs text-gray-500">
+                      <td className="px-4 py-2.5 text-xs text-gray-500">
                         {patient.archived_at ? formatDate(patient.archived_at) : '—'}
                         {patient.archived_by_name && (
                           <div className="text-gray-400">by {patient.archived_by_name}</div>
@@ -135,12 +135,12 @@ export const PatientList: React.FC<PatientListProps> = ({
                       </td>
                     )}
 
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center justify-center gap-2 flex-wrap">
                         {!isArchived && (
                           <button
                             onClick={() => navigate(`/patients/${patient.id}/profile`)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                             Profile
@@ -148,7 +148,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         )}
                         <button
                           onClick={() => onView(patient)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                         >
                           <Eye className="w-4 h-4" />
                           View
@@ -156,7 +156,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         {!isArchived && (
                           <button
                             onClick={() => onEdit(patient)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
                           >
                             <Edit className="w-4 h-4" />
                             Edit
@@ -165,7 +165,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         {!isArchived && onMerge && (
                           <button
                             onClick={() => onMerge(patient)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
                           >
                             <ArchiveRestore className="w-4 h-4" />
                             Merge
@@ -176,7 +176,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         {isArchived ? (
                           <button
                             onClick={() => onRestore?.(patient)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
                           >
                             <ArchiveRestore className="w-4 h-4" />
                             Restore
@@ -184,7 +184,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                         ) : (
                           <button
                             onClick={() => onArchive?.(patient)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
                           >
                             <Archive className="w-4 h-4" />
                             Archive
@@ -202,7 +202,7 @@ export const PatientList: React.FC<PatientListProps> = ({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="shrink-0 bg-white border-t border-gray-200 px-6 py-4">
+        <div className="shrink-0 bg-white border-t border-gray-200 px-4 py-2.5">
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={handlePrevPage}

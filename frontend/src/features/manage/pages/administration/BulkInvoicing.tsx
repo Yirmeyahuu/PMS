@@ -89,7 +89,7 @@ const BatchRow: React.FC<{
         </span>
         <span className="text-xs text-gray-400">{batch.date_from} → {batch.date_to}</span>
       </div>
-      <div className="flex items-center gap-4 text-sm text-gray-600">
+      <div className="flex items-center gap-3 text-sm text-gray-600">
         <span>{batch.total_created} invoices</span>
         <span className="font-semibold text-gray-800">
           ₱{parseFloat(batch.total_invoiced_amount).toLocaleString()}
@@ -207,7 +207,7 @@ export const AdminMenu2: React.FC = () => {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-4">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5">
@@ -252,7 +252,7 @@ export const AdminMenu2: React.FC = () => {
             </h3>
 
             {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {([
                 { label: 'Appointment Date From', field: 'date_from'    },
                 { label: 'Appointment Date To',   field: 'date_to'      },
@@ -275,7 +275,7 @@ export const AdminMenu2: React.FC = () => {
             </div>
 
             {/* Discount / Tax */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {([
                 { label: 'Discount %', field: 'discount_percent' },
                 { label: 'Tax %',      field: 'tax_percent'      },
@@ -363,7 +363,7 @@ export const AdminMenu2: React.FC = () => {
 
           {/* Error banner */}
           {(previewMutation.isError || runMutation.isError) && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
                 {(() => {
@@ -380,7 +380,7 @@ export const AdminMenu2: React.FC = () => {
 
           {/* Success banner */}
           {runMutation.isSuccess && (
-            <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-700">
+            <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
               <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>
                 Batch <strong>{runMutation.data.batch_number}</strong> completed —&nbsp;

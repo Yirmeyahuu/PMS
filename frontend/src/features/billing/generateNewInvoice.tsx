@@ -525,7 +525,7 @@ export default function GenerateNewInvoice() {
 
   if (appointment?.is_covered_by_package && !existingInvoice) {
     return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-600" />
@@ -548,7 +548,7 @@ export default function GenerateNewInvoice() {
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Top Bar with Breadcrumb */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0">
         <div className="flex items-center text-sm text-gray-600">
           <Link to="/appointments" className="hover:text-sky-600 flex items-center gap-1">
             <Calendar className="w-4 h-4" />
@@ -560,9 +560,9 @@ export default function GenerateNewInvoice() {
       </div>
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -611,13 +611,13 @@ export default function GenerateNewInvoice() {
       )}
 
       {/* Main Content - 1440px optimized layout */}
-      <div className="flex-1 overflow-hidden p-6">
-        <div className="h-full grid grid-cols-12 gap-6">
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="h-full grid grid-cols-12 gap-4">
 
           {/* LEFT COLUMN - 7 cols */}
           <div className="col-span-7 space-y-4 overflow-y-auto pr-2">
             {/* Client Information Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center gap-2 mb-3">
                 <User className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Client Information</h2>
@@ -664,7 +664,7 @@ export default function GenerateNewInvoice() {
             </div>
 
             {/* Invoice Details Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center gap-2 mb-3">
                 <FileText className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Invoice Details</h2>
@@ -693,7 +693,7 @@ export default function GenerateNewInvoice() {
             </div>
 
             {/* Invoice Items Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-4 h-4 text-sky-600" />
@@ -882,7 +882,7 @@ export default function GenerateNewInvoice() {
             </div>
 
             {/* Payment Details Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center gap-2 mb-3">
                 <CreditCard className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Payment Methods</h2>
@@ -973,7 +973,7 @@ export default function GenerateNewInvoice() {
             </div>
 
             {/* Notes Section */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center gap-2 mb-3">
                 <StickyNote className="w-4 h-4 text-sky-600" />
                 <h2 className="text-base font-semibold text-gray-900">Notes</h2>

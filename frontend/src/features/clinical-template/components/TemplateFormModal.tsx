@@ -126,7 +126,7 @@ export const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-[95vw] h-[90vh] max-w-7xl flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-7xl flex flex-col">
         {/* Modal Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>

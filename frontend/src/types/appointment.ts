@@ -78,6 +78,7 @@ export interface CreateAppointmentData {
   notes?: string;
   patient_notes?: string;
   patient_case?: number | null;
+  is_rebook?: boolean;
 }
 
 export interface PractitionerSchedule {

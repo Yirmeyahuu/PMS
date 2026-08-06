@@ -58,7 +58,7 @@ export const ConsentFormModal: React.FC<ConsentFormModalProps> = ({
   return (
     <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-[95vw] max-h-[95vh] overflow-auto"
+        className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-[95vw] max-h-[95vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
@@ -69,7 +69,7 @@ export const ConsentFormModal: React.FC<ConsentFormModalProps> = ({
         </div>
 
         <div className="p-4">
-          <div className="w-[816px] h-[1056px] max-w-full bg-white border border-gray-200 rounded-xl p-8 mx-auto">
+          <div className="w-[816px] h-[1056px] max-w-full bg-white border border-gray-200 rounded-xl p-5 mx-auto">
             <header className="mb-6">
               {/* Clinic Branding */}
               <div className="flex items-center gap-4 mb-6 border-b-2 border-sky-600 pb-4">
@@ -85,7 +85,7 @@ export const ConsentFormModal: React.FC<ConsentFormModalProps> = ({
               
               <div className="text-center">
                 <p className="text-sm font-semibold text-gray-700">Clinic Compliance Document</p>
-                <h3 className="text-2xl font-bold text-gray-900 mt-2">Patient Data Privacy Consent Form</h3>
+                <h3 className="text-xl font-bold text-gray-900 mt-2">Patient Data Privacy Consent Form</h3>
               </div>
             </header>
 

@@ -249,7 +249,7 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-5">
           {isDeleting ? (
             /* Delete Confirmation */
             <div className="text-center">
@@ -284,7 +284,7 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
             </div>
           ) : isEditing ? (
             /* Edit Form - 2-Column Layout matching AddEventModal */
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-4">
               {/* LEFT COLUMN - Event Details */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
@@ -562,7 +562,7 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
             </div>
           ) : (
             /* View Mode - Event Details - 2-Column Layout */
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-4">
               {/* LEFT COLUMN - Event Information */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">

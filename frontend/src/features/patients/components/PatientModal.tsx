@@ -230,7 +230,7 @@ export const PatientModal: React.FC<PatientModalProps> = ({
 
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] pointer-events-auto overflow-hidden flex flex-col"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] pointer-events-auto overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* ── Header ── */}
@@ -261,7 +261,7 @@ export const PatientModal: React.FC<PatientModalProps> = ({
 
           {/* ── Form ── */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
               {/* ── Personal Information ── */}
               <div>

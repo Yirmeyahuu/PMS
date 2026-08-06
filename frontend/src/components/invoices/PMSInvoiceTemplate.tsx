@@ -96,7 +96,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
 
             <div className="relative z-10 flex items-start justify-between">
               {/* Clinic / Company Info */}
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 {clinic?.logoUrl ? (
                   <img
                     src={clinic.logoUrl}
@@ -140,9 +140,9 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
         {/* ═══════════ BODY ═══════════ */}
         <div className="px-8 -mt-4 relative z-10 flex-1">
           {/* ── Bill From / Bill To / Payment Details ── */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-3 gap-4 mb-8">
             {/* Bill From */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-sky-600 mb-2">
                 Bill From
               </p>
@@ -156,7 +156,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             </div>
 
             {/* Bill To */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-sky-600 mb-2">
                 Bill To
               </p>
@@ -167,7 +167,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             </div>
 
             {/* Payment Details */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-sky-600 mb-2">
                 Invoice Details
               </p>
@@ -434,7 +434,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
 
           {/* ── Notes ── */}
           {invoice.notes && (
-            <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">
                 Notes
               </p>
@@ -464,11 +464,11 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             <div className="bg-sky-600 pt-8 pb-6 px-8 relative">
               {/* Decorative shapes */}
               <div className="absolute -left-12 -bottom-12 w-48 h-48 rounded-full bg-sky-500/20" />
-              <div className="absolute right-1/4 -top-6 w-32 h-32 rounded-full bg-sky-500/15" />
+              <div className="absolute right-1/4 -top-4 w-32 h-32 rounded-full bg-sky-500/15" />
 
               <div className="relative z-10">
                 {/* Contact Row */}
-                <div className="flex items-center justify-center gap-6 text-sky-100 text-xs mb-3 flex-wrap">
+                <div className="flex items-center justify-center gap-4 text-sky-100 text-xs mb-3 flex-wrap">
                   {clinic?.phone && (
                     <span className="flex items-center gap-1">📞 {clinic.phone}</span>
                   )}

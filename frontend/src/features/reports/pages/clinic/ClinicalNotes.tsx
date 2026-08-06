@@ -65,7 +65,7 @@ export const ClinicalNotes: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 space-y-3">
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2.5 space-y-3">
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}

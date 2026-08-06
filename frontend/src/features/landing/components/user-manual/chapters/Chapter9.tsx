@@ -10,7 +10,7 @@ const Chapter9: React.FC = () => {
       </p>
 
       {/* IMPORTANT CONCEPT — Permission Evaluation Flow */}
-      <div className="bg-sky-50 border-l-4 border-sky-500 p-6 md:p-8 rounded-r-2xl mb-12">
+      <div className="bg-sky-50 border-l-4 border-sky-500 p-4 md:p-8 rounded-r-2xl mb-12">
         <h3 className="text-xl font-bold text-sky-900 mb-4">Permission Evaluation Flow</h3>
         
         <p className="text-gray-700 font-body mb-4">
@@ -24,7 +24,7 @@ const Chapter9: React.FC = () => {
 
         <div className="bg-white p-5 rounded-xl border border-sky-100 shadow-[0_4px_12px_rgb(14,165,233,0.1)] mb-6 text-center">
           <p className="text-sm font-semibold text-gray-800 mb-2">Evaluation Sequence</p>
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-sm text-gray-600 font-mono">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-sm text-gray-600 font-mono">
             <span className="px-3 py-1.5 bg-gray-50 rounded border border-gray-200">User Login</span>
             <span className="text-sky-400">→</span>
             <span className="px-3 py-1.5 bg-sky-50 rounded border border-sky-200">Role & Branch Check</span>
@@ -48,7 +48,7 @@ const Chapter9: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">Permissions are primarily determined by user roles.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             Higher-level roles generally possess broader administrative permissions, while lower-level roles focus on operational tasks. Below is a simplified comparison of what each role can access:
           </p>
@@ -133,12 +133,12 @@ const Chapter9: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">How location assignments isolate clinic data.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             Even if a user possesses the correct role to perform an action, they must also be explicitly authorized to perform that action <strong>at that specific clinic branch</strong>.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div className="p-5 rounded-xl border border-gray-200 bg-gray-50">
               <h5 className="font-bold text-gray-900 mb-2 border-b border-gray-200 pb-2">Example 1: Manager</h5>
               <p className="text-sm text-gray-600 mb-2">Assigned to Branch 1 & Branch 2</p>
@@ -179,7 +179,7 @@ const Chapter9: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">How Malasakit controls module access.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             To ensure bulletproof security, Malasakit evaluates user permissions using a two-layer security approach:
           </p>
@@ -212,7 +212,7 @@ const Chapter9: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">How Malasakit safeguards clinic data.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             System security is maintained through secure session management and branch isolation. This guarantees patient privacy by ensuring that only authorized personnel interact with sensitive information.
           </p>

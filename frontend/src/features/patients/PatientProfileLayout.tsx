@@ -22,7 +22,7 @@ const NavItem = ({ label, to, icon, activePathPattern, end }: NavItemProps) => {
       end={end}
       className={({ isActive }) => {
         const active = isCustomActive !== undefined ? isCustomActive : isActive;
-        return `flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+        return `flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
           active
             ? 'bg-sky-600 text-white shadow-sm'
             : 'text-gray-600 hover:bg-sky-50 hover:text-sky-700'
@@ -40,12 +40,12 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
 
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-80px)] p-4 md:p-6 overflow-hidden flex flex-col">
+      <div className="h-full p-4 overflow-hidden flex flex-col">
         <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
-          <aside className="w-full lg:w-70 xl:w-75 flex-shrink-0 overflow-y-auto">
+          <aside className="w-full lg:w-64 xl:w-72 flex-shrink-0 overflow-y-auto">
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
-              <div className="text-center border-b border-gray-100 pb-5 mb-5">
-                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-sky-500 to-sky-700 text-white flex items-center justify-center text-2xl font-bold shadow-sm">
+              <div className="text-center border-b border-gray-100 pb-4 mb-4">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-sky-500 to-sky-700 text-white flex items-center justify-center text-xl font-bold shadow-sm">
                   {loadingPatient || !patient
                     ? '...'
                     : `${patient.first_name.charAt(0)}${patient.last_name.charAt(0)}`
@@ -82,7 +82,7 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
                 )}
               </div>
 
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 <NavItem
                   label="Profile"
                   to={`/patients/${patientId}/profile`}

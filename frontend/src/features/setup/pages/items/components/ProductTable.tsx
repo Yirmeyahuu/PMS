@@ -34,7 +34,7 @@ export const ProductTable: React.FC<Props> = ({
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-400">
         <Package className="w-12 h-12 mb-3 opacity-30" />
-        <p className="text-sm font-medium">No products found</p>
+        <p className="text-xs font-semibold">No products found</p>
         <p className="text-xs mt-1">Try adjusting your filters or create a new product</p>
       </div>
     );

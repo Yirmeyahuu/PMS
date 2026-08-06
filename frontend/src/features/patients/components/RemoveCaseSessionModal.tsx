@@ -49,7 +49,7 @@ export const RemoveCaseSessionModal: React.FC<RemoveCaseSessionModalProps> = ({
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" onClick={!isSaving ? onClose : undefined} />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
-        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl pointer-events-auto overflow-hidden">
+        <div className="w-full max-w-sm bg-white rounded-xl shadow-xl pointer-events-auto overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
@@ -83,7 +83,7 @@ export const RemoveCaseSessionModal: React.FC<RemoveCaseSessionModalProps> = ({
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                className="w-full text-center text-2xl font-bold py-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none"
+                className="w-full text-center text-xl font-bold py-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none"
                 placeholder="0"
                 autoFocus
                 disabled={isSaving}

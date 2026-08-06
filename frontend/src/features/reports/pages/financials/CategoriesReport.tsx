@@ -159,7 +159,7 @@ export const CategoriesReport: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard label="Total Revenue" value={formatPeso(data.summary.total_revenue)} color="text-purple-700" bg="bg-purple-50" border="border-purple-200" icon={<TrendingUp className="w-5 h-5 text-purple-600" />} />
             <StatCard label="Total Payments" value={formatPeso(data.summary.total_payments)} color="text-green-700" bg="bg-green-50" border="border-green-200" icon={<CheckCircle className="w-5 h-5 text-green-600" />} />
             <StatCard label="Outstanding" value={formatPeso(data.summary.outstanding)} color="text-orange-700" bg="bg-orange-50" border="border-orange-200" icon={<DollarSign className="w-5 h-5 text-orange-600" />} />
@@ -171,14 +171,14 @@ export const CategoriesReport: React.FC = () => {
           ) : (
             <>
               {/* Category breakdown cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {categories.map((c, idx) => {
                   const pct = data.summary.total_revenue > 0
                     ? ((c.total_revenue / data.summary.total_revenue) * 100).toFixed(1)
                     : '0.0';
                   const colorClass = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
                   return (
-                    <div key={c.category} className={`rounded-xl p-4 border ${colorClass.split(' ').slice(0, 2).join(' ')} border-opacity-50`}>
+                    <div key={c.category} className={`rounded-xl p-3 border ${colorClass.split(' ').slice(0, 2).join(' ')} border-opacity-50`}>
                       <div className="flex items-center justify-between mb-2">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${colorClass}`}>
                           {CATEGORY_LABELS[c.category] ?? c.category.replace(/_/g, ' ')}

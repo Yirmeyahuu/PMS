@@ -480,7 +480,7 @@ export const ClinicSetupPage: React.FC = () => {
         </div>
 
         {/* ── PROGRESS BAR ── */}
-        <div className="bg-white rounded-lg border border-[#E5E7EB] p-4">
+        <div className="bg-white rounded-lg border border-[#E5E7EB] p-3">
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-sm font-semibold text-gray-700">Setup Progress</p>
             <p className="text-xs font-bold text-[#0575E6]">{completedCount} / 4 steps</p>
@@ -530,12 +530,12 @@ export const ClinicSetupPage: React.FC = () => {
 
             {/* Logo Upload */}
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2.5 flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-gray-700 mb-2.5 flex items-center gap-1.5">
                 <Upload className="w-3.5 h-3.5 text-[#0575E6]" />
                 Clinic Logo
                 <span className="text-xs font-normal text-gray-400">(optional)</span>
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div className="w-16 h-16 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
                   {logoPreview
                     ? <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain" />
@@ -563,7 +563,7 @@ export const ClinicSetupPage: React.FC = () => {
             <div className="space-y-3">
               <p className="text-[11px] font-bold text-[#556A73] uppercase tracking-widest">Basic Information</p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Clinic Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -575,7 +575,7 @@ export const ClinicSetupPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5 text-gray-400" /> Phone <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -586,7 +586,7 @@ export const ClinicSetupPage: React.FC = () => {
                   {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5 text-gray-400" /> Clinic Email <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -598,7 +598,7 @@ export const ClinicSetupPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <label className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
                   <Globe className="w-3.5 h-3.5 text-gray-400" /> Website
                   <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
                 </label>
@@ -616,7 +616,7 @@ export const ClinicSetupPage: React.FC = () => {
                 <MapPin className="w-3.5 h-3.5" /> Location
               </p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Street Address</label>
                 <textarea
                   name="address" value={form.address} onChange={handleChange} rows={2}
                   placeholder="Unit/Floor, Building, Street"
@@ -641,7 +641,7 @@ export const ClinicSetupPage: React.FC = () => {
                 />
               </div>
               <div className="sm:w-1/3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Postal Code</label>
                 <input
                   name="postal_code" value={form.postal_code} onChange={handleChange}
                   placeholder="6000"
@@ -655,7 +655,7 @@ export const ClinicSetupPage: React.FC = () => {
                 </button>
                 {showManual && (
                   <div className="mt-2.5">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Custom Location / Address</label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Custom Location / Address</label>
                     <input
                       name="custom_location" value={form.custom_location} onChange={handleChange}
                       placeholder="e.g. Purok Santan, Brgy. Alijis, Bacolod City"
@@ -666,7 +666,7 @@ export const ClinicSetupPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1">
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-[#0575E6]" /> Pin Clinic Location
                   <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>
                 </label>
@@ -688,7 +688,7 @@ export const ClinicSetupPage: React.FC = () => {
                   <input type="checkbox" checked={emailNotifEnabled} onChange={(e) => setEmailNotifEnabled(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors">Email Notifications</p>
+                  <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">Email Notifications</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Master switch for appointment reminders, booking confirmations, and welcome messages.
                   </p>
@@ -699,7 +699,7 @@ export const ClinicSetupPage: React.FC = () => {
                   <input type="checkbox" checked={smsNotifEnabled} disabled className="w-4 h-4 rounded border-gray-300 text-gray-400 cursor-not-allowed" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <p className="text-xs font-semibold text-gray-500 flex items-center gap-2">
                     SMS Notifications
                     <span className="text-[10px] font-medium px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded-full">Coming Soon</span>
                   </p>
@@ -782,7 +782,7 @@ export const ClinicSetupPage: React.FC = () => {
               {branches.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-gray-200 rounded-lg mb-4">
                   <MapPin className="w-8 h-8 text-gray-200 mb-2" />
-                  <p className="text-sm font-medium text-gray-400">No branches added yet</p>
+                  <p className="text-xs font-semibold text-gray-400">No branches added yet</p>
                   <p className="text-xs text-gray-300 mt-0.5">Add your first branch location below.</p>
                 </div>
               )}
@@ -806,7 +806,7 @@ export const ClinicSetupPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setStep2Skipped(true); staffRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   Skip for now <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -902,7 +902,7 @@ export const ClinicSetupPage: React.FC = () => {
               {staff.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-gray-200 rounded-lg mb-4">
                   <Users className="w-8 h-8 text-gray-200 mb-2" />
-                  <p className="text-sm font-medium text-gray-400">No staff added yet</p>
+                  <p className="text-xs font-semibold text-gray-400">No staff added yet</p>
                   <p className="text-xs text-gray-300 mt-0.5">Add at least 1 practitioner to continue.</p>
                 </div>
               )}
@@ -926,7 +926,7 @@ export const ClinicSetupPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setStep3Skipped(true); servicesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   Skip for now <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -1010,7 +1010,7 @@ export const ClinicSetupPage: React.FC = () => {
               {services.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-gray-200 rounded-lg mb-4">
                   <Stethoscope className="w-8 h-8 text-gray-200 mb-2" />
-                  <p className="text-sm font-medium text-gray-400">No services added yet</p>
+                  <p className="text-xs font-semibold text-gray-400">No services added yet</p>
                   <p className="text-xs text-gray-300 mt-0.5">Add at least 1 service to complete setup.</p>
                 </div>
               )}
@@ -1027,7 +1027,7 @@ export const ClinicSetupPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setStep4Skipped(true); saveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   Skip for now <ChevronRight className="w-3.5 h-3.5" />
                 </button>

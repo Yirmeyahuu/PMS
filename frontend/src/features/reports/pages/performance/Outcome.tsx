@@ -69,7 +69,7 @@ export const Outcome: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+      <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2.5">
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}

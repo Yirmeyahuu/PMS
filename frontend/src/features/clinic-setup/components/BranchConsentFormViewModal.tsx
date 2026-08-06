@@ -78,7 +78,7 @@ export const BranchConsentFormViewModal: React.FC<BranchConsentFormViewModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-5">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
@@ -86,7 +86,7 @@ export const BranchConsentFormViewModal: React.FC<BranchConsentFormViewModalProp
       />
       
       {/* Modal Window */}
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
@@ -108,7 +108,7 @@ export const BranchConsentFormViewModal: React.FC<BranchConsentFormViewModalProp
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+        <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
           
           {/* Information Card */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6 flex flex-col gap-3">
@@ -156,7 +156,7 @@ export const BranchConsentFormViewModal: React.FC<BranchConsentFormViewModalProp
           </div>
 
           {loading ? (
-            <div className="flex justify-center p-8">
+            <div className="flex justify-center p-5">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
           ) : (
@@ -169,7 +169,7 @@ export const BranchConsentFormViewModal: React.FC<BranchConsentFormViewModalProp
               </div>
 
               {consentEnabled && (
-                <div className="space-y-4 pt-2 border-t border-gray-100 flex flex-col items-center justify-center p-8">
+                <div className="space-y-4 pt-2 border-t border-gray-100 flex flex-col items-center justify-center p-5">
                   <p className="text-sm text-gray-600 text-center mb-2">
                     This consent form is active and contains content.
                   </p>

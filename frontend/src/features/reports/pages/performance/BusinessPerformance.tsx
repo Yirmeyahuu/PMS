@@ -101,7 +101,7 @@ export const BusinessPerformance: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+      <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2.5">
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
@@ -219,7 +219,7 @@ export const BusinessPerformance: React.FC = () => {
             </div>
 
             {/* Sparkline charts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-green-500" />

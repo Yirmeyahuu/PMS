@@ -14,7 +14,7 @@ const Chapter37: React.FC = () => {
         37.1 Overview
       </h3>
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             While this User Manual and the Troubleshooting Guide are designed to solve the vast majority of operational questions, some situations inevitably require direct assistance from the Malasakit Support Team. 
           </p>
@@ -43,7 +43,7 @@ const Chapter37: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">Requesting help for system failures.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             Technical support focuses specifically on resolving software-related failures and system errors rather than providing training on clinic workflows. You should contact Technical Support when experiencing:
           </p>
@@ -57,7 +57,7 @@ const Chapter37: React.FC = () => {
 
           <h4 className="text-lg font-bold text-gray-900 mt-8 mb-2">Information to Include</h4>
           <p className="text-gray-700 mb-4">When opening a technical support ticket, always include the following payload to speed up diagnostics:</p>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-700 text-sm">
               <li>• Clinic Name & Branch</li>
               <li>• Your User Role</li>
@@ -82,7 +82,7 @@ const Chapter37: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">Reporting software defects.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             A "bug" is an error, flaw, or fault in the software that causes it to produce an incorrect or unexpected result. Examples of bugs include buttons that don't respond when clicked, incorrect invoice calculations, or visual layouts that appear broken.
           </p>
@@ -113,7 +113,7 @@ const Chapter37: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">Suggesting system improvements.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             We continuously build Malasakit around the real-world needs of healthcare providers. Users are actively encouraged to submit ideas for improving the platform, such as new statistical reports, UI enhancements, or ideas for workflow automation.
           </p>
@@ -142,31 +142,31 @@ const Chapter37: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">Choosing the right method of communication.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <div className="overflow-x-auto mb-6 border border-gray-200 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200 text-sm font-body">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Support Channel</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Best Used For</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-900">Support Channel</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-900">Best Used For</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700"><strong>Email Support</strong></td>
-                  <td className="px-6 py-4 text-gray-600">General technical support inquiries and account recovery.</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-700"><strong>Email Support</strong></td>
+                  <td className="px-4 py-2.5 text-gray-600">General technical support inquiries and account recovery.</td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700"><strong>Help Desk Portal</strong></td>
-                  <td className="px-6 py-4 text-gray-600">Submitting bug reports, tracking issue progress, and escalating urgent server outages.</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-700"><strong>Help Desk Portal</strong></td>
+                  <td className="px-4 py-2.5 text-gray-600">Submitting bug reports, tracking issue progress, and escalating urgent server outages.</td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700"><strong>Website Contact Form</strong></td>
-                  <td className="px-6 py-4 text-gray-600">General inquiries, billing questions, or subscription upgrade requests.</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-700"><strong>Website Contact Form</strong></td>
+                  <td className="px-4 py-2.5 text-gray-600">General inquiries, billing questions, or subscription upgrade requests.</td>
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-700"><strong>Feature Request Board</strong></td>
-                  <td className="px-6 py-4 text-gray-600">Submitting and voting on product suggestions and workflow improvements.</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-700"><strong>Feature Request Board</strong></td>
+                  <td className="px-4 py-2.5 text-gray-600">Submitting and voting on product suggestions and workflow improvements.</td>
                 </tr>
               </tbody>
             </table>
@@ -184,7 +184,7 @@ const Chapter37: React.FC = () => {
       <p className="text-gray-700 font-body mb-6">What happens after you submit a ticket.</p>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             After submitting a support request, you can expect the following workflow:
           </p>
@@ -226,7 +226,7 @@ const Chapter37: React.FC = () => {
       </h3>
 
       <div className="space-y-8">
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-6 md:p-8">
+        <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.04)] border border-gray-100 p-4 md:p-8">
           <p className="text-gray-700 font-body leading-relaxed mb-6">
             Thank you for choosing Malasakit as your Practice Management System. Our goal is to streamline your clinic's operations so you can focus entirely on delivering exceptional patient care.
           </p>
@@ -243,7 +243,7 @@ const Chapter37: React.FC = () => {
           <div className="mt-12 flex justify-center">
             <a 
               href="#chapter-1" 
-              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-trust-harbor hover:bg-trust-harbor-dark transition-colors duration-200"
+              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-trust-harbor hover:bg-trust-harbor-dark transition-colors duration-200"
             >
               Return to Table of Contents
             </a>

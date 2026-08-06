@@ -201,7 +201,7 @@ export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
     >
       {/* Card */}
       <div
-        className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onKeyDown={handleFormKeyDown}
       >
         {/* ── Header gradient bar ─────────────────────────────────── */}
@@ -215,7 +215,7 @@ export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
           </button>
 
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
               <ShieldCheck className="w-7 h-7 text-white" />
             </div>
             <div>
@@ -253,7 +253,7 @@ export const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 onFocus={(e) => e.target.select()}
                 disabled={isVerifying || isExpired}
-                className={`w-11 h-14 text-center text-2xl font-bold border-2 rounded-xl
+                className={`w-11 h-14 text-center text-xl font-bold border-2 rounded-xl
                   bg-gray-50 focus:outline-none focus:ring-2 transition-all
                   ${digit ? 'border-care-blue bg-blue-50 text-trust-harbor' : 'border-gray-200 text-gray-400'}
                   ${error ? 'border-red-400 bg-red-50' : ''}

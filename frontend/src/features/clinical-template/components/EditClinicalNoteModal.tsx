@@ -206,7 +206,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-350 h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-[95vw] max-w-350 h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
@@ -222,7 +222,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-hidden p-5">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
@@ -230,7 +230,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
           ) : (
             // Form Editor (single column)
             <div className="h-full overflow-y-auto">
-              <div className="space-y-6 max-w-3xl mx-auto">
+              <div className="space-y-4 max-w-3xl mx-auto">
                 {/* Meta Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
                   <div>

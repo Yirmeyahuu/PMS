@@ -76,7 +76,7 @@ export const CaseSessionHistoryModal: React.FC<CaseSessionHistoryModalProps> = (
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" onClick={onClose} />
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
+        <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
@@ -96,7 +96,7 @@ export const CaseSessionHistoryModal: React.FC<CaseSessionHistoryModalProps> = (
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto custom-scrollbar max-h-[330px]">
+          <div className="p-5 overflow-y-auto custom-scrollbar max-h-[330px]">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-600 rounded-full animate-spin mb-4" />
@@ -115,7 +115,7 @@ export const CaseSessionHistoryModal: React.FC<CaseSessionHistoryModalProps> = (
             ) : (
               <div className="relative">
                 <div className="absolute left-6 top-6 bottom-6 w-px bg-slate-200" />
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {logs.map((log) => (
                     <div key={log.id} className="relative flex gap-5 group">
                       <div className="relative mt-1">

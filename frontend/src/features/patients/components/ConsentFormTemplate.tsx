@@ -60,13 +60,14 @@ export const ConsentFormTemplate: React.FC<ConsentFormTemplateData> = ({
         }}
       >
         <div>
-          {clinicLogo ? (
-            <img
-              src={clinicLogo}
-              alt={clinicName}
-              style={{ height: '48px', maxWidth: '180px', objectFit: 'contain', display: 'block', marginBottom: '4px' }}
-            />
-          ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+            {clinicLogo && (
+              <img
+                src={clinicLogo}
+                alt={clinicName}
+                style={{ height: '48px', maxWidth: '180px', objectFit: 'contain', display: 'block' }}
+              />
+            )}
             <p
               style={{
                 fontSize: '18px',
@@ -78,7 +79,7 @@ export const ConsentFormTemplate: React.FC<ConsentFormTemplateData> = ({
             >
               {clinicName}
             </p>
-          )}
+          </div>
           <p
             style={{
               fontSize: '11px',

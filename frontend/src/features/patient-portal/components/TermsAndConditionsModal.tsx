@@ -15,7 +15,7 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
   return (
     <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden"
+        className="bg-white w-full max-w-3xl rounded-xl shadow-xl border border-gray-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">

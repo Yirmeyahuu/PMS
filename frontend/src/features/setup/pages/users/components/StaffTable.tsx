@@ -28,7 +28,7 @@ export const StaffTable: React.FC<Props> = ({
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-400">
         <Users className="w-12 h-12 mb-3 opacity-30" />
-        <p className="text-sm font-medium">No staff members found</p>
+        <p className="text-xs font-semibold">No staff members found</p>
         <p className="text-xs mt-1">Try adjusting your search or add a new staff member</p>
       </div>
     );

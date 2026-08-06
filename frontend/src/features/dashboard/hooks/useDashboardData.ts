@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   getDashboardMetrics,
-  getPatientStatistics,
   getDashboardAnalytics,
 } from '../api/dashboard.api';
 import type { DashboardData } from '../types/dashboard.types';
@@ -32,9 +31,8 @@ export const useDashboardData = () => {
         setIsLoading(true);
         setError(null);
 
-        const [metrics, patientStats, analytics] = await Promise.all([
+        const [metrics, analytics] = await Promise.all([
           getDashboardMetrics(),
-          getPatientStatistics(),
           getDashboardAnalytics(),
         ]);
 
@@ -46,8 +44,10 @@ export const useDashboardData = () => {
               percentage: metrics.today_occupancy_pct ?? 0,
             },
             todayBookings:      metrics.today_appointments,
-            todayNewClients:    patientStats.new_this_month,
-            todayCancellations: 0, // loaded via metrics if needed
+            todayNewClients:    metrics.today_new_clients,
+            todayExistingClients: metrics.today_existing_clients,
+            todayTotalClients:  metrics.today_total_clients,
+            todayCancellations: metrics.today_cancellations,
             todayConfirmed:     metrics.today_confirmed,
             todayDeclined:      metrics.today_declined,
             todayAwaiting:      metrics.today_awaiting,

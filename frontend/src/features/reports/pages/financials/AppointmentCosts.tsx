@@ -155,7 +155,7 @@ export const AppointmentCosts: React.FC = () => {
     <div className="flex-1 overflow-y-auto px-6 py-5">
 
       {/* ── Filters Bar ── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-3 mb-5 shadow-sm">
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
@@ -207,7 +207,7 @@ export const AppointmentCosts: React.FC = () => {
           />
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <StatCard
               label="Total Revenue"
               value={formatPeso(data.summary.total_revenue)}
@@ -254,7 +254,7 @@ export const AppointmentCosts: React.FC = () => {
 
           {/* Paid / Unpaid breakdown bar */}
           {data.summary.total_revenue > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-5">
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
               <div className="flex justify-between text-xs font-medium text-gray-600 mb-2">
                 <span>Paid ({((data.summary.paid_total / data.summary.total_revenue) * 100).toFixed(1)}%)</span>
                 <span>Unpaid ({((data.summary.unpaid_total / data.summary.total_revenue) * 100).toFixed(1)}%)</span>
@@ -269,7 +269,7 @@ export const AppointmentCosts: React.FC = () => {
                   style={{ width: `${(data.summary.unpaid_total / data.summary.total_revenue) * 100}%` }}
                 />
               </div>
-              <div className="flex gap-4 mt-2">
+              <div className="flex gap-3 mt-2">
                 <span className="flex items-center gap-1.5 text-xs text-gray-500">
                   <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />Paid
                 </span>
@@ -363,7 +363,7 @@ export const AppointmentCosts: React.FC = () => {
           </p>
           <button
             onClick={runReport}
-            className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors"
           >
             Run Report
           </button>

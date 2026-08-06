@@ -125,7 +125,7 @@ export const BranchConsentFormModal: React.FC<BranchConsentFormModalProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
           
           {/* Phase 4: Assign To Dropdown Logic */}
           <div>
@@ -186,7 +186,7 @@ export const BranchConsentFormModal: React.FC<BranchConsentFormModalProps> = ({
           </div>
 
           {loading ? (
-            <div className="flex justify-center p-8">
+            <div className="flex justify-center p-5">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
           ) : (

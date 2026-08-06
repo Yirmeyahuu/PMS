@@ -141,7 +141,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -154,7 +154,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
 
           {/* ── Service Name ─────────────────────────────────────────────── */}
           <div>

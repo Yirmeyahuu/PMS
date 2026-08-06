@@ -159,7 +159,7 @@ export const PatientInvoicesPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden rounded-2xl shadow-sm border border-gray-200">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 px-6 py-5">
+      <div className="flex-shrink-0 border-b border-gray-200 px-4 py-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
             <Receipt className="w-5 h-5 text-white" />

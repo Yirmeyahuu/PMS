@@ -16,8 +16,8 @@ export const CaseRequiredModal: React.FC<CaseRequiredModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-5">
           <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
             <AlertTriangle className="w-6 h-6 text-amber-600" />
           </div>

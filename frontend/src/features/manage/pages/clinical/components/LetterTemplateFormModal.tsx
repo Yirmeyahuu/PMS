@@ -130,9 +130,9 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
         className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center">
               <FileText className="w-5 h-5 text-sky-600" />
@@ -153,9 +153,9 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
-          <form id="letter-template-form" onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+        <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
+          <form id="letter-template-form" onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Template Name *
@@ -296,7 +296,7 @@ export const LetterTemplateFormModal: React.FC<LetterTemplateFormModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-2xl shrink-0">
+        <div className="p-5 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-2xl shrink-0">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"

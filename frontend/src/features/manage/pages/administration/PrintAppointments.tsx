@@ -142,7 +142,7 @@ export const AdminMenu1: React.FC = () => {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-4">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5">
@@ -170,7 +170,7 @@ export const AdminMenu1: React.FC = () => {
             <button
               onClick={handlePrint}
               disabled={appointments.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-semibold"
             >
               <Printer className="w-4 h-4" />
               Print / Export
@@ -275,12 +275,12 @@ export const AdminMenu1: React.FC = () => {
       {/* ── Summary cards ──────────────────────────────────────────────────── */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
             <p className="text-xs text-gray-500 mb-1">Total</p>
             <p className="text-2xl font-bold text-gray-900">{summary.total}</p>
           </div>
           {Object.entries(summary.by_status).map(([s, count]) => (
-            <div key={s} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={s} className="bg-white rounded-xl border border-gray-200 p-3">
               <p className="text-xs text-gray-500 mb-1">{s.replace('_', ' ')}</p>
               <p className="text-2xl font-bold text-gray-900">{count as number}</p>
             </div>
