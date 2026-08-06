@@ -49,7 +49,7 @@ const ClinicalWorkspaceLayout = () => {
           {/* Left Panel: Templates / Letters / Editor */}
           <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             {isEditorActive ? (
-              <ClinicalNoteEditor />
+              <ClinicalNoteEditor initialAppointmentId={state?.appointmentId} />
             ) : (
               <>
                 {/* Left Panel Tabs */}

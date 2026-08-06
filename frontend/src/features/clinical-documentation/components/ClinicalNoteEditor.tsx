@@ -9,7 +9,11 @@ import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, Templat
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
 
-export const ClinicalNoteEditor: React.FC = () => {
+export interface ClinicalNoteEditorProps {
+  initialAppointmentId?: number;
+}
+
+export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialAppointmentId }) => {
   const { patient, cases } = usePatientProfileContext();
   const {
     selectedCaseId,
@@ -64,7 +68,7 @@ export const ClinicalNoteEditor: React.FC = () => {
       }
 
       setAppointments(sortedAppointments);
-      return templatesData;
+      return { templatesData, sortedAppointments };
     } catch (err) {
       toast.error('Failed to load data for note editor');
       return null;
@@ -76,8 +80,24 @@ export const ClinicalNoteEditor: React.FC = () => {
   useEffect(() => {
     if (editorContext.type !== 'NEW_NOTE' && editorContext.type !== 'COPY_NOTE') return;
 
-    fetchData().then(async (fetchedTemplates) => {
-      if (!fetchedTemplates) return;
+    fetchData().then(async (result) => {
+      if (!result) return;
+      const { templatesData: fetchedTemplates, sortedAppointments } = result;
+      
+      // Initialize Appointment and Date
+      let defaultApptId: number | null = null;
+      let defaultDate = new Date().toISOString().split('T')[0];
+      
+      if (initialAppointmentId) {
+        const match = sortedAppointments.find(a => a.id === initialAppointmentId);
+        if (match) {
+          defaultApptId = initialAppointmentId;
+          defaultDate = match.date;
+        }
+      }
+      setSelectedAppointment(defaultApptId);
+      setNoteDate(defaultDate);
+
 
       if (editorContext.type === 'COPY_NOTE') {
         try {
@@ -127,11 +147,7 @@ export const ClinicalNoteEditor: React.FC = () => {
       }
     });
 
-    // Reset date and appointment state on mount
-    setSelectedAppointment(null);
-    setNoteDate(new Date().toISOString().split('T')[0]);
-
-  }, [editorContext, fetchData, setEditorContext]);
+  }, [editorContext, fetchData, setEditorContext, initialAppointmentId]);
 
   // Handle appointment selection
   const handleAppointmentSelect = (appointmentId: number) => {
@@ -279,7 +295,8 @@ export const ClinicalNoteEditor: React.FC = () => {
               <select
                 value={selectedAppointment ?? ''}
                 onChange={(e) => handleAppointmentSelect(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white"
+                disabled={!!initialAppointmentId}
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 ${!!initialAppointmentId ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white'}`}
               >
                 <option value="">Select a session...</option>
                 {appointments.map((appt) => {
