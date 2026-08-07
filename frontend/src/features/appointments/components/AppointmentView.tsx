@@ -1341,21 +1341,11 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const queryClient = useQueryClient();
 
   // Query to check if invoice exists for this appointment
-  const { data: outerPatientCase } = useQuery({
-    queryKey: ['patient-case', initialAppointment?.patient_case],
-    queryFn: async () => {
-      const cases = await getPatientCases(initialAppointment!.patient);
-      return cases.find(c => c.id === initialAppointment!.patient_case) ?? null;
-    },
-    enabled: !!initialAppointment?.patient && !!initialAppointment?.patient_case,
-  });
-  const outerPackageInvoiceId = (outerPatientCase?.session_source === 'PACKAGE') ? outerPatientCase.package_invoice : undefined;
-
+  // Query to check if invoice exists for this appointment
   const { data: hasInvoice } = useQuery({
-    queryKey: ['appointment-invoice-exists', initialAppointment?.id, outerPackageInvoiceId],
+    queryKey: ['appointment-invoice-exists', initialAppointment?.id],
     queryFn: async () => {
       if (!initialAppointment?.id) return false;
-      if (outerPackageInvoiceId) return true;
       try {
         const invoice = await billingApi.getByAppointment(initialAppointment.id);
         return !!invoice;
@@ -2198,7 +2188,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
 
             {/* ── Invoice Tab ── */}
             {activeTab === 'invoice' && (
-              <InvoiceTab appointment={appointment} invoiceIdToFetch={invoiceIdToFetch} />
+              <InvoiceTab appointment={appointment} />
             )}
 
             {/* ── Clinical Notes Tab ── */}

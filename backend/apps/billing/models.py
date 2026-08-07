@@ -189,11 +189,14 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         # ── Auto-update status ONLY based on THIS invoice's payment ───────────
         # Only auto-transition DRAFT/PENDING — never touch CANCELLED/OVERDUE
         # unless explicitly set by the caller.
-        if self.status not in ('CANCELLED', 'OVERDUE') and total > 0:
-            if paid >= total:
+        if self.status not in ('CANCELLED', 'OVERDUE'):
+            if total > 0:
+                if paid >= total:
+                    self.status = 'PAID'
+                elif paid > 0:
+                    self.status = 'PARTIALLY_PAID'
+            elif total == 0 and paid > 0:
                 self.status = 'PAID'
-            elif paid > 0:
-                self.status = 'PARTIALLY_PAID'
             # Leave DRAFT/PENDING as-is if nothing is paid yet
 
         super().save(*args, **kwargs)

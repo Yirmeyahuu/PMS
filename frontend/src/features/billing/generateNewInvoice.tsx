@@ -117,11 +117,8 @@ export default function GenerateNewInvoice() {
   });
 
   const { data: existingInvoice, isLoading: loadingInvoice } = useQuery<Invoice | null>({
-    queryKey: ['appointment-invoice', appointmentId, patientCase?.package_invoice],
+    queryKey: ['appointment-invoice', Number(appointmentId)],
     queryFn: async () => {
-      if (patientCase?.session_source === 'PACKAGE' && patientCase?.package_invoice) {
-        return billingApi.getInvoice(patientCase.package_invoice);
-      }
       return billingApi.getByAppointment(Number(appointmentId));
     },
     enabled: !!appointmentId && (appointment?.patient_case ? patientCase !== undefined : true),
@@ -223,7 +220,7 @@ export default function GenerateNewInvoice() {
     setItems([{
       description: isSubsequentPackage ? `${description} (Covered by Package)` : description,
       quantity: 1,
-      unit_price: matchedService ? Number(matchedService.price) : 0,
+      unit_price: isSubsequentPackage ? 0 : (matchedService ? Number(matchedService.price) : 0),
     }]);
   }, [appointment, clinicServices]);
 
@@ -318,8 +315,12 @@ export default function GenerateNewInvoice() {
     version_number: existingInvoice?.version_number ?? 1,
     invoice_date: invoiceDate,
     due_date: dueDate || null,
-    status: totalPaid >= totalAmount && totalAmount > 0 ? 'PAID' : totalPaid > 0 ? 'PARTIALLY_PAID' : 'DRAFT',
-    status_display: totalPaid >= totalAmount && totalAmount > 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Draft',
+    status: isPackageBilling ? 
+      (packageOutstandingPreview <= 0 ? 'PAID' : packagePaidPreview > 0 ? 'PARTIALLY_PAID' : 'DRAFT') :
+      (totalPaid >= totalAmount && totalAmount > 0 ? 'PAID' : totalPaid > 0 ? 'PARTIALLY_PAID' : 'DRAFT'),
+    status_display: isPackageBilling ?
+      (packageOutstandingPreview <= 0 ? 'Paid' : packagePaidPreview > 0 ? 'Partially Paid' : 'Draft') :
+      (totalPaid >= totalAmount && totalAmount > 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Draft'),
     subtotal: subtotal.toFixed(2),
     discount_amount: totalDiscount.toFixed(2),
     discount_percent: '0',
@@ -532,8 +533,8 @@ export default function GenerateNewInvoice() {
         }
       }
 
-      qc.invalidateQueries({ queryKey: ['appointment-invoice', appointmentId] });
-      qc.invalidateQueries({ queryKey: ['appointment-invoice-exists', appointmentId] });
+      qc.invalidateQueries({ queryKey: ['appointment-invoice', Number(appointmentId)] });
+      qc.invalidateQueries({ queryKey: ['appointment-invoice-exists', Number(appointmentId)] });
       qc.invalidateQueries({ queryKey: ['inventory-products-active'] });
       if (existingInvoice) {
         toast.success('Invoice Updated Successfully!');

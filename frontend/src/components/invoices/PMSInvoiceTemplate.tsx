@@ -71,7 +71,27 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
   ({ invoice, clinic, currencySymbol = '₱', showPaymentHistory = true, nextAppointment, className = '', packageSummary }, ref) => {
     const items: InvoiceItem[] = invoice.items ?? [];
     const payments: Payment[] = invoice.payments ?? [];
-    const statusStyle = STATUS_STYLES[invoice.status] ?? STATUS_STYLES.DRAFT;
+    
+    let displayStatus = invoice.status;
+    let displayStatusText = invoice.status_display ?? invoice.status.replace('_', ' ');
+
+    if (packageSummary) {
+      const pOutstanding = Number(packageSummary.outstanding_balance);
+      const pPaid = Number(packageSummary.total_paid);
+      
+      if (pOutstanding <= 0) {
+        displayStatus = 'PAID';
+        displayStatusText = 'Paid';
+      } else if (pPaid > 0) {
+        displayStatus = 'PARTIALLY_PAID';
+        displayStatusText = 'Partially Paid';
+      } else {
+        displayStatus = 'DRAFT';
+        displayStatusText = 'Draft';
+      }
+    }
+
+    const statusStyle = STATUS_STYLES[displayStatus] ?? STATUS_STYLES.DRAFT;
 
     const hasDiscounts = items.some((i) => parseFloat(i.discount_percent) > 0);
     const hasTaxes = items.some((i) => parseFloat(i.tax_percent) > 0);
@@ -135,7 +155,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
                 <span
                   className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
                 >
-                  {invoice.status_display ?? invoice.status.replace('_', ' ')}
+                  {displayStatusText}
                 </span>
               </div>
             </div>

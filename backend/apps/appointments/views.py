@@ -247,9 +247,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def edit(self, request, pk=None):
         appointment = self.get_object()
 
-        if appointment.status in ('CANCELLED', 'COMPLETED'):
+        if appointment.status == 'CANCELLED':
             return Response(
-                {'detail': 'Cannot edit a cancelled or completed appointment.'},
+                {'detail': 'Cannot edit a cancelled appointment.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
