@@ -4,7 +4,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Layers
 } from 'lucide-react';
 import { billingApi } from '@/features/billing/billing.api';
 import type { Invoice, PaymentMethod } from '@/types/billing';
@@ -12,6 +13,7 @@ import toast from 'react-hot-toast';
 import { usePatientProfileContext } from '../context/PatientProfileContext';
 import { InvoiceList, InvoiceDetailModal, AddPaymentModal, PrintInvoiceModal } from '@/features/billing/Invoices';
 import { SendInvoiceEmailModal } from '../components/SendInvoiceEmailModal';
+import { MasterInvoiceCard } from '../components/MasterInvoiceCard';
 
 export const PatientInvoicesPage: React.FC = () => {
   const { patientId, patient } = usePatientProfileContext();
@@ -156,25 +158,28 @@ export const PatientInvoicesPage: React.FC = () => {
     setPage(1);
   };
 
+  const masterInvoices = invoices.filter(inv => inv.patient_case !== null && inv.patient_case !== undefined);
+  const regularInvoices = invoices.filter(inv => inv.patient_case === null || inv.patient_case === undefined);
+
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden rounded-2xl shadow-sm border border-gray-200">
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden rounded-2xl shadow-sm border border-gray-200">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
-            <Receipt className="w-5 h-5 text-white" />
+      <div className="flex-shrink-0 border-b border-gray-200 px-6 py-5 bg-white">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-sky-600 flex items-center justify-center shadow-sm">
+            <Receipt className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Invoices</h1>
-            <p className="text-xs text-gray-400">
-              {patient?.full_name}'s billing history
+            <h1 className="text-2xl font-bold text-gray-900">Billing History</h1>
+            <p className="text-sm text-gray-500">
+              Manage master invoices and standard transactions for {patient?.full_name}
             </p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex-shrink-0 px-6 py-4 bg-gray-50 border-b border-gray-200">
+      <div className="flex-shrink-0 px-6 py-4 bg-white border-b border-gray-200">
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -214,21 +219,54 @@ export const PatientInvoicesPage: React.FC = () => {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-auto bg-white">
-        <InvoiceList
-          invoices={invoices}
-          isLoading={isLoading}
-          onView={handleViewInvoice}
-          onEdit={handleViewInvoice}
-          onDelete={handleDeleteInvoice}
-          onPrint={handlePrintInvoice}
-          onSendEmail={handleSendEmail}
-        />
+      <div className="flex-1 overflow-auto p-6 space-y-8">
+        
+        {masterInvoices.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="w-5 h-5 text-sky-600" />
+              <h2 className="text-lg font-bold text-gray-900">Master Invoices</h2>
+              <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                {masterInvoices.length} Packages
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {masterInvoices.map((inv) => (
+                <MasterInvoiceCard 
+                  key={inv.id} 
+                  invoice={inv} 
+                  onClick={handleViewInvoice} 
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="w-5 h-5 text-gray-600" />
+            <h2 className="text-lg font-bold text-gray-900">Standard Transactions</h2>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <InvoiceList
+              invoices={regularInvoices}
+              isLoading={isLoading}
+              onView={handleViewInvoice}
+              onEdit={handleViewInvoice}
+              onDelete={handleDeleteInvoice}
+              onPrint={handlePrintInvoice}
+              onSendEmail={handleSendEmail}
+            />
+          </div>
+        </section>
+
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-white">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-500">
               Page {page} of {totalPages}

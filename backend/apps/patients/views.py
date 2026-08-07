@@ -2081,11 +2081,12 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
                 'outstanding_balance': 0,
             })
         
-        # Find all non-deleted invoices linked to appointments belonging to this case
+        # Find all non-deleted invoices linked to this case
+        from django.db.models import Q
         case_invoices = Invoice.objects.filter(
-            appointment__patient_case=case,
+            Q(patient_case=case) | Q(appointment__patient_case=case),
             is_deleted=False,
-        ).prefetch_related('payments')
+        ).prefetch_related('payments').distinct()
         
         # If case.package_cost is empty, fallback to the first invoice's total amount
         package_total = case.package_cost

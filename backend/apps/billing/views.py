@@ -155,115 +155,134 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        existing = Invoice.objects.filter(
-            appointment=appt, is_deleted=False
-        ).first()
-        if existing:
+        # If it's a Package Case, we use Master Invoice logic
+        is_package = appt.patient_case and appt.patient_case.session_source == 'PACKAGE'
+        
+        # Determine existing invoice
+        existing = None
+        if is_package:
+            existing = appt.patient_case.billing_invoices.filter(is_deleted=False).first()
+            if not existing and appt.patient_case.package_invoice:
+                existing = appt.patient_case.package_invoice
+        else:
+            existing = Invoice.objects.filter(appointment=appt, is_deleted=False).first()
+
+        # If it's a standard appointment and an invoice exists, return it
+        if not is_package and existing:
             return Response(
                 InvoiceSerializer(existing).data,
                 status=status.HTTP_200_OK,
             )
+            
+        # If it's a package case, and this specific appointment already has a version, return the master invoice
+        if is_package and existing:
+            # Check if this appointment already has a version
+            if existing.versions.filter(appointment=appt).exists():
+                return Response(
+                    InvoiceSerializer(existing).data,
+                    status=status.HTTP_200_OK,
+                )
 
         try:
             with transaction.atomic():
-                invoice = Invoice.objects.create(
-                    clinic       = clinic,
-                    patient      = patient,
-                    appointment  = appt,
-                    invoice_date = data['invoice_date'],
-                    due_date     = data.get('due_date'),
-                    notes        = data.get('notes', ''),
-                    created_by   = request.user,
-                    status       = 'DRAFT',
-                )
-
-                items = data.get('items', [])
-                if items:
-                    for item_data in items:
-                        InvoiceItem.objects.create(
-                            invoice          = invoice,
-                            description      = item_data.get('description', ''),
-                            quantity         = item_data.get('quantity', 1),
-                            unit_price       = Decimal(str(item_data.get('unit_price', 0))),
-                            discount_percent = Decimal(str(item_data.get('discount_percent', 0))),
-                            tax_percent      = Decimal(str(item_data.get('tax_percent', 0))),
-                            service_code     = item_data.get('service_code', ''),
-                        )
-                else:
-                    from apps.clinics.services.models import Service as ClinicService
-
-                    description = appt.get_appointment_type_display()
-                    unit_price  = Decimal('0')
-
-                    main_clinic    = clinic.main_clinic if hasattr(clinic, 'main_clinic') else clinic
-                    all_branch_ids = list(
-                        main_clinic.get_all_branches().values_list('id', flat=True)
+                if not existing:
+                    # Create the Invoice
+                    invoice = Invoice.objects.create(
+                        clinic       = clinic,
+                        patient      = patient,
+                        appointment  = None if is_package else appt,
+                        patient_case = appt.patient_case if is_package else None,
+                        invoice_date = data['invoice_date'],
+                        due_date     = data.get('due_date'),
+                        notes        = data.get('notes', ''),
+                        created_by   = request.user,
+                        status       = 'DRAFT',
                     )
-
-                    service_qs = ClinicService.objects.filter(
-                        clinic_id__in=all_branch_ids,
-                        is_active=True,
-                        is_deleted=False,
-                    )
-
-                    matching_service = (
-                        service_qs.filter(name__iexact=description).first()
-                        or service_qs.filter(name__icontains=description).first()
-                        or service_qs.filter(name__icontains=appt.appointment_type).first()
-                        or service_qs.filter(name__iexact=appt.appointment_type).first()
-                    )
-
-                    # Word-by-word fallback
-                    if not matching_service:
-                        for word in [w for w in description.split() if len(w) > 3]:
-                            matching_service = service_qs.filter(name__icontains=word).first()
-                            if matching_service:
-                                break
-
-                    if matching_service:
-                        description = matching_service.name
-                        unit_price  = Decimal(str(matching_service.price))
-                        logger.info(
-                            "Auto-matched clinic service '%s' (₱%s) for appointment %s",
-                            matching_service.name, unit_price, appt.id,
-                        )
-                    else:
-                        if appt.practitioner and hasattr(appt.practitioner, 'consultation_fee'):
-                            unit_price = Decimal(str(appt.practitioner.consultation_fee or 0))
-                        logger.warning(
-                            "No clinic service matched for appointment %s (type=%s). unit_price=₱%s",
-                            appt.id, appt.appointment_type, unit_price,
-                        )
-
-                    is_covered_by_package = False
-                    if appt.patient_case and appt.patient_case.session_source == 'PACKAGE':
-                        if appt.patient_case.package_invoice:
-                            approved = appt.patient_case.approved_sessions or 0
-                            completed = appt.patient_case.completed_sessions or 0
-                            if appt.patient_case.is_unlimited or (approved - completed > 0):
-                                is_covered_by_package = True
-                                
-                    if is_covered_by_package:
-                        unit_price = Decimal('0')
-                        description = f"{description} (Covered by Package)"
-                        logger.info("Session %s covered by package allocation for case %s", appt.id, appt.patient_case.id)
-
-                    InvoiceItem.objects.create(
-                        invoice     = invoice,
-                        description = description,
-                        quantity    = 1,
-                        unit_price  = unit_price,
-                    )
-
-                invoice.update_totals()
-
-                # If this appointment belongs to a package case and it doesn't have a package invoice yet,
-                # designate this invoice as the Package Invoice.
-                if appt.patient_case and appt.patient_case.session_source == 'PACKAGE':
-                    if not appt.patient_case.package_invoice:
+                    
+                    if is_package:
                         appt.patient_case.package_invoice = invoice
                         appt.patient_case.save(update_fields=['package_invoice'])
-                        logger.info("Designated invoice %s as the Package Invoice for case %s", invoice.invoice_number, appt.patient_case.id)
+
+                    items = data.get('items', [])
+                    if items:
+                        for item_data in items:
+                            InvoiceItem.objects.create(
+                                invoice          = invoice,
+                                description      = item_data.get('description', ''),
+                                quantity         = item_data.get('quantity', 1),
+                                unit_price       = Decimal(str(item_data.get('unit_price', 0))),
+                                discount_percent = Decimal(str(item_data.get('discount_percent', 0))),
+                                tax_percent      = Decimal(str(item_data.get('tax_percent', 0))),
+                                service_code     = item_data.get('service_code', ''),
+                            )
+                    else:
+                        from apps.clinics.services.models import Service as ClinicService
+
+                        description = appt.get_appointment_type_display()
+                        unit_price  = Decimal('0')
+
+                        main_clinic    = clinic.main_clinic if hasattr(clinic, 'main_clinic') else clinic
+                        all_branch_ids = list(
+                            main_clinic.get_all_branches().values_list('id', flat=True)
+                        )
+
+                        service_qs = ClinicService.objects.filter(
+                            clinic_id__in=all_branch_ids,
+                            is_active=True,
+                            is_deleted=False,
+                        )
+
+                        matching_service = (
+                            service_qs.filter(name__iexact=description).first()
+                            or service_qs.filter(name__icontains=description).first()
+                            or service_qs.filter(name__icontains=appt.appointment_type).first()
+                            or service_qs.filter(name__iexact=appt.appointment_type).first()
+                        )
+
+                        if not matching_service:
+                            for word in [w for w in description.split() if len(w) > 3]:
+                                matching_service = service_qs.filter(name__icontains=word).first()
+                                if matching_service:
+                                    break
+
+                        if matching_service:
+                            description = matching_service.name
+                            unit_price  = Decimal(str(matching_service.price))
+                        else:
+                            if appt.practitioner and hasattr(appt.practitioner, 'consultation_fee'):
+                                unit_price = Decimal(str(appt.practitioner.consultation_fee or 0))
+
+                        InvoiceItem.objects.create(
+                            invoice     = invoice,
+                            description = description,
+                            quantity    = 1,
+                            unit_price  = unit_price,
+                        )
+
+                    invoice.update_totals()
+                    
+                    # Force creation of Version 1 for this appointment
+                    invoice.refresh_from_db()
+                    version = invoice.create_version_snapshot(
+                        user=request.user,
+                        change_summary={'created': 'Initial invoice created.'},
+                        ip_address=self._get_client_ip()
+                    )
+                    version.appointment = appt
+                    version.save(update_fields=['appointment'])
+                    
+                else:
+                    # Master Invoice already exists. We just append a version for this new appointment!
+                    invoice = existing
+                    
+                    # Don't add a new line item, just create a new version snapshot indicating the session occurred
+                    version = invoice.create_version_snapshot(
+                        user=request.user,
+                        change_summary={'session_added': f'Session {appt.id} recorded.'},
+                        ip_address=self._get_client_ip()
+                    )
+                    version.appointment = appt
+                    version.save(update_fields=['appointment'])
 
         except Exception as exc:
             logger.exception("Failed to create invoice for appointment %s: %s", appt.id, exc)
@@ -298,7 +317,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        invoice = self.get_queryset().filter(appointment_id=appt_id).first()
+        from django.db.models import Q
+        invoice = self.get_queryset().filter(
+            Q(appointment_id=appt_id) | Q(versions__appointment_id=appt_id)
+        ).distinct().first()
 
         if not invoice:
             return Response(None, status=status.HTTP_200_OK)

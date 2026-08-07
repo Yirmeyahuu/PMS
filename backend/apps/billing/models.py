@@ -80,6 +80,14 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='billing_invoices',
     )
+    patient_case = models.ForeignKey(
+        'patients.PatientCase',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='billing_invoices',
+        help_text='If set, this Invoice serves as the Master Invoice for the Case.'
+    )
     appointment = models.ForeignKey(
         'appointments.Appointment',
         on_delete=models.SET_NULL,
@@ -270,7 +278,7 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
         # Refresh local instance to match DB
         self.refresh_from_db()
 
-    def create_version_snapshot(self, user, change_summary, version_number=None, ip_address=None):
+    def create_version_snapshot(self, user, change_summary, version_number=None, ip_address=None, appointment=None, payment_made=0):
         """Create an immutable InvoiceVersion snapshot for the given invoice state."""
         if version_number is None:
             self.version_number += 1
@@ -289,7 +297,7 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
             }
             for item in self.items.all()
         ]
-        InvoiceVersion.objects.create(
+        version = InvoiceVersion.objects.create(
             invoice          = self,
             version_number   = version_number,
             invoice_date     = self.invoice_date,
@@ -301,6 +309,8 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
             tax_amount       = self.tax_amount,
             tax_percent      = self.tax_percent,
             total_amount     = self.total_amount,
+            appointment      = appointment,
+            payment_made     = payment_made,
             amount_paid      = self.amount_paid,
             balance_due      = self.balance_due,
             philhealth_coverage = getattr(self, 'philhealth_coverage', 0),
@@ -322,6 +332,7 @@ class Invoice(TimeStampedModel, SoftDeleteModel):
             changes    = change_summary,
             ip_address = ip_address or '127.0.0.1',
         )
+        return version
 
 
 class InvoiceItem(TimeStampedModel):
@@ -483,6 +494,20 @@ class InvoiceVersion(TimeStampedModel):
         related_name='versions',
     )
     version_number = models.PositiveIntegerField()
+
+    appointment = models.ForeignKey(
+        'appointments.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text='The appointment that generated this invoice version.'
+    )
+    payment_made = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        help_text='The payment contributed during this specific version/session.'
+    )
 
     # ── Snapshot of editable invoice fields ───────────────────────────────────
     invoice_date      = models.DateField()

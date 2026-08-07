@@ -27,6 +27,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     patient_number   = serializers.CharField(source='patient.patient_number', read_only=True)
     patient_email    = serializers.CharField(source='patient.email', read_only=True)
     clinic_name      = serializers.CharField(source='clinic.name',            read_only=True)
+    case_name        = serializers.CharField(source='patient_case.case_name', read_only=True)
+    package_name     = serializers.CharField(source='patient_case.session_source', read_only=True)
+    version_count    = serializers.IntegerField(source='versions.count', read_only=True)
     created_by_name  = serializers.SerializerMethodField()
     modified_by_name = serializers.SerializerMethodField()
     status_display   = serializers.CharField(source='get_status_display',     read_only=True)
@@ -62,8 +65,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         }
 
     def get_is_package_invoice(self, obj) -> bool:
-        # Avoid N+1 if we prefetch package_cases, but for now simple exists() works
-        return getattr(obj, 'package_cases', obj.package_cases.all()).exists()
+        return obj.patient_case_id is not None or getattr(obj, 'package_cases', obj.package_cases.all()).exists()
 
     def get_created_by_name(self, obj) -> str | None:
         return obj.created_by.get_full_name() if obj.created_by else None

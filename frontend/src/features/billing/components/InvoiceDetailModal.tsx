@@ -102,7 +102,9 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           {/* LEFT SIDEBAR: VERSION HISTORY */}
           <div className="w-full md:w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
             <div className="p-3 border-b border-gray-200">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Version History</h3>
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">
+                {invoice.patient_case ? 'Session Timeline' : 'Version History'}
+              </h3>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {isLoadingVersions && versions.length === 0 ? (
@@ -119,7 +121,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-sm font-bold ${isCurrentVersion ? 'text-sky-900' : 'text-gray-700'}`}>
-                        Version {invoice.version_number}
+                        {invoice.patient_case ? `Master Status (v${invoice.version_number})` : `Version ${invoice.version_number}`}
                       </span>
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">
                         CURRENT
@@ -152,7 +154,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className={`text-sm font-bold ${isSelected ? 'text-sky-900' : 'text-gray-700'}`}>
-                            Version {v.version_number}
+                            {invoice.patient_case ? (v.appointment ? `Session (Appt ${v.appointment})` : `Initial Creation`) : `Version ${v.version_number}`}
                           </span>
                         </div>
                         <div className="mt-2 space-y-0.5">
@@ -165,6 +167,11 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                           <p className="text-[11px] text-gray-400 mt-1">
                             {new Date(v.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </p>
+                          {invoice.patient_case && parseFloat(v.payment_made || '0') > 0 && (
+                            <p className="text-[11px] font-bold text-emerald-600 mt-1">
+                              + ₱{parseFloat(v.payment_made).toLocaleString()} Paid
+                            </p>
+                          )}
                         </div>
                       </button>
                     );
