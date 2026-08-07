@@ -22,7 +22,7 @@ from .serializers import (
 )
 from apps.patients.models import PortalBooking
 from apps.clinics.models import Clinic
-from apps.billing.models import Invoice
+from apps.billing.models import Invoice, InvoiceVersion
 from apps.appointments.email_service import (
     send_appointment_reminder_email,
     send_appointment_cancellation_email,
@@ -78,6 +78,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             'billing_invoices',
             queryset=Invoice.objects.filter(is_deleted=False).only('id'),
             to_attr='_active_invoices',
+        ),
+        Prefetch(
+            'invoiceversion_set',
+            queryset=InvoiceVersion.objects.filter(invoice__is_deleted=False).only('id', 'appointment_id', 'invoice_id'),
+            to_attr='_invoice_versions',
         ),
     )
     serializer_class   = AppointmentSerializer

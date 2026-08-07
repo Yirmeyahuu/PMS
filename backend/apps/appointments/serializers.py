@@ -94,9 +94,22 @@ class AppointmentSerializer(serializers.ModelSerializer):
         Uses _active_invoices prefetch when available to avoid N+1 queries.
         """
         active_invoices = getattr(obj, '_active_invoices', None)
+        active_versions = getattr(obj, '_invoice_versions', None)
+        
+        has_direct = False
         if active_invoices is not None:
-            return len(active_invoices) > 0
-        return obj.billing_invoices.filter(is_deleted=False).exists()
+            has_direct = len(active_invoices) > 0
+        else:
+            has_direct = obj.billing_invoices.filter(is_deleted=False).exists()
+            
+        has_version = False
+        if active_versions is not None:
+            has_version = len(active_versions) > 0
+        else:
+            from apps.billing.models import InvoiceVersion
+            has_version = InvoiceVersion.objects.filter(appointment=obj, invoice__is_deleted=False).exists()
+            
+        return has_direct or has_version
 
     def get_case_remaining_sessions(self, obj) -> int | None:
         if obj.patient_case_id:
