@@ -32,6 +32,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     # ── Has invoice ───────────────────────────────────────────────────────────
     has_invoice = serializers.SerializerMethodField()
     is_covered_by_package = serializers.SerializerMethodField()
+    package_invoice_id = serializers.SerializerMethodField()
     
     patient_case = serializers.PrimaryKeyRelatedField(
         queryset=PatientCase.objects.all(), required=False, allow_null=True
@@ -47,11 +48,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'practitioner', 'practitioner_name', 'practitioner_avatar',
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
-            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited',
+            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count',
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
-            'reminder_sent', 'reminder_sent_at', 'has_invoice', 'is_covered_by_package',
+            'reminder_sent', 'reminder_sent_at', 'has_invoice', 'is_covered_by_package', 'package_invoice_id',
             'confirmation_sent', 'confirmation_sent_at', 'confirmation_status',
             'patient_reply', 'patient_reply_at',
             'dna_followup_sent', 'dna_followup_sent_at',
@@ -66,17 +67,27 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
-            'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package',
-            'case_remaining_sessions', 'case_is_unlimited',
+            'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package', 'package_invoice_id',
+            'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count',
             'created_at', 'updated_at',
         ]
 
     def get_is_covered_by_package(self, obj) -> bool:
-        """Check if this appointment is covered by an already billed package."""
+        """Check if this appointment belongs to a package case."""
         if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
-            # It's considered covered if the package invoice has already been generated
-            return obj.patient_case.package_invoice_id is not None
+            return True
         return False
+        
+    def get_package_invoice_id(self, obj) -> int | None:
+        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+            return obj.patient_case.package_invoice_id
+        return None
+        
+    package_invoices_count = serializers.SerializerMethodField()
+    def get_package_invoices_count(self, obj) -> int:
+        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+            return obj.patient_case.case_appointments.filter(billing_invoices__isnull=False, billing_invoices__is_deleted=False).distinct().count()
+        return 0
 
     def get_has_invoice(self, obj) -> bool:
         """Check if this appointment has a non-deleted invoice.

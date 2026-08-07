@@ -27,6 +27,11 @@ export interface PMSInvoiceTemplateProps {
   showPaymentHistory?: boolean;
   nextAppointment?: NextAppointmentInfo | null;
   className?: string;
+  packageSummary?: {
+    package_total: string | number;
+    total_paid: string | number;
+    outstanding_balance: string | number;
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -63,7 +68,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateProps>(
-  ({ invoice, clinic, currencySymbol = '₱', showPaymentHistory = true, nextAppointment, className = '' }, ref) => {
+  ({ invoice, clinic, currencySymbol = '₱', showPaymentHistory = true, nextAppointment, className = '', packageSummary }, ref) => {
     const items: InvoiceItem[] = invoice.items ?? [];
     const payments: Payment[] = invoice.payments ?? [];
     const statusStyle = STATUS_STYLES[invoice.status] ?? STATUS_STYLES.DRAFT;
@@ -198,10 +203,32 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             </div>
           </div>
 
+          {packageSummary && (
+            <div className="mb-8">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-3">
+                Package Billing Summary
+              </p>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Package Total</p>
+                  <p className="text-xl font-bold text-gray-900">{fmt(packageSummary.package_total, currencySymbol)}</p>
+                </div>
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Already Paid</p>
+                  <p className="text-xl font-bold text-gray-900">{fmt(packageSummary.total_paid, currencySymbol)}</p>
+                </div>
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Outstanding</p>
+                  <p className="text-xl font-bold text-gray-900">{fmt(packageSummary.outstanding_balance, currencySymbol)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Items Table ── */}
           <div className="mb-8">
             <p className="text-[10px] font-bold uppercase tracking-widest text-sky-600 mb-3">
-              Services / Items
+              {packageSummary ? "Session Details" : "Services / Items"}
             </p>
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
@@ -291,9 +318,9 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             <div className="w-80 border border-gray-200 rounded-xl overflow-hidden">
               {/* Subtotal */}
               <div className="flex justify-between px-4 py-2.5 text-sm">
-                <span className="text-gray-500">Subtotal</span>
+                <span className="text-gray-500">{packageSummary ? 'Package Subtotal' : 'Subtotal'}</span>
                 <span className="font-semibold text-gray-800">
-                  {fmt(invoice.subtotal, currencySymbol)}
+                  {fmt(packageSummary ? packageSummary.package_total : invoice.subtotal, currencySymbol)}
                 </span>
               </div>
 
@@ -347,30 +374,31 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
 
               {/* Grand Total */}
               <div className="flex justify-between px-4 py-3 bg-sky-600 text-white">
-                <span className="font-bold text-sm">Total Amount</span>
+                <span className="font-bold text-sm">{packageSummary ? 'Package Total' : 'Total Amount'}</span>
                 <span className="font-bold text-base">
-                  {fmt(invoice.total_amount, currencySymbol)}
+                  {fmt(packageSummary ? packageSummary.package_total : invoice.total_amount, currencySymbol)}
                 </span>
               </div>
 
               {/* Amount Paid */}
-              {amountPaid > 0 && (
+              {(amountPaid > 0 || packageSummary) && (
                 <div className="flex justify-between px-4 py-2.5 text-sm">
-                  <span className="text-gray-500">Amount Paid</span>
+                  <span className="text-gray-500">{packageSummary ? 'Total Amount Paid' : 'Amount Paid'}</span>
                   <span className="font-semibold text-emerald-600">
-                    {fmt(invoice.amount_paid, currencySymbol)}
+                    {fmt(packageSummary ? packageSummary.total_paid : invoice.amount_paid, currencySymbol)}
                   </span>
                 </div>
               )}
 
               {/* Balance Due */}
               <div className="flex justify-between px-4 py-3 border-t-2 border-gray-200">
-                <span className="font-bold text-sm text-gray-800">Balance Due</span>
+                <span className="font-bold text-sm text-gray-800">{packageSummary ? 'Package Balance Due' : 'Balance Due'}</span>
                 <span
-                  className={`font-bold text-base ${balanceDue <= 0 ? 'text-emerald-600' : 'text-red-600'
-                    }`}
+                  className={`font-bold text-base ${
+                    parseFloat(packageSummary ? String(packageSummary.outstanding_balance) : invoice.balance_due) <= 0 ? 'text-emerald-600' : 'text-red-600'
+                  }`}
                 >
-                  {fmt(invoice.balance_due, currencySymbol)}
+                  {fmt(packageSummary ? packageSummary.outstanding_balance : invoice.balance_due, currencySymbol)}
                 </span>
               </div>
             </div>

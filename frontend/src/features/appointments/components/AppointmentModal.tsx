@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X, Calendar, Clock, Timer, User, FileText, FolderKanban,
@@ -57,6 +58,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const queryClient = useQueryClient();
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [notes, setNotes] = useState('');
@@ -252,6 +254,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setFormData(prev => ({ ...prev, patient_case: savedCase.id }));
       if (errors.patient_case) setErrors(prev => ({ ...prev, patient_case: '' }));
       setShowCreateCaseModal(false);
+      queryClient.invalidateQueries({ queryKey: ['patient-cases', Number(formData.patient)] });
       toast.success('Case created successfully!');
     } catch (err) {
       toast.error('Failed to create case');
@@ -313,6 +316,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
           });
           setPatientCases(prev => [...prev, savedCase]);
           finalCaseId = savedCase.id;
+          queryClient.invalidateQueries({ queryKey: ['patient-cases', Number(formData.patient)] });
         } catch (err: any) {
           toast.error(err.response?.data?.error || 'Failed to create case');
           setSaving(false);
@@ -516,16 +520,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     ) : loadingCases ? (
                       <div className="flex items-center justify-center py-4">
                         <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-600 border-t-transparent" />
-                      </div>
-                    ) : patientCases.length === 0 ? (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-semibold text-amber-800 mb-1">No active cases found</p>
-                            <p className="text-xs text-amber-700">This patient must have an active case to book an appointment.</p>
-                          </div>
-                        </div>
                       </div>
                     ) : isCreatingInlineCase ? (
                       <div className="bg-sky-100 border border-sky-200 rounded-xl p-4 space-y-4 shadow-sm">

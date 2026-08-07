@@ -12,7 +12,16 @@ def auto_populate_package_case(appointment):
         return
 
     if appointment.patient_case:
-        # Already linked, reuse the existing case.
+        # Already linked. Check if we need to initialize session allocation.
+        case = appointment.patient_case
+        if case.approved_sessions is None or case.approved_sessions == 0:
+            case.approved_sessions = appointment.service.session_allocation or 0
+            case.completed_sessions = 0
+            case.session_source = 'PACKAGE'
+            case.is_unlimited = False
+            if not case.package_cost or case.package_cost == 0:
+                case.package_cost = appointment.service.price
+            case.save(update_fields=['approved_sessions', 'completed_sessions', 'session_source', 'is_unlimited', 'package_cost'])
         return
 
     # No Case assigned. Create a new one.

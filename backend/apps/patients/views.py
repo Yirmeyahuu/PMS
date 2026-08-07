@@ -2065,6 +2065,47 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         case.save(update_fields=['is_archived'])
         return Response({'status': 'restored'})
 
+    @action(detail=True, methods=['get'], url_path='payment-summary')
+    def payment_summary(self, request, pk=None):
+        """GET /api/cases/{id}/payment-summary/ — Returns package payment totals for a case."""
+        from decimal import Decimal
+        from apps.billing.models import Invoice
+        
+        case = self.get_object()
+        
+        if case.session_source != 'PACKAGE':
+            return Response({
+                'is_package': False,
+                'package_total': 0,
+                'total_paid': 0,
+                'outstanding_balance': 0,
+            })
+        
+        # Find all non-deleted invoices linked to appointments belonging to this case
+        case_invoices = Invoice.objects.filter(
+            appointment__patient_case=case,
+            is_deleted=False,
+        ).prefetch_related('payments')
+        
+        # If case.package_cost is empty, fallback to the first invoice's total amount
+        package_total = case.package_cost
+        if not package_total:
+            first_invoice = case_invoices.order_by('created_at').first()
+            package_total = first_invoice.total_amount if first_invoice else Decimal('0')
+
+        total_paid = sum(
+            sum(p.amount for p in inv.payments.all())
+            for inv in case_invoices
+        )
+        outstanding_balance = max(Decimal('0'), package_total - total_paid)
+        
+        return Response({
+            'is_package': True,
+            'package_total': str(package_total),
+            'total_paid': str(total_paid),
+            'outstanding_balance': str(outstanding_balance),
+        })
+
     @action(detail=True, methods=['get'])
     def deletion_impact(self, request, pk=None):
         case = self.get_object()

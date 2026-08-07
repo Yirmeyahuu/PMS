@@ -36,6 +36,7 @@ export interface Appointment {
   reminder_sent_at: string | null;
   has_invoice:      boolean; // Whether this appointment has an invoice
   is_covered_by_package?: boolean;
+  package_invoice_id?: number | null;
   confirmation_sent?: boolean;
   confirmation_sent_at?: string | null;
   confirmation_status?: 'PENDING' | 'CONFIRMED' | 'DECLINED';

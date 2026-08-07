@@ -31,6 +31,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
   const [content, setContent] = useState<Record<string, unknown>>({});
   const [existingNotes, setExistingNotes] = useState<ClinicalNote[]>([]);
   const [allDrafts, setAllDrafts] = useState<ClinicalNote[]>([]);
+  const [isSessionLocked, setIsSessionLocked] = useState(false);
 
   // Get current case title
   const currentCaseTitle = useMemo(() => {
@@ -68,7 +69,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       }
 
       setAppointments(sortedAppointments);
-      return { templatesData, sortedAppointments };
+      return { templatesData, sortedAppointments, signedNotes };
     } catch (err) {
       toast.error('Failed to load data for note editor');
       return null;
@@ -82,21 +83,26 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
     fetchData().then(async (result) => {
       if (!result) return;
-      const { templatesData: fetchedTemplates, sortedAppointments } = result;
+      const { templatesData: fetchedTemplates, sortedAppointments, signedNotes } = result;
       
       // Initialize Appointment and Date
       let defaultApptId: number | null = null;
       let defaultDate = new Date().toISOString().split('T')[0];
+      let isAutoSelected = false;
       
       if (initialAppointmentId) {
         const match = sortedAppointments.find(a => a.id === initialAppointmentId);
-        if (match) {
+        const hasNote = signedNotes.some(n => n.appointment === initialAppointmentId);
+        
+        if (match && !hasNote) {
           defaultApptId = initialAppointmentId;
           defaultDate = match.date;
+          isAutoSelected = true;
         }
       }
       setSelectedAppointment(defaultApptId);
       setNoteDate(defaultDate);
+      setIsSessionLocked(isAutoSelected);
 
 
       if (editorContext.type === 'COPY_NOTE') {
@@ -295,8 +301,8 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
               <select
                 value={selectedAppointment ?? ''}
                 onChange={(e) => handleAppointmentSelect(Number(e.target.value))}
-                disabled={!!initialAppointmentId}
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 ${!!initialAppointmentId ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white'}`}
+                disabled={isSessionLocked}
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 ${isSessionLocked ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed' : 'border-slate-300 bg-white'}`}
               >
                 <option value="">Select a session...</option>
                 {appointments.map((appt) => {

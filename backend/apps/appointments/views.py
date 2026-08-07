@@ -211,6 +211,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         old_status = serializer.instance.status
         appointment = serializer.save(updated_by=self.request.user)
 
+        # ── Auto-populate case for package services if needed ───────────────
+        from apps.patients.services.case_service import auto_populate_package_case
+        auto_populate_package_case(appointment)
+
         # ── Trigger DNA follow-up when status changes to DNA/NO_SHOW ──────
         new_status = appointment.status
         if new_status in ('DNA', 'NO_SHOW') and old_status not in ('DNA', 'NO_SHOW'):

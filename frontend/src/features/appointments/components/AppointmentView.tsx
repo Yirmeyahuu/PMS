@@ -7,6 +7,7 @@ import {
   Save, XCircle, Search, UserCircle, ClipboardList,
   ExternalLink, Repeat, List, Stethoscope, Repeat2,
   Phone, Mail, Home, ShieldCheck, AlertTriangle, Mailbox,
+  Calculator,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +27,8 @@ import {
   getPatientCases,
   createPatientCase as apiCreatePatientCase,
   updatePatientCase as apiUpdatePatientCase,
+  getCasePaymentSummary,
+  type CasePaymentSummary
 } from '@/features/patients/patientCases.api';
 import type { PatientCase, PatientCaseStatus, PatientCasePayer } from '@/types/patient';
 import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
@@ -864,9 +867,23 @@ const InlineAppointmentCard = React.forwardRef<
 });
 
 // ── Invoice Tab ───────────────────────────────────────────────────────────────
-const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
+const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number }> = ({ appointment, invoiceIdToFetch }) => {
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  const { data: apiPatientCases = [] } = useQuery<PatientCase[]>({
+    queryKey: ['patient-cases', appointment?.patient],
+    queryFn: () => getPatientCases(appointment!.patient),
+    enabled: !!appointment?.patient,
+  });
+  const patientCases = Array.isArray(apiPatientCases) ? apiPatientCases : [];
+  const isPackageBilling = appointment?.patient_case && patientCases.find(c => c.id === appointment.patient_case)?.session_source === 'PACKAGE';
+  
+  const { data: casePaymentSummary } = useQuery<CasePaymentSummary | null>({
+    queryKey: ['case-payment-summary', appointment?.patient_case],
+    queryFn: () => appointment?.patient_case ? getCasePaymentSummary(appointment.patient_case) : Promise.resolve(null),
+    enabled: !!appointment?.patient_case && !!isPackageBilling,
+  });
 
   const [isEditing,   setIsEditing]   = useState(false);
   const [editItems,   setEditItems]   = useState<EditableItem[]>([]);
@@ -879,8 +896,11 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   const { data: invoice, isLoading, error: fetchError, refetch } = useQuery<Invoice | null>({
-    queryKey: ['appointment-invoice', appointment.id],
-    queryFn:  () => billingApi.getByAppointment(appointment.id),
+    queryKey: ['appointment-invoice', appointment.id, invoiceIdToFetch],
+    queryFn:  async () => {
+      if (invoiceIdToFetch) return billingApi.getInvoice(invoiceIdToFetch);
+      return billingApi.getByAppointment(appointment.id);
+    },
     retry: (failureCount, error: any) => {
       if (error?.response?.status === 404) return false;
       return failureCount < 2;
@@ -992,22 +1012,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
   }
 
   if (!invoice) {
-    if (appointment.is_covered_by_package) {
-      return (
-        <div className="space-y-4">
-          <AppointmentSummary appointment={appointment} />
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-3 shadow-sm">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-            <p className="text-gray-900 font-medium text-center">Covered by Package</p>
-            <p className="text-sm text-gray-500 text-center mt-1 max-w-xs">
-              This appointment is covered by a prepaid package. No additional treatment invoice is required.
-            </p>
-          </div>
-        </div>
-      );
-    }
+
 
     return (
       <div className="space-y-4">
@@ -1184,6 +1189,29 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <p className="text-sm font-semibold text-gray-800 mt-0.5">{invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : <span className="text-gray-400">—</span>}</p>
         </div>
       </div>
+      {isPackageBilling && casePaymentSummary && (
+        <div className="bg-sky-50 border border-sky-100 rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calculator className="w-4 h-4 text-sky-600" />
+            <h3 className="text-sm font-bold text-sky-900 uppercase tracking-wide">Package Billing Summary</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-lg p-2.5 border border-sky-100/50">
+              <p className="text-[10px] font-semibold text-sky-600/70 uppercase">Package Total</p>
+              <p className="text-sm font-bold text-gray-900 mt-0.5">₱{Number(casePaymentSummary.package_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-white rounded-lg p-2.5 border border-sky-100/50">
+              <p className="text-[10px] font-semibold text-emerald-600/70 uppercase">Already Paid</p>
+              <p className="text-sm font-bold text-emerald-600 mt-0.5">₱{Number(casePaymentSummary.total_paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-white rounded-lg p-2.5 border border-sky-100/50">
+              <p className="text-[10px] font-semibold text-red-600/70 uppercase">Outstanding</p>
+              <p className="text-sm font-bold text-red-600 mt-0.5">₱{Number(casePaymentSummary.outstanding_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {invoice.items.length > 0 && (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
           <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
@@ -1226,14 +1254,36 @@ const InvoiceTab: React.FC<{ appointment: Appointment }> = ({ appointment }) => 
           <span className="text-sm font-bold text-gray-900">Total</span>
           <span className="text-base font-bold text-gray-900">₱{parseFloat(invoice.total_amount).toLocaleString()}</span>
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Amount Paid</span>
-          <span className="text-green-600 font-medium">₱{parseFloat(invoice.amount_paid).toLocaleString()}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-semibold text-gray-700">Balance Due</span>
-          <span className={`font-bold ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{parseFloat(invoice.balance_due).toLocaleString()}</span>
-        </div>
+
+        {isPackageBilling && casePaymentSummary ? (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Total Paid (All Sessions)</span>
+              <span className="text-green-600 font-medium">₱{Number(casePaymentSummary.total_paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Amount Paid for this session</span>
+              <span className="text-green-600 font-medium">₱{parseFloat(invoice.amount_paid).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-gray-700">Package Balance Due</span>
+              <span className={`font-bold ${Number(casePaymentSummary.outstanding_balance) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                ₱{Number(casePaymentSummary.outstanding_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Amount Paid</span>
+              <span className="text-green-600 font-medium">₱{parseFloat(invoice.amount_paid).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-gray-700">Balance Due</span>
+              <span className={`font-bold ${parseFloat(invoice.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{parseFloat(invoice.balance_due).toLocaleString()}</span>
+            </div>
+          </>
+        )}
       </div>
       {invoice.notes && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -1291,10 +1341,21 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const queryClient = useQueryClient();
 
   // Query to check if invoice exists for this appointment
+  const { data: outerPatientCase } = useQuery({
+    queryKey: ['patient-case', initialAppointment?.patient_case],
+    queryFn: async () => {
+      const cases = await getPatientCases(initialAppointment!.patient);
+      return cases.find(c => c.id === initialAppointment!.patient_case) ?? null;
+    },
+    enabled: !!initialAppointment?.patient && !!initialAppointment?.patient_case,
+  });
+  const outerPackageInvoiceId = (outerPatientCase?.session_source === 'PACKAGE') ? outerPatientCase.package_invoice : undefined;
+
   const { data: hasInvoice } = useQuery({
-    queryKey: ['appointment-invoice-exists', initialAppointment?.id],
+    queryKey: ['appointment-invoice-exists', initialAppointment?.id, outerPackageInvoiceId],
     queryFn: async () => {
       if (!initialAppointment?.id) return false;
+      if (outerPackageInvoiceId) return true;
       try {
         const invoice = await billingApi.getByAppointment(initialAppointment.id);
         return !!invoice;
@@ -1383,9 +1444,11 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
     enabled: !!appointment?.patient,
   });
 
-  const patientCases = casesVersion >= 0 && appointment
+  const patientCases = Array.isArray(apiPatientCases) && casesVersion >= 0 && appointment
     ? apiPatientCases
     : [];
+
+
 
   const { data: communicationLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['communication_logs', appointment?.id],
@@ -1415,7 +1478,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   const isTerminal    = isCancelled || isCompleted;
 
 const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = {};
-  patientCases.forEach((caseItem: PatientCase) => {
+  (Array.isArray(patientCases) ? patientCases : []).forEach((caseItem: PatientCase) => {
     const notes = getCaseNotes(appointment.patient, String(caseItem.id), patientNotes);
     const noteCount = getCaseNoteCount(appointment.patient, String(caseItem.id), patientNotes);
     const latestNoteDate = notes
@@ -1523,7 +1586,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
               { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
               { 
                 key: 'invoice', 
-                label: appointment?.is_covered_by_package ? 'Covered by Package' : (hasInvoice ? 'View Invoice' : 'Generate Invoice'), 
+                label: hasInvoice ? 'View Invoice' : 'Generate Invoice', 
                 icon: Receipt 
               },
               { key: 'communications', label: 'Communications', icon: Mailbox },
@@ -2135,7 +2198,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
 
             {/* ── Invoice Tab ── */}
             {activeTab === 'invoice' && (
-              <InvoiceTab appointment={appointment} />
+              <InvoiceTab appointment={appointment} invoiceIdToFetch={invoiceIdToFetch} />
             )}
 
             {/* ── Clinical Notes Tab ── */}

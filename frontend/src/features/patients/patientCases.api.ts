@@ -97,3 +97,15 @@ export const getCaseSessionLogs = async (caseId: number): Promise<any[]> => {
   const response = await axiosInstance.get(`${BASE_URL}${caseId}/session_logs/`);
   return response.data;
 };
+
+export interface CasePaymentSummary {
+  is_package: boolean;
+  package_total: string;
+  total_paid: string;
+  outstanding_balance: string;
+}
+
+export const getCasePaymentSummary = async (caseId: number): Promise<CasePaymentSummary> => {
+  const response = await axiosInstance.get(`${BASE_URL}${caseId}/payment-summary/`);
+  return response.data;
+};

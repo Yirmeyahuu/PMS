@@ -107,10 +107,11 @@ class InvoiceCreateSerializer(serializers.Serializer):
 
     def validate_appointment(self, value):
         """Check appointment doesn't already have a non-deleted invoice."""
-        existing = Invoice.objects.filter(
-            appointment=value,
-            is_deleted=False,
-        ).first()
+        qs = Invoice.objects.filter(appointment=value, is_deleted=False)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        
+        existing = qs.first()
         if existing:
             raise serializers.ValidationError(
                 f"Appointment already has invoice {existing.invoice_number}. "

@@ -34,6 +34,7 @@ import type { Appointment } from '@/types/appointment';
 import toast from 'react-hot-toast';
 import { PMSInvoiceTemplate, type InvoiceClinicInfo, type NextAppointmentInfo } from '@/components/invoices/PMSInvoiceTemplate';
 import { PHILIPPINE_BANKS, requiresBankSelection } from '@/data/philippineBanks';
+import { getPatientCases, getCasePaymentSummary, type CasePaymentSummary } from '@/features/patients/patientCases.api';
 
 interface EditableItem {
   id?: number;
@@ -92,17 +93,41 @@ export default function GenerateNewInvoice() {
     enabled: !!appointmentId,
   });
 
-  const { data: existingInvoice, isLoading: loadingInvoice } = useQuery<Invoice | null>({
-    queryKey: ['appointment-invoice', appointmentId],
-    queryFn: () => billingApi.getByAppointment(Number(appointmentId)),
-    enabled: !!appointmentId,
-  });
+  // This query will be placed after patientCase query is defined.
 
   const { data: clinicServices = [] } = useQuery<ClinicService[]>({
     queryKey: ['clinic-services'],
     queryFn: () => billingApi.getClinicServices(),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: patientCase } = useQuery({
+    queryKey: ['patient-cases', appointment?.patient],
+    queryFn: async () => {
+      const cases = await getPatientCases(appointment!.patient);
+      return cases.find(c => c.id === appointment!.patient_case) ?? null;
+    },
+    enabled: !!appointment?.patient && !!appointment?.patient_case,
+  });
+
+  const { data: casePaymentSummary } = useQuery<CasePaymentSummary | null>({
+    queryKey: ['case-payment-summary', appointment?.patient_case],
+    queryFn: () => getCasePaymentSummary(appointment!.patient_case!),
+    enabled: !!appointment?.patient_case && patientCase?.session_source === 'PACKAGE',
+  });
+
+  const { data: existingInvoice, isLoading: loadingInvoice } = useQuery<Invoice | null>({
+    queryKey: ['appointment-invoice', appointmentId, patientCase?.package_invoice],
+    queryFn: async () => {
+      if (patientCase?.session_source === 'PACKAGE' && patientCase?.package_invoice) {
+        return billingApi.getInvoice(patientCase.package_invoice);
+      }
+      return billingApi.getByAppointment(Number(appointmentId));
+    },
+    enabled: !!appointmentId && (appointment?.patient_case ? patientCase !== undefined : true),
+  });
+
+
 
   const { data: clinicProfile } = useQuery<ClinicProfile>({
     queryKey: ['my-clinic'],
@@ -174,6 +199,10 @@ export default function GenerateNewInvoice() {
   // Auto-populate appointment type as first invoice item
   useEffect(() => {
     if (!appointment || items.length > 0) return;
+    
+    // For subsequent package appointments, we still add the item so the invoice isn't blank,
+    // but we will force its price to 0 later before adding it to state.
+    const isSubsequentPackage = appointment.is_covered_by_package && (appointment.package_invoices_count || 0) > 0;
 
     // First try to match by exact service ID if available
     let matchedService = undefined;
@@ -192,7 +221,7 @@ export default function GenerateNewInvoice() {
     const description = matchedService?.name || appointment.service_name || appointment.appointment_type || '';
 
     setItems([{
-      description: description,
+      description: isSubsequentPackage ? `${description} (Covered by Package)` : description,
       quantity: 1,
       unit_price: matchedService ? Number(matchedService.price) : 0,
     }]);
@@ -249,7 +278,17 @@ export default function GenerateNewInvoice() {
   };
 
   const totalPaid = calculateTotalPaid();
-  const balanceDue = totalPaid > 0 ? totalAmount - totalPaid : totalAmount;
+  const balanceDue = Math.max(0, totalAmount - totalPaid);
+  
+  // isPackageBilling: true if this appointment belongs to a PACKAGE case
+  const isPackageBilling = patientCase?.session_source === 'PACKAGE';
+  // Package-level summary comes from case payment summary (all invoices in the case)
+  const packageTotal = Number(casePaymentSummary?.package_total ?? patientCase?.package_cost ?? 0);
+  const packageAlreadyPaid = Number(casePaymentSummary?.total_paid ?? 0);
+  const packageOutstanding = Number(casePaymentSummary?.outstanding_balance ?? packageTotal);
+  // Real-time preview: deduct current session payment entry from outstanding
+  const packageOutstandingPreview = Math.max(0, packageOutstanding - totalPaid);
+  const packagePaidPreview = packageAlreadyPaid + totalPaid;
 
   const calculateItemTotal = (item: EditableItem) => {
     const itemTotal = item.quantity * item.unit_price;
@@ -523,27 +562,7 @@ export default function GenerateNewInvoice() {
     );
   }
 
-  if (appointment?.is_covered_by_package && !existingInvoice) {
-    return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Covered by Package</h2>
-          <p className="text-gray-500 mb-6">
-            This appointment is part of a prepaid package. No additional treatment invoice is required.
-          </p>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors font-medium"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -578,26 +597,7 @@ export default function GenerateNewInvoice() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || items.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {saveMutation.isPending ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              {saveMutation.isPending ? 'Saving...' : 'Save Invoice'}
-            </button>
-          </div>
+
         </div>
       </div>
 
@@ -692,7 +692,31 @@ export default function GenerateNewInvoice() {
               </div>
             </div>
 
-            {/* Invoice Items Section */}
+            {/* Invoice Items Section OR Package Summary */}
+            {isPackageBilling ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm bg-gradient-to-r from-sky-50 to-white">
+                <div className="flex items-center gap-2 mb-4">
+                  <Calculator className="w-5 h-5 text-sky-600" />
+                  <h2 className="text-lg font-bold text-gray-900">Package Billing Summary</h2>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Package Total</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">₱{packageTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Already Paid</p>
+                    <p className="text-xl font-bold text-emerald-600 mt-1">₱{packagePaidPreview.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    {totalPaid > 0 && <p className="text-xs text-emerald-500 mt-0.5">+₱{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })} this session</p>}
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</p>
+                    <p className="text-xl font-bold text-red-600 mt-1">₱{packageOutstandingPreview.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -881,6 +905,8 @@ export default function GenerateNewInvoice() {
               </div>
             </div>
 
+            )}
+
             {/* Payment Details Section */}
             <div className="bg-white rounded-xl border border-gray-200 p-3">
               <div className="flex items-center gap-2 mb-3">
@@ -986,6 +1012,28 @@ export default function GenerateNewInvoice() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
               />
             </div>
+
+            {/* Action Buttons */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-end gap-3 mt-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || (items.length === 0 && !isPackageBilling)}
+                className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
+              >
+                {saveMutation.isPending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {saveMutation.isPending ? 'Saving...' : 'Save Invoice'}
+              </button>
+            </div>
           </div>
 
           {/* RIGHT COLUMN - 5 cols - Invoice Preview only */}
@@ -1003,6 +1051,11 @@ export default function GenerateNewInvoice() {
                     showPaymentHistory
                     nextAppointment={previewNextAppointment}
                     className="shadow-lg rounded-xl"
+                    packageSummary={isPackageBilling && casePaymentSummary ? {
+                      package_total: packageTotal,
+                      total_paid: packagePaidPreview,
+                      outstanding_balance: packageOutstandingPreview
+                    } : undefined}
                   />
                 </div>
               </div>
