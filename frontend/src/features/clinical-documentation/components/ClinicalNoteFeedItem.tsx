@@ -292,7 +292,16 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Session (Appointment)</label>
             {isReadOnly ? (
               <p className="text-sm font-medium text-slate-800">
-                {appt ? `${formatDate(appt.date)} — ${formatTime(appt.start_time)} — ${appt.service_name}` : 'No Session Linked'}
+                {appt ? (
+                  <>
+                    {formatDate(appt.date)} — {formatTime(appt.start_time)} — {appt.service_name}
+                    {appt.case_session_number && (
+                      <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-2 border border-sky-200 inline-block">
+                        {appt.case_session_number}{appt.case_approved_sessions ? `/${appt.case_approved_sessions}` : ''} Session
+                      </span>
+                    )}
+                  </>
+                ) : 'No Session Linked'}
               </p>
             ) : (
               <select

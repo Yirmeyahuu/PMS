@@ -12,7 +12,7 @@ import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 
 export const WorkspaceRightPanel = () => {
-  const { patient, refreshCases } = usePatientProfileContext();
+  const { patient, cases, refreshCases } = usePatientProfileContext();
   const { selectedCaseId, refreshTrigger, triggerRefresh, setEditorContext, activeRightTab, setActiveRightTab } = useClinicalWorkspace();
 
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
@@ -147,8 +147,24 @@ export const WorkspaceRightPanel = () => {
               </div>
             ) : (
               <>
-                <div className="flex justify-end gap-2 mb-4">
-                  <button
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center">
+                    {(() => {
+                      const currentCase = cases.find(c => c.id === selectedCaseId);
+                      if (currentCase && currentCase.session_source === 'PACKAGE') {
+                        return (
+                          <span className="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
+                            {currentCase.is_unlimited || !currentCase.approved_sessions
+                              ? `${currentCase.completed_sessions} Session${currentCase.completed_sessions !== 1 ? 's' : ''}`
+                              : `${currentCase.completed_sessions} out of ${currentCase.approved_sessions} Sessions`}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
                     onClick={() => setExpandedNoteIds(new Set(notes.map(n => n.id)))}
                     className="text-xs font-medium text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-md transition-colors"
                   >
@@ -160,6 +176,7 @@ export const WorkspaceRightPanel = () => {
                   >
                     Collapse all Notes
                   </button>
+                  </div>
                 </div>
                 <div className="space-y-3 pl-6 border-l-2 border-slate-200 ml-3 relative before:absolute before:top-0 before:bottom-0 before:-left-[2px] before:w-[2px] before:bg-gradient-to-b before:from-slate-200 before:via-indigo-200 before:to-slate-200">
                   {notes.map((note) => (

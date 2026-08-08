@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, X, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Practitioner } from '@/features/clinics/clinic.api';
@@ -28,10 +28,11 @@ interface CaseModalProps {
   practitioners: Practitioner[];
   loadingPractitioners: boolean;
   /** When true, the Primary Practitioner field is shown read-only (auto-filled from the appointment). */
+  autoFocusField?: 'approved_sessions';
   lockPractitioner?: boolean;
 }
 
-export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practitioners, loadingPractitioners, lockPractitioner }: CaseModalProps) => {
+export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practitioners, loadingPractitioners, lockPractitioner, autoFocusField }: CaseModalProps) => {
   const [title, setTitle] = useState(initialValues?.title ?? '');
   const [status, setStatus] = useState<PatientCaseStatus>(initialValues?.status ?? 'OPEN');
   const [primaryPractitionerId, setPrimaryPractitionerId] = useState(initialValues?.primary_practitioner ? String(initialValues.primary_practitioner) : '');
@@ -40,6 +41,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
   const [alertNotes, setAlertNotes] = useState(initialValues?.alert_notes ?? '');
   
   // Session Management State
+  const approvedSessionsRef = React.useRef<HTMLInputElement>(null);
   const [sessionSource, setSessionSource] = useState<'MANUAL' | 'PACKAGE' | 'HMO'>(initialValues?.session_source ?? 'MANUAL');
   const [approvedSessions, setApprovedSessions] = useState<number | ''>(initialValues?.approved_sessions ?? '');
   const [isUnlimited, setIsUnlimited] = useState<boolean>(initialValues?.is_unlimited ?? false);
@@ -67,8 +69,14 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
       setReferredBy(initialValues?.referred_by ?? '');
       setReferralInfo(initialValues?.referral_info ?? '');
       setDescription(initialValues?.description ?? '');
+      
+      if (autoFocusField === 'approved_sessions') {
+        setTimeout(() => {
+          approvedSessionsRef.current?.focus();
+        }, 100);
+      }
     }
-  }, [isOpen, initialValues]);
+  }, [isOpen, initialValues, autoFocusField]);
 
   const handlePractitionerChange = (id: string) => {
 

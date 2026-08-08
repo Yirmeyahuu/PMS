@@ -11,6 +11,9 @@ import type { PatientCase } from '@/types/patient';
 import { PatientModal } from '@/features/patients/components/PatientModal';
 import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
 import { createAppointment } from '../appointment.api';
+import { useSessionLimitValidation } from '../hooks/useSessionLimitValidation';
+import { SessionAllocationLimitModal } from './SessionAllocationLimitModal';
+import { updatePatientCase } from '@/features/patients/patientCases.api';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';   // ← ADD

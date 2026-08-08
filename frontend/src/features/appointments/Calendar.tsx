@@ -1674,7 +1674,14 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             style={col.useHex ? { color: col.textColor } : {}}
           >
             {renderCommunicationIndicator(apt)}
-            <span className={!col.useHex ? col.text : ''}>{apt.patient_name}</span>
+            <span className={!col.useHex ? col.text : ''}>
+              {apt.patient_name}
+              {apt.case_session_number ? (
+                <span className="opacity-80 font-medium ml-1">
+                  ({apt.case_session_number}{apt.case_approved_sessions ? `/${apt.case_approved_sessions}` : ''} Session)
+                </span>
+              ) : null}
+            </span>
           </div>
           {!compact && (
             <div
@@ -2038,6 +2045,11 @@ const CalendarComponent: React.FC<CalendarProps> = ({
         >
           <span className={!col.useHex ? col.text : ''}>
             {formatTime12Hour(apt.start_time)} · {apt.patient_name}
+            {apt.case_session_number ? (
+              <span className="opacity-80 font-medium ml-1">
+                ({apt.case_session_number}{apt.case_approved_sessions ? `/${apt.case_approved_sessions}` : ''} Session)
+              </span>
+            ) : null}
           </span>
         </div>
         {apt.service_name && (

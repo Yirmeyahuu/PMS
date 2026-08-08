@@ -40,6 +40,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     is_rebook = serializers.BooleanField(write_only=True, required=False, default=False)
     case_remaining_sessions = serializers.SerializerMethodField()
     case_is_unlimited = serializers.SerializerMethodField()
+    case_session_number = serializers.SerializerMethodField()
+    case_approved_sessions = serializers.SerializerMethodField()
 
     class Meta:
         model  = Appointment
@@ -48,7 +50,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'practitioner', 'practitioner_name', 'practitioner_avatar',
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
-            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count',
+            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
@@ -68,7 +70,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package', 'package_invoice_id',
-            'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count',
+            'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
             'created_at', 'updated_at',
         ]
 
@@ -110,6 +112,26 @@ class AppointmentSerializer(serializers.ModelSerializer):
             has_version = InvoiceVersion.objects.filter(appointment=obj, invoice__is_deleted=False).exists()
             
         return has_direct or has_version
+
+    def get_case_session_number(self, obj) -> int | None:
+        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+            if hasattr(obj.patient_case, '_ordered_case_appointments'):
+                for i, apt in enumerate(obj.patient_case._ordered_case_appointments):
+                    if apt.id == obj.id:
+                        return i + 1
+            
+            from apps.appointments.models import Appointment
+            appointments = list(Appointment.objects.filter(patient_case_id=obj.patient_case_id).order_by('date', 'start_time', 'id').values_list('id', flat=True))
+            try:
+                return appointments.index(obj.id) + 1
+            except ValueError:
+                return None
+        return None
+
+    def get_case_approved_sessions(self, obj) -> int | None:
+        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+            return obj.patient_case.approved_sessions
+        return None
 
     def get_case_remaining_sessions(self, obj) -> int | None:
         if obj.patient_case_id:
@@ -196,6 +218,19 @@ class AppointmentSerializer(serializers.ModelSerializer):
             patient = data.get('patient')
             if patient and patient_case and patient_case.patient_id != patient.id:
                 raise serializers.ValidationError({"patient_case": "The selected case does not belong to the selected patient."})
+
+        # ── Session Allocation Hard Limit Validation ──────────────────────────
+        patient_case = data.get('patient_case') or (self.instance.patient_case if self.instance else None)
+        if patient_case:
+            is_new = self.instance is None
+            case_changed = self.instance and self.instance.patient_case != patient_case
+            
+            if is_new or case_changed:
+                if not patient_case.is_unlimited and patient_case.approved_sessions is not None:
+                    if patient_case.remaining_sessions is not None and patient_case.remaining_sessions <= 0:
+                        raise serializers.ValidationError({
+                            'detail': 'This case has reached its approved session allocation.'
+                        })
 
         return data
 

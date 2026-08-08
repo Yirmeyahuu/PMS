@@ -1522,6 +1522,8 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
       lastAppointmentIdRef.current = updated.id;
       onUpdated?.(updated);
       setShowCancelModal(false);
+      // Immediately close the AppointmentView modal so the user returns to the Diary
+      onClose();
     }
   };
 

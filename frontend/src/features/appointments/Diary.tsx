@@ -18,6 +18,10 @@ import type { BlockAppointment, Appointment } from '@/types';
 import type { PractitionerAvailability } from '@/features/clinics/clinic.api';
 import { useRebookMode } from './hooks/useRebookMode';
 import { createAppointment } from './appointment.api';
+import { useSessionLimitValidation } from './hooks/useSessionLimitValidation';
+import { SessionAllocationLimitModal } from './components/SessionAllocationLimitModal';
+import { CaseModal } from '@/features/patients/CaseModal';
+import { updatePatientCase } from '@/features/patients/patientCases.api';
 import type { CreateAppointmentData } from '@/types';
 import toast from 'react-hot-toast';
 import { PRACTITIONER_REMOVED_EVENT } from '@/events/practitionerEvents';
@@ -43,6 +47,19 @@ export const Diary: React.FC = () => {
   const { rebookMode, rebookData, startRebook, exitRebook } = useRebookMode();
   // Guard against rapid double-clicks creating duplicate appointments
   const isRebooking = useRef(false);
+
+  const {
+    validateAndProceed,
+    isLimitModalOpen,
+    closeLimitModal,
+    handleAddSessions,
+    caseDetails,
+    pendingCallback,
+    clearPendingCallback,
+    editCaseOpen,
+    setEditCaseOpen,
+    handleEditCaseClose
+  } = useSessionLimitValidation();
   // Visible loading state while the API request is in-flight
   const [isRebookingInProgress, setIsRebookingInProgress] = useState(false);
   const [showRebookContinueModal, setShowRebookContinueModal] = useState(false);
@@ -656,29 +673,36 @@ export const Diary: React.FC = () => {
       is_rebook:        true,
     };
 
-    // Show a loading toast while the API call is in-flight
-    const loadingToastId = toast.loading(`Rebooking for ${format(slot.date, 'MMM d')} at ${displayTime}…`);
+    const proceedWithRebooking = async () => {
+      const loadingToastId = toast.loading(`Rebooking for ${format(slot.date, 'MMM d')} at ${displayTime}…`);
 
-    try {
-      await createAppointment(data);
-      setAppointmentRefreshKey(prev => prev + 1);
-      toast.dismiss(loadingToastId);
-      toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${displayTime}`);
+      try {
+        await createAppointment(data);
+        setAppointmentRefreshKey(prev => prev + 1);
+        toast.dismiss(loadingToastId);
+        toast.success(`Rebooked for ${format(slot.date, 'MMM d')} at ${displayTime}`);
 
-      // Delay slightly to let the toast render, then show the custom modal
-      setTimeout(() => {
-        setShowRebookContinueModal(true);
-      }, 50);
-    } catch (err: unknown) {
-      toast.dismiss(loadingToastId);
-      const detail = err && typeof err === 'object' && 'response' in err
-        ? (err as any).response?.data
-        : undefined;
-      toast.error(typeof detail === 'object' ? JSON.stringify(detail) : (detail ?? 'Failed to rebook appointment'));
-    } finally {
-      isRebooking.current = false;
-      setIsRebookingInProgress(false);
-    }
+        setTimeout(() => {
+          setShowRebookContinueModal(true);
+        }, 50);
+      } catch (err: unknown) {
+        toast.dismiss(loadingToastId);
+        const detail = err && typeof err === 'object' && 'response' in err
+          ? (err as any).response?.data
+          : undefined;
+        toast.error(typeof detail === 'object' ? JSON.stringify(detail) : (detail ?? 'Failed to rebook appointment'));
+      } finally {
+        isRebooking.current = false;
+        setIsRebookingInProgress(false);
+      }
+    };
+
+    validateAndProceed(
+      rebookData.patient_case,
+      () => {
+        proceedWithRebooking();
+      }
+    );
   };
 
   // ── Effective Practitioner ID for Week View ──────────────────────────────────
@@ -1405,6 +1429,54 @@ export const Diary: React.FC = () => {
           onClose={() => {
             setShowRebookContinueModal(false);
             exitRebook();
+          }}
+        />
+      )}
+      {/* Modals for Session Validation */}
+      <SessionAllocationLimitModal
+        isOpen={isLimitModalOpen}
+        onClose={closeLimitModal}
+        patientCase={caseDetails}
+        onAddSessions={handleAddSessions}
+      />
+      {editCaseOpen && caseDetails && (
+        <CaseModal
+          isOpen={editCaseOpen}
+          onClose={() => {
+            setEditCaseOpen(false);
+            handleEditCaseClose();
+          }}
+          mode="edit"
+          initialValues={caseDetails}
+          autoFocusField="approved_sessions"
+          practitioners={practitioners}
+          loadingPractitioners={isLoadingPractitioners}
+          onSave={async (updatedData) => {
+            try {
+              const payload = {
+                title: updatedData.title,
+                status: updatedData.status,
+                primary_practitioner: updatedData.primaryPractitionerId ? Number(updatedData.primaryPractitionerId) : null,
+                payer: updatedData.payer,
+                alert_notes: updatedData.alertNotes,
+                session_source: updatedData.sessionSource,
+                approved_sessions: updatedData.approvedSessions,
+                is_unlimited: updatedData.isUnlimited,
+                referred_by: updatedData.referredBy,
+                referral_info: updatedData.referralInfo,
+                description: updatedData.description,
+              };
+              await updatePatientCase(caseDetails.id, payload);
+              toast.success('Case updated successfully!');
+              setEditCaseOpen(false);
+              
+              if (pendingCallback) {
+                pendingCallback();
+                clearPendingCallback();
+              }
+            } catch (err: any) {
+              toast.error(err.response?.data?.detail || 'Failed to update case');
+            }
           }}
         />
       )}

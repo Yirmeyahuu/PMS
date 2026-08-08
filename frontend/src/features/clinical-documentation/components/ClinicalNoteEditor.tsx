@@ -14,7 +14,7 @@ export interface ClinicalNoteEditorProps {
 }
 
 export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialAppointmentId }) => {
-  const { patient, cases } = usePatientProfileContext();
+  const { patient, cases, refreshCases } = usePatientProfileContext();
   const {
     selectedCaseId,
     editorContext,
@@ -210,6 +210,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       }
 
       triggerRefresh();
+      refreshCases(); // Update case session counts (e.g., 6 out of 8 Sessions)
       setEditorContext({ type: 'IDLE' }); // go back to templates list on success
     } catch (err: unknown) {
       console.error('Create note error:', err);
