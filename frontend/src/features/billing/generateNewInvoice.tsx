@@ -17,8 +17,7 @@ import {
   User,
   Calendar,
   StickyNote,
-  CheckCircle2
-} from 'lucide-react';
+  } from 'lucide-react';
 import { billingApi, type ClinicService } from './billing.api';
 import { getMyClinic, type ClinicProfile } from '@/features/clinics/clinic.api';
 import { productApi } from '@/features/setup/pages/items/services/inventory.api';

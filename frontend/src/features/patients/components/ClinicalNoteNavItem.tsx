@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
+
 import { NavLink, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { ClipboardList, Check, ChevronRight } from 'lucide-react';
 import { usePatientProfileContext } from '../context/PatientProfileContext';
@@ -10,7 +10,6 @@ import {
   shift,
   autoUpdate,
   useHover,
-  useFocus,
   useDismiss,
   useRole,
   useInteractions,

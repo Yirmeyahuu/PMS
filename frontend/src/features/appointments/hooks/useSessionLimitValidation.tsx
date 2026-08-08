@@ -1,6 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { axiosInstance } from '@/lib/axios';
-import { SessionAllocationLimitModal } from '../components/SessionAllocationLimitModal';
 import type { PatientCase } from '@/types/patient';
 
 export const useSessionLimitValidation = () => {

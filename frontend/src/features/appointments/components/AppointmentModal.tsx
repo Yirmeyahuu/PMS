@@ -9,11 +9,7 @@ import { getPatients, createPatient } from '@/features/patients/patient.api';
 import { getPatientCases, createPatientCase } from '@/features/patients/patientCases.api';
 import type { PatientCase } from '@/types/patient';
 import { PatientModal } from '@/features/patients/components/PatientModal';
-import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
 import { createAppointment } from '../appointment.api';
-import { useSessionLimitValidation } from '../hooks/useSessionLimitValidation';
-import { SessionAllocationLimitModal } from './SessionAllocationLimitModal';
-import { updatePatientCase } from '@/features/patients/patientCases.api';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';   // ← ADD
@@ -68,7 +64,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [patientNotes, setPatientNotes] = useState('');
   const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
   const [loadingCases, setLoadingCases] = useState(false);
-  const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
   const [isCreatingInlineCase, setIsCreatingInlineCase] = useState(false);
   const [inlineCaseData, setInlineCaseData] = useState({
     title: '',
@@ -240,29 +235,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     handleSelectChange(e);
   };
 
-  const handleCreateCase = async (data: CaseFormData) => {
-    try {
-      const savedCase = await createPatientCase({
-        patient: Number(formData.patient),
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
-        primary_practitioner_name: data.primaryPractitionerName || undefined,
-        payer: data.payer || undefined,
-        alert_notes: data.alertNotes || undefined,
-        approved_sessions: data.approvedSessions,
-      });
-      setPatientCases(prev => [...prev, savedCase]);
-      setFormData(prev => ({ ...prev, patient_case: savedCase.id }));
-      if (errors.patient_case) setErrors(prev => ({ ...prev, patient_case: '' }));
-      setShowCreateCaseModal(false);
-      queryClient.invalidateQueries({ queryKey: ['patient-cases', Number(formData.patient)] });
-      toast.success('Case created successfully!');
-    } catch (err) {
-      toast.error('Failed to create case');
-    }
-  };
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};

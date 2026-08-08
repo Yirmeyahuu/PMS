@@ -1450,13 +1450,13 @@ export const Diary: React.FC = () => {
           initialValues={caseDetails}
           autoFocusField="approved_sessions"
           practitioners={practitioners}
-          loadingPractitioners={isLoadingPractitioners}
+          loadingPractitioners={loadingPractitioners}
           onSave={async (updatedData) => {
             try {
               const payload = {
                 title: updatedData.title,
                 status: updatedData.status,
-                primary_practitioner: updatedData.primaryPractitionerId ? Number(updatedData.primaryPractitionerId) : null,
+                primary_practitioner: updatedData.primaryPractitionerId ? Number(updatedData.primaryPractitionerId) : undefined,
                 payer: updatedData.payer,
                 alert_notes: updatedData.alertNotes,
                 session_source: updatedData.sessionSource,

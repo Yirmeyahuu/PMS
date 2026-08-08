@@ -139,6 +139,10 @@ export interface Invoice {
   patient:             number;
   patient_name:        string;
   patient_email?:      string;
+  patient_case?:       number | null;
+  case_name?:          string | null;
+  package_name?:       string | null;
+  version_count?:      number;
   patient_number:      string;
   appointment:         number | null;
   appointment_date:    string | null;
@@ -306,6 +310,8 @@ export interface InvoiceVersion {
   id:               number;
   invoice:          number;
   version_number:   number;
+  appointment:      number | null;
+  payment_made:     string;
   invoice_date:     string;
   due_date:         string | null;
   status:           InvoiceStatus;

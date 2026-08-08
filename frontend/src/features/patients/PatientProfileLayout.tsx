@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, ClipboardList, Receipt } from 'lucide-react';
+import { Calendar, FileText, FolderKanban, MessageSquare, Settings, UserCircle2, Receipt } from 'lucide-react';
 import { Navigate, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ClinicalNoteNavItem } from './components/ClinicalNoteNavItem';

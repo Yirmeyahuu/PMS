@@ -102,7 +102,6 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
     const philhealthCoverage = parseFloat(invoice.philhealth_coverage || '0');
     const hmoCoverage = parseFloat(invoice.hmo_coverage || '0');
     const amountPaid = parseFloat(invoice.amount_paid || '0');
-    const balanceDue = parseFloat(invoice.balance_due || '0');
 
     return (
       <div

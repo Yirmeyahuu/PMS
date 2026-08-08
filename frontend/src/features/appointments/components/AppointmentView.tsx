@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } 
 import { useNavigate } from 'react-router-dom';
 import {
   X, Calendar, Clock, User, FileText, Tag, MapPin,
-  Receipt, Plus, Printer, AlertCircle, CheckCircle2,
-  RefreshCw, ChevronDown, Building2, Edit3, Trash2,
+  Receipt, Plus, Printer, AlertCircle, RefreshCw, ChevronDown, Building2, Edit3, Trash2,
   Save, XCircle, Search, UserCircle, ClipboardList,
   ExternalLink, Repeat, List, Stethoscope, Repeat2,
   Phone, Mail, Home, ShieldCheck, AlertTriangle, Mailbox,
