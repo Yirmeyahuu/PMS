@@ -146,6 +146,35 @@ class LetterViewSet(viewsets.ModelViewSet):
             patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
             appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
 
+            # Layout Controls Injection
+            layout_html = ""
+            
+            if template.layout_letter_head:
+                layout_html += f"""
+                <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
+                    <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
+                    <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
+                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone_number} | {request.user.clinic.email}</p>
+                </div>
+                """
+
+            if template.layout_date:
+                from django.utils import timezone
+                layout_html += f"""
+                <div style="margin-bottom: 20px; font-family: sans-serif;">
+                    <p style="margin: 0;">{timezone.now().strftime('%d %B %Y')}</p>
+                </div>
+                """
+
+            if template.layout_addressee and patient:
+                layout_html += f"""
+                <div style="margin-bottom: 30px; font-family: sans-serif;">
+                    <p style="font-weight: bold; margin: 0;">{patient.get_full_name()}</p>
+                    <p style="margin: 2px 0 0 0;">{patient.address}</p>
+                    <p style="margin: 2px 0 0 0;">{patient.city} {patient.province} {patient.postal_code}</p>
+                </div>
+                """
+
             # 1. Render content for Header, Body, Footer
             rendered_header = LetterGeneratorService.replace_variables(
                 template.header_html or '',
@@ -176,8 +205,13 @@ class LetterViewSet(viewsets.ModelViewSet):
                 appointment=appointment
             )
             
+            # Wrap content if removing top space
+            top_margin = "0px" if template.layout_remove_top_space else "40px"
+            wrapper_start = f"<div style='padding-top: {top_margin};'>"
+            wrapper_end = "</div>"
+            
             # Optionally wrap in header/footer
-            full_html = f"{rendered_header}{rendered_content}{rendered_footer}"
+            full_html = f"{wrapper_start}{layout_html}{rendered_header}{rendered_content}{rendered_footer}{wrapper_end}"
             
             # 2. Generate PDF
             pdf_bytes = LetterGeneratorService.generate_pdf(full_html)
@@ -248,6 +282,38 @@ class LetterViewSet(viewsets.ModelViewSet):
             patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
             appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
 
+            # Layout Controls Injection
+            layout_html = ""
+            
+            # Clinic Letter Head is typically handled by rendering the PDF template wrapper in services,
+            # but we can optionally inject it into the HTML here if layout_letter_head is true.
+            # Actually, standard practice here is to prepend it:
+            if template.layout_letter_head:
+                layout_html += f"""
+                <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
+                    <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
+                    <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
+                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone_number} | {request.user.clinic.email}</p>
+                </div>
+                """
+
+            if template.layout_date:
+                from django.utils import timezone
+                layout_html += f"""
+                <div style="margin-bottom: 20px; font-family: sans-serif;">
+                    <p style="margin: 0;">{timezone.now().strftime('%d %B %Y')}</p>
+                </div>
+                """
+
+            if template.layout_addressee and patient:
+                layout_html += f"""
+                <div style="margin-bottom: 30px; font-family: sans-serif;">
+                    <p style="font-weight: bold; margin: 0;">{patient.get_full_name()}</p>
+                    <p style="margin: 2px 0 0 0;">{patient.address}</p>
+                    <p style="margin: 2px 0 0 0;">{patient.city} {patient.province} {patient.postal_code}</p>
+                </div>
+                """
+
             # Render content for Header, Body, Footer
             rendered_header = LetterGeneratorService.replace_variables(
                 template.header_html or '',
@@ -271,8 +337,13 @@ class LetterViewSet(viewsets.ModelViewSet):
                 appointment=appointment
             )
             
+            # Wrap content if removing top space
+            top_margin = "0px" if template.layout_remove_top_space else "40px"
+            wrapper_start = f"<div style='padding-top: {top_margin};'>"
+            wrapper_end = "</div>"
+            
             # Optionally wrap in header/footer for preview display
-            full_html = f"{rendered_header}\n<br>\n{rendered_content}\n<br>\n{rendered_footer}"
+            full_html = f"{wrapper_start}{layout_html}{rendered_header}\n<br>\n{rendered_content}\n<br>\n{rendered_footer}{wrapper_end}"
 
             return Response({'content_html': full_html})
 

@@ -4,7 +4,7 @@ import { useTemplates } from '@/features/clinical-template/hooks/useTemplates';
 import { TemplateList } from '@/features/clinical-template/components/TemplateList';
 import { TemplateFormModal } from '@/features/clinical-template/components/TemplateFormModal';
 import { LetterTemplateList } from '@/features/manage/pages/clinical/components/LetterTemplateList';
-import { LetterTemplateFormModal } from '@/features/manage/pages/clinical/components/LetterTemplateFormModal';
+import { LetterTemplateEditor } from '@/features/manage/pages/clinical/components/editor/LetterTemplateEditor';
 import { useLetterTemplates } from '@/features/manage/pages/clinical/hooks/useLetterTemplates';
 import type { ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
@@ -30,11 +30,11 @@ export const ClinicalMenu2: React.FC = () => {
   } = useLetterTemplates();
 
   const [activeTab, setActiveTab] = useState<'notes' | 'letters'>('notes');
+  const [editorMode, setEditorMode] = useState<'list' | 'create' | 'edit'>('list');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ClinicalTemplate | null>(null);
 
-  const [letterModalOpen, setLetterModalOpen] = useState(false);
   const [editingLetterTemplate, setEditingLetterTemplate] = useState<LetterTemplate | null>(null);
 
   const handleOpenCreate = () => {
@@ -43,7 +43,7 @@ export const ClinicalMenu2: React.FC = () => {
       setModalOpen(true);
     } else {
       setEditingLetterTemplate(null);
-      setLetterModalOpen(true);
+      setEditorMode('create');
     }
   };
 
@@ -68,7 +68,7 @@ export const ClinicalMenu2: React.FC = () => {
 
   const handleEditLetter = (template: LetterTemplate) => {
     setEditingLetterTemplate(template);
-    setLetterModalOpen(true);
+    setEditorMode('edit');
   };
 
   const handleSaveLetter = async (data: Partial<LetterTemplate>) => {
@@ -77,6 +77,7 @@ export const ClinicalMenu2: React.FC = () => {
     } else {
       await createLetterTemplate(data);
     }
+    setEditorMode('list');
   };
 
   const handleArchiveLetter = async (template: LetterTemplate) => {
@@ -98,6 +99,17 @@ export const ClinicalMenu2: React.FC = () => {
       }
     }
   };
+
+  if (editorMode !== 'list') {
+    return (
+      <LetterTemplateEditor
+        template={editingLetterTemplate}
+        onSave={handleSaveLetter}
+        onCancel={() => setEditorMode('list')}
+        saving={letterSaving}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -214,17 +226,6 @@ export const ClinicalMenu2: React.FC = () => {
         }}
         onSave={handleSave}
         saving={saving}
-      />
-
-      <LetterTemplateFormModal
-        isOpen={letterModalOpen}
-        template={editingLetterTemplate}
-        onClose={() => {
-          setLetterModalOpen(false);
-          setEditingLetterTemplate(null);
-        }}
-        onSave={handleSaveLetter}
-        saving={letterSaving}
       />
     </div>
   );

@@ -5,6 +5,12 @@ export interface LetterTemplate {
   name: string;
   description: string;
   category: string;
+  discipline?: string;
+  clinic_branch?: number | null;
+  layout_letter_head: boolean;
+  layout_remove_top_space: boolean;
+  layout_date: boolean;
+  layout_addressee: boolean;
   content_html: string;
   header_html?: string;
   footer_html?: string;

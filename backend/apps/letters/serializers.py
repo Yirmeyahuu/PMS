@@ -13,7 +13,9 @@ class LetterTemplateSerializer(serializers.ModelSerializer):
         model = LetterTemplate
         fields = [
             'id', 'clinic', 'created_by', 'created_by_name',
-            'name', 'description', 'category',
+            'name', 'description', 'category', 'discipline', 'clinic_branch',
+            'layout_letter_head', 'layout_remove_top_space',
+            'layout_date', 'layout_addressee',
             'content_html', 'header_html', 'footer_html',
             'include_logo', 'include_signature',
             'merge_fields', 'version', 'parent_template',

@@ -3,7 +3,18 @@ import { X, FileText, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { generateLetter, previewLetter } from '../api/letters.api';
 import { getActiveLetterTemplates, type LetterTemplate } from '../api/letterTemplates.api';
-
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
+import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+import Color from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Underline from '@tiptap/extension-underline';
+import { EditorToolbar } from '../../manage/pages/clinical/components/editor/EditorToolbar';
 
 interface GenerateLetterModalProps {
   patientId: string | number;
@@ -27,17 +38,37 @@ export const GenerateLetterModal = ({
 
   const [selectedTemplate, setSelectedTemplate] = useState<number | ''>(preSelectedTemplateId || '');
   const [subject, setSubject] = useState('');
-  const [contentHtml, setContentHtml] = useState('');
   const [patientCaseId] = useState<number | ''>(preSelectedCaseId || '');
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image.configure({ inline: true, allowBase64: true }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Color,
+      TextStyle,
+      Underline,
+    ],
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 bg-white',
+      },
+    },
+    content: '',
+  });
+
   // Fetch preview when template is selected
   useEffect(() => {
     const fetchPreview = async () => {
       if (!selectedTemplate) {
-        setContentHtml('');
+        editor?.commands.setContent('');
         return;
       }
       try {
@@ -48,7 +79,7 @@ export const GenerateLetterModal = ({
           patient_case_id: patientCaseId ? Number(patientCaseId) : undefined,
           appointment_id: appointmentId,
         });
-        setContentHtml(data.content_html);
+        editor?.commands.setContent(data.content_html || '');
       } catch (err) {
         console.error('Failed to preview letter', err);
         toast.error('Failed to load letter preview');
@@ -57,7 +88,7 @@ export const GenerateLetterModal = ({
       }
     };
     fetchPreview();
-  }, [selectedTemplate, patientId, patientCaseId, appointmentId]);
+  }, [selectedTemplate, patientId, patientCaseId, appointmentId, editor]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -96,7 +127,7 @@ export const GenerateLetterModal = ({
         subject,
         patient_case_id: patientCaseId ? Number(patientCaseId) : undefined,
         appointment_id: appointmentId,
-        content_html: contentHtml,
+        content_html: editor?.getHTML() || '',
       });
       toast.success('Letter generated successfully');
       onSuccess();
@@ -127,8 +158,8 @@ export const GenerateLetterModal = ({
             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-5 space-y-4">
-            <div className="flex gap-4">
+          <form onSubmit={handleSubmit} className="p-5 space-y-4 flex flex-col flex-1 overflow-hidden">
+            <div className="flex gap-4 shrink-0">
               <div className="w-1/3">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Letter Template *</label>
                 <select
@@ -169,26 +200,28 @@ export const GenerateLetterModal = ({
             </div>
 
             {selectedTemplate && (
-              <div className="flex-1 flex flex-col min-h-[300px] mt-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Letter Content *</label>
+              <div className="flex-1 flex flex-col min-h-[300px] mt-4 overflow-hidden border border-indigo-200 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50">
+                <label className="block text-sm font-medium text-slate-700 p-3 bg-slate-50 border-b border-slate-200">Letter Content *</label>
                 {isPreviewLoading ? (
-                  <div className="flex-1 flex justify-center items-center bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex-1 flex justify-center items-center bg-slate-50">
                     <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
                   </div>
                 ) : (
-                  <textarea
-                    required
-                    value={contentHtml}
-                    onChange={(e) => setContentHtml(e.target.value)}
-                    className="flex-1 w-full p-4 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none whitespace-pre-wrap font-mono text-sm"
-                  />
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="border-b border-gray-200 bg-gray-50 shrink-0">
+                      <EditorToolbar editor={editor} />
+                    </div>
+                    <div className="flex-1 overflow-y-auto bg-gray-100 p-4">
+                      <div className="max-w-[800px] mx-auto bg-white shadow border border-gray-200 min-h-full">
+                         <EditorContent editor={editor} />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
 
-
-
-            <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-6">
+            <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 mt-2 shrink-0">
               <button
                 type="button"
                 onClick={onClose}

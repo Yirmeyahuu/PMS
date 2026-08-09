@@ -45,6 +45,26 @@ class LetterTemplate(TimeStampedModel, SoftDeleteModel):
         max_length=50,
         default='GENERAL',
     )
+    discipline = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Practitioner discipline this template is designed for'
+    )
+    clinic_branch = models.ForeignKey(
+        'clinics.Clinic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='branch_letter_templates',
+        help_text='Specific branch this template is for. Null means all locations.'
+    )
+
+    # Layout Controls
+    layout_letter_head = models.BooleanField(default=True)
+    layout_remove_top_space = models.BooleanField(default=False)
+    layout_date = models.BooleanField(default=True)
+    layout_addressee = models.BooleanField(default=True)
 
     # Content
     content_html = models.TextField(
@@ -109,6 +129,12 @@ class LetterTemplate(TimeStampedModel, SoftDeleteModel):
             name=self.name,
             description=self.description,
             category=self.category,
+            discipline=self.discipline,
+            clinic_branch=self.clinic_branch,
+            layout_letter_head=self.layout_letter_head,
+            layout_remove_top_space=self.layout_remove_top_space,
+            layout_date=self.layout_date,
+            layout_addressee=self.layout_addressee,
             content_html=self.content_html,
             header_html=self.header_html,
             footer_html=self.footer_html,
