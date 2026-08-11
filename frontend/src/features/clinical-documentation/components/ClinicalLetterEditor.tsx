@@ -14,6 +14,9 @@ import TextAlign from '@tiptap/extension-text-align';
 import Color from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
+import { CustomOrderedList } from '../../manage/pages/clinical/components/editor/CustomOrderedList';
+import { CustomBulletList } from '../../manage/pages/clinical/components/editor/CustomBulletList';
+import { Indent } from '../../manage/pages/clinical/components/editor/Indent';
 import { EditorToolbar } from '../../manage/pages/clinical/components/editor/EditorToolbar';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
@@ -30,7 +33,13 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        orderedList: false,
+        bulletList: false,
+      }),
+      CustomOrderedList,
+      CustomBulletList,
+      Indent,
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,

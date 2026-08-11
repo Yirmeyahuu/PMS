@@ -13,6 +13,9 @@ import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorToolbar } from './EditorToolbar';
 import { MergeField } from './MergeField';
+import { CustomOrderedList } from './CustomOrderedList';
+import { CustomBulletList } from './CustomBulletList';
+import { Indent } from './Indent';
 import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
 
 import { LetterTemplateHeader } from './LetterTemplateHeader';
@@ -45,7 +48,13 @@ export const LetterTemplateEditor: React.FC<LetterTemplateEditorProps> = ({
 
   const editorConfig = {
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        orderedList: false,
+        bulletList: false,
+      }),
+      CustomOrderedList,
+      CustomBulletList,
+      Indent,
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
