@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { background: #e0e0e0; display: flex; justify-content: center; padding: 50px; }
+  .editor-wrapper {
+    width: 794px; /* A4 width */
+    overflow-x: visible;
+  }
+  .prosemirror-mock {
+    columns: 1;
+    column-width: 794px;
+    column-gap: 50px; /* Space between pages */
+    column-fill: auto;
+    height: 1123px; /* A4 height */
+    background: transparent;
+  }
+  /* To give columns a background, we actually need to apply background to the columns. 
+     CSS columns don't have their own backgrounds. This is a common problem with CSS pagination. */
+</style>
+</head>
+<body>
+  <div class="editor-wrapper">
+    <div class="prosemirror-mock">
+      <p>Test line 1</p>
+      <!-- Need enough content to overflow -->
+    </div>
+  </div>
+</body>
+</html>

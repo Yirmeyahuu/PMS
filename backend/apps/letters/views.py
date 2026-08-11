@@ -154,7 +154,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
                     <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
                     <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
-                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone_number} | {request.user.clinic.email}</p>
+                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone} | {request.user.clinic.email}</p>
                 </div>
                 """
 
@@ -293,7 +293,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
                     <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
                     <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
-                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone_number} | {request.user.clinic.email}</p>
+                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone} | {request.user.clinic.email}</p>
                 </div>
                 """
 

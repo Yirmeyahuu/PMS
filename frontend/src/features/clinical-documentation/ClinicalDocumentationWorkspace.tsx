@@ -5,14 +5,14 @@ import { ClinicalWorkspaceProvider, useClinicalWorkspace } from './context/Clini
 import { WorkspaceTemplatesPanel } from './components/WorkspaceTemplatesPanel';
 import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
 import { WorkspaceLettersPanel } from './components/WorkspaceLettersPanel';
+import { ClinicalLetterEditor } from './components/ClinicalLetterEditor';
 import { ClinicalNoteEditor } from './components/ClinicalNoteEditor';
-import { GenerateLetterModal } from './components/GenerateLetterModal';
 
 const ClinicalWorkspaceLayout = () => {
   const navigate = useNavigate();
   const { caseId } = useParams();
   const { cases, patient } = usePatientProfileContext();
-  const { selectedCaseId, setSelectedCaseId, editorContext, setEditorContext, triggerRefresh, activeLeftTab, setActiveLeftTab } = useClinicalWorkspace();
+  const { selectedCaseId, setSelectedCaseId, editorContext, activeLeftTab, setActiveLeftTab } = useClinicalWorkspace();
   const location = useLocation();
   const state = location.state as { appointmentId?: number } | null;
 
@@ -26,7 +26,9 @@ const ClinicalWorkspaceLayout = () => {
   }, [caseId, selectedCaseId, setSelectedCaseId]);
 
 
-  const isEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE';
+  const isNoteEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE';
+  const isLetterEditorActive = editorContext.type === 'NEW_LETTER';
+  const isEditorActive = isNoteEditorActive || isLetterEditorActive;
 
   return (
     <div className="h-[calc(100vh-88px)] w-full flex flex-col bg-slate-50/50 overflow-hidden rounded-2xl">
@@ -49,7 +51,11 @@ const ClinicalWorkspaceLayout = () => {
           {/* Left Panel: Templates / Letters / Editor */}
           <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             {isEditorActive ? (
-              <ClinicalNoteEditor initialAppointmentId={state?.appointmentId} />
+              isLetterEditorActive ? (
+                <ClinicalLetterEditor initialAppointmentId={state?.appointmentId} />
+              ) : (
+                <ClinicalNoteEditor initialAppointmentId={state?.appointmentId} />
+              )
             ) : (
               <>
                 {/* Left Panel Tabs */}
@@ -85,20 +91,6 @@ const ClinicalWorkspaceLayout = () => {
         </div>
       </div>
 
-
-      {patient && editorContext.type === 'NEW_LETTER' && (
-        <GenerateLetterModal
-          patientId={patient.id}
-          preSelectedTemplateId={editorContext.templateId}
-          preSelectedCaseId={selectedCaseId || undefined}
-          appointmentId={state?.appointmentId}
-          onClose={() => setEditorContext({ type: 'IDLE' })}
-          onSuccess={() => {
-            setEditorContext({ type: 'IDLE' });
-            triggerRefresh();
-          }}
-        />
-      )}
     </div>
   );
 };

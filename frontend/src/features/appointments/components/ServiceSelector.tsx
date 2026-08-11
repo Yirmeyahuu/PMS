@@ -80,8 +80,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
         setDropdownPos({
-          top: rect.bottom + window.scrollY + 6,
-          left: rect.left + window.scrollX,
+          top: rect.bottom + 6,
+          left: rect.left,
           width: rect.width,
         });
       }
@@ -91,10 +91,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     }
   }, [isOpen]);
 
-  // Close on outside click
+  // Close on outside click or scroll
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
+    const clickHandler = (e: MouseEvent) => {
       const isClickInsideContainer = containerRef.current && containerRef.current.contains(e.target as Node);
       const isClickInsideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target as Node);
       
@@ -102,8 +102,23 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+
+    const scrollHandler = (e: Event) => {
+      // Don't close if they are scrolling inside the dropdown itself
+      const isScrollInsideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target as Node);
+      if (!isScrollInsideDropdown) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', clickHandler);
+    // Use capture phase for scroll events since they don't bubble
+    window.addEventListener('scroll', scrollHandler, true);
+    
+    return () => {
+      document.removeEventListener('mousedown', clickHandler);
+      window.removeEventListener('scroll', scrollHandler, true);
+    };
   }, [isOpen]);
 
   const select = useCallback((svc: ClinicService | null) => {

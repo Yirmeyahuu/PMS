@@ -155,7 +155,13 @@ export const Manage: React.FC = () => {
             {/* Subpage content — FeatureAccessGuard enforces view vs edit access.
                 'view' access → pointer-events blocked + toast on first render.
                 'edit' access → fully interactive. */}
-            <div className="flex-1 overflow-y-auto">
+            <div 
+              className={`flex-1 h-full flex flex-col min-h-0 relative ${
+                activeCategory === 'clinical' && activeItem === 'clinical2' 
+                  ? 'overflow-hidden' 
+                  : 'overflow-y-auto'
+              }`}
+            >
               <FeatureAccessGuard
                 feature={CARD_FEATURE_KEY[activeCategory ?? '']}
                 required="edit"

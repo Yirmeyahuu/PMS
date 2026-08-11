@@ -38,7 +38,6 @@ import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
 import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
 import { PrintInvoiceModal } from '@/features/billing/components/PrintInvoiceModal';
-import { ServiceSelector }         from './ServiceSelector';
 import {
   createRecurringAppointments,
   editAppointment as apiEditAppointment,
@@ -803,14 +802,21 @@ const InlineAppointmentCard = React.forwardRef<
           </div>
         ) : (
           /* ── Normal: show discipline-filtered services ── */
-          <ServiceSelector
-            services={filteredServices}
+          <select
             value={editService}
-            onChange={handleServiceChange}
-            disabled={isTerminal || (!hasPractitioner && !isTerminal)}
-            loading={loadingServices || (hasPractitioner && loadingPractitioners)}
-            compact
-          />
+            onChange={e => handleServiceChange(e.target.value === '' ? '' : Number(e.target.value))}
+            disabled={isTerminal || (!hasPractitioner && !isTerminal) || loadingServices || (hasPractitioner && loadingPractitioners)}
+            className={fieldCls}
+          >
+            <option value="">— Select a service —</option>
+            {filteredServices.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.duration_minutes ? ` (${minsToLabel(s.duration_minutes)})` : ''}
+                {s.price && parseFloat(s.price) > 0 ? ` - ₱${parseFloat(s.price).toLocaleString()}` : ''}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 

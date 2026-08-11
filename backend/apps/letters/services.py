@@ -29,7 +29,7 @@ class LetterGeneratorService:
         # Clinic
         '{{clinic.name}}': lambda p, pr, n, c, a: pr.clinic.name if pr and pr.clinic else (p.clinic.name if p and p.clinic else ''),
         '{{clinic.address}}': lambda p, pr, n, c, a: pr.clinic.address if pr and pr.clinic else (p.clinic.address if p and p.clinic else ''),
-        '{{clinic.phone}}': lambda p, pr, n, c, a: pr.clinic.phone_number if pr and pr.clinic else (p.clinic.phone_number if p and p.clinic else ''),
+        '{{clinic.phone}}': lambda p, pr, n, c, a: pr.clinic.phone if pr and pr.clinic else (p.clinic.phone if p and p.clinic else ''),
         '{{clinic.email}}': lambda p, pr, n, c, a: pr.clinic.email if pr and pr.clinic else (p.clinic.email if p and p.clinic else ''),
         
         # Appointment
