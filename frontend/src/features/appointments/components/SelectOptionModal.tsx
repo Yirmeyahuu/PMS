@@ -131,11 +131,16 @@ export const SelectOptionModal: React.FC<SelectOptionModalProps> = ({
   }, []);
 
   useEffect(() => {
+    // If a patient is already selected and the input matches their name, don't trigger a new search
+    if (selectedPatient && selectedPatient.first_name === firstName && selectedPatient.last_name === lastName) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       searchPatients(firstName, lastName);
     }, 200);
     return () => clearTimeout(timer);
-  }, [firstName, lastName, searchPatients]);
+  }, [firstName, lastName, searchPatients, selectedPatient]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
