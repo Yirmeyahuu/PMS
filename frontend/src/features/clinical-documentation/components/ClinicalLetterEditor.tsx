@@ -7,8 +7,9 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
+import { CustomTableHeader } from '@/features/manage/pages/clinical/components/editor/CustomTableHeader';
+import { CustomTableCell } from '@/features/manage/pages/clinical/components/editor/CustomTableCell';
+import { TrailingNode } from '@/features/manage/pages/clinical/components/editor/TrailingNode';
 import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import Color from '@tiptap/extension-color';
@@ -17,6 +18,7 @@ import Underline from '@tiptap/extension-underline';
 import { CustomOrderedList } from '../../manage/pages/clinical/components/editor/CustomOrderedList';
 import { CustomBulletList } from '../../manage/pages/clinical/components/editor/CustomBulletList';
 import { Indent } from '../../manage/pages/clinical/components/editor/Indent';
+import { FontSize } from '../../manage/pages/clinical/components/editor/FontSize';
 import { EditorToolbar } from '../../manage/pages/clinical/components/editor/EditorToolbar';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
@@ -42,12 +44,14 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
       Indent,
       Table.configure({ resizable: true }),
       TableRow,
-      TableHeader,
-      TableCell,
+      CustomTableHeader,
+      CustomTableCell,
+      TrailingNode,
       Image.configure({ inline: true, allowBase64: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Color,
       TextStyle,
+      FontSize,
       Underline,
     ],
     editorProps: {

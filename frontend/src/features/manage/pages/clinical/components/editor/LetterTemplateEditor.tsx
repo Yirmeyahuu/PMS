@@ -3,8 +3,9 @@ import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
+import { CustomTableHeader } from './CustomTableHeader';
+import { CustomTableCell } from './CustomTableCell';
+import { TrailingNode } from './TrailingNode';
 import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import Color from '@tiptap/extension-color';
@@ -16,6 +17,7 @@ import { MergeField } from './MergeField';
 import { CustomOrderedList } from './CustomOrderedList';
 import { CustomBulletList } from './CustomBulletList';
 import { Indent } from './Indent';
+import { FontSize } from './FontSize';
 import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
 
 import { LetterTemplateHeader } from './LetterTemplateHeader';
@@ -57,12 +59,14 @@ export const LetterTemplateEditor: React.FC<LetterTemplateEditorProps> = ({
       Indent,
       Table.configure({ resizable: true }),
       TableRow,
-      TableHeader,
-      TableCell,
+      CustomTableHeader,
+      CustomTableCell,
+      TrailingNode,
       Image.configure({ inline: true, allowBase64: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Color,
       TextStyle,
+      FontSize,
       Underline,
       MergeField,
     ],

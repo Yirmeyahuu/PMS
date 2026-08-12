@@ -11,7 +11,6 @@ import {
   AlignJustify,
   List,
   ListOrdered,
-  Image as ImageIcon,
   Table as TableIcon,
   Minus,
   Undo,
@@ -116,6 +115,41 @@ const TableGridSelector = ({ onSelect }: { onSelect: (rows: number, cols: number
   );
 };
 
+const COLORS = [
+  '#f87171', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#4ade80', '#34d399', '#2dd4bf', 
+  '#22d3ee', '#38bdf8', '#60a5fa', '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
+  '#fca5a5', '#fdba74', '#fcd34d', '#fef08a', '#d9f99d', '#bbf7d0', '#a7f3d0', '#99f6e4',
+  '#67e8f9', '#7dd3fc', '#93c5fd', '#a5b4fc', '#c4b5fd', '#d8b4fe', '#f0abfc', '#f9a8d4',
+  '#991b1b', '#9a3412', '#92400e', '#854d0e', '#3f6212', '#166534', '#065f46', '#115e59',
+  '#155e75', '#075985', '#1e40af', '#3730a3', '#5b21b6', '#6b21a8', '#86198f', '#9d174d',
+  '#f9fafb', '#f3f4f6', '#e5e7eb', '#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#1f2937'
+];
+
+const ColorPaletteSelector = ({ onSelect, onClear }: { onSelect: (color: string) => void, onClear: () => void }) => {
+  return (
+    <div className="flex flex-col gap-2 p-2 w-56">
+      <div className="grid grid-cols-8 gap-1">
+        {COLORS.map((color) => (
+          <div
+            key={color}
+            className="w-5 h-5 rounded-sm cursor-pointer border border-gray-200 hover:scale-110 transition-transform"
+            style={{ backgroundColor: color }}
+            onClick={(e) => { e.preventDefault(); onSelect(color); }}
+            title={color}
+          />
+        ))}
+      </div>
+      <button 
+        type="button" 
+        onClick={(e) => { e.preventDefault(); onClear(); }}
+        className="w-full text-center px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 border border-gray-200 rounded"
+      >
+        No Color
+      </button>
+    </div>
+  );
+};
+
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
   if (!editor) return null;
 
@@ -125,12 +159,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
 
 
 
-  const addImage = () => {
-    const url = window.prompt('Enter Image URL');
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
-    }
-  };
+
 
   return (
     <div className="flex flex-wrap items-center gap-1 p-2 bg-gray-50 border-b border-gray-200">
@@ -184,6 +213,51 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         >
           <Strikethrough className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Font Size */}
+      <div className="flex items-center gap-0.5 px-2 border-r border-gray-200">
+        <Menu as="div" className="relative">
+          <Menu.Button className="flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded" title="Font Size">
+            Size
+            <ChevronDown className="w-3 h-3 text-gray-500" />
+          </Menu.Button>
+          <Transition
+            as={React.Fragment}
+            enter="transition ease-out duration-100"
+            enterFrom="transform opacity-0 scale-95"
+            enterTo="transform opacity-100 scale-100"
+            leave="transition ease-in duration-75"
+            leaveFrom="transform opacity-100 scale-100"
+            leaveTo="transform opacity-0 scale-95"
+          >
+            <Menu.Items className="absolute z-10 left-0 mt-1 w-24 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+              {['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'].map((size) => (
+                <Menu.Item key={size}>
+                  {({ active }) => (
+                    <button type="button" onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => editor.chain().focus().setFontSize(size).run()}
+                      className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'} ${editor.isActive('textStyle', { fontSize: size }) ? 'bg-sky-100 font-semibold' : ''}`}
+                    >
+                      {size}
+                    </button>
+                  )}
+                </Menu.Item>
+              ))}
+              <div className="w-full h-px bg-gray-100 my-1"></div>
+              <Menu.Item>
+                {({ active }) => (
+                  <button type="button" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().unsetFontSize().run()}
+                    className={`w-full text-left px-4 py-1 text-xs ${active ? 'bg-gray-100 text-gray-700' : 'text-gray-500'}`}
+                  >
+                    Default
+                  </button>
+                )}
+              </Menu.Item>
+            </Menu.Items>
+          </Transition>
+        </Menu>
       </div>
 
       {/* Alignment */}
@@ -341,11 +415,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         </button>
       </div>
 
-      {/* Insert Elements */}
+      {/* Unified Table Tools */}
       <div className="flex items-center gap-0.5 px-2 border-r border-gray-200">
         <Menu as="div" className="relative">
-          <Menu.Button className="p-1.5 text-gray-600 hover:bg-gray-200 rounded" title="Insert Table">
+          <Menu.Button 
+            onMouseDown={(e) => e.preventDefault()}
+            className={`p-1.5 rounded flex items-center gap-1 ${editor.can().deleteTable() ? 'bg-sky-100 text-sky-700' : 'text-gray-600 hover:bg-gray-200'}`}
+            title="Table Tools"
+          >
             <TableIcon className="w-4 h-4" />
+            <ChevronDown className="w-3 h-3" />
           </Menu.Button>
           <Transition
             as={React.Fragment}
@@ -356,27 +435,197 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
             leaveFrom="transform opacity-100 scale-100"
             leaveTo="transform opacity-0 scale-95"
           >
-            <Menu.Items className="absolute z-10 left-0 mt-1 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none p-2 w-48">
-              <Menu.Item>
-                {({ close }) => (
-                  <div onMouseDown={(e) => e.preventDefault()}>
-                    <TableGridSelector onSelect={(r, c) => {
-                      editor.chain().focus().insertTable({rows: r, cols: c, withHeaderRow: true}).run();
-                      close();
-                    }} />
+            <Menu.Items className="absolute z-10 left-0 mt-1 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1 w-56">
+              
+              {/* Add Table Submenu */}
+              <div className="relative group">
+                <Menu.Item>
+                  {({ active }) => (
+                    <button type="button" onMouseDown={(e) => e.preventDefault()}
+                      className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                    >
+                      <span>Add table</span>
+                      <span>›</span>
+                    </button>
+                  )}
+                </Menu.Item>
+                <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-max">
+                     <Menu.Item>
+                        {({ close }) => (
+                          <div onMouseDown={(e) => e.preventDefault()}>
+                            <TableGridSelector onSelect={(r, c) => {
+                              editor.chain().focus().insertTable({rows: r, cols: c, withHeaderRow: true}).run();
+                              close();
+                            }} />
+                          </div>
+                        )}
+                     </Menu.Item>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-gray-100 my-1"></div>
+
+              {/* Add Row Submenu */}
+              <div className="relative group">
+                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addRowBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+                  <span>Add row</span>
+                  <span>›</span>
+                </div>
+                {editor.can().addRowBefore() && (
+                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button type="button" onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => editor.chain().focus().addRowBefore().run()}
+                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                          >
+                            Above
+                          </button>
+                        )}
+                      </Menu.Item>
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button type="button" onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => editor.chain().focus().addRowAfter().run()}
+                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                          >
+                            Below
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </div>
                   </div>
                 )}
+              </div>
+
+              {/* Add Column Submenu */}
+              <div className="relative group">
+                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addColumnBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+                  <span>Add column</span>
+                  <span>›</span>
+                </div>
+                {editor.can().addColumnBefore() && (
+                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button type="button" onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => editor.chain().focus().addColumnBefore().run()}
+                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                          >
+                            Left
+                          </button>
+                        )}
+                      </Menu.Item>
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button type="button" onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => editor.chain().focus().addColumnAfter().run()}
+                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                          >
+                            Right
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Remove Row */}
+              <Menu.Item disabled={!editor.can().deleteRow()}>
+                {({ active, disabled }) => (
+                  <button type="button" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().deleteRow().run()}
+                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                  >
+                    Remove row
+                  </button>
+                )}
               </Menu.Item>
+
+              {/* Remove Column */}
+              <Menu.Item disabled={!editor.can().deleteColumn()}>
+                {({ active, disabled }) => (
+                  <button type="button" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().deleteColumn().run()}
+                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                  >
+                    Remove column
+                  </button>
+                )}
+              </Menu.Item>
+              
+              <div className="w-full h-px bg-gray-100 my-1"></div>
+
+              {/* Cell Background Color Submenu */}
+              <div className="relative group">
+                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+                  <span>Cell background color</span>
+                  <span>›</span>
+                </div>
+                {editor.can().deleteTable() && (
+                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max">
+                      <Menu.Item>
+                        {() => (
+                          <div onMouseDown={(e) => e.preventDefault()}>
+                            <ColorPaletteSelector 
+                              onSelect={(c) => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: c }).updateAttributes('tableHeader', { backgroundColor: c }).run()}
+                              onClear={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run()}
+                            />
+                          </div>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cell Border Color Submenu */}
+              <div className="relative group">
+                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+                  <span>Border color</span>
+                  <span>›</span>
+                </div>
+                {editor.can().deleteTable() && (
+                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max">
+                      <Menu.Item>
+                        {() => (
+                          <div onMouseDown={(e) => e.preventDefault()}>
+                            <ColorPaletteSelector 
+                              onSelect={(c) => editor.chain().focus().updateAttributes('tableCell', { borderColor: c }).updateAttributes('tableHeader', { borderColor: c }).run()}
+                              onClear={() => editor.chain().focus().updateAttributes('tableCell', { borderColor: null }).updateAttributes('tableHeader', { borderColor: null }).run()}
+                            />
+                          </div>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Delete Table */}
+              <div className="w-full h-px bg-gray-100 my-1"></div>
+              <Menu.Item disabled={!editor.can().deleteTable()}>
+                {({ active, disabled }) => (
+                  <button type="button" onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().deleteTable().run()}
+                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
+                  >
+                    Delete Table
+                  </button>
+                )}
+              </Menu.Item>
+
             </Menu.Items>
           </Transition>
         </Menu>
-        <button type="button" onMouseDown={(e) => e.preventDefault()}
-          onClick={addImage}
-          className="p-1.5 text-gray-600 hover:bg-gray-200 rounded"
-          title="Insert Image"
-        >
-          <ImageIcon className="w-4 h-4" />
-        </button>
+
         <button type="button" onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
           className="p-1.5 text-gray-600 hover:bg-gray-200 rounded"
@@ -385,54 +634,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           <Minus className="w-4 h-4" />
         </button>
       </div>
-
-      {/* Contextual Table Tools */}
-      {editor.isActive('table') && (
-        <Menu as="div" className="relative ml-2">
-          <Menu.Button className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded hover:bg-sky-100 focus:outline-none">
-            Table Tools
-            <ChevronDown className="w-3 h-3 text-sky-700" />
-          </Menu.Button>
-          <Transition
-            as={React.Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute z-10 left-0 mt-1 w-48 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
-              {[
-                { label: 'Add Row Above', action: () => editor.chain().focus().addRowBefore().run() },
-                { label: 'Add Row Below', action: () => editor.chain().focus().addRowAfter().run() },
-                { label: 'Delete Row', action: () => editor.chain().focus().deleteRow().run(), danger: true },
-                { divider: true },
-                { label: 'Add Column Before', action: () => editor.chain().focus().addColumnBefore().run() },
-                { label: 'Add Column After', action: () => editor.chain().focus().addColumnAfter().run() },
-                { label: 'Delete Column', action: () => editor.chain().focus().deleteColumn().run(), danger: true },
-                { divider: true },
-                { label: 'Delete Table', action: () => editor.chain().focus().deleteTable().run(), danger: true },
-              ].map((item, index) => (
-                item.divider ? (
-                  <div key={`divider-${index}`} className="w-full h-px bg-gray-100 my-1"></div>
-                ) : (
-                  <Menu.Item key={item.label}>
-                    {({ active }) => (
-                      <button type="button" onMouseDown={(e) => e.preventDefault()}
-                        onClick={item.action}
-                        className={`w-full text-left px-4 py-1.5 text-sm ${active ? (item.danger ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700') : (item.danger ? 'text-red-600' : 'text-gray-700')}`}
-                      >
-                        {item.label}
-                      </button>
-                    )}
-                  </Menu.Item>
-                )
-              ))}
-            </Menu.Items>
-          </Transition>
-        </Menu>
-      )}
 
       {/* Dynamic Fields Dropdowns */}
       <div className="flex items-center gap-2 px-2">

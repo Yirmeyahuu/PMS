@@ -235,7 +235,7 @@ textarea {
 .tiptap table td,
 .tiptap table th {
   min-width: 1em;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #9ca3af;
   padding: 0.5rem;
   vertical-align: top;
   box-sizing: border-box;
@@ -244,7 +244,8 @@ textarea {
 
 .tiptap table th {
   font-weight: 600;
-  background-color: #f9fafb;
+  background-color: #e5e7eb;
+  color: #111827;
 }
 
 .tiptap table .selectedCell:after {

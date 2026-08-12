@@ -52,14 +52,18 @@ export const Indent = Extension.create({
   addCommands() {
     return {
       indent: () => ({ tr, state, dispatch, editor }) => {
-        const { selection } = state;
+        // Safely check if we can sink a list item
+        const canSink = editor.can().sinkListItem('listItem');
         
-        // Try list indent first
-        if (editor.can().sinkListItem('listItem')) {
-          return editor.chain().sinkListItem('listItem').run();
+        if (canSink) {
+          if (dispatch) {
+            editor.commands.sinkListItem('listItem');
+          }
+          return true;
         }
 
         // Otherwise indent block
+        const { selection } = state;
         let hasChanged = false;
         tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
           if (this.options.types.includes(node.type.name)) {
@@ -78,14 +82,18 @@ export const Indent = Extension.create({
         return hasChanged;
       },
       outdent: () => ({ tr, state, dispatch, editor }) => {
-        const { selection } = state;
-
-        // Try list outdent first
-        if (editor.can().liftListItem('listItem')) {
-          return editor.chain().liftListItem('listItem').run();
+        // Safely check if we can lift a list item
+        const canLift = editor.can().liftListItem('listItem');
+        
+        if (canLift) {
+          if (dispatch) {
+            editor.commands.liftListItem('listItem');
+          }
+          return true;
         }
 
         // Otherwise outdent block
+        const { selection } = state;
         let hasChanged = false;
         tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
           if (this.options.types.includes(node.type.name)) {
@@ -101,6 +109,17 @@ export const Indent = Extension.create({
             }
           }
         });
+        
+        if (!hasChanged && dispatch) {
+           console.log("[Indent Debug] Outdent failed. Node types in selection:", 
+              (() => {
+                 const types: string[] = [];
+                 tr.doc.nodesBetween(selection.from, selection.to, n => { types.push(n.type.name); });
+                 return types;
+              })()
+           );
+        }
+        
         return hasChanged;
       },
     };
