@@ -42,6 +42,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
     case_is_unlimited = serializers.SerializerMethodField()
     case_session_number = serializers.SerializerMethodField()
     case_approved_sessions = serializers.SerializerMethodField()
+    effective_session_limit = serializers.SerializerMethodField()
+    session_limit_source = serializers.SerializerMethodField()
+    session_display = serializers.SerializerMethodField()
 
     class Meta:
         model  = Appointment
@@ -51,6 +54,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
             'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
+            'effective_session_limit', 'session_limit_source', 'session_display',
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
             'chief_complaint', 'notes', 'patient_notes',
@@ -71,6 +75,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package', 'package_invoice_id',
             'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
+            'effective_session_limit', 'session_limit_source', 'session_display',
             'created_at', 'updated_at',
         ]
 
@@ -114,7 +119,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return has_direct or has_version
 
     def get_case_session_number(self, obj) -> int | None:
-        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
+        if obj.patient_case_id:
             if hasattr(obj.patient_case, '_ordered_case_appointments'):
                 for i, apt in enumerate(obj.patient_case._ordered_case_appointments):
                     if apt.id == obj.id:
@@ -128,24 +133,52 @@ class AppointmentSerializer(serializers.ModelSerializer):
                 return None
         return None
 
+    def _get_session_stats(self, obj):
+        if not hasattr(obj, '_cached_session_stats'):
+            if obj.patient_case_id:
+                from apps.patients.services.session_engine import SessionEngine
+                obj._cached_session_stats = SessionEngine.get_session_stats(obj.patient_case, service=obj.service)
+            else:
+                obj._cached_session_stats = {}
+        return obj._cached_session_stats
+
     def get_case_approved_sessions(self, obj) -> int | None:
-        if obj.patient_case_id and obj.patient_case.session_source == 'PACKAGE':
-            return obj.patient_case.approved_sessions
-        return None
+        stats = self._get_session_stats(obj)
+        return stats.get('approved_sessions')
+
+    def get_effective_session_limit(self, obj) -> int | None:
+        stats = self._get_session_stats(obj)
+        return stats.get('approved_sessions')
+
+    def get_session_limit_source(self, obj) -> str | None:
+        stats = self._get_session_stats(obj)
+        return stats.get('allocation_source')
 
     def get_case_remaining_sessions(self, obj) -> int | None:
-        if obj.patient_case_id:
-            from apps.patients.services.session_engine import SessionEngine
-            stats = SessionEngine.get_session_stats(obj.patient_case)
-            return stats.get('remaining_sessions')
-        return None
+        stats = self._get_session_stats(obj)
+        return stats.get('remaining_sessions')
 
     def get_case_is_unlimited(self, obj) -> bool:
-        if obj.patient_case_id:
-            from apps.patients.services.session_engine import SessionEngine
-            stats = SessionEngine.get_session_stats(obj.patient_case)
-            return stats.get('is_unlimited', False)
-        return False
+        stats = self._get_session_stats(obj)
+        return stats.get('is_unlimited', False)
+
+    def get_session_display(self, obj) -> str | None:
+        if not obj.patient_case_id:
+            return None
+        
+        stats = self._get_session_stats(obj)
+        if stats.get('is_unlimited'):
+            return "∞ Sessions"
+            
+        session_num = self.get_case_session_number(obj)
+        effective_limit = stats.get('approved_sessions')
+        
+        if session_num is not None and effective_limit is not None:
+            return f"{session_num}/{effective_limit} Sessions"
+        elif session_num is not None:
+            return f"{session_num} Sessions"
+            
+        return None
 
     def get_practitioner_avatar(self, obj) -> str | None:
         """Get practitioner avatar URL from user model with full absolute URL."""
@@ -226,10 +259,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
             case_changed = self.instance and self.instance.patient_case != patient_case
             
             if is_new or case_changed:
-                if not patient_case.is_unlimited and patient_case.approved_sessions is not None:
-                    if patient_case.remaining_sessions is not None and patient_case.remaining_sessions <= 0:
+                from apps.patients.services.session_engine import SessionEngine
+                service = data.get('service') or (self.instance.service if self.instance else None)
+                stats = SessionEngine.get_session_stats(patient_case, service=service)
+                
+                if not stats.get('is_unlimited') and stats.get('approved_sessions') is not None:
+                    remaining = stats.get('remaining_sessions')
+                    if remaining is not None and remaining <= 0:
                         raise serializers.ValidationError({
-                            'detail': 'This case has reached its approved session allocation.'
+                            'detail': 'This case has reached its effective session allocation.'
                         })
 
         return data

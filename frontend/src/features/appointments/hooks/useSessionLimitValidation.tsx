@@ -8,7 +8,11 @@ export const useSessionLimitValidation = () => {
   const [pendingCallback, setPendingCallback] = useState<(() => void) | null>(null);
   const [editCaseOpen, setEditCaseOpen] = useState(false);
 
-  const validateAndProceed = useCallback(async (patientCaseId: number | null | undefined, onProceed: () => void) => {
+  const validateAndProceed = useCallback(async (
+    patientCaseId: number | null | undefined, 
+    onProceed: () => void,
+    serviceId?: number | null
+  ) => {
     if (!patientCaseId) {
       onProceed();
       return;
@@ -16,10 +20,37 @@ export const useSessionLimitValidation = () => {
     try {
       const response = await axiosInstance.get(`/patient-cases/${patientCaseId}/`);
       const ptCase: PatientCase = response.data;
+
+      let selectedService: any = null;
+      if (serviceId) {
+        try {
+          // Attempt to fetch the service to check if it's a package
+          const srvRes = await axiosInstance.get(`/clinic-services/${serviceId}/`);
+          selectedService = srvRes.data;
+        } catch (e) {
+          console.warn('Could not fetch service details for validation', e);
+        }
+      }
       
-      if (!ptCase.is_unlimited && ptCase.approved_sessions !== null) {
-        if ((ptCase.remaining_sessions ?? 0) <= 0) {
-          setCaseDetails(ptCase);
+      let effectiveLimit = ptCase.approved_sessions;
+      let isUnlimited = ptCase.is_unlimited;
+      let isPackageOverride = false;
+
+      if (selectedService?.is_package && selectedService.session_allocation != null) {
+        effectiveLimit = selectedService.session_allocation;
+        isUnlimited = false;
+        isPackageOverride = true;
+      }
+      
+      if (!isUnlimited && effectiveLimit !== null) {
+        const remaining = Math.max(0, effectiveLimit - ptCase.completed_sessions);
+        if (remaining <= 0) {
+          setCaseDetails({
+            ...ptCase,
+            approved_sessions: effectiveLimit,
+            remaining_sessions: remaining,
+            session_source: isPackageOverride ? 'PACKAGE' : ptCase.session_source
+          });
           setPendingCallback(() => onProceed);
           setIsOpen(true);
           return;

@@ -1676,9 +1676,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             {renderCommunicationIndicator(apt)}
             <span className={!col.useHex ? col.text : ''}>
               {apt.patient_name}
-              {apt.case_session_number ? (
+              {apt.session_display ? (
                 <span className="opacity-80 font-medium ml-1">
-                  ({apt.case_session_number}{apt.case_approved_sessions ? `/${apt.case_approved_sessions}` : ''} Session)
+                  ({apt.session_display})
                 </span>
               ) : null}
             </span>
@@ -2045,9 +2045,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
         >
           <span className={!col.useHex ? col.text : ''}>
             {formatTime12Hour(apt.start_time)} · {apt.patient_name}
-            {apt.case_session_number ? (
+            {apt.session_display ? (
               <span className="opacity-80 font-medium ml-1">
-                ({apt.case_session_number}{apt.case_approved_sessions ? `/${apt.case_approved_sessions}` : ''} Session)
+                ({apt.session_display})
               </span>
             ) : null}
           </span>

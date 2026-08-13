@@ -23,6 +23,9 @@ export interface Appointment {
   case_is_unlimited: boolean;
   case_session_number?: number | null;
   case_approved_sessions?: number | null;
+  effective_session_limit?: number | null;
+  session_limit_source?: 'CASE' | 'PACKAGE' | null;
+  session_display?: string | null;
   package_invoices_count?: number;
 
   status: 'SCHEDULED' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'ARRIVED' | 'DNA';

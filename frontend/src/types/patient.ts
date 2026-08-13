@@ -99,6 +99,8 @@ export interface PatientCase {
   allocation_status: 'ACTIVE' | 'EXHAUSTED' | 'UNLIMITED';
   is_unlimited: boolean;
   session_source: 'MANUAL' | 'PACKAGE';
+  effective_session_limit: number | null;
+  session_limit_source: 'CASE' | 'PACKAGE';
   referred_by: string;
   referral_info: string;
   created_at: string;

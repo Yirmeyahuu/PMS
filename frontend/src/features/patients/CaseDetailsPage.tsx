@@ -100,15 +100,15 @@ export const CaseDetailsPage = () => {
               <Clock className="w-4 h-4 text-sky-600" />
               <span className="font-medium text-gray-800">{caseData.progress_text}</span>
             </div>
-            {!caseData.is_unlimited && caseData.approved_sessions && (
-              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden">
+            {!caseData.is_unlimited && (caseData.effective_session_limit || caseData.approved_sessions) && (
+              <div className="w-full bg-gray-100 rounded-full h-1 mt-0.5 overflow-hidden">
                 <div 
                   className={`h-1.5 rounded-full transition-all ${
                     (caseData.remaining_sessions || 0) === 0 ? 'bg-red-500' : 
                     (caseData.remaining_sessions || 0) <= 2 ? 'bg-amber-500' : 
                     'bg-emerald-500'
                   }`}
-                  style={{ width: `${Math.min(100, (caseData.completed_sessions / caseData.approved_sessions) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (caseData.completed_sessions / (caseData.effective_session_limit || caseData.approved_sessions || 1)) * 100)}%` }}
                 ></div>
               </div>
             )}

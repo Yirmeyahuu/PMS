@@ -69,7 +69,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
     title: '',
     status: 'OPEN' as any,
     payer: '' as any,
-    sessionSource: 'MANUAL' as 'MANUAL' | 'PACKAGE' | 'HMO',
     approvedSessions: '' as number | '',
     isUnlimited: false,
     referredBy: '',
@@ -283,7 +282,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             status: inlineCaseData.status,
             primary_practitioner: formData.practitioner ? Number(formData.practitioner) : undefined,
             payer: inlineCaseData.payer || undefined,
-            session_source: inlineCaseData.sessionSource,
             approved_sessions: inlineCaseData.isUnlimited ? undefined : (inlineCaseData.approvedSessions || undefined),
             is_unlimited: inlineCaseData.isUnlimited,
             referred_by: inlineCaseData.referredBy || undefined,
@@ -526,23 +524,32 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                             </select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Session Source</label>
-                            <select value={inlineCaseData.sessionSource} onChange={e => setInlineCaseData({...inlineCaseData, sessionSource: e.target.value as any})} className={inputBase}>
-                              <option value="MANUAL">Manual Setup</option>
-                              <option value="PACKAGE">Package/Bundle</option>
-                              <option value="HMO">HMO Covered</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Approved Sessions</label>
-                            <input type="number" disabled={inlineCaseData.isUnlimited} value={inlineCaseData.approvedSessions} onChange={e => setInlineCaseData({...inlineCaseData, approvedSessions: e.target.value ? Number(e.target.value) : ''})} className={inputBase} min={1} placeholder={inlineCaseData.isUnlimited ? 'Unlimited' : ''} />
-                            <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
-                              <input type="checkbox" checked={inlineCaseData.isUnlimited} onChange={e => setInlineCaseData({...inlineCaseData, isUnlimited: e.target.checked})} className="rounded border-gray-300 text-sky-600 focus:ring-sky-500" />
-                              <span className="text-xs text-gray-600">Unlimited sessions</span>
-                            </label>
-                          </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {selectedService?.is_package ? (
+                            <div className="bg-sky-50 border border-sky-200 rounded-md p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <label className="block text-xs font-semibold text-gray-700">Approved Sessions</label>
+                                <span className="text-xs text-gray-500 font-mono">[ {inlineCaseData.approvedSessions || 0} ]</span>
+                              </div>
+                              <div className="text-sm font-semibold text-sky-900 mb-1">
+                                Package Allocation: {selectedService.session_allocation} sessions
+                              </div>
+                              <p className="text-xs text-sky-700">
+                                ⓘ This Case will use the package session allocation of {selectedService.session_allocation} sessions.
+                              </p>
+                              {/* Keep inputs hidden to maintain state if they switch services later */}
+                              <input type="hidden" value={inlineCaseData.approvedSessions} />
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">Approved Sessions</label>
+                              <input type="number" disabled={inlineCaseData.isUnlimited} value={inlineCaseData.approvedSessions} onChange={e => setInlineCaseData({...inlineCaseData, approvedSessions: e.target.value ? Number(e.target.value) : ''})} className={inputBase} min={1} placeholder={inlineCaseData.isUnlimited ? 'Unlimited' : ''} />
+                              <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
+                                <input type="checkbox" checked={inlineCaseData.isUnlimited} onChange={e => setInlineCaseData({...inlineCaseData, isUnlimited: e.target.checked})} className="rounded border-gray-300 text-sky-600 focus:ring-sky-500" />
+                                <span className="text-xs text-gray-600">Unlimited sessions</span>
+                              </label>
+                            </div>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>

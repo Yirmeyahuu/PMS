@@ -707,6 +707,8 @@ class PatientCaseSerializer(serializers.ModelSerializer):
     remaining_sessions = serializers.SerializerMethodField()
     progress_text = serializers.SerializerMethodField()
     allocation_status = serializers.SerializerMethodField()
+    effective_session_limit = serializers.SerializerMethodField()
+    session_limit_source = serializers.SerializerMethodField()
     
     class Meta:
         model = PatientCase
@@ -716,6 +718,7 @@ class PatientCaseSerializer(serializers.ModelSerializer):
             'payer', 'alert_notes', 'approved_sessions',
             'completed_sessions', 'remaining_sessions', 'progress_text',
             'allocation_status', 'is_unlimited', 'session_source',
+            'effective_session_limit', 'session_limit_source',
             'referred_by', 'referral_info', 'created_at', 'updated_at',
             # Financial Fields
             'package_invoice', 'package_cost', 'amount_paid',
@@ -724,6 +727,7 @@ class PatientCaseSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'completed_sessions', 
             'remaining_sessions', 'progress_text', 'allocation_status',
+            'effective_session_limit', 'session_limit_source',
             'outstanding_balance', 'package_status', 'is_archived'
         ]
 
@@ -738,7 +742,9 @@ class PatientCaseSerializer(serializers.ModelSerializer):
     def _get_stats(self, obj):
         if not hasattr(obj, '_session_stats'):
             from apps.patients.services.session_engine import SessionEngine
-            obj._session_stats = SessionEngine.get_session_stats(obj)
+            latest_apt = obj.case_appointments.order_by('-created_at').first()
+            service = latest_apt.service if latest_apt else None
+            obj._session_stats = SessionEngine.get_session_stats(obj, service=service)
         return obj._session_stats
 
     def get_remaining_sessions(self, obj) -> int | None:
@@ -749,6 +755,12 @@ class PatientCaseSerializer(serializers.ModelSerializer):
 
     def get_allocation_status(self, obj) -> str:
         return self._get_stats(obj).get('allocation_status', 'ACTIVE')
+
+    def get_effective_session_limit(self, obj) -> int | None:
+        return self._get_stats(obj).get('approved_sessions')
+
+    def get_session_limit_source(self, obj) -> str:
+        return self._get_stats(obj).get('allocation_source', 'MANUAL')
 
     def validate(self, attrs):
         approved = attrs.get('approved_sessions', getattr(self.instance, 'approved_sessions', None) if self.instance else None)

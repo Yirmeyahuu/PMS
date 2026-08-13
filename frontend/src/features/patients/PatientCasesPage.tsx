@@ -198,7 +198,7 @@ export const PatientCasesPage = () => {
                         {c.allocation_status}
                       </span>
                     </div>
-                    {!c.is_unlimited && c.approved_sessions && (
+                    {!c.is_unlimited && (c.effective_session_limit || c.approved_sessions) && (
                       <div className="w-full bg-gray-100 rounded-full h-1 mt-0.5 overflow-hidden">
                         <div 
                           className={`h-1 rounded-full transition-all ${
@@ -206,7 +206,7 @@ export const PatientCasesPage = () => {
                             (c.remaining_sessions || 0) <= 2 ? 'bg-amber-500' : 
                             'bg-emerald-500'
                           }`}
-                          style={{ width: `${Math.min(100, (c.completed_sessions / c.approved_sessions) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (c.completed_sessions / (c.effective_session_limit || c.approved_sessions || 1)) * 100)}%` }}
                         ></div>
                       </div>
                     )}

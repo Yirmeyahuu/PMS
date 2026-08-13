@@ -40,7 +40,9 @@ export const SessionAllocationLimitModal: React.FC<SessionAllocationLimitModalPr
 
           <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 space-y-3 mb-6">
             <div className="flex justify-between items-center text-sm">
-              <span className="text-slate-500 font-medium">Approved Sessions:</span>
+              <span className="text-slate-500 font-medium">
+                {patientCase.session_source === 'PACKAGE' ? 'Package Allocation:' : 'Approved Sessions:'}
+              </span>
               <span className="font-semibold text-slate-900">{patientCase.approved_sessions}</span>
             </div>
             <div className="flex justify-between items-center text-sm">

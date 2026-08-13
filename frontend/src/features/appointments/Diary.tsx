@@ -696,12 +696,12 @@ export const Diary: React.FC = () => {
         setIsRebookingInProgress(false);
       }
     };
-
     validateAndProceed(
       rebookData.patient_case,
       () => {
         proceedWithRebooking();
-      }
+      },
+      rebookData.service
     );
   };
 
