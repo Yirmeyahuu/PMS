@@ -1018,6 +1018,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     getSelectionStartTime,
   } = useDragSelection();
 
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef    = useRef(false);
   const dragStartTimeRef = useRef<number>(0);
 
@@ -1315,85 +1316,108 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   };
 
   // ── Shared overlays ───────────────────────────────────────────────────────
+  const constrainPosition = (rawX: number, rawY: number, offsetX: number, offsetY: number, elWidth: number, elHeight: number) => {
+    if (!calendarContainerRef.current) return { x: rawX, y: rawY };
+    const rect = calendarContainerRef.current.getBoundingClientRect();
+    const minX = rect.left + offsetX;
+    const maxX = rect.right - elWidth + offsetX;
+    const minY = rect.top + offsetY;
+    const maxY = rect.bottom - elHeight + offsetY;
+
+    return {
+      x: Math.max(minX, Math.min(rawX, maxX)),
+      y: Math.max(minY, Math.min(rawY, maxY))
+    };
+  };
+
   const dragOverlays = (
     <>
       {dragState.isDragging && dragState.ghostPosition && dragState.draggedAppointment && (
-        <DragGhost appointment={dragState.draggedAppointment} position={dragState.ghostPosition} />
+        <DragGhost appointment={dragState.draggedAppointment} position={constrainPosition(dragState.ghostPosition.x, dragState.ghostPosition.y, 80, 20, 160, 60)} />
       )}
-      {blockDragState.isDragging && blockDragState.ghostPosition && blockDragState.draggedBlock && (
-        <div
-          className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
-          style={{
-            left:      blockDragState.ghostPosition.x - 80,
-            top:       blockDragState.ghostPosition.y - 20,
-            width:     160,
-            transform: 'rotate(2deg)',
-          }}
-        >
-          <div className="bg-gray-800 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-gray-600">
-            <div className="truncate">{blockDragState.draggedBlock.event_name}</div>
-            <div className="text-gray-300 mt-0.5 truncate">
-              {formatTime12Hour(blockDragState.draggedBlock.start_time)} · {formatTime12Hour(blockDragState.draggedBlock.end_time)}
-            </div>
-            <div className="mt-1 flex items-center gap-1 text-gray-400">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Drop to reschedule
+      {blockDragState.isDragging && blockDragState.ghostPosition && blockDragState.draggedBlock && (() => {
+        const pos = constrainPosition(blockDragState.ghostPosition.x, blockDragState.ghostPosition.y, 80, 20, 160, 60);
+        return (
+          <div
+            className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
+            style={{
+              left:      pos.x - 80,
+              top:       pos.y - 20,
+              width:     160,
+              transform: 'rotate(2deg)',
+            }}
+          >
+            <div className="bg-gray-800 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-gray-600">
+              <div className="truncate">{blockDragState.draggedBlock.event_name}</div>
+              <div className="text-gray-300 mt-0.5 truncate">
+                {formatTime12Hour(blockDragState.draggedBlock.start_time)} · {formatTime12Hour(blockDragState.draggedBlock.end_time)}
+              </div>
+              <div className="mt-1 flex items-center gap-1 text-gray-400">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Drop to reschedule
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      {noteDragState.isDragging && noteDragState.ghostPosition && noteDragState.draggedNote && (
-        <div
-          className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
-          style={{
-            left:      noteDragState.ghostPosition.x - 80,
-            top:       noteDragState.ghostPosition.y - 20,
-            width:     160,
-            transform: 'rotate(-1deg)',
-          }}
-        >
-          <div className="bg-orange-500 text-white px-3 py-2 text-xs font-semibold shadow-lg border-2 border-orange-600">
-            <div className="truncate">📌 {noteDragState.draggedNote.message}</div>
-            <div className="text-orange-200 mt-0.5 truncate">
-              {formatTime12Hour(noteDragState.draggedNote.start_time)} · {formatTime12Hour(noteDragState.draggedNote.end_time)}
-            </div>
-            <div className="mt-1 flex items-center gap-1 text-orange-300">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Drop to move note
+        );
+      })()}
+      {noteDragState.isDragging && noteDragState.ghostPosition && noteDragState.draggedNote && (() => {
+        const pos = constrainPosition(noteDragState.ghostPosition.x, noteDragState.ghostPosition.y, 80, 20, 160, 60);
+        return (
+          <div
+            className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
+            style={{
+              left:      pos.x - 80,
+              top:       pos.y - 20,
+              width:     160,
+              transform: 'rotate(-1deg)',
+            }}
+          >
+            <div className="bg-orange-500 text-white px-3 py-2 text-xs font-semibold shadow-lg border-2 border-orange-600">
+              <div className="truncate">📌 {noteDragState.draggedNote.message}</div>
+              <div className="text-orange-200 mt-0.5 truncate">
+                {formatTime12Hour(noteDragState.draggedNote.start_time)} · {formatTime12Hour(noteDragState.draggedNote.end_time)}
+              </div>
+              <div className="mt-1 flex items-center gap-1 text-orange-300">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Drop to move note
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* Rebook mode ghost — follows cursor when placing a rebook */}
-      {rebookMode && rebookGhostPos && (
-        <div
-          className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
-          style={{
-            left:      rebookGhostPos.x - 80,
-            top:       rebookGhostPos.y - 20,
-            width:     180,
-            transform: 'rotate(-1.5deg)',
-          }}
-        >
-          <div className="bg-emerald-600 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-emerald-400">
-            <div className="truncate">{rebookPreviewLabel ?? 'Rebook'}</div>
-            <div className="text-emerald-200 mt-0.5 truncate">Click slot to rebook</div>
-            <div className="mt-1 flex items-center gap-1 text-emerald-100">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              ESC to cancel
+      {rebookMode && rebookGhostPos && (() => {
+        const pos = constrainPosition(rebookGhostPos.x, rebookGhostPos.y, 80, 20, 180, 60);
+        return (
+          <div
+            className="fixed pointer-events-none z-[9999] opacity-90 shadow-2xl"
+            style={{
+              left:      pos.x - 80,
+              top:       pos.y - 20,
+              width:     180,
+              transform: 'rotate(-1.5deg)',
+            }}
+          >
+            <div className="bg-emerald-600 text-white rounded-lg px-3 py-2 text-xs font-semibold shadow-lg border-2 border-emerald-400">
+              <div className="truncate">{rebookPreviewLabel ?? 'Rebook'}</div>
+              <div className="text-emerald-200 mt-0.5 truncate">Click slot to rebook</div>
+              <div className="mt-1 flex items-center gap-1 text-emerald-100">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                ESC to cancel
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 
@@ -2294,6 +2318,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
 
   // ── Global mouse-move / mouse-up on the calendar wrapper ─────────────────
   const calendarWrapperProps = {
+    ref: calendarContainerRef,
     style: (isResizing
       ? ({ cursor: 'ns-resize', userSelect: 'none' } as React.CSSProperties)
       : rebookMode

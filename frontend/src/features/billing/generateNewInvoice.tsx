@@ -566,7 +566,7 @@ export default function GenerateNewInvoice() {
         toast.success('Invoice Created Successfully!');
       }
       if (appointment?.patient) {
-        navigate(`/clients/${appointment.patient}`);
+        navigate(`/patients/${appointment.patient}/invoices`);
       } else {
         navigate(-1);
       }

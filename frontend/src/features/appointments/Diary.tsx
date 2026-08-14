@@ -1234,7 +1234,7 @@ export const Diary: React.FC = () => {
                 comparePractitionerIdA={typeof comparePractitioners[0] === 'number' ? comparePractitioners[0] : null}
                 comparePractitionerIdB={typeof comparePractitioners[1] === 'number' ? comparePractitioners[1] : null}
                 onRebook={startRebook}
-                rebookMode={rebookMode}
+                rebookMode={rebookMode && !showRebookContinueModal}
                 rebookPreviewLabel={
                   rebookData
                     ? `${rebookData.patient_name}${
