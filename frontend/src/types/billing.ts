@@ -11,7 +11,7 @@ export type BatchStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export type PaymentMethod =
   | 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER'
-  | 'GCASH';
+  | 'GCASH' | 'CHECK';
 
 // ── Print Appointments ────────────────────────────────────────────────────────
 

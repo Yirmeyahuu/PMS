@@ -2073,7 +2073,13 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         
         case = self.get_object()
         
-        if case.session_source != 'PACKAGE':
+        latest_apt = case.case_appointments.order_by('-created_at').first()
+        service = latest_apt.service if latest_apt else None
+        
+        from apps.patients.services.session_engine import SessionEngine
+        stats = SessionEngine.get_session_stats(case, service=service)
+        
+        if stats.get('allocation_source') != 'PACKAGE':
             return Response({
                 'is_package': False,
                 'package_total': 0,
@@ -2092,7 +2098,10 @@ class PatientCaseViewSet(viewsets.ModelViewSet):
         package_total = case.package_cost
         if not package_total:
             first_invoice = case_invoices.order_by('created_at').first()
-            package_total = first_invoice.total_amount if first_invoice else Decimal('0')
+            if first_invoice:
+                package_total = first_invoice.total_amount
+            else:
+                package_total = service.price if service and service.price else Decimal('0')
 
         total_paid = sum(
             sum(p.amount for p in inv.payments.all())

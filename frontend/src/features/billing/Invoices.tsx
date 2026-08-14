@@ -46,6 +46,7 @@ const paymentMethodLabels: Record<PaymentMethod, string> = {
   DEBIT_CARD: 'Debit Card',
   BANK_TRANSFER: 'Bank Transfer',
   GCASH: 'GCash',
+  CHECK: 'Cheque',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

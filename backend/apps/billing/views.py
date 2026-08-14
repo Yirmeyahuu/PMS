@@ -155,8 +155,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # If it's a Package Case, we use Master Invoice logic
-        is_package = appt.patient_case and appt.patient_case.session_source == 'PACKAGE'
+        # If it's a Package Case based on the appointment service, we use Master Invoice logic
+        is_package = False
+        if appt.patient_case:
+            from apps.patients.services.session_engine import SessionEngine
+            stats = SessionEngine.get_session_stats(appt.patient_case, service=appt.service)
+            is_package = (stats.get('allocation_source') == 'PACKAGE')
         
         # Determine existing invoice
         existing = None
