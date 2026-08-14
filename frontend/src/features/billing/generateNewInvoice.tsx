@@ -62,6 +62,7 @@ export default function GenerateNewInvoice() {
   const [invoiceDate, setInvoiceDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [accountNotes, setAccountNotes] = useState('');
   const [items, setItems] = useState<EditableItem[]>([]);
 
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([
@@ -96,6 +97,23 @@ export default function GenerateNewInvoice() {
     },
     enabled: !!appointmentId,
   });
+
+  const { data: patientData } = useQuery({
+    queryKey: ['patient-details', appointment?.patient],
+    queryFn: async () => {
+      if (!appointment?.patient) return null;
+      const { data } = await axiosInstance.get(`/patients/${appointment.patient}/`);
+      return data;
+    },
+    enabled: !!appointment?.patient,
+  });
+
+  // Pre-fill accountNotes when patient data is loaded
+  useEffect(() => {
+    if (patientData?.account_notes) {
+      setAccountNotes(patientData.account_notes);
+    }
+  }, [patientData]);
 
   // This query will be placed after patientCase query is defined.
 
@@ -471,6 +489,7 @@ export default function GenerateNewInvoice() {
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           notes,
+          account_notes: accountNotes,
         } as any);
 
         if (calculateTotalPaid() > 0) {
@@ -495,6 +514,7 @@ export default function GenerateNewInvoice() {
           invoice_date: invoiceDate,
           due_date: dueDate || undefined,
           notes,
+          account_notes: accountNotes,
           items: items.filter(i => i.description.trim()).map(i => ({
             description: i.description,
             quantity: i.quantity,
@@ -901,6 +921,29 @@ export default function GenerateNewInvoice() {
                   </>
                 )}
               </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-300 mb-8 w-full"></div>
+
+          {/* Notes Section */}
+          <div className="grid grid-cols-2 gap-8 mb-10">
+            <div>
+              <h2 className="text-sm font-black text-gray-900 mb-4 uppercase">INVOICE NOTES</h2>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notes specifically for this invoice..."
+                className="w-full h-24 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none"
+              />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-gray-900 mb-4 uppercase">ACCOUNT NOTES</h2>
+              <textarea
+                value={accountNotes}
+                onChange={(e) => setAccountNotes(e.target.value)}
+                placeholder="Persistent notes for this patient's account..."
+                className="w-full h-24 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none bg-amber-50 border-amber-200"
+              />
             </div>
           </div>
 

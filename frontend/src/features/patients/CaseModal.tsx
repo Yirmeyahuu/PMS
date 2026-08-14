@@ -11,7 +11,7 @@ export interface CaseFormData {
   primaryPractitionerName: string;
   payer: PatientCasePayer;
   alertNotes: string;
-  sessionSource: 'MANUAL' | 'PACKAGE' | 'HMO';
+  sessionSource?: 'MANUAL' | 'PACKAGE' | 'HMO';
   approvedSessions?: number;
   isUnlimited: boolean;
   referredBy: string;
@@ -42,7 +42,6 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
   
   // Session Management State
   const approvedSessionsRef = React.useRef<HTMLInputElement>(null);
-  const [sessionSource, setSessionSource] = useState<'MANUAL' | 'PACKAGE' | 'HMO'>(initialValues?.session_source ?? 'MANUAL');
   const [approvedSessions, setApprovedSessions] = useState<number | ''>(initialValues?.approved_sessions ?? '');
   const [isUnlimited, setIsUnlimited] = useState<boolean>(initialValues?.is_unlimited ?? false);
   
@@ -63,7 +62,6 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
       setPrimaryPractitionerName(initialValues?.primary_practitioner_name ?? '');
       setPayer(initialValues?.payer ?? '');
       setAlertNotes(initialValues?.alert_notes ?? '');
-      setSessionSource(initialValues?.session_source ?? 'MANUAL');
       setApprovedSessions(initialValues?.approved_sessions ?? '');
       setIsUnlimited(initialValues?.is_unlimited ?? false);
       setReferredBy(initialValues?.referred_by ?? '');
@@ -182,21 +180,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                 <div className="space-y-4 pt-4 border-t border-gray-100">
                   <h4 className="text-sm font-semibold text-gray-800">Session Management</h4>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Session Source</label>
-                      <select
-                        value={sessionSource}
-                        onChange={(e) => setSessionSource(e.target.value as any)}
-                        disabled={mode === 'edit'}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-gray-50 disabled:text-gray-500"
-                      >
-                        <option value="MANUAL">Manual</option>
-                        <option value="PACKAGE">Prepaid Package</option>
-                        <option value="HMO">HMO Approval</option>
-                      </select>
-                    </div>
-                    
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Approved Sessions</label>
                       <input
@@ -204,7 +188,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                         min="0"
                         value={isUnlimited ? '' : approvedSessions}
                         onChange={(e) => setApprovedSessions(e.target.value === '' ? '' : Number(e.target.value))}
-                        disabled={isUnlimited || (mode === 'edit' && sessionSource === 'PACKAGE')}
+                        disabled={isUnlimited || initialValues?.session_source === 'PACKAGE'}
                         placeholder={isUnlimited ? "Unlimited" : "Enter amount"}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-gray-50 disabled:text-gray-500"
                       />
@@ -220,7 +204,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                         setIsUnlimited(e.target.checked);
                         if (e.target.checked) setApprovedSessions('');
                       }}
-                      disabled={sessionSource === 'PACKAGE'}
+                      disabled={initialValues?.session_source === 'PACKAGE'}
                       className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500 disabled:opacity-50"
                     />
                     <label htmlFor="unlimited-sessions" className="text-sm font-medium text-gray-700">
@@ -323,7 +307,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                   primaryPractitionerName, 
                   payer, 
                   alertNotes, 
-                  sessionSource,
+                  sessionSource: initialValues?.session_source ?? 'MANUAL',
                   approvedSessions: isUnlimited ? undefined : (approvedSessions === '' ? undefined : approvedSessions),
                   isUnlimited,
                   referredBy, 

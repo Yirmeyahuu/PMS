@@ -132,6 +132,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return x_forwarded_for.split(',')[0].strip()
         return self.request.META.get('REMOTE_ADDR')
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if 'account_notes' in self.request.data:
+            instance.patient.account_notes = self.request.data['account_notes']
+            instance.patient.save(update_fields=['account_notes'])
+
     # ── Create invoice from appointment ───────────────────────────────────────
     @action(
         detail=False,
@@ -206,6 +212,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     if is_package:
                         appt.patient_case.package_invoice = invoice
                         appt.patient_case.save(update_fields=['package_invoice'])
+
+                    if 'account_notes' in data:
+                        patient.account_notes = data['account_notes']
+                        patient.save(update_fields=['account_notes'])
 
                     items = data.get('items', [])
                     if items:
@@ -477,6 +487,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.version_number = next_version
             invoice.save()
 
+            if 'account_notes' in data:
+                invoice.patient.account_notes = data['account_notes']
+                invoice.patient.save(update_fields=['account_notes'])
+
             # ── Replace line items if provided ────────────────────────────────
             if 'items' in data and data['items'] is not None:
                 invoice.items.all().delete()
@@ -564,12 +578,20 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=['get'],
         url_path='print',
-        url_name='print',
-        authentication_classes=[QueryParamJWTAuthentication],
+        url_name='print-invoice',
     )
     def print_invoice(self, request, pk=None):
-        """GET /api/invoices/{id}/print/ — Renders printable HTML for this invoice only."""
+        """Render the invoice print template as HTML."""
+        from django.shortcuts import render
+        
         invoice = self.get_object()
+        context = self._build_invoice_context(invoice, request)
+        return render(request, 'billing/invoice_print.html', context)
+
+    def _build_invoice_context(self, invoice, request):
+        """Build the single authoritative context dictionary for rendering invoice templates."""
+        from django.utils.timezone import now
+        from apps.appointments.models import Appointment
 
         # Force recalculate totals from items to ensure accuracy
         invoice.update_totals()
@@ -610,6 +632,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         computed_total       = computed_items_total - discount_amount + tax_amount
         computed_balance_due = max(computed_total - amount_paid - philhealth - hmo, Decimal('0'))
 
+        # Package Summary Support
+        package_summary = None
+        patient_case = invoice.patient_case
+        if not patient_case and invoice.appointment and invoice.appointment.patient_case:
+            patient_case = invoice.appointment.patient_case
+            
+        if patient_case and patient_case.session_source == 'PACKAGE':
+            package_summary = {
+                'package_total': patient_case.package_cost,
+                'total_paid': amount_paid,
+                'outstanding_balance': max(patient_case.package_cost - amount_paid, Decimal('0'))
+            }
+
+        # Next Appointment Logic
+        next_appointment = Appointment.objects.filter(
+            patient=invoice.patient,
+            date__gte=now().date(),
+            status__in=['SCHEDULED', 'CONFIRMED']
+        ).exclude(id=invoice.appointment_id if invoice.appointment else None).order_by('date', 'start_time').first()
+
         context = {
             'system_branding':      SYSTEM_BRANDING,
             'invoice':              invoice,
@@ -624,7 +666,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'computed_subtotal':    f'{computed_subtotal:,.2f}',
             'computed_total':       f'{computed_total:,.2f}',
             'computed_balance_due': f'{computed_balance_due:,.2f}',
+            'package_summary':      package_summary,
+            'next_appointment':     next_appointment,
         }
+        return context
+
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='print',
+        url_name='print',
+        authentication_classes=[QueryParamJWTAuthentication],
+    )
+    def print_invoice(self, request, pk=None):
+        """GET /api/invoices/{id}/print/ — Renders printable HTML for this invoice only."""
+        invoice = self.get_object()
+        context = self._build_invoice_context(invoice, request)
 
         return TemplateResponse(request, 'billing/invoice_print.html', context)
 
@@ -652,47 +709,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             try:
                 from weasyprint import HTML
                 
-                # Force recalculate totals from items to ensure accuracy
-                invoice.update_totals()
-                invoice = Invoice.objects.get(pk=invoice.pk)
-                items    = list(invoice.items.all().order_by('id'))
-                payments = invoice.payments.all().order_by('-payment_date')
-
-                print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
-                clinic_display_name = print_settings.clinic_name or invoice.clinic.name
-
-                date_format = print_settings.date_format or '%B %d, %Y'
-                template_date_format = 'F j, Y'
-
-                has_discounts = any(item.discount_percent > 0 for item in items)
-                has_taxes     = any(item.tax_percent > 0 for item in items)
-                currency      = print_settings.currency_symbol or '₱'
-
-                computed_subtotal    = sum(
-                    Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items
-                )
-                computed_items_total = sum(Decimal(str(item.total)) for item in items)
-                discount_amount      = Decimal(str(invoice.discount_amount or 0))
-                tax_amount           = Decimal(str(invoice.tax_amount or 0))
-                amount_paid          = Decimal(str(invoice.amount_paid or 0))
-                computed_total       = computed_items_total - discount_amount + tax_amount
-                computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
-
-                context = {
-                    'system_branding':      SYSTEM_BRANDING,
-                    'invoice':              invoice,
-                    'items':                items,
-                    'payments':             payments,
-                    'settings':             print_settings,
-                    'clinic_display_name':  clinic_display_name,
-                    'date_format':          template_date_format,
-                    'has_discounts':        has_discounts,
-                    'has_taxes':            has_taxes,
-                    'currency':             currency,
-                    'computed_subtotal':    f'{computed_subtotal:,.2f}',
-                    'computed_total':       f'{computed_total:,.2f}',
-                    'computed_balance_due': f'{computed_balance_due:,.2f}',
-                }
+                context = self._build_invoice_context(invoice, request)
 
                 html_string = render_to_string('billing/invoice_print.html', context)
                 pdf_file = BytesIO()
@@ -709,24 +726,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 # Fall back to HTML
                 logger.warning(f"PDF generation failed for invoice #{invoice.invoice_number}, falling back to HTML: {pdf_err}")
                 
-                # Build context for HTML
-                invoice.update_totals()
-                invoice = Invoice.objects.get(pk=invoice.pk)
-                items    = list(invoice.items.all().order_by('id'))
-                payments = invoice.payments.all().order_by('-payment_date')
-
-                print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
-                clinic_display_name = print_settings.clinic_name or invoice.clinic.name
-                template_date_format = 'F j, Y'
-                has_discounts = any(item.discount_percent > 0 for item in items)
-                has_taxes     = any(item.tax_percent > 0 for item in items)
-                currency      = print_settings.currency_symbol or '₱'
-                computed_subtotal    = sum(Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items)
-                computed_items_total = sum(Decimal(str(item.total)) for item in items)
-                discount_amount      = Decimal(str(invoice.discount_amount or 0))
-                tax_amount           = Decimal(str(invoice.tax_amount or 0))
-                amount_paid          = Decimal(str(invoice.amount_paid or 0))
-                computed_total       = computed_items_total - discount_amount + tax_amount
                 computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
                 context = {
                     'system_branding':      SYSTEM_BRANDING,
@@ -856,50 +855,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     from weasyprint import HTML
 
                     # Build the invoice print context
-                    invoice.update_totals()
-                    invoice = Invoice.objects.get(pk=invoice.pk)
-
-                    items    = list(invoice.items.all().order_by('id'))
-                    payments = invoice.payments.all().order_by('-payment_date')
-
-                    print_settings      = InvoicePrintSettings.get_for_clinic(invoice.clinic)
-                    clinic_display_name = print_settings.clinic_name or invoice.clinic.name
-
-                    if not print_settings.logo_url and invoice.clinic and invoice.clinic.logo:
-                        print_settings.logo_url = request.build_absolute_uri(invoice.clinic.logo.url)
-
-                    date_format = print_settings.date_format or '%B %d, %Y'
-                    template_date_format = 'F j, Y'
-
-                    has_discounts = any(item.discount_percent > 0 for item in items)
-                    has_taxes     = any(item.tax_percent > 0 for item in items)
-                    currency      = print_settings.currency_symbol or '₱'
-
-                    computed_subtotal    = sum(
-                        Decimal(str(item.quantity)) * Decimal(str(item.unit_price)) for item in items
-                    )
-                    computed_items_total = sum(Decimal(str(item.total)) for item in items)
-                    discount_amount      = Decimal(str(invoice.discount_amount or 0))
-                    tax_amount           = Decimal(str(invoice.tax_amount or 0))
-                    amount_paid          = Decimal(str(invoice.amount_paid or 0))
-                    computed_total       = computed_items_total - discount_amount + tax_amount
-                    computed_balance_due = max(computed_total - amount_paid, Decimal('0'))
-
-                    context = {
-                        'system_branding':      SYSTEM_BRANDING,
-                        'invoice':              invoice,
-                        'items':                items,
-                        'payments':             payments,
-                        'settings':             print_settings,
-                        'clinic_display_name':  clinic_display_name,
-                        'date_format':          template_date_format,
-                        'has_discounts':        has_discounts,
-                        'has_taxes':            has_taxes,
-                        'currency':             currency,
-                        'computed_subtotal':    f'{computed_subtotal:,.2f}',
-                        'computed_total':       f'{computed_total:,.2f}',
-                        'computed_balance_due': f'{computed_balance_due:,.2f}',
-                    }
+                    context = self._build_invoice_context(invoice, request)
 
                     # Render HTML and convert to PDF
                     html_string = render_to_string('billing/invoice_print.html', context)

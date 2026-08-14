@@ -78,6 +78,13 @@ class Patient(TimeStampedModel, SoftDeleteModel):
         blank=True,
         help_text='Patient preferences for data sharing with third parties.',
     )
+    
+    # ── Billing & Account ─────────────────────────────────────────────────────
+    account_notes = models.TextField(
+        blank=True,
+        default='',
+        help_text='Internal notes regarding the patient\'s overall account and billing status.',
+    )
 
     # ── Communication workflow fields ─────────────────────────────────────────
     last_visit_date = models.DateField(

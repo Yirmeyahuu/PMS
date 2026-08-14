@@ -81,14 +81,25 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if obj.appointment and obj.appointment.practitioner:
             user = obj.appointment.practitioner.user
             return user.get_full_name() if user else None
+        if obj.patient_case and obj.patient_case.primary_practitioner:
+            user = obj.patient_case.primary_practitioner.user
+            return user.get_full_name() if user else None
         return None
 
     def get_appointment_service_name(self, obj) -> str | None:
         if obj.appointment and obj.appointment.service:
-            return obj.appointment.service.name
+            name = obj.appointment.service.name
+            if obj.appointment.patient_case:
+                name += f" : {obj.appointment.patient_case.title}"
+            return name
         # fallback to legacy appointment_type display
         if obj.appointment:
-            return obj.appointment.get_appointment_type_display()
+            name = obj.appointment.get_appointment_type_display()
+            if obj.appointment.patient_case:
+                name += f" : {obj.appointment.patient_case.title}"
+            return name
+        if obj.patient_case:
+            return f"Package: {obj.patient_case.title}"
         return None
 
 
@@ -103,6 +114,7 @@ class InvoiceCreateSerializer(serializers.Serializer):
     invoice_date = serializers.DateField()
     due_date     = serializers.DateField(required=False, allow_null=True)
     notes        = serializers.CharField(required=False, allow_blank=True, default='')
+    account_notes = serializers.CharField(required=False, allow_blank=True, default='')
 
     # Optional line items to add immediately
     items = InvoiceItemWriteSerializer(many=True, required=False, default=list)
@@ -142,6 +154,7 @@ class InvoiceCreateVersionSerializer(serializers.Serializer):
     discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
     tax_percent      = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
     notes            = serializers.CharField(required=False, allow_blank=True)
+    account_notes    = serializers.CharField(required=False, allow_blank=True)
     terms_conditions = serializers.CharField(required=False, allow_blank=True)
     philhealth_coverage = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     hmo_coverage        = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)

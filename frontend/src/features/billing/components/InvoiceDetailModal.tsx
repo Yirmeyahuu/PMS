@@ -187,7 +187,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-gray-900">Invoice Detailsss</h2>
+                  <h2 className="text-lg font-bold text-gray-900">Invoice Details</h2>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
                     v{displayData.version_number}
                   </span>
@@ -277,7 +277,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                   <label className="text-xs text-gray-500 uppercase">Status</label>
                   <div className="mt-1">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${statusColors[displayData.status as InvoiceStatus]}`}>
-                      {displayData.status}
+                      {displayData.status?.replace('_', ' ')}
                     </span>
                   </div>
                 </div>

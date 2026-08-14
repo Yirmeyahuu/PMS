@@ -363,6 +363,12 @@ class InvoiceItem(TimeStampedModel):
     def __str__(self):
         return f"{self.description} — {self.invoice.invoice_number}"
 
+    @property
+    def subtotal(self):
+        """Calculates quantity * unit_price before discounts and taxes."""
+        from decimal import Decimal
+        return Decimal(str(self.quantity or 0)) * Decimal(str(self.unit_price or 0))
+
     def save(self, *args, **kwargs):
         quantity         = Decimal(str(self.quantity or 0))
         unit_price       = Decimal(str(self.unit_price or 0))

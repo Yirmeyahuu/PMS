@@ -18,6 +18,7 @@ export interface InvoiceClinicInfo {
 export interface NextAppointmentInfo {
   date: string;
   start_time: string;
+  type?: string;
 }
 
 export interface PMSInvoiceTemplateProps {
@@ -49,6 +50,16 @@ const fmtDate = (dateStr: string | null | undefined) => {
     day: 'numeric',
     year: 'numeric',
   });
+};
+
+const fmtTime = (timeStr: string | null | undefined) => {
+  if (!timeStr) return '';
+  const [hours, minutes] = timeStr.split(':');
+  const h = parseInt(hours, 10);
+  if (isNaN(h)) return timeStr;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${minutes}${ampm}`;
 };
 
 const fmtQty = (qty: string | number) => {
@@ -208,8 +219,20 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
                 )}
                 {invoice.appointment_date && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Appointment</span>
+                    <span className="text-gray-500">Appointment Date</span>
                     <span className="font-semibold text-gray-800">{fmtDate(invoice.appointment_date)}</span>
+                  </div>
+                )}
+                {invoice.appointment_service_name && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Service</span>
+                    <span className="font-semibold text-gray-800">{invoice.appointment_service_name}</span>
+                  </div>
+                )}
+                {invoice.appointment_practitioner_name && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Practitioner</span>
+                    <span className="font-semibold text-gray-800 text-right">{invoice.appointment_practitioner_name}</span>
                   </div>
                 )}
                 {invoice.payment_method && (
@@ -480,12 +503,24 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
           )}
 
           {/* ── Notes ── */}
-          {invoice.notes && (
-            <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">
-                Notes
-              </p>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+          {(invoice.notes || invoice.account_notes) && (
+            <div className="mb-8 grid grid-cols-2 gap-4">
+              {invoice.notes ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">
+                    Invoice Notes
+                  </p>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+                </div>
+              ) : <div />}
+              {invoice.account_notes ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">
+                    Account Notes
+                  </p>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap">{invoice.account_notes}</p>
+                </div>
+              ) : <div />}
             </div>
           )}
 
@@ -537,7 +572,7 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
                 <div className="mt-2">
                   {nextAppointment ? (
                     <p className="text-xs text-emerald-300 font-semibold text-center">
-                      Next Appointment: {new Date(nextAppointment.date).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })} {nextAppointment.start_time}
+                      Next Appointment: {fmtDate(nextAppointment.date)} at {fmtTime(nextAppointment.start_time)} {nextAppointment.type ? `(${nextAppointment.type})` : ''}
                     </p>
                   ) : (
                     <p className="text-xs text-red-300 font-medium text-center">

@@ -176,6 +176,7 @@ export interface Invoice {
   philhealth_coverage: string;
   hmo_coverage:        string;
   notes:               string;
+  account_notes?:      string;
   terms_conditions:    string;
 
   items:               InvoiceItem[];
@@ -195,6 +196,7 @@ export interface CreateInvoiceFromAppointmentPayload {
   invoice_date:  string;
   due_date?:     string;
   notes?:        string;
+  account_notes?: string;
   items?:        CreateInvoiceItemPayload[];
 }
 
@@ -211,6 +213,7 @@ export interface CreateInvoicePayload {
   discount_percent?: number;
   tax_percent?:     number;
   notes?:           string;
+  account_notes?:   string;
   inline_items?:    CreateInvoiceItemPayload[];
 }
 
@@ -364,6 +367,7 @@ export interface CreateInvoiceVersionPayload {
   discount_percent?:    number;
   tax_percent?:         number;
   notes?:               string;
+  account_notes?:       string;
   terms_conditions?:    string;
   philhealth_coverage?: number;
   hmo_coverage?:        number;

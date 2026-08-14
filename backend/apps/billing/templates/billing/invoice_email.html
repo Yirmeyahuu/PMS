@@ -659,6 +659,12 @@
             </div>
         </div>
 
+        <!-- Notes -->
+        {% if invoice.notes %}
+        <div class="section-title">Notes</div>
+        <div style="margin-bottom: 24px; padding: 12px; background-color: #f9fafb; border-radius: 8px; font-size: 11px; color: #374151; white-space: pre-wrap;">{{ invoice.notes }}</div>
+        {% endif %}
+
         <!-- Payment History -->
         {% if payments %}
         <div class="section-title">Payment History</div>
