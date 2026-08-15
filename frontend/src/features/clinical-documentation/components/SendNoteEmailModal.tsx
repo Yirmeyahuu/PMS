@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { X, Mail, Loader2, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Mail, Loader2, FileText, AlertCircle } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
@@ -143,7 +143,7 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
       document.body.removeChild(container);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      setErrorMessage('Failed to generate PDF attachment.');
+      toast.error('Failed to generate PDF attachment.');
     } finally {
       setIsGeneratingPdf(false);
     }

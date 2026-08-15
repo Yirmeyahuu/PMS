@@ -321,6 +321,8 @@ export interface CreateRecurringAppointmentsParams {
   start_time: string;
   patient_id: number;
   clinic_id: number;
+  patient_case?: number | null;
+  is_rebook?: boolean;
 }
 
 export const createRecurringAppointments = async (

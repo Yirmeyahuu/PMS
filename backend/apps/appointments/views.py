@@ -933,6 +933,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         start_time_str = request.data.get('start_time')
         patient_id = request.data.get('patient_id')
         clinic_id = request.data.get('clinic_id')
+        patient_case_id = request.data.get('patient_case')
         
         logger.info(f"[DEBUG Backend] Payload received for create_recurring: dates={dates}, start_time={start_time_str}")
 
@@ -987,6 +988,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 service = Service.objects.get(pk=service_id)
             except Service.DoesNotExist:
                 pass
+                
+        patient_case = None
+        if patient_case_id:
+            from apps.patients.models import PatientCase
+            try:
+                patient_case = PatientCase.objects.get(pk=patient_case_id)
+            except PatientCase.DoesNotExist:
+                pass
         
         # Parse dates
         generated_dates = []
@@ -1010,6 +1019,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment = Appointment.objects.create(
                 clinic=clinic,
                 patient=patient,
+                patient_case=patient_case,
                 practitioner=practitioner,
                 service=service,
                 appointment_type=service.name if service else 'INITIAL',

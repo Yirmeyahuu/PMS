@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { X, Mail, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useClinicSettings } from '@/hooks/useClinicSettings';
 import { getClinicEmailRecipients, type ClinicEmailRecipient } from '@/features/clinics/clinic.api';

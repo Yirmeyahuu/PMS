@@ -72,7 +72,6 @@ import { ClinicalNoteRedirect } from '@/features/clinical-documentation/componen
 import { PatientProfile } from '@/features/patients/PatientProfile';
 import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
 import { GenerateNewInvoice } from '@/features/billing/generateNewInvoice';
-import { RightSidebarBookmarks } from '@/components/layout/RightSidebarBookmarks';
 import { FloatingNotificationsContainer } from '@/features/notifications/components/FloatingNotificationsContainer';
 import { FeatureAccessGuard } from '@/components/auth/FeatureAccessGuard';
 import { FloatingSupportButton } from '@/features/support';
@@ -82,14 +81,6 @@ import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
 
 // ─── Routes where internal components should NOT appear ────────────────────────────
 const PUBLIC_PATHS = ['/login', '/register', '/portal', '/clinic-setup', '/book', '/client-form', '/public', '/user-manual'];
-
-const CommunicationBookmarksGuard = () => {
-  const { isAuthenticated } = useAuthStore();
-  const location            = useLocation();
-  const isPublicPage        = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
-  if (!isAuthenticated || isPublicPage) return null;
-  return <RightSidebarBookmarks />;
-};
 
 const FloatingNotificationsGuard = () => {
   const location = useLocation();
@@ -353,7 +344,6 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        <CommunicationBookmarksGuard />
         <FloatingNotificationsGuard />
         <FloatingSupportGuard />
         <GlobalLogoutModal />

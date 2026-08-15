@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { billingApi, type ClinicService } from '@/features/billing/billing.api';
 import { checkRecurringAvailability } from '../appointment.api';
 import type { Appointment } from '@/types';
+import { axiosInstance } from '@/lib/axios';
+import { ConfirmRecurringContinue } from './ConfirmRecurringContinue';
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +21,8 @@ export interface RecurringAppointmentData {
   dates: string[];
   practitioner_id: number | null;
   start_time: string;
+  patient_case?: number | null;
+  is_rebook?: boolean;
 }
 
 // Day options for selection
@@ -46,6 +50,24 @@ interface TimeSlot {
   status: 'AVAILABLE' | 'BOOKED' | 'UNAVAILABLE';
 }
 
+const formatTime12h = (time24: string) => {
+  if (!time24) return '';
+  const [h, m] = time24.split(':');
+  let hour = parseInt(h, 10);
+  if (isNaN(hour)) return time24;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12;
+  hour = hour ? hour : 12;
+  return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+};
+
+const TIME_OPTIONS: string[] = [];
+for (let h = 0; h < 24; h++) {
+  for (let m = 0; m < 60; m += 15) {
+    TIME_OPTIONS.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+  }
+}
+
 export const AddRecurringAppointments: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -66,6 +88,10 @@ export const AddRecurringAppointments: React.FC<Props> = ({
   const [isSaving, setIsSaving] = useState(false);
   // Track whether slots are stale (form changed since last check)
   const [slotsStale, setSlotsStale] = useState(false);
+
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [pendingRecurringData, setPendingRecurringData] = useState<RecurringAppointmentData | null>(null);
+  const [pendingSessionCounts, setPendingSessionCounts] = useState({ package: 0, existing: 0, new: 0 });
 
   // Fetch clinic services
   const { data: clinicServices = [], isLoading: loadingServices } = useQuery<ClinicService[]>({
@@ -235,9 +261,54 @@ export const AddRecurringAppointments: React.FC<Props> = ({
       dates:            finalDates,
       practitioner_id:  appointment.practitioner || null,
       start_time:       startTime.substring(0, 5),
+      patient_case:     appointment.patient_case,
+      is_rebook:        true,
     };
+
+    if (appointment.patient_case) {
+      try {
+        const response = await axiosInstance.get(`/patient-cases/${appointment.patient_case}/`);
+        const ptCase = response.data;
+        let effectiveLimit = ptCase.approved_sessions;
+        let isUnlimited = ptCase.is_unlimited;
+
+        if (selectedServiceId) {
+          try {
+            const srvRes = await axiosInstance.get(`/clinic-services/${selectedServiceId}/`);
+            if (srvRes.data?.is_package && srvRes.data?.session_allocation != null) {
+              effectiveLimit = srvRes.data.session_allocation;
+              isUnlimited = false;
+            }
+          } catch (e) {
+            console.warn('Could not fetch service details for validation', e);
+          }
+        }
+
+        if (!isUnlimited && effectiveLimit !== null) {
+          const totalAfter = ptCase.completed_sessions + finalDates.length;
+          if (totalAfter > effectiveLimit) {
+            setPendingRecurringData(recurringData);
+            setPendingSessionCounts({
+              package: effectiveLimit,
+              existing: ptCase.completed_sessions,
+              new: finalDates.length,
+            });
+            setShowWarningModal(true);
+            setIsSaving(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to validate session limit:', e);
+      }
+    }
+
+    executeSave(recurringData);
+  };
+
+  const executeSave = (data: RecurringAppointmentData) => {
     try {
-      onSave?.(recurringData);
+      onSave?.(data);
       onClose();
     } catch (error) {
       console.error('Failed to save recurring appointments:', error);
@@ -256,8 +327,9 @@ export const AddRecurringAppointments: React.FC<Props> = ({
   const bookedCount        = availableSlots.filter(s => s.status === 'BOOKED').length;
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto">
-      {/* Backdrop */}
+    <>
+      <div className="fixed inset-0 z-[9999] overflow-y-auto">
+        {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       <div className="flex min-h-full items-center justify-center p-3">
@@ -311,7 +383,7 @@ export const AddRecurringAppointments: React.FC<Props> = ({
                       <Clock className="w-3.5 h-3.5 text-sky-500 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">Time</p>
-                        <p className="text-xs font-semibold text-gray-800">{startTime}</p>
+                        <p className="text-xs font-semibold text-gray-800">{formatTime12h(startTime)}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -396,12 +468,17 @@ export const AddRecurringAppointments: React.FC<Props> = ({
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                         Start Time <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="time"
+                      <select
                         value={startTime}
                         onChange={e => setStartTime(e.target.value)}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"
-                      />
+                      >
+                        {TIME_OPTIONS.map(time => (
+                          <option key={time} value={time}>
+                            {formatTime12h(time)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Frequency */}
@@ -580,7 +657,7 @@ export const AddRecurringAppointments: React.FC<Props> = ({
                                     {format(new Date(slot.date), 'MMM d, yyyy')}
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">{slot.day_name}</td>
-                                  <td className="px-3 py-2 text-gray-500">{slot.time}</td>
+                                  <td className="px-3 py-2 text-gray-500">{formatTime12h(slot.time)}</td>
                                   <td className="px-3 py-2">
                                     {slot.status === 'AVAILABLE' ? (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
@@ -656,6 +733,24 @@ export const AddRecurringAppointments: React.FC<Props> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <ConfirmRecurringContinue
+        isOpen={showWarningModal}
+        packageSessions={pendingSessionCounts.package}
+        existingSessions={pendingSessionCounts.existing}
+        newSessions={pendingSessionCounts.new}
+        onCancel={() => {
+          setShowWarningModal(false);
+          setPendingRecurringData(null);
+        }}
+        onContinue={() => {
+          setShowWarningModal(false);
+          if (pendingRecurringData) {
+            setIsSaving(true);
+            executeSave(pendingRecurringData);
+          }
+        }}
+      />
+    </>
   );
 };

@@ -2337,10 +2337,13 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
               start_time: data.start_time,
               patient_id: appointment!.patient,
               clinic_id: appointment!.clinic,
+              patient_case: data.patient_case,
+              is_rebook: data.is_rebook,
             });
             toast.success(`${result.created} recurring appointment(s) created!`);
             onRecurringCreated?.();
             setShowRecurringModal(false);
+            onClose(); // Close the AppointmentView modal as requested
           } catch (error: any) {
             console.error('Failed to create recurring appointments:', error);
             toast.error(error.response?.data?.error || 'Failed to create recurring appointments');
