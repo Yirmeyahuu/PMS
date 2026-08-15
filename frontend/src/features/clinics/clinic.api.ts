@@ -249,3 +249,21 @@ export const updateBranchConsentForm = async (
   const res = await axiosInstance.patch<ClinicConsentFormResponse>(`/clinics/${branchId}/consent_form/`, payload);
   return res.data;
 };
+
+/**
+ * GET /api/clinics/email_recipients/
+ * Returns a normalized directory of patients, staff, and contacts for email sending.
+ */
+export interface ClinicEmailRecipient {
+  id: string;
+  name: string;
+  email: string;
+  type: string;
+  role: string;
+  avatarUrl?: string | null;
+}
+
+export const getClinicEmailRecipients = async (): Promise<ClinicEmailRecipient[]> => {
+  const res = await axiosInstance.get<ClinicEmailRecipient[]>('/clinics/email_recipients/');
+  return res.data;
+};

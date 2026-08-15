@@ -1,16 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Loader2, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useClinicSettings } from '@/hooks/useClinicSettings';
-import { getPractitioners } from '@/features/clinics/clinic.api';
-import { getContacts } from '@/features/contacts/contact.api';
-import axiosInstance from '@/lib/axios';
-
-interface EmailSuggestion {
-  name: string;
-  email: string;
-  role: string;
-  avatarUrl?: string | null;
-}
+import { getClinicEmailRecipients, type ClinicEmailRecipient } from '@/features/clinics/clinic.api';
 
 interface SendInvoiceEmailModalProps {
   isOpen: boolean;
@@ -33,7 +25,9 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   appointmentDate,
   appointmentType,
 }) => {
-  const [emails, setEmails] = useState<string[]>([patientEmail]);
+  const [emails, setEmails] = useState<string[]>(
+    patientEmail && patientEmail.trim() !== '' ? [patientEmail] : []
+  );
   const [emailInput, setEmailInput] = useState('');
   const [subject, setSubject] = useState(`Invoice #${invoiceNumber} - Appointment Invoice`);
   const [body, setBody] = useState(
@@ -44,15 +38,13 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
     `Best regards,\n` +
     `Clinic Team`
   );
-  const [isSending, setIsSending] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const { emailEnabled } = useClinicSettings();
 
   // Email suggestions state
-  const [allSuggestions, setAllSuggestions] = useState<EmailSuggestion[]>([]);
-  const [filteredSuggestions, setFilteredSuggestions] = useState<EmailSuggestion[]>([]);
+  const [allSuggestions, setAllSuggestions] = useState<ClinicEmailRecipient[]>([]);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<ClinicEmailRecipient[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -63,55 +55,19 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
     let cancelled = false;
 
     const fetchEmailSuggestions = async () => {
+      setIsLoadingSuggestions(true);
       try {
-        // Fetch practitioners
-        const practitionersData = await getPractitioners();
-        const practitionerSuggestions = practitionersData.practitioners.map(p => ({
-          name: p.name,
-          email: p.email,
-          role: p.role || 'PRACTITIONER',
-          avatarUrl: p.avatar_url,
-        }));
+        const recipients = await getClinicEmailRecipients();
 
-        // Fetch staff/admin users
-        interface User {
-          email: string;
-          first_name: string;
-          last_name: string;
-          role: string;
-          avatar_url?: string;
+        if (!cancelled) {
+          setAllSuggestions(recipients);
+          setFilteredSuggestions(recipients);
         }
-        const usersResponse = await axiosInstance.get('/users/');
-        const users = usersResponse.data.results || usersResponse.data;
-        const userSuggestions = (users as User[])
-          .filter((u: User) => u.email && (u.role === 'STAFF' || u.role === 'ADMIN'))
-          .map((u: User) => ({
-            name: `${u.first_name} ${u.last_name}`,
-            email: u.email,
-            role: u.role,
-            avatarUrl: u.avatar_url,
-          }));
-
-        // Fetch active contacts with emails
-        const contactsData = await getContacts({ is_active: true, page_size: 100 });
-        const contactSuggestions = contactsData.results
-          .filter((c) => c.email)
-          .map((c) => ({
-            name: c.full_name,
-            email: c.email!,
-            role: c.contact_type_display,
-          }));
-
-        // Combine and deduplicate
-        const combined = [...practitionerSuggestions, ...userSuggestions, ...contactSuggestions];
-        const uniqueSuggestions = Array.from(
-          new Map(combined.map(s => [s.email, s])).values()
-        );
-
-        if (!cancelled) setAllSuggestions(uniqueSuggestions);
       } catch (err) {
         // Silently fail - suggestions are optional
         if (!cancelled) console.error('Failed to fetch email suggestions:', err);
+      } finally {
+        if (!cancelled) setIsLoadingSuggestions(false);
       }
     };
 
@@ -123,7 +79,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
-          emailInputRef.current && !emailInputRef.current.contains(e.target as Node)) {
+        emailInputRef.current && !emailInputRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
     };
@@ -134,7 +90,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
 
   const handleEmailInput = (value: string) => {
     setEmailInput(value);
-    
+
     // Check if user pressed space to add email
     if (value.endsWith(' ')) {
       const emailToAdd = value.trim();
@@ -147,7 +103,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
       }
       return;
     }
-    
+
     // Filter suggestions as user types
     if (value.length > 0) {
       const filtered = allSuggestions.filter(s =>
@@ -162,7 +118,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
     }
   };
 
-  const handleSuggestionSelect = (suggestion: EmailSuggestion) => {
+  const handleSuggestionSelect = (suggestion: ClinicEmailRecipient) => {
     if (!emails.includes(suggestion.email)) {
       setEmails([...emails, suggestion.email]);
     }
@@ -176,54 +132,46 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
     setEmails(emails.filter(e => e !== emailToRemove));
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (emails.length === 0) {
-      setErrorMessage('Please enter at least one recipient email address');
+      toast.error('Please enter at least one recipient email address');
       return;
     }
 
-    setIsSending(true);
-    setErrorMessage('');
-    setSuccessMessage('');
+    const token = localStorage.getItem('access_token');
 
-    try {
-      const token = localStorage.getItem('access_token');
-      
-      // Join emails with comma (no spaces) for backend
-      const emailsToSend = emails.join(',');
-      
-      const formData = new FormData();
-      formData.append('to_email', emailsToSend);
-      formData.append('subject', subject);
-      formData.append('body', body);
+    // Join emails with comma (no spaces) for backend
+    const emailsToSend = emails.join(',');
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoiceId}/send-email/`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
+    const formData = new FormData();
+    formData.append('to_email', emailsToSend);
+    formData.append('subject', subject);
+    formData.append('body', body);
 
+    const sendPromise = fetch(
+      `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/invoices/${invoiceId}/send-email/`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    ).then(async (response) => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to send email');
       }
+      return response.json();
+    });
 
-      setSuccessMessage('Invoice sent successfully!');
-      setTimeout(() => {
-        onClose();
-        setSuccessMessage('');
-      }, 2000);
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMessage(error.message || 'Failed to send email. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
+    toast.promise(sendPromise, {
+      loading: 'Sending invoice email...',
+      success: 'Invoice sent successfully!',
+      error: (err) => err.message || 'Failed to send invoice email.',
+    });
+
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -258,20 +206,6 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
 
           {/* Content */}
           <div className="p-5 space-y-4">
-            {/* Success Message */}
-            {successMessage && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                {successMessage}
-              </div>
-            )}
-
-            {/* Error Message */}
-            {errorMessage && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
             {/* Email notifications disabled warning */}
             {!emailEnabled && (
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -305,7 +239,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
                       </button>
                     </div>
                   ))}
-                  
+
                   {/* Input for new email */}
                   <input
                     ref={emailInputRef}
@@ -317,38 +251,44 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
                     className="flex-1 min-w-[150px] outline-none bg-transparent text-sm"
                   />
                 </div>
-                
+
                 {/* Dropdown Suggestions */}
-                {showSuggestions && filteredSuggestions.length > 0 && (
+                {showSuggestions && (
                   <div
                     ref={suggestionsRef}
                     className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
                   >
-                    {filteredSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSuggestionSelect(suggestion)}
-                        className="w-full flex items-start gap-2 px-3 py-2 hover:bg-sky-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
-                        type="button"
-                      >
-                        <div className="flex-1 min-w-0 flex items-center gap-3">
-                          {suggestion.avatarUrl ? (
-                            <img src={suggestion.avatarUrl} alt={suggestion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-100" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {suggestion.name.charAt(0).toUpperCase()}
+                    {isLoadingSuggestions ? (
+                      <div className="p-3 text-sm text-gray-500 text-center">Loading recipients...</div>
+                    ) : filteredSuggestions.length === 0 ? (
+                      <div className="p-3 text-sm text-gray-500 text-center">No matching recipients found.</div>
+                    ) : (
+                      filteredSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSuggestionSelect(suggestion)}
+                          className="w-full flex items-start gap-2 px-3 py-2 hover:bg-sky-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+                          type="button"
+                        >
+                          <div className="flex-1 min-w-0 flex items-center gap-3">
+                            {suggestion.avatarUrl ? (
+                              <img src={suggestion.avatarUrl} alt={suggestion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-100" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {suggestion.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</p>
+                              <p className="text-xs text-gray-500 truncate">{suggestion.email}</p>
                             </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{suggestion.email}</p>
                           </div>
-                        </div>
-                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded whitespace-nowrap ml-2">
-                          {suggestion.role}
-                        </span>
-                      </button>
-                    ))}
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded whitespace-nowrap ml-2">
+                            {suggestion.role}
+                          </span>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -387,20 +327,11 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
             </button>
             <button
               onClick={handleSend}
-              disabled={isSending || emails.length === 0 || !emailEnabled}
+              disabled={emails.length === 0 || !emailEnabled}
               className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:hover:bg-sky-600 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
             >
-              {isSending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Mail className="w-4 h-4" />
-                  Send Invoice
-                </>
-              )}
+              <Mail className="w-4 h-4" />
+              Send Invoice
             </button>
           </div>
         </div>

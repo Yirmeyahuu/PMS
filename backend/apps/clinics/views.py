@@ -140,6 +140,65 @@ class ClinicViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, result, timeout=300)  # 5-minute cache
         return Response(result)
 
+    # ── GET /api/clinics/email_recipients/ ────────────────────────────────────
+    @action(detail=False, methods=['get'], url_path='email_recipients')
+    def email_recipients(self, request):
+        """
+        Return a normalized, clinic-scoped directory of email recipients
+        for sending invoices and communications. Includes Patients, Users (Staff, Admin, Practitioners),
+        and Clinic Contacts.
+        """
+        user = request.user
+        if not user.clinic:
+            return Response([])
+            
+        main_clinic = user.clinic.main_clinic
+        all_branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+        
+        # We need a unified list, deduplicated by email (lowercase)
+        recipients = {}
+        
+        def add_recipient(email, name, r_type, role, avatar_url=None):
+            if not email:
+                return
+            email = email.strip().lower()
+            if not email or email in recipients:
+                return
+            recipients[email] = {
+                "id": f"{r_type}-{len(recipients)}",
+                "name": name,
+                "email": email,
+                "type": r_type,
+                "role": role,
+                "avatarUrl": avatar_url
+            }
+            
+        # 1. Fetch Patients
+        from apps.patients.models import Patient
+        patients = Patient.objects.filter(clinic_id__in=all_branch_ids, is_deleted=False).exclude(email__isnull=True).exclude(email='')
+        for p in patients:
+            add_recipient(p.email, p.get_full_name(), 'Patient', 'Patient')
+            
+        # 2. Fetch Users (Staff, Practitioners, Admins)
+        from apps.accounts.models import User
+        users = User.objects.filter(clinic_id__in=all_branch_ids, is_active=True, is_deleted=False).exclude(email__isnull=True).exclude(email='')
+        for u in users:
+            role_display = dict(User.ROLE_CHOICES).get(u.role, u.role)
+            avatar_url = request.build_absolute_uri(u.avatar.url) if getattr(u, 'avatar', None) and hasattr(u.avatar, 'url') else None
+            add_recipient(u.email, u.get_full_name(), 'User', role_display, avatar_url)
+            
+        # 3. Fetch Contacts
+        from apps.contacts.models import Contact
+        contacts = Contact.objects.filter(clinic_id__in=all_branch_ids, is_active=True).exclude(email__isnull=True).exclude(email='')
+        for c in contacts:
+            add_recipient(c.email, c.full_name, 'Contact', f"Clinic Contact - {c.display_contact_type}")
+            
+        # Sort by name
+        result_list = list(recipients.values())
+        result_list.sort(key=lambda x: x['name'].lower())
+        
+        return Response(result_list)
+
     # ── POST /api/clinics/{id}/create_branch/ ────────────────────────────────
     @action(detail=True, methods=['post'])
     def create_branch(self, request, pk=None):

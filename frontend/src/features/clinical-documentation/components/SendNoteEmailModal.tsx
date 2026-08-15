@@ -3,6 +3,7 @@ import { X, Mail, Loader2, FileText, CheckCircle, AlertCircle } from 'lucide-rea
 import { createRoot } from 'react-dom/client';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
+import toast from 'react-hot-toast';
 import { ClinicalNotePrintTemplate } from './ClinicalNotePrintTemplate';
 import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
@@ -42,7 +43,9 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
   clinicLogoUrl,
 }) => {
   const noteDate = note.date ? new Date(note.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  const [emails, setEmails] = useState<string[]>(patientEmail ? [patientEmail] : []);
+  const [emails, setEmails] = useState<string[]>(
+    patientEmail && patientEmail.trim() !== '' ? [patientEmail] : []
+  );
   const [emailInput, setEmailInput] = useState('');
   const [subject, setSubject] = useState(`Clinical Note – ${noteDate}`);
   const [body, setBody] = useState(
@@ -53,9 +56,6 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
     `Clinic Team`
   );
   
-  const [isSending, setIsSending] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const { emailEnabled } = useClinicSettings();
@@ -272,40 +272,30 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
     setEmails(emails.filter(e => e !== emailToRemove));
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (emails.length === 0) {
-      setErrorMessage('Please add at least one recipient email address.');
+      toast.error('Please add at least one recipient email address.');
       return;
     }
     if (!attachment) {
-      setErrorMessage('PDF attachment is still generating. Please wait.');
+      toast.error('PDF attachment is still generating. Please wait.');
       return;
     }
 
-    setIsSending(true);
-    setErrorMessage('');
-    setSuccessMessage('');
+    const sendPromise = sendClinicalNoteEmail(note.id, {
+      to: emails.join(','),
+      subject,
+      body,
+      attachment
+    });
 
-    try {
-      await sendClinicalNoteEmail(note.id, {
-        to: emails.join(','),
-        subject,
-        body,
-        attachment
-      });
+    toast.promise(sendPromise, {
+      loading: 'Sending Note email...',
+      success: 'Email sent successfully!',
+      error: 'Failed to send email. Please try again.',
+    });
 
-      setSuccessMessage('Email sent successfully!');
-      setTimeout(() => {
-        onClose();
-        setSuccessMessage('');
-        setEmails(patientEmail ? [patientEmail] : []);
-        setAttachment(null);
-      }, 2000);
-    } catch (error) {
-      setErrorMessage('Failed to send email. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -463,20 +453,6 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
               </div>
             </div>
             
-            {/* Alerts */}
-            {successMessage && (
-              <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl flex items-center gap-2 text-sm font-medium">
-                <CheckCircle className="w-4 h-4" />
-                {successMessage}
-              </div>
-            )}
-            
-            {errorMessage && (
-              <div className="p-3 bg-red-50 text-red-700 rounded-xl flex items-center gap-2 text-sm font-medium">
-                <AlertCircle className="w-4 h-4" />
-                {errorMessage}
-              </div>
-            )}
           </div>
         </div>
 
@@ -484,27 +460,17 @@ export const SendNoteEmailModal: React.FC<SendNoteEmailModalProps> = ({
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
           <button
             onClick={onClose}
-            disabled={isSending}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSend}
-            disabled={!emailEnabled || isSending || emails.length === 0 || isGeneratingPdf || !attachment}
+            disabled={!emailEnabled || emails.length === 0 || isGeneratingPdf || !attachment}
             className="inline-flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-sky-600 rounded-xl hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-sky-600/20"
           >
-            {isSending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Mail className="w-4 h-4" />
-                Send Email
-              </>
-            )}
+            <Mail className="w-4 h-4" />
+            Send Email
           </button>
         </div>
       </div>

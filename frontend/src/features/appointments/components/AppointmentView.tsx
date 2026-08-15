@@ -1297,14 +1297,14 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
         </div>
       )}
 
-      {showEmailModal && (
+      {showEmailModal && invoice && (
         <SendInvoiceEmailModal
           isOpen={showEmailModal}
           onClose={() => setShowEmailModal(false)}
           invoiceId={invoice.id}
           invoiceNumber={invoice.invoice_number}
-          patientName={appointment.patient_name}
-          patientEmail={appointment.patient_email || ''}
+          patientName={invoice.patient_name || appointment.patient_name}
+          patientEmail={invoice.patient_email || appointment.patient_email || ''}
           appointmentDate={appointment.date}
           appointmentType={appointment.appointment_type || 'Appointment'}
         />
