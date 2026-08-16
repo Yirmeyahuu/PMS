@@ -4,7 +4,7 @@ import { X, FileText, Loader2, Save, Calendar, ClipboardList, Plus, History } fr
 import { getActiveTemplates, createNote, getNotes, getNote } from '../clinical-templates.api';
 import type { ClinicalNote } from '@/types/clinicalTemplate';
 import { PreviewPreviousNoteModal } from './PreviewPreviousNoteModal';
-import { getAppointments } from '@/features/appointments/appointment.api';
+import { getAppointments, getAppointment } from '@/features/appointments/appointment.api';
 import { getPatientCases } from '@/features/patients/patientCases.api';
 import { DynamicFormRenderer } from './DynamicFormRenderer';
 import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, TemplateField } from '@/types/clinicalTemplate';
@@ -97,17 +97,34 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch both templates and patient's appointments in parallel
       // Fetch templates, appointments, patient's previous notes, and cases
-      const [templatesData, appointmentsData, notesData, casesData] = await Promise.all([
+      const promises: any[] = [
         getActiveTemplates(),
         getAppointments({ patient: patientId, page_size: 100 }),
         getNotes({ patient: patientId }),
         getPatientCases(patientId),
-      ]);
+      ];
+
+      if (initialAppointmentId) {
+        promises.push(getAppointment(initialAppointmentId).catch(() => null));
+      }
+
+      const results = await Promise.all(promises);
+      const templatesData = results[0];
+      const appointmentsData = results[1];
+      const notesData = results[2];
+      const casesData = results[3];
+      const initialApptData = initialAppointmentId ? results[4] : null;
+
+      if (initialApptData && appointmentsData.results) {
+        const exists = appointmentsData.results.some((a: Appointment) => a.id === initialApptData.id);
+        if (!exists) {
+          appointmentsData.results.push(initialApptData);
+        }
+      }
       
-      const signedNotes = (notesData || []).filter(n => n.is_signed || !n.is_draft);
-      const drafts = (notesData || []).filter(n => !n.is_signed || n.is_draft);
+      const signedNotes = (notesData || []).filter((n: any) => n.is_signed || !n.is_draft);
+      const drafts = (notesData || []).filter((n: any) => !n.is_signed || n.is_draft);
       
       setTemplates(templatesData);
       setPatientCases(casesData);
@@ -118,7 +135,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       if (signedNotes && signedNotes.length > 0) {
         if (patientCaseId) {
           // Look for note in the same case first (check DB fields and local storage links)
-          const caseNote = signedNotes.find(n => {
+          const caseNote = signedNotes.find((n: any) => {
             if (n.patient_case === patientCaseId || n.patient_case_id === patientCaseId) return true;
             return false;
           });
@@ -159,7 +176,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         if (copyFromNoteId && fetchedTemplates) {
           try {
             const sourceNote = await getNote(copyFromNoteId);
-            const template = fetchedTemplates.find(t => t.id === sourceNote.template);
+            const template = fetchedTemplates.find((t: ClinicalTemplate) => t.id === sourceNote.template);
             if (template) {
               setSelectedTemplate(template);
               let mergedValues = { ...sourceNote.decrypted_content };
@@ -182,7 +199,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
             setStep('template');
           }
         } else if (preselectedTemplateId && fetchedTemplates) {
-          const template = fetchedTemplates.find(t => t.id === preselectedTemplateId);
+          const template = fetchedTemplates.find((t: ClinicalTemplate) => t.id === preselectedTemplateId);
           if (template) {
             setSelectedTemplate(template);
             setStep('form');

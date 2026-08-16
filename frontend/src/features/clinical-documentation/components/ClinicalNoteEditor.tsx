@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, FileText, Loader2, Save, Calendar, ClipboardList } from 'lucide-react';
 import { getActiveTemplates, createNote, getNote, getNotes } from '@/features/clinical-template/clinical-templates.api';
-import { getAppointments } from '@/features/appointments/appointment.api';
+import { getAppointments, getAppointment } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
@@ -44,14 +44,31 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
     if (!patient) return null;
     setLoading(true);
     try {
-      const [templatesData, appointmentsData, notesData] = await Promise.all([
+      const promises: any[] = [
         getActiveTemplates(),
         getAppointments({ patient: patient.id, page_size: 100 }),
         getNotes({ patient: patient.id }),
-      ]);
+      ];
 
-      const signedNotes = (notesData || []).filter(n => n.is_signed || !n.is_draft);
-      const drafts = (notesData || []).filter(n => !n.is_signed || n.is_draft);
+      if (initialAppointmentId) {
+        promises.push(getAppointment(initialAppointmentId).catch(() => null));
+      }
+
+      const results = await Promise.all(promises);
+      const templatesData = results[0];
+      const appointmentsData = results[1];
+      const notesData = results[2];
+      const initialApptData = initialAppointmentId ? results[3] : null;
+
+      if (initialApptData && appointmentsData.results) {
+        const exists = appointmentsData.results.some((a: Appointment) => a.id === initialApptData.id);
+        if (!exists) {
+          appointmentsData.results.push(initialApptData);
+        }
+      }
+
+      const signedNotes = (notesData || []).filter((n: any) => n.is_signed || !n.is_draft);
+      const drafts = (notesData || []).filter((n: any) => !n.is_signed || n.is_draft);
 
       setExistingNotes(signedNotes);
       setAllDrafts(drafts);
@@ -91,8 +108,8 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       let isAutoSelected = false;
       
       if (initialAppointmentId) {
-        const match = sortedAppointments.find(a => a.id === initialAppointmentId);
-        const hasNote = signedNotes.some(n => n.appointment === initialAppointmentId);
+        const match = sortedAppointments.find((a: Appointment) => a.id === initialAppointmentId);
+        const hasNote = signedNotes.some((n: any) => n.appointment === initialAppointmentId);
         
         if (match && !hasNote) {
           defaultApptId = initialAppointmentId;
@@ -108,7 +125,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       if (editorContext.type === 'COPY_NOTE') {
         try {
           const sourceNote = await getNote(editorContext.sourceNoteId);
-          const template = fetchedTemplates.find(t => t.id === sourceNote.template);
+          const template = fetchedTemplates.find((t: ClinicalTemplate) => t.id === sourceNote.template);
           if (template) {
             setSelectedTemplate(template);
             let mergedValues = { ...sourceNote.decrypted_content };
@@ -127,7 +144,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
           setEditorContext({ type: 'IDLE' });
         }
       } else if (editorContext.type === 'NEW_NOTE') {
-        const template = fetchedTemplates.find(t => t.id === editorContext.templateId);
+        const template = fetchedTemplates.find((t: ClinicalTemplate) => t.id === editorContext.templateId);
         if (template) {
           setSelectedTemplate(template);
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Edit, FileText, FolderKanban, Loader2, Mail, Plus, User } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   emailNote,
@@ -24,6 +24,8 @@ export const PatientClinicalNotesPage = () => {
   } = usePatientProfileContext();
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const stateAppointmentId = location.state?.appointmentId;
 
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
   const [viewingNoteId, setViewingNoteId] = useState<number | null>(null);
@@ -283,6 +285,7 @@ export const PatientClinicalNotesPage = () => {
         onClose={() => setIsCreateNoteOpen(false)}
         patientId={patient.id}
         patientName={patient.full_name}
+        appointmentId={stateAppointmentId}
         patientCaseId={createCaseId ? Number(createCaseId) : undefined}
         onSuccess={() => {
           const beforeNoteIds = new Set(clinicalNotes.map((note) => note.id));
