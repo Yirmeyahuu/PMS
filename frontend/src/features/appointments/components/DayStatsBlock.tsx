@@ -36,11 +36,11 @@ export const DayStatsBlock: React.FC<DayStatsBlockProps> = ({
   const newClients = stats?.new_clients ?? 0;
   const occupancy = stats?.occupancy_pct ?? 0;
   const totalDutyMinutes = stats?.available_minutes ?? 0;
-  
+
   const showOccupancy = totalDutyMinutes > 0;
   const textCol = occupancyTextColor(occupancy);
-  const bgCol   = occupancyBgColor(occupancy, showOccupancy);
-  
+  const bgCol = occupancyBgColor(occupancy, showOccupancy);
+
   const formattedOccupancy = Number(occupancy.toFixed(2));
 
   // ── COMPACT LAYOUT (week-view column footer) ──────────────────────────────
@@ -86,9 +86,7 @@ export const DayStatsBlock: React.FC<DayStatsBlockProps> = ({
   // ── EXPANDED LAYOUT (day-view footer) ────────────────────────────────────
   return (
     <div className="shrink-0 border-t border-gray-200 bg-gray-50">
-      <div className="px-6 py-2.5 flex items-center gap-5 flex-wrap">
-
-        {/* Total clients */}
+      <div className="pl-6 py-2.5 flex items-center gap-5 flex-wrap">
         <div className="flex items-center gap-2">
           <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">

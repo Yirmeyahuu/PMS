@@ -74,8 +74,6 @@ import { NoteEditor }     from '@/features/clinical-template/pages/NoteEditor';
 import { GenerateNewInvoice } from '@/features/billing/generateNewInvoice';
 import { FloatingNotificationsContainer } from '@/features/notifications/components/FloatingNotificationsContainer';
 import { FeatureAccessGuard } from '@/components/auth/FeatureAccessGuard';
-import { FloatingSupportButton } from '@/features/support';
-
 // ── NEW: Clinic Setup ─────────────────────────────────────────────────────────
 import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
 
@@ -87,14 +85,6 @@ const FloatingNotificationsGuard = () => {
   const isPublicPage = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
   if (isPublicPage) return null;
   return <FloatingNotificationsContainer />;
-};
-
-const FloatingSupportGuard = () => {
-  const { isAuthenticated } = useAuthStore();
-  const location = useLocation();
-  const isPublicPage = PUBLIC_PATHS.some(p => location.pathname.startsWith(p));
-  if (!isAuthenticated || isPublicPage) return null;
-  return <FloatingSupportButton />;
 };
 
 const GlobalLogoutModal = () => {
@@ -345,7 +335,6 @@ function App() {
         </Routes>
 
         <FloatingNotificationsGuard />
-        <FloatingSupportGuard />
         <GlobalLogoutModal />
         <SessionGuard />
         <Analytics />
