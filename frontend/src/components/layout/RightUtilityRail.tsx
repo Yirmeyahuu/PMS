@@ -73,60 +73,15 @@ export const RightUtilityRail: React.FC = () => {
     loadMore,
   } = useNotifications(activePanel === 'NOTIFICATIONS', handleIncomingNotification);
 
-  // Width logic:
-  // When activePanel === NONE, it's just the 32px (w-8) toggle rail.
-  // When activePanel === MESSAGES, we want ~800px on large screens if possible, or adapt.
-  // When activePanel === NOTIFICATIONS, we want ~400px (w-96).
-  let railWidthClass = 'w-8';
-  if (activePanel === 'MESSAGES') {
-    railWidthClass = 'w-full max-w-[800px]'; // Flexible up to 800px
-  } else if (activePanel === 'NOTIFICATIONS') {
-    railWidthClass = 'w-full max-w-[400px]';
-  }
-
   return (
     <>
       {/* ── DESKTOP RAIL (lg and up) ── */}
-      {/* Flex container that lives IN the layout, not fixed overlay */}
+      {/* Always 32px wide tab bar */}
       <aside 
-        className={`
-          hidden lg:flex flex-row flex-shrink-0 h-full border-l border-gray-300 bg-white
-          transition-[max-width,width] duration-300 ease-in-out relative z-30 shadow-[-4px_0_20px_rgba(0,0,0,0.05)]
-          ${railWidthClass}
-        `}
+        className="hidden lg:flex flex-col flex-shrink-0 h-full w-8 bg-white border-l border-gray-100 relative z-30 shadow-[-4px_0_20px_rgba(0,0,0,0.05)]"
       >
-        {/* The expanded utility view (takes up the remaining space to the left of the 32px tab bar) */}
-        <div 
-          className={`
-            flex-1 h-full overflow-hidden flex flex-col transition-opacity duration-300
-            ${activePanel === 'NONE' ? 'opacity-0 hidden' : 'opacity-100'}
-          `}
-        >
-          {activePanel === 'MESSAGES' && showMessages && user && (
-            <MessageUtility
-              currentUserId={user.id}
-              onClose={() => setActivePanel('NONE')}
-              onUnreadChange={handleMsgUnreadChange}
-            />
-          )}
 
-          {activePanel === 'NOTIFICATIONS' && (
-            <NotificationUtility
-              onClose={() => setActivePanel('NONE')}
-              notifications={notifications}
-              unreadCount={notifUnread}
-              isLoading={isLoading}
-              isLoadingMore={isLoadingMore}
-              hasMore={hasMore}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-              onLoadMore={loadMore}
-            />
-          )}
-        </div>
 
-        {/* The 32px wide vertical tab bar */}
-        <div className="w-8 flex-shrink-0 flex flex-col h-full bg-white border-l border-gray-100">
           {/* Top 50% - Messages */}
           {showMessages ? (
             <button
@@ -176,7 +131,6 @@ export const RightUtilityRail: React.FC = () => {
           >
             <Headphones className="w-4 h-4 drop-shadow-sm" />
           </button>
-        </div>
       </aside>
 
       {/* ── MOBILE FALLBACKS (Visible only on small screens < lg) ── */}
@@ -215,10 +169,11 @@ export const RightUtilityRail: React.FC = () => {
         </button>
       </div>
 
-      {/* Mobile Modal Wrappers (We reuse the Utility components, but inside a fixed modal on mobile) */}
+      {/* Universal Modal Wrappers */}
       {activePanel !== 'NONE' && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className={`fixed inset-0 z-50 flex p-4 bg-black/50 backdrop-blur-sm items-center justify-center lg:items-start lg:justify-end lg:pr-12 ${activePanel === 'MESSAGES' ? 'lg:pt-[10vh]' : 'lg:pt-[35vh]'}`}>
+          <div onClick={() => setActivePanel('NONE')} className="absolute inset-0" />
+          <div className={`relative z-10 w-full h-[80vh] lg:h-[75vh] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col ${activePanel === 'MESSAGES' ? 'max-w-4xl' : 'max-w-md'}`}>
             {activePanel === 'MESSAGES' && showMessages && user && (
               <MessageUtility
                 currentUserId={user.id}

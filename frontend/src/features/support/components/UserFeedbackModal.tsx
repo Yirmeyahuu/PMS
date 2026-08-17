@@ -110,8 +110,9 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm lg:items-end lg:justify-end lg:pr-12 lg:pb-[10vh]">
+      <div onClick={onClose} className="absolute inset-0" />
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center p-5 border-b">
           <h2 className="text-xl font-semibold text-gray-800">Submit Feedback & Reports</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
