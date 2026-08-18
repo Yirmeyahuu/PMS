@@ -110,7 +110,7 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm lg:items-end lg:justify-end lg:pr-12 lg:pb-[10vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm lg:justify-end lg:pr-12">
       <div onClick={onClose} className="absolute inset-0" />
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center p-5 border-b">

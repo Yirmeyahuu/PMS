@@ -32,6 +32,7 @@ export interface CommunicationLogEntry {
   patient_name: string;
   appointment: number | null;
   appointment_color: string | null;
+  appointment_status: string | null;
   comm_type: string;
   comm_type_display: string;
   channel: string;
@@ -77,8 +78,12 @@ export const communicationApi = {
     status?: string;
     search?: string;
     page?: number;
+    page_size?: number;
+    date_from?: string;
+    date_to?: string;
     ordering?: string;
     patient?: string | number;
+    appointment_status?: string;
   }): Promise<{ results: CommunicationLogEntry[]; count: number }> => {
     const { data } = await axiosInstance.get('/communication-logs/', { params });
     return data;

@@ -187,6 +187,12 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
         allow_null=True,
         default=None
     )
+    appointment_status   = serializers.CharField(
+        source='appointment.status',
+        read_only=True,
+        allow_null=True,
+        default=None
+    )
 
     class Meta:
         model  = CommunicationLog
@@ -197,6 +203,7 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
             'patient_name',
             'appointment',
             'appointment_color',
+            'appointment_status',
             'practitioner',
             'practitioner_name',
             'comm_type',

@@ -286,6 +286,24 @@ class CommunicationLogViewSet(viewsets.ReadOnlyModelViewSet):
         if branch_id:
             qs = qs.filter(clinic_id=branch_id)
 
+        # Appointment status filter
+        appointment_status = self.request.query_params.get('appointment_status')
+        if appointment_status:
+            from django.db.models import Q
+            if appointment_status == 'Confirmed':
+                qs = qs.filter(appointment__status__in=['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'])
+            elif appointment_status == 'Pending':
+                qs = qs.filter(appointment__status='SCHEDULED')
+            elif appointment_status == 'Cancelled':
+                qs = qs.filter(appointment__status__in=['CANCELLED', 'DNA', 'NO_SHOW'])
+            elif appointment_status == 'Rescheduled':
+                # An appointment is considered rescheduled if it has a used RebookingLink
+                # or if the patient manually replied RESCHEDULE.
+                qs = qs.filter(
+                    Q(appointment__rebooking_links__is_used=True) |
+                    Q(patient_reply='RESCHEDULE')
+                )
+
         # RBAC: practitioners see only their own patients' communications
         if user.role == 'PRACTITIONER':
             try:

@@ -95,7 +95,7 @@ def _log_communication(
         channel=channel,
         recipient=recipient,
         subject=subject,
-        body_preview=body_preview[:500],
+        body_preview=body_preview[:2000],
         status=status,
         error_message=error_message,
     )

@@ -4,6 +4,7 @@ import {
   Mail, MessageSquare, Check, X, Send, Reply,
   Loader2, ChevronLeft, ChevronRight, MessageCircle,
   Building2, AlertCircle, Clock, CalendarDays,
+  Search, XCircle, Filter
 } from 'lucide-react';
 import {
   communicationApi,
@@ -11,7 +12,7 @@ import {
 } from '@/features/setup/services/communication.api';
 import { SystemBranding } from '@/config/branding';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
@@ -48,6 +49,20 @@ function formatFull(dateStr: string | null): string {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) => 
+        part.toLowerCase() === query.toLowerCase() 
+          ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded-sm px-0.5">{part}</mark> 
+          : <span key={i}>{part}</span>
+      )}
+    </>
+  );
 }
 
 // ── Status Pill ────────────────────────────────────────────────────────────
@@ -117,17 +132,34 @@ function DeliveryDots({ status }: { status: string }) {
 }
 
 // ── Inline Thread (expandable row) ────────────────────────────────────────
-function InlineThread({ log }: { log: CommunicationLogEntry }) {
-  const confirmed = log.patient_reply === 'Y';
-  const declined  = log.patient_reply === 'N';
+function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; searchQuery?: string }) {
+  const isConfirmedAppt = log.appointment_status 
+    ? ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(log.appointment_status) 
+    : false;
+  const isCancelledAppt = log.appointment_status 
+    ? ['CANCELLED', 'DNA', 'NO_SHOW'].includes(log.appointment_status) 
+    : false;
+
+  const confirmed = log.patient_reply === 'Y' || isConfirmedAppt;
   const rescheduled = log.patient_reply === 'RESCHEDULE';
-  const isPending = !log.patient_reply && (log.status === 'SENT' || log.status === 'DELIVERED');
+  const declined  = (log.patient_reply === 'N' || isCancelledAppt) && !rescheduled;
   
-  // Use the appointment color as a subtle left border AND a very light background tint
-  const borderStyle = log.appointment_color 
-    ? { borderLeftColor: log.appointment_color, backgroundColor: `${log.appointment_color}0D` } // ~5% opacity
+  const isPending = !confirmed && !declined && !rescheduled && (log.status === 'SENT' || log.status === 'DELIVERED');
+  const isAwaitingReply = log.comm_type === 'APPOINTMENT_REMINDER' && isPending;
+  
+  let cardColor = log.appointment_color;
+  if (log.appointment) {
+    if (confirmed) cardColor = '#10B981'; // Green
+    else if (declined) cardColor = '#EF4444'; // Red
+    else if (rescheduled) cardColor = '#3B82F6'; // Blue
+    else if (isPending) cardColor = '#F97316'; // Orange
+  }
+
+  // Use the computed color as a subtle left border AND a very light background tint
+  const borderStyle = cardColor 
+    ? { borderLeftColor: cardColor, backgroundColor: `${cardColor}0D` } // ~5% opacity
     : {};
-  const bgClass = log.appointment_color 
+  const bgClass = cardColor 
     ? 'px-5 py-4 border-b border-gray-100 border-l-4' 
     : 'px-5 py-4 bg-gray-50/60 border-b border-gray-100 border-l-4 border-l-transparent';
 
@@ -147,7 +179,7 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
           </div>
           <div className="ml-7 bg-gray-50 rounded-lg border border-gray-100 px-4 py-3 shadow-sm">
             {log.body_preview
-              ? <p className="text-[12.5px] text-gray-700 leading-relaxed whitespace-pre-line">{log.body_preview}</p>
+              ? <p className="text-[12.5px] text-gray-700 leading-relaxed whitespace-pre-line"><Highlight text={log.body_preview} query={searchQuery} /></p>
               : <p className="text-[12.5px] text-gray-400 italic">No preview available.</p>
             }
           </div>
@@ -159,13 +191,13 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
           )}
         </div>
 
-        {/* Patient reply */}
-        {log.patient_reply && (
+        {/* Patient reply / Status Update */}
+        {(log.patient_reply || confirmed || declined || rescheduled) && (
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Avatar name={log.patient_name || '?'} size="sm" />
               <span className="text-[11.5px] font-semibold text-gray-800">{log.patient_name || 'Patient'}</span>
-              <span className="text-[11.5px] text-gray-500">replied</span>
+              <span className="text-[11.5px] text-gray-500">{log.patient_reply ? 'replied' : 'status updated'}</span>
               {log.replied_at && (
                 <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.replied_at)}</span>
               )}
@@ -173,7 +205,7 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
             <div className={`ml-7 rounded-lg border p-3 ${
               confirmed ? 'bg-emerald-50 border-emerald-200'
               : declined ? 'bg-red-50 border-red-200'
-              : rescheduled ? 'bg-amber-50 border-amber-200'
+              : rescheduled ? 'bg-blue-50 border-blue-200'
               : 'bg-gray-50 border-gray-200'
             }`}>
               {confirmed && (
@@ -183,7 +215,9 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
                   </div>
                   <div>
                     <p className="text-[12px] font-semibold text-emerald-800">Appointment Confirmed</p>
-                    <p className="text-[11px] text-emerald-600">Patient confirmed attendance</p>
+                    <p className="text-[11px] text-emerald-600">
+                      {log.patient_reply === 'Y' ? 'Patient confirmed attendance' : 'Appointment was confirmed'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -194,18 +228,20 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
                   </div>
                   <div>
                     <p className="text-[12px] font-semibold text-red-800">Cannot Attend</p>
-                    <p className="text-[11px] text-red-600">Patient declined</p>
+                    <p className="text-[11px] text-red-600">
+                      {log.patient_reply === 'N' ? 'Patient declined' : 'Appointment was cancelled'}
+                    </p>
                   </div>
                 </div>
               )}
               {rescheduled && (
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
                     <CalendarDays className="w-3 h-3 text-white" />
                   </div>
                   <div>
-                    <p className="text-[12px] font-semibold text-amber-800">Needs Rescheduling</p>
-                    <p className="text-[11px] text-amber-600">Patient opted to reschedule</p>
+                    <p className="text-[12px] font-semibold text-blue-800">Needs Rescheduling</p>
+                    <p className="text-[11px] text-blue-600">Patient opted to reschedule</p>
                   </div>
                 </div>
               )}
@@ -219,10 +255,10 @@ function InlineThread({ log }: { log: CommunicationLogEntry }) {
         )}
 
         {/* Awaiting reply */}
-        {isPending && (
-          <div className="ml-7 flex items-center gap-2 px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-            <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <p className="text-[11px] text-amber-700 font-medium">Awaiting patient response</p>
+        {isAwaitingReply && (
+          <div className="ml-7 flex items-center gap-2 px-3.5 py-2.5 bg-orange-50 border border-orange-200 rounded-lg">
+            <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+            <p className="text-[11px] text-orange-700 font-medium">Awaiting patient response</p>
           </div>
         )}
       </div>
@@ -241,14 +277,47 @@ export function PatientCommunicationHistoryPage() {
   const [error, setError]         = useState(false);
   const [expanded, setExpanded]   = useState<number | null>(null);
 
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilterType, setDateFilterType] = useState<'NONE' | 'DAY' | 'MONTH' | 'YEAR'>('NONE');
+  const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD or YYYY-MM or YYYY
+  const [appointmentStatus, setAppointmentStatus] = useState('ALL');
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const fetchLogs = useCallback(async (p: number) => {
+  const fetchLogs = useCallback(async (p: number, q: string, dType: string, dVal: string, status: string) => {
     if (!patientId) return;
     setLoading(true);
     setError(false);
+
+    let date_from;
+    let date_to;
+
+    if (dType === 'DAY' && dVal) {
+      date_from = dVal;
+      date_to = dVal;
+    } else if (dType === 'MONTH' && dVal) {
+      date_from = `${dVal}-01`;
+      // approximate end of month by adding 32 days and setting to day 0
+      const nextMonth = new Date(date_from);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      nextMonth.setDate(0);
+      date_to = nextMonth.toISOString().split('T')[0];
+    } else if (dType === 'YEAR' && dVal) {
+      date_from = `${dVal}-01-01`;
+      date_to = `${dVal}-12-31`;
+    }
+
     try {
-      const result = await communicationApi.getLogs({ patient: patientId, page: p });
+      const result = await communicationApi.getLogs({ 
+        patient: patientId, 
+        page: p, 
+        page_size: PAGE_SIZE,
+        search: q || undefined,
+        date_from,
+        date_to,
+        appointment_status: status === 'ALL' ? undefined : status,
+      });
       setLogs(result.results);
       setTotal(result.count);
     } catch {
@@ -259,8 +328,29 @@ export function PatientCommunicationHistoryPage() {
   }, [patientId]);
 
   useEffect(() => {
-    fetchLogs(page);
-  }, [fetchLogs, page]);
+    fetchLogs(page, searchQuery, dateFilterType, selectedDate, appointmentStatus);
+  }, [fetchLogs, page, searchQuery, dateFilterType, selectedDate, appointmentStatus]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchQuery(searchInput);
+    setPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    setDateFilterType('NONE');
+    setSelectedDate('');
+    setAppointmentStatus('ALL');
+    setPage(1);
+  };
+
+  const handleDateFilterChange = (type: 'NONE' | 'DAY' | 'MONTH' | 'YEAR') => {
+    setDateFilterType(type);
+    setSelectedDate('');
+    setPage(1);
+  };
 
   useEffect(() => {
     const handleUpdate = (e: Event) => {
@@ -284,14 +374,14 @@ export function PatientCommunicationHistoryPage() {
   }, [patientId]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full max-h-[85vh]">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
             <MessageCircle className="w-3.5 h-3.5 text-sky-600" />
           </div>
-          <h2 className="text-sm font-semibold text-gray-900">Communication History here</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Communication History</h2>
         </div>
         {!loading && (
           <span className="text-[11px] text-gray-400">
@@ -300,8 +390,81 @@ export function PatientCommunicationHistoryPage() {
         )}
       </div>
 
+      {/* Action Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50/50 shrink-0">
+        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search communications..."
+            className="w-full pl-9 pr-3 py-1.5 text-[13px] bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
+          />
+        </form>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <select
+              value={dateFilterType}
+              onChange={(e) => handleDateFilterChange(e.target.value as any)}
+              className="text-[12px] text-gray-600 bg-transparent border-none focus:outline-none cursor-pointer"
+            >
+              <option value="NONE">All Time</option>
+              <option value="DAY">Day</option>
+              <option value="MONTH">Month</option>
+              <option value="YEAR">Year</option>
+            </select>
+            {dateFilterType !== 'NONE' && (
+              <input
+                type={dateFilterType === 'DAY' ? 'date' : dateFilterType === 'MONTH' ? 'month' : 'number'}
+                min={dateFilterType === 'YEAR' ? '2000' : undefined}
+                max={dateFilterType === 'YEAR' ? '2100' : undefined}
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setPage(1);
+                }}
+                className="ml-2 text-[12px] text-gray-700 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-sky-500"
+              />
+            )}
+          </div>
+          
+          {/* Appointment Status Filter */}
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <select
+              value={appointmentStatus}
+              onChange={(e) => {
+                setAppointmentStatus(e.target.value);
+                setPage(1);
+              }}
+              className="text-[12px] text-gray-600 bg-transparent border-none focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Rescheduled">Rescheduled</option>
+            </select>
+          </div>
+          
+          {(searchQuery || dateFilterType !== 'NONE' || appointmentStatus !== 'ALL') && (
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Body */}
-      {loading ? (
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
         <div className="flex items-center justify-center py-14 gap-2">
           <Loader2 className="w-5 h-5 text-sky-500 animate-spin" />
           <span className="text-[13px] text-gray-400">Loading…</span>
@@ -326,16 +489,28 @@ export function PatientCommunicationHistoryPage() {
           <div>
             {logs.map(log => {
               const isOpen = expanded === log.id;
-              const confirmed = log.patient_reply === 'Y';
-              const declined  = log.patient_reply === 'N';
-              const rescheduled = log.patient_reply === 'RESCHEDULE';
+              const isRescheduled = log.patient_reply === 'RESCHEDULE';
+              const isConfirmed = log.appointment_status 
+                ? ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(log.appointment_status) 
+                : log.patient_reply === 'Y';
+              const isDeclined  = log.appointment_status 
+                ? ['CANCELLED', 'DNA', 'NO_SHOW'].includes(log.appointment_status) && !isRescheduled
+                : log.patient_reply === 'N';
 
+              const isPending = !isConfirmed && !isDeclined && !isRescheduled && (log.status === 'SENT' || log.status === 'DELIVERED');
+
+              let cardColor = log.appointment_color;
               let triangleColor = '';
-              if (log.comm_type === 'APPOINTMENT_REMINDER') {
-                if (confirmed) triangleColor = '#10B981'; // Green
-                else if (declined) triangleColor = '#EF4444'; // Red
-                else if (rescheduled) triangleColor = '#F59E0B'; // Amber
-                else if (log.status === 'SENT' || log.status === 'DELIVERED') triangleColor = '#F97316'; // Orange
+              
+              if (log.appointment) {
+                if (isConfirmed) cardColor = '#10B981'; // Green
+                else if (isRescheduled) cardColor = '#3B82F6'; // Blue
+                else if (isDeclined) cardColor = '#EF4444'; // Red
+                else if (isPending) cardColor = '#F97316'; // Orange
+                
+                if (log.comm_type === 'APPOINTMENT_REMINDER') {
+                  triangleColor = cardColor || ''; // Make triangle match the card color for reminders
+                }
               }
 
               let rowStyle = {};
@@ -345,18 +520,18 @@ export function PatientCommunicationHistoryPage() {
                 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500
               `;
 
-              // Nookal-style accent border + light background tint
-              if (log.appointment_color) {
+              // Accent border + light background tint based on cardColor
+              if (cardColor) {
                 rowClasses += ' border-l-4';
                 rowStyle = { 
-                  borderLeftColor: log.appointment_color,
-                  backgroundColor: isOpen ? `${log.appointment_color}1A` : `${log.appointment_color}0D` // 10% and 5% opacity
+                  borderLeftColor: cardColor,
+                  backgroundColor: isOpen ? `${cardColor}1A` : `${cardColor}0D` // 10% and 5% opacity
                 };
               } else {
                 rowClasses += ' border-l-4 border-l-transparent';
               }
 
-              if (!log.appointment_color) {
+              if (!cardColor) {
                 rowClasses += isOpen ? ' bg-sky-50/40' : ' bg-white hover:bg-gray-50/80';
               } else {
                 rowClasses += ' hover:brightness-95';
@@ -400,22 +575,28 @@ export function PatientCommunicationHistoryPage() {
                       <div className="flex items-center gap-2">
                         {log.subject && (
                           <p className="text-[13px] text-gray-800 font-medium truncate flex-1">
-                            {log.subject}
+                            <Highlight text={log.subject} query={searchQuery} />
                           </p>
                         )}
                         <div className="flex items-center gap-2 shrink-0 ml-auto">
                           <DeliveryDots status={log.status} />
                           <StatusPill status={log.status} />
-                          {confirmed && (
+                          {isConfirmed && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 rounded-full">
                               <Check className="w-2.5 h-2.5" />
                               Confirmed
                             </span>
                           )}
-                          {declined && (
+                          {isDeclined && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 rounded-full">
                               <X className="w-2.5 h-2.5" />
-                              Declined
+                              Cancelled
+                            </span>
+                          )}
+                          {isRescheduled && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-full">
+                              <CalendarDays className="w-2.5 h-2.5" />
+                              Rescheduled
                             </span>
                           )}
                         </div>
@@ -424,38 +605,39 @@ export function PatientCommunicationHistoryPage() {
                   </button>
 
                   {/* Expandable thread */}
-                  {isOpen && <InlineThread log={log} />}
+                  {isOpen && <InlineThread log={log} searchQuery={searchQuery} />}
                 </div>
               );
             })}
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-white">
-              <span className="text-[11px] text-gray-500">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
-              </span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-[11px] text-gray-500 px-1.5">{page}/{totalPages}</span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </>
+      )}
+      </div>
+
+      {/* Pagination */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-white shrink-0">
+          <span className="text-[11px] text-gray-500">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[11px] text-gray-500 px-1.5">{page}/{totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
