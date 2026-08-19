@@ -214,6 +214,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         old_status = serializer.instance.status
+        old_date = serializer.instance.date
+        old_time = serializer.instance.start_time
+
+        # Check if date or time is being updated
+        if 'date' in serializer.validated_data or 'start_time' in serializer.validated_data:
+            new_date = serializer.validated_data.get('date', old_date)
+            new_time = serializer.validated_data.get('start_time', old_time)
+            
+            if new_date != old_date or new_time != old_time:
+                serializer.validated_data['reminder_sent'] = False
+                serializer.validated_data['reminder_sent_at'] = None
+
         appointment = serializer.save(updated_by=self.request.user)
 
         # ── Auto-populate case for package services if needed ───────────────
@@ -1953,6 +1965,9 @@ class PublicRebookingLinkView(APIView):
             )
 
         original = link.appointment
+        old_date_str = str(original.date)
+        old_time_str = original.start_time.strftime('%H:%M')
+
         duration = (
             original.duration_minutes
             if original.duration_minutes
@@ -1960,34 +1975,40 @@ class PublicRebookingLinkView(APIView):
                       datetime.combine(new_date, new_start_time)).total_seconds() // 60)
         )
 
-        new_appt = Appointment.objects.create(
-            clinic=original.clinic,
-            patient=link.patient,
-            practitioner=original.practitioner,
-            service=original.service,
-            patient_case=original.patient_case,
-            appointment_type=original.appointment_type,
-            status='SCHEDULED',
-            date=new_date,
-            start_time=new_start_time,
-            end_time=new_end_time,
-            duration_minutes=duration,
-            chief_complaint=original.chief_complaint or '',
-            notes=f'Rebooked via secure link (original appt #{original.id})',
-        )
+        original.date = new_date
+        original.start_time = new_start_time
+        original.end_time = new_end_time
+        original.duration_minutes = duration
+        original.status = 'SCHEDULED'
+        original.confirmation_status = 'PENDING'
+        original.patient_reply = ''
+        original.reminder_sent = False
+        original.reminder_sent_at = None
+
+        reschedule_note = f'Rescheduled from {old_date_str} {old_time_str} to {date_str} {start_time_str} via secure link'
+        if original.notes:
+            original.notes = f"{original.notes}\n{reschedule_note}"
+        else:
+            original.notes = reschedule_note
+
+        original.save(update_fields=[
+            'date', 'start_time', 'end_time', 'duration_minutes', 
+            'status', 'confirmation_status', 'patient_reply', 'notes',
+            'reminder_sent', 'reminder_sent_at'
+        ])
 
         # Emit calendar event so clients see the rebook instantly.
         try:
-            main_clinic_id = new_appt.clinic.main_clinic.id if new_appt.clinic and new_appt.clinic.main_clinic else None
+            main_clinic_id = original.clinic.main_clinic.id if original.clinic and original.clinic.main_clinic else None
             if main_clinic_id:
-                data = AppointmentSerializer(new_appt, context={'request': request}).data
-                emit_calendar_event(main_clinic_id, 'APPOINTMENT_CREATED', dict(data))
+                data = AppointmentSerializer(original, context={'request': request}).data
+                emit_calendar_event(main_clinic_id, 'APPOINTMENT_UPDATED', dict(data))
         except Exception:
-            logger.exception('Failed to emit APPOINTMENT_CREATED for rebooked appt #%s', getattr(new_appt, 'id', '?'))
+            logger.exception('Failed to emit APPOINTMENT_UPDATED for rebooked appt #%s', original.id)
 
         link.is_used = True
         link.used_at = timezone.now()
-        link.new_appointment = new_appt
+        link.new_appointment = original
         link.save(update_fields=['is_used', 'used_at', 'new_appointment'])
 
         # Update the most recent APPOINTMENT_REMINDER communication log for this appointment
@@ -2015,10 +2036,10 @@ class PublicRebookingLinkView(APIView):
 
         return Response({
             'detail': 'Appointment successfully booked!',
-            'appointment_id': new_appt.id,
-            'date': str(new_appt.date),
-            'start_time': new_appt.start_time.strftime('%H:%M'),
-            'end_time': new_appt.end_time.strftime('%H:%M'),
+            'appointment_id': original.id,
+            'date': str(original.date),
+            'start_time': original.start_time.strftime('%H:%M'),
+            'end_time': original.end_time.strftime('%H:%M'),
         }, status=status.HTTP_201_CREATED)
 
     def delete(self, request, token):
@@ -2084,6 +2105,44 @@ class PublicAppointmentConfirmView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        appt = ct.appointment
+
+        # Check if rescheduled AFTER this token was created
+        rebook_link = appt.rebooking_links.filter(is_used=True, used_at__gte=ct.created_at).order_by('-used_at').first()
+        if rebook_link:
+            return Response(
+                {
+                    'detail': 'This appointment has already been rescheduled.',
+                    'code': 'already_rescheduled',
+                    'new_date': str(rebook_link.new_appointment.date) if rebook_link.new_appointment else '',
+                    'new_time': rebook_link.new_appointment.start_time.strftime('%H:%M') if rebook_link.new_appointment else '',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+        if appt.confirmation_status == 'CANCELLED' or appt.status == 'CANCELLED' or appt.patient_reply == 'N' or appt.confirmation_status == 'DECLINED':
+            return Response(
+                {
+                    'detail': 'This appointment was already cancelled.',
+                    'code': 'already_cancelled',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        if appt.confirmation_status == 'CONFIRMED' or appt.status == 'CONFIRMED':
+            return Response(
+                {
+                    'detail': 'Your appointment has already been confirmed.',
+                    'code': 'already_confirmed',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
         if ct.is_used:
             return Response(
                 {'detail': 'This confirmation link has already been used.', 'code': 'used'},
@@ -2093,19 +2152,6 @@ class PublicAppointmentConfirmView(APIView):
         if ct.is_expired:
             return Response(
                 {'detail': 'This confirmation link has expired.', 'code': 'expired'},
-                status=status.HTTP_410_GONE,
-            )
-
-        appt = ct.appointment
-
-        if appt.confirmation_status == 'CANCELLED' or appt.status == 'CANCELLED':
-            return Response(
-                {
-                    'detail': 'This appointment was already cancelled.',
-                    'code': 'already_cancelled',
-                    'clinic_email': appt.clinic.email if appt.clinic else '',
-                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
-                },
                 status=status.HTTP_410_GONE,
             )
 
@@ -2123,6 +2169,11 @@ class PublicAppointmentConfirmView(APIView):
         appt.save(update_fields=[
             'status', 'confirmation_status', 'patient_reply', 'patient_reply_at',
         ])
+
+        # Mark other tokens used (one decision per reminder)
+        from apps.appointments.models import AppointmentCancelToken, RebookingLink
+        AppointmentCancelToken.objects.filter(appointment=appt, is_used=False).update(is_used=True, used_at=timezone.now())
+        RebookingLink.objects.filter(appointment=appt, is_used=False).update(is_used=True, used_at=timezone.now())
 
         # Update the most recent APPOINTMENT_REMINDER communication log for this appointment
         try:
@@ -2185,8 +2236,46 @@ class PublicAppointmentCancelView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        appt = ct.appointment
+
+        # Check if rescheduled AFTER this token was created
+        rebook_link = appt.rebooking_links.filter(is_used=True, used_at__gte=ct.created_at).order_by('-used_at').first()
+        if rebook_link:
+            return Response(
+                {
+                    'detail': 'This appointment has already been rescheduled.',
+                    'code': 'already_rescheduled',
+                    'new_date': str(rebook_link.new_appointment.date) if rebook_link.new_appointment else '',
+                    'new_time': rebook_link.new_appointment.start_time.strftime('%H:%M') if rebook_link.new_appointment else '',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        if appt.confirmation_status == 'CANCELLED' or appt.status == 'CANCELLED' or appt.patient_reply == 'N' or appt.confirmation_status == 'DECLINED':
+            return Response(
+                {
+                    'detail': 'This appointment was already cancelled.',
+                    'code': 'already_cancelled',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        if appt.confirmation_status == 'CONFIRMED' or appt.status == 'CONFIRMED':
+            return Response(
+                {
+                    'detail': 'This appointment has already been confirmed.',
+                    'code': 'already_confirmed',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
         if ct.is_used:
-            appt = ct.appointment
             return Response(
                 {
                     'detail': 'This cancellation link has already been used.',
@@ -2200,19 +2289,6 @@ class PublicAppointmentCancelView(APIView):
         if ct.is_expired:
             return Response(
                 {'detail': 'This cancellation link has expired.', 'code': 'expired'},
-                status=status.HTTP_410_GONE,
-            )
-
-        appt = ct.appointment
-
-        if appt.confirmation_status == 'CONFIRMED' or appt.status == 'CONFIRMED':
-            return Response(
-                {
-                    'detail': 'This appointment has already been confirmed.',
-                    'code': 'already_confirmed',
-                    'clinic_email': appt.clinic.email if appt.clinic else '',
-                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
-                },
                 status=status.HTTP_410_GONE,
             )
 
@@ -2237,8 +2313,46 @@ class PublicAppointmentCancelView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        appt = ct.appointment
+
+        # Check if rescheduled AFTER this token was created
+        rebook_link = appt.rebooking_links.filter(is_used=True, used_at__gte=ct.created_at).order_by('-used_at').first()
+        if rebook_link:
+            return Response(
+                {
+                    'detail': 'This appointment has already been rescheduled.',
+                    'code': 'already_rescheduled',
+                    'new_date': str(rebook_link.new_appointment.date) if rebook_link.new_appointment else '',
+                    'new_time': rebook_link.new_appointment.start_time.strftime('%H:%M') if rebook_link.new_appointment else '',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        if appt.confirmation_status == 'CANCELLED' or appt.status == 'CANCELLED' or appt.patient_reply == 'N' or appt.confirmation_status == 'DECLINED':
+            return Response(
+                {
+                    'detail': 'This appointment was already cancelled.',
+                    'code': 'already_cancelled',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
+        if appt.confirmation_status == 'CONFIRMED' or appt.status == 'CONFIRMED':
+            return Response(
+                {
+                    'detail': 'This appointment has already been confirmed.',
+                    'code': 'already_confirmed',
+                    'clinic_email': appt.clinic.email if appt.clinic else '',
+                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
+                },
+                status=status.HTTP_410_GONE,
+            )
+
         if ct.is_used:
-            appt = ct.appointment
             return Response(
                 {
                     'detail': 'This cancellation link has already been used.',
@@ -2252,19 +2366,6 @@ class PublicAppointmentCancelView(APIView):
         if ct.is_expired:
             return Response(
                 {'detail': 'This cancellation link has expired.', 'code': 'expired'},
-                status=status.HTTP_410_GONE,
-            )
-
-        appt = ct.appointment
-
-        if appt.confirmation_status == 'CONFIRMED' or appt.status == 'CONFIRMED':
-            return Response(
-                {
-                    'detail': 'This appointment has already been confirmed.',
-                    'code': 'already_confirmed',
-                    'clinic_email': appt.clinic.email if appt.clinic else '',
-                    'clinic_phone': appt.clinic.phone if appt.clinic else ''
-                },
                 status=status.HTTP_410_GONE,
             )
 

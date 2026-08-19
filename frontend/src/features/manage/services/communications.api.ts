@@ -100,6 +100,7 @@ export interface CommFilters {
   channel?: CommChannel | '';
   status?: CommStatus | '';
   patient?: number | '';
+  appointment?: number | '';
   practitioner?: number | '';
   branch?: number | '';
   date_from?: string;
@@ -126,6 +127,7 @@ export const communicationRecordsApi = {
     if (filters.channel)      params.channel      = filters.channel;
     if (filters.status)       params.status       = filters.status;
     if (filters.patient)      params.patient      = filters.patient;
+    if (filters.appointment)  params.appointment  = filters.appointment;
     if (filters.practitioner) params.practitioner = filters.practitioner;
     if (filters.branch)       params.branch       = filters.branch;
     if (filters.date_from)    params.date_from    = filters.date_from;

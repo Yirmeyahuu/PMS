@@ -8,7 +8,7 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
-type PageState = 'loading' | 'confirming' | 'cancelling' | 'success' | 'expired' | 'used' | 'error' | 'already_confirmed';
+type PageState = 'loading' | 'confirming' | 'cancelling' | 'success' | 'expired' | 'used' | 'error' | 'already_confirmed' | 'already_cancelled' | 'already_rescheduled';
 
 interface CancelResponse {
   detail: string;
@@ -22,6 +22,8 @@ interface CancelResponse {
 interface ErrorData {
   code?: string;
   detail?: string;
+  new_date?: string;
+  new_time?: string;
   clinic_email?: string;
   clinic_phone?: string;
 }
@@ -51,6 +53,8 @@ export function AppointmentCancelPage() {
           setErrorData(resData);
           const code = resData.code;
           if (code === 'already_confirmed') setPageState('already_confirmed');
+          else if (code === 'already_cancelled') setPageState('already_cancelled');
+          else if (code === 'already_rescheduled') setPageState('already_rescheduled');
           else setPageState(code === 'used' ? 'used' : 'expired');
         } else {
           setPageState('error');
@@ -75,6 +79,8 @@ export function AppointmentCancelPage() {
           setErrorData(resData);
           const code = resData.code;
           if (code === 'already_confirmed') setPageState('already_confirmed');
+          else if (code === 'already_cancelled') setPageState('already_cancelled');
+          else if (code === 'already_rescheduled') setPageState('already_rescheduled');
           else setPageState(code === 'used' ? 'used' : 'expired');
         } else {
           setPageState('error');
@@ -96,8 +102,8 @@ export function AppointmentCancelPage() {
     );
   }
 
-  // ── Terminal states: expired / used / error / already_confirmed ────────────
-  if (pageState === 'expired' || pageState === 'used' || pageState === 'error' || pageState === 'already_confirmed') {
+  // ── Terminal states: expired / used / error / already_confirmed / already_cancelled / already_rescheduled ────────────
+  if (pageState === 'expired' || pageState === 'used' || pageState === 'error' || pageState === 'already_confirmed' || pageState === 'already_cancelled' || pageState === 'already_rescheduled') {
     const configs = {
       expired: {
         icon: <AlertTriangle className="w-12 h-12 text-amber-500" />,
@@ -118,6 +124,16 @@ export function AppointmentCancelPage() {
         icon: <AlertTriangle className="w-12 h-12 text-amber-500" />,
         title: 'Appointment Already Confirmed',
         message: 'You have already confirmed this appointment. You cannot cancel it online. Please contact the clinic directly for assistance.',
+      },
+      already_cancelled: {
+        icon: <CheckCircle2 className="w-12 h-12 text-green-500" />,
+        title: 'Already Cancelled',
+        message: 'Your appointment was already cancelled. Please contact the clinic for further assistance.',
+      },
+      already_rescheduled: {
+        icon: <AlertTriangle className="w-12 h-12 text-blue-500" />,
+        title: 'Appointment Rescheduled',
+        message: `This appointment has already been rescheduled${errorData?.new_date ? ` to ${errorData.new_date} at ${errorData.new_time}` : ''}. Please check your email for the updated details or contact the clinic.`,
       },
     };
     const cfg = configs[pageState as keyof typeof configs];
