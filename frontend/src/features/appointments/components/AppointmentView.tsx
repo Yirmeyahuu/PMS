@@ -44,7 +44,7 @@ import {
   rescheduleAppointment as apiRescheduleAppointment,
 } from '../appointment.api';
 import toast from 'react-hot-toast';
-import axiosInstance from '@/lib/axios';
+
 import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
 import { communicationRecordsApi } from '@/features/manage/services/communications.api';
 import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';

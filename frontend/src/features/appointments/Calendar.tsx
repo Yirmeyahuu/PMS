@@ -170,7 +170,7 @@ const renderCommunicationIndicator = (apt: Appointment) => {
   if (apt.confirmation_status === 'CONFIRMED') {
     return <span className="w-2 h-2 rounded-[2px] bg-[#10B981] inline-block mr-1 flex-shrink-0 shadow-sm" title="Confirmed" />;
   }
-  if (apt.confirmation_status === 'DECLINED' || apt.confirmation_status === 'CANCELLED' || apt.status === 'CANCELLED') {
+  if (apt.confirmation_status === 'DECLINED' || apt.status === 'CANCELLED') {
     return <span className="w-2 h-2 rounded-[2px] bg-[#EF4444] inline-block mr-1 flex-shrink-0 shadow-sm" title="Cancelled" />;
   }
   if (apt.reminder_sent) {
@@ -630,7 +630,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     for (const apt of appointments) {
-      if (apt.status === 'DELETED') continue; // Only filter out explicitly deleted, not cancelled
+      if ((apt as any).status === 'DELETED') continue; // Only filter out explicitly deleted, not cancelled
       if (!map[apt.date]) map[apt.date] = [];
       map[apt.date].push(apt);
     }
