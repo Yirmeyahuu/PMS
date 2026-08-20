@@ -12,7 +12,7 @@ import { getUpcomingAppointments } from '../appointment.api';
 
 interface AppointmentHoverCardProps {
   appointment: Appointment;
-  anchorRect:  DOMRect;
+  anchorElement: HTMLElement;
   onEnter:     () => void;
   onLeave:     () => void;
 }
@@ -35,7 +35,7 @@ const fmt12 = (time: string): string => {
 
 export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
   appointment: apt,
-  anchorRect,
+  anchorElement,
   onEnter,
   onLeave,
 }) => {
@@ -44,30 +44,80 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
   const CARD_WIDTH            = 300;
   const GAP                   = 8;
 
-  // ── Position the card once it's rendered so we know its height ───────────
+  // ── Position the card and track scroll/resize ───────────
   useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
+    if (!anchorElement) return;
 
-    const cardH  = card.offsetHeight;
-    const vw     = window.innerWidth;
-    const vh     = window.innerHeight;
+    const updatePosition = () => {
+      const card = cardRef.current;
+      if (!card) return;
 
-    // Prefer right side; fall back to left
-    let left = anchorRect.right + GAP;
-    if (left + CARD_WIDTH > vw - 8) {
-      left = anchorRect.left - CARD_WIDTH - GAP;
-    }
+      const rect = anchorElement.getBoundingClientRect();
+      const cardH = card.offsetHeight;
+      const cardW = CARD_WIDTH;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-    // Vertically align with the anchor, clamped to viewport
-    let top = anchorRect.top;
-    if (top + cardH > vh - 8) {
-      top = vh - cardH - 8;
-    }
-    if (top < 8) top = 8;
+      let top = 0;
+      let left = 0;
 
-    setStyle({ position: 'fixed', top, left, width: CARD_WIDTH, visibility: 'visible', zIndex: 9990 });
-  }, [anchorRect]);
+      const spaceRight = vw - rect.right;
+      const spaceLeft = rect.left;
+      
+      const fitsRight = spaceRight >= cardW + GAP;
+      const fitsLeft = spaceLeft >= cardW + GAP;
+
+      if (fitsRight || (!fitsLeft && spaceRight >= spaceLeft)) {
+        // Place on RIGHT
+        left = rect.right + GAP;
+        top = rect.top;
+        if (top + cardH > vh - GAP) {
+          top = Math.max(GAP, rect.bottom - cardH);
+        }
+      } else if (fitsLeft) {
+        // Place on LEFT
+        left = rect.left - cardW - GAP;
+        top = rect.top;
+        if (top + cardH > vh - GAP) {
+          top = Math.max(GAP, rect.bottom - cardH);
+        }
+      } else {
+        // Place BELOW or ABOVE (for very narrow screens)
+        left = rect.left + (rect.width / 2) - (cardW / 2);
+        left = Math.max(GAP, Math.min(left, vw - cardW - GAP)); // clamp horizontally
+        
+        const spaceBelow = vh - rect.bottom;
+        const spaceAbove = rect.top;
+        
+        if (spaceBelow >= cardH + GAP || spaceBelow >= spaceAbove) {
+          top = rect.bottom + GAP;
+        } else {
+          top = rect.top - cardH - GAP;
+        }
+      }
+
+      setStyle({
+        position: 'fixed',
+        top,
+        left,
+        width: CARD_WIDTH,
+        visibility: 'visible',
+        zIndex: 9990
+      });
+    };
+
+    // Initial position
+    updatePosition();
+    
+    // Track scroll events on window (capture phase to catch inner scrolls) and resize events
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [anchorElement]);
 
   const statusColors = APPOINTMENT_STATUS_COLORS[apt.status] ?? APPOINTMENT_STATUS_COLORS['SCHEDULED'];
 

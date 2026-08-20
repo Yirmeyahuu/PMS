@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Editor } from '@tiptap/react';
 import {
   Bold,
@@ -146,6 +146,171 @@ const ColorPaletteSelector = ({ onSelect, onClear }: { onSelect: (color: string)
       >
         No Color
       </button>
+    </div>
+  );
+};
+
+const TableToolsDropdown = ({ editor }: { editor: Editor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button 
+        type="button"
+        onMouseDown={(e) => { e.preventDefault(); setIsOpen(!isOpen); }}
+        className={`p-1.5 rounded flex items-center gap-1 ${editor.can().deleteTable() ? 'bg-sky-100 text-sky-700' : 'text-gray-600 hover:bg-gray-200'}`}
+        title="Table Tools"
+      >
+        <TableIcon className="w-4 h-4" />
+        <ChevronDown className="w-3 h-3" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 left-0 mt-1 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-56">
+          
+          {/* Add Table Submenu */}
+          <div className="relative group">
+            <button type="button" onMouseDown={(e) => e.preventDefault()}
+              className="w-full text-left px-4 py-1.5 text-sm flex justify-between items-center text-gray-700 hover:bg-sky-50 hover:text-sky-700"
+            >
+              <span>Add table</span>
+              <span>›</span>
+            </button>
+            <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-max" onMouseDown={(e) => e.preventDefault()}>
+                <TableGridSelector onSelect={(r, c) => {
+                  editor.chain().focus().insertTable({rows: r, cols: c, withHeaderRow: true}).run();
+                  setIsOpen(false);
+                }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full h-px bg-gray-100 my-1"></div>
+
+          {/* Add Row Submenu */}
+          <div className="relative group">
+            <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addRowBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+              <span>Add row</span>
+              <span>›</span>
+            </div>
+            {editor.can().addRowBefore() && (
+              <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().addRowBefore().run(); setIsOpen(false); }}
+                    className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    Above
+                  </button>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().addRowAfter().run(); setIsOpen(false); }}
+                    className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    Below
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Add Column Submenu */}
+          <div className="relative group">
+            <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addColumnBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+              <span>Add column</span>
+              <span>›</span>
+            </div>
+            {editor.can().addColumnBefore() && (
+              <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().addColumnBefore().run(); setIsOpen(false); }}
+                    className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    Left
+                  </button>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().addColumnAfter().run(); setIsOpen(false); }}
+                    className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    Right
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Remove Row */}
+          <button type="button" disabled={!editor.can().deleteRow()} onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().deleteRow().run(); setIsOpen(false); }}
+            className={`w-full text-left px-4 py-1.5 text-sm ${!editor.can().deleteRow() ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50 hover:text-red-700'}`}
+          >
+            Remove row
+          </button>
+
+          {/* Remove Column */}
+          <button type="button" disabled={!editor.can().deleteColumn()} onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().deleteColumn().run(); setIsOpen(false); }}
+            className={`w-full text-left px-4 py-1.5 text-sm ${!editor.can().deleteColumn() ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50 hover:text-red-700'}`}
+          >
+            Remove column
+          </button>
+          
+          <div className="w-full h-px bg-gray-100 my-1"></div>
+
+          {/* Cell Background Color Submenu */}
+          <div className="relative group">
+            <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+              <span>Cell background color</span>
+              <span>›</span>
+            </div>
+            {editor.can().deleteTable() && (
+              <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max" onMouseDown={(e) => e.preventDefault()}>
+                  <ColorPaletteSelector 
+                    onSelect={(c) => { editor.chain().focus().updateAttributes('tableCell', { backgroundColor: c }).updateAttributes('tableHeader', { backgroundColor: c }).run(); setIsOpen(false); }}
+                    onClear={() => { editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run(); setIsOpen(false); }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Cell Border Color Submenu */}
+          <div className="relative group">
+            <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
+              <span>Border color</span>
+              <span>›</span>
+            </div>
+            {editor.can().deleteTable() && (
+              <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max" onMouseDown={(e) => e.preventDefault()}>
+                  <ColorPaletteSelector 
+                    onSelect={(c) => { editor.chain().focus().updateAttributes('tableCell', { borderColor: c }).updateAttributes('tableHeader', { borderColor: c }).run(); setIsOpen(false); }}
+                    onClear={() => { editor.chain().focus().updateAttributes('tableCell', { borderColor: null }).updateAttributes('tableHeader', { borderColor: null }).run(); setIsOpen(false); }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Delete Table */}
+          <div className="w-full h-px bg-gray-100 my-1"></div>
+          <button type="button" disabled={!editor.can().deleteTable()} onMouseDown={(e) => e.preventDefault()} onClick={() => { editor.chain().focus().deleteTable().run(); setIsOpen(false); }}
+            className={`w-full text-left px-4 py-1.5 text-sm ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50 hover:text-red-700'}`}
+          >
+            Delete Table
+          </button>
+
+        </div>
+      )}
     </div>
   );
 };
@@ -414,218 +579,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           <Indent className="w-4 h-4" />
         </button>
       </div>
-
       {/* Unified Table Tools */}
       <div className="flex items-center gap-0.5 px-2 border-r border-gray-200">
-        <Menu as="div" className="relative">
-          <Menu.Button 
-            onMouseDown={(e) => e.preventDefault()}
-            className={`p-1.5 rounded flex items-center gap-1 ${editor.can().deleteTable() ? 'bg-sky-100 text-sky-700' : 'text-gray-600 hover:bg-gray-200'}`}
-            title="Table Tools"
-          >
-            <TableIcon className="w-4 h-4" />
-            <ChevronDown className="w-3 h-3" />
-          </Menu.Button>
-          <Transition
-            as={React.Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute z-10 left-0 mt-1 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1 w-56">
-              
-              {/* Add Table Submenu */}
-              <div className="relative group">
-                <Menu.Item>
-                  {({ active }) => (
-                    <button type="button" onMouseDown={(e) => e.preventDefault()}
-                      className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                    >
-                      <span>Add table</span>
-                      <span>›</span>
-                    </button>
-                  )}
-                </Menu.Item>
-                <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
-                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-max">
-                     <Menu.Item>
-                        {({ close }) => (
-                          <div onMouseDown={(e) => e.preventDefault()}>
-                            <TableGridSelector onSelect={(r, c) => {
-                              editor.chain().focus().insertTable({rows: r, cols: c, withHeaderRow: true}).run();
-                              close();
-                            }} />
-                          </div>
-                        )}
-                     </Menu.Item>
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-gray-100 my-1"></div>
-
-              {/* Add Row Submenu */}
-              <div className="relative group">
-                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addRowBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
-                  <span>Add row</span>
-                  <span>›</span>
-                </div>
-                {editor.can().addRowBefore() && (
-                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button type="button" onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => editor.chain().focus().addRowBefore().run()}
-                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                          >
-                            Above
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button type="button" onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => editor.chain().focus().addRowAfter().run()}
-                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                          >
-                            Below
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Add Column Submenu */}
-              <div className="relative group">
-                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().addColumnBefore() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
-                  <span>Add column</span>
-                  <span>›</span>
-                </div>
-                {editor.can().addColumnBefore() && (
-                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button type="button" onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => editor.chain().focus().addColumnBefore().run()}
-                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                          >
-                            Left
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button type="button" onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => editor.chain().focus().addColumnAfter().run()}
-                            className={`w-full text-left px-4 py-1.5 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                          >
-                            Right
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Remove Row */}
-              <Menu.Item disabled={!editor.can().deleteRow()}>
-                {({ active, disabled }) => (
-                  <button type="button" onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().deleteRow().run()}
-                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
-                  >
-                    Remove row
-                  </button>
-                )}
-              </Menu.Item>
-
-              {/* Remove Column */}
-              <Menu.Item disabled={!editor.can().deleteColumn()}>
-                {({ active, disabled }) => (
-                  <button type="button" onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().deleteColumn().run()}
-                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
-                  >
-                    Remove column
-                  </button>
-                )}
-              </Menu.Item>
-              
-              <div className="w-full h-px bg-gray-100 my-1"></div>
-
-              {/* Cell Background Color Submenu */}
-              <div className="relative group">
-                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
-                  <span>Cell background color</span>
-                  <span>›</span>
-                </div>
-                {editor.can().deleteTable() && (
-                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max">
-                      <Menu.Item>
-                        {() => (
-                          <div onMouseDown={(e) => e.preventDefault()}>
-                            <ColorPaletteSelector 
-                              onSelect={(c) => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: c }).updateAttributes('tableHeader', { backgroundColor: c }).run()}
-                              onClear={() => editor.chain().focus().updateAttributes('tableCell', { backgroundColor: null }).updateAttributes('tableHeader', { backgroundColor: null }).run()}
-                            />
-                          </div>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Cell Border Color Submenu */}
-              <div className="relative group">
-                <div className={`w-full text-left px-4 py-1.5 text-sm flex justify-between items-center ${!editor.can().deleteTable() ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-700 cursor-default'}`}>
-                  <span>Border color</span>
-                  <span>›</span>
-                </div>
-                {editor.can().deleteTable() && (
-                  <div className="absolute left-full top-0 hidden group-hover:block ml-0.5 z-50">
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg w-max">
-                      <Menu.Item>
-                        {() => (
-                          <div onMouseDown={(e) => e.preventDefault()}>
-                            <ColorPaletteSelector 
-                              onSelect={(c) => editor.chain().focus().updateAttributes('tableCell', { borderColor: c }).updateAttributes('tableHeader', { borderColor: c }).run()}
-                              onClear={() => editor.chain().focus().updateAttributes('tableCell', { borderColor: null }).updateAttributes('tableHeader', { borderColor: null }).run()}
-                            />
-                          </div>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Delete Table */}
-              <div className="w-full h-px bg-gray-100 my-1"></div>
-              <Menu.Item disabled={!editor.can().deleteTable()}>
-                {({ active, disabled }) => (
-                  <button type="button" onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().deleteTable().run()}
-                    className={`w-full text-left px-4 py-1.5 text-sm ${disabled ? 'text-gray-400 cursor-not-allowed' : active ? 'bg-red-50 text-red-700' : 'text-red-600'}`}
-                  >
-                    Delete Table
-                  </button>
-                )}
-              </Menu.Item>
-
-            </Menu.Items>
-          </Transition>
-        </Menu>
-
+        <TableToolsDropdown editor={editor} />
+        
         <button type="button" onMouseDown={(e) => e.preventDefault()}
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
           className="p-1.5 text-gray-600 hover:bg-gray-200 rounded"

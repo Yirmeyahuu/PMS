@@ -170,8 +170,8 @@ const renderCommunicationIndicator = (apt: Appointment) => {
   if (apt.confirmation_status === 'CONFIRMED') {
     return <span className="w-2 h-2 rounded-[2px] bg-[#10B981] inline-block mr-1 flex-shrink-0 shadow-sm" title="Confirmed" />;
   }
-  if (apt.confirmation_status === 'DECLINED') {
-    return <span className="w-2 h-2 rounded-[2px] bg-[#EF4444] inline-block mr-1 flex-shrink-0 shadow-sm" title="Declined" />;
+  if (apt.confirmation_status === 'DECLINED' || apt.confirmation_status === 'CANCELLED' || apt.status === 'CANCELLED') {
+    return <span className="w-2 h-2 rounded-[2px] bg-[#EF4444] inline-block mr-1 flex-shrink-0 shadow-sm" title="Cancelled" />;
   }
   if (apt.reminder_sent) {
     return <span className="w-2 h-2 rounded-[2px] bg-[#F97316] inline-block mr-1 flex-shrink-0 shadow-sm" title="Reminder Sent" />;
@@ -440,10 +440,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
 
   const getBlockColors = (apt: Appointment): BlockColors => {
     // ── DNA → RED (highest-priority visual override) ──────────────────────
-    // Business rule: DNA is never a soft marker. Both arrival_status=DNA and
-    // status=DNA must display RED so staff immediately spot missed appointments
+    // Business rule: DNA and CANCELLED appointments must display RED so staff immediately spot them
     // across all calendar and diary views.
-    if (apt.arrival_status === 'DNA' || apt.status === 'DNA') {
+    if (apt.arrival_status === 'DNA' || apt.status === 'DNA' || apt.status === 'CANCELLED') {
       const dnaRed = '#DC2626';
       return {
         useHex: true,
@@ -631,7 +630,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     for (const apt of appointments) {
-      if (apt.status === 'CANCELLED') continue;
+      if (apt.status === 'DELETED') continue; // Only filter out explicitly deleted, not cancelled
       if (!map[apt.date]) map[apt.date] = [];
       map[apt.date].push(apt);
     }
@@ -1422,10 +1421,10 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   );
 
   // ── Hover card overlay ────────────────────────────────────────────────────
-  const hoverCardOverlay = hoverState.visible && hoverState.appointment && hoverState.anchorRect && (
+  const hoverCardOverlay = hoverState.visible && hoverState.appointment && hoverState.anchorElement && (
     <AppointmentHoverCard
       appointment={hoverState.appointment}
-      anchorRect={hoverState.anchorRect}
+      anchorElement={hoverState.anchorElement}
       onEnter={onHoverCardEnter}
       onLeave={onHoverCardLeave}
     />

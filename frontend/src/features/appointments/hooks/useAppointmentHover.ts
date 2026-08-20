@@ -3,14 +3,14 @@ import type { Appointment } from '@/types';
 
 interface HoverState {
   appointment: Appointment | null;
-  anchorRect:  DOMRect | null;
+  anchorElement: HTMLElement | null;
   visible:     boolean;
 }
 
 export const useAppointmentHover = () => {
   const [hoverState, setHoverState] = useState<HoverState>({
     appointment: null,
-    anchorRect:  null,
+    anchorElement: null,
     visible:     false,
   });
 
@@ -24,9 +24,9 @@ export const useAppointmentHover = () => {
 
   const onMouseEnter = useCallback((apt: Appointment, e: React.MouseEvent) => {
     clearTimers();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const el = e.currentTarget as HTMLElement;
     timerRef.current = setTimeout(() => {
-      setHoverState({ appointment: apt, anchorRect: rect, visible: true });
+      setHoverState({ appointment: apt, anchorElement: el, visible: true });
     }, 1000);
   }, []);
 
@@ -49,7 +49,7 @@ export const useAppointmentHover = () => {
 
   const hideHover = useCallback(() => {
     clearTimers();
-    setHoverState({ appointment: null, anchorRect: null, visible: false });
+    setHoverState({ appointment: null, anchorElement: null, visible: false });
   }, []);
 
   return {

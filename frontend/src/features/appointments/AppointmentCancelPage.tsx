@@ -143,7 +143,7 @@ export function AppointmentCancelPage() {
           <div className="flex justify-center mb-4">{cfg.icon}</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">{cfg.title}</h1>
           <p className="text-gray-500 text-sm leading-relaxed mb-4">{cfg.message}</p>
-          
+
           {(errorData?.clinic_email || errorData?.clinic_phone) && (
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-sm text-gray-600 space-y-2 mt-4 text-left">
               <h3 className="font-medium text-gray-900 mb-2 border-b pb-2">Clinic Contact Info</h3>
@@ -185,7 +185,7 @@ export function AppointmentCancelPage() {
             <p className="text-sm font-medium text-gray-500 mb-4 uppercase tracking-wider">
               Appointment Details
             </p>
-            
+
             <div className="space-y-4">
               <div className="flex items-start">
                 <User className="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
@@ -221,7 +221,7 @@ export function AppointmentCancelPage() {
                 </div>
               )}
             </div>
-            
+
             <div className="mt-8 space-y-3">
               <button
                 onClick={handleCancel}
@@ -254,7 +254,7 @@ export function AppointmentCancelPage() {
           <p className="text-sm font-medium text-gray-500 mb-4 uppercase tracking-wider">
             Cancellation Details
           </p>
-          
+
           <div className="space-y-4">
             <div className="flex items-start">
               <User className="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" />
