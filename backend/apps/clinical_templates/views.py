@@ -122,31 +122,39 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def get_queryset(self):
-        """Filter notes by user's clinic (including branches)"""
+        """Filter notes by user's clinic branches and role"""
         user = self.request.user
-        print(f'[ClinicalNoteViewSet] User: {user}, clinic: {user.clinic}, is_practitioner: {user.is_practitioner}, is_admin: {user.is_admin}')
         
-        # Get all clinics the user has access to (main clinic and all its branches)
-        if user.clinic:
-            # Get the main clinic (if user.clinic is a branch, get its parent)
-            main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
-            # Include main clinic and all its branches
-            from django.db.models import Q
-            queryset = self.queryset.filter(
-                Q(clinic=main_clinic) | Q(clinic__parent_clinic=main_clinic)
-            )
-            print(f'[ClinicalNoteViewSet] After clinic/branch filter: {queryset.count()}')
+        # 1. Base filter: restrict to allowed branches based on RBAC
+        from apps.accounts.utils.rbac import validate_branch_access
+        allowed_branches, is_branch_restricted = validate_branch_access(user)
+        
+        if is_branch_restricted:
+            if allowed_branches:
+                queryset = self.queryset.filter(clinic_id__in=allowed_branches)
+            else:
+                return self.queryset.none()
         else:
-            queryset = self.queryset.none()
+            # If not restricted (ADMIN), show all branches in their clinic network
+            if user.clinic:
+                main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
+                from django.db.models import Q
+                queryset = self.queryset.filter(
+                    Q(clinic=main_clinic) | Q(clinic__parent_clinic=main_clinic)
+                )
+            else:
+                return self.queryset.none()
             
         # Filter out notes belonging to archived cases
         from django.db.models import Q
         queryset = queryset.filter(Q(patient_case__isnull=True) | Q(patient_case__is_archived=False))
         
-        # Practitioners see only their own notes
-        if user.is_practitioner and not user.is_admin:
+        # 2. Role-based scoping: Pure Practitioners see only their own notes
+        effective_roles = user.get_effective_roles()
+        has_elevated_roles = any(r in effective_roles for r in ['ADMIN', 'ADMIN_ASSISTANT', 'STAFF', 'FINANCE'])
+        
+        if 'PRACTITIONER' in effective_roles and not has_elevated_roles:
             queryset = queryset.filter(practitioner__user=user)
-            print(f'[ClinicalNoteViewSet] After practitioner filter: {queryset.count()}')
         
         # If filtering by patient, log that too
         patient_filter = self.request.query_params.get('patient')
@@ -668,18 +676,31 @@ class GlobalClinicalNoteAuditViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # 1. Base filter: restrict to user's clinic (including main/branch)
-        if user.clinic:
-            main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
-            from django.db.models import Q
-            qs = self.queryset.filter(
-                Q(clinical_note__clinic=main_clinic) | Q(clinical_note__clinic__parent_clinic=main_clinic)
-            )
+        # 1. Base filter: restrict to allowed branches based on RBAC
+        from apps.accounts.utils.rbac import validate_branch_access
+        allowed_branches, is_branch_restricted = validate_branch_access(user)
+        
+        if is_branch_restricted:
+            if allowed_branches:
+                qs = self.queryset.filter(clinical_note__clinic_id__in=allowed_branches)
+            else:
+                return self.queryset.none()
         else:
-            return self.queryset.none()
+            # If not restricted (ADMIN), show all branches in their clinic network
+            if user.clinic:
+                main_clinic = user.clinic.parent_clinic if user.clinic.parent_clinic else user.clinic
+                from django.db.models import Q
+                qs = self.queryset.filter(
+                    Q(clinical_note__clinic=main_clinic) | Q(clinical_note__clinic__parent_clinic=main_clinic)
+                )
+            else:
+                return self.queryset.none()
             
-        # 2. Role-based scoping: Practitioner (if not admin/staff/manager) sees only their own notes
-        if user.is_practitioner and not (user.is_admin or getattr(user, 'is_manager', False) or user.is_staff):
+        # 2. Role-based scoping: Pure Practitioners see only their own notes
+        effective_roles = user.get_effective_roles()
+        has_elevated_roles = any(r in effective_roles for r in ['ADMIN', 'ADMIN_ASSISTANT', 'STAFF', 'FINANCE'])
+        
+        if 'PRACTITIONER' in effective_roles and not has_elevated_roles:
             qs = qs.filter(clinical_note__practitioner__user=user)
             
         # 3. Optional date range filtering

@@ -10,7 +10,7 @@ import { AddNoteModal } from './components/AddNoteModal';
 import { SelectOptionModal } from './components/SelectOptionModal';
 import { AppointmentModal } from './components/AppointmentModal';
 import { ConfirmRebookContinue } from './components/ConfirmRebookContinue';
-import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
+import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, parseISO } from 'date-fns';
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 import { useAuthStore } from '@/store/auth.store';
@@ -33,16 +33,15 @@ export const Diary: React.FC = () => {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const effectiveRoles = (user?.roles && user.roles.length > 0) ? user.roles : (user?.role ? [user.role] : []);
-  const isAdmin        = effectiveRoles.includes('ADMIN');
+  const isAdmin = effectiveRoles.includes('ADMIN');
   const isPractitioner = effectiveRoles.includes('PRACTITIONER');
-  const isStaff        = effectiveRoles.includes('STAFF');
-  const isManager      = user?.is_manager || false;
+  const isStaff = effectiveRoles.includes('STAFF');
 
-  const isRestrictedPractitioner = isPractitioner && !isAdmin && !isManager;
-  const practitionerBranchIds = useMemo(() => {
-    if (!isRestrictedPractitioner) return null;
+  const isBranchScopedUser = !isAdmin;
+  const authorizedBranchIds = useMemo(() => {
+    if (!isBranchScopedUser) return null;
     return (user?.manager_branches || []).map((b: any) => b.id);
-  }, [isRestrictedPractitioner, user?.manager_branches]);
+  }, [isBranchScopedUser, user?.manager_branches]);
   // ── Rebook Mode ──────────────────────────────────────────────────
   const { rebookMode, rebookData, startRebook, exitRebook } = useRebookMode();
   // Guard against rapid double-clicks creating duplicate appointments
@@ -79,23 +78,52 @@ export const Diary: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [rebookMode, exitRebook]);
 
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(() => {
+    if (!user?.id) return new Date();
+    const saved = localStorage.getItem(`diary_view_${user.id}`);
+    if (!saved) return new Date();
+    
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed.currentDate) {
+        return parseISO(parsed.currentDate);
+      }
+    } catch (e) {
+      // Legacy string format fallback
+    }
+    return new Date();
+  });
+
   // Default to week view for practitioners / staff, but restore from localStorage if available
   const [view, setView] = useState<CalendarView>(() => {
     if (!user?.id) return 'week';
     const saved = localStorage.getItem(`diary_view_${user.id}`);
-    if (saved === 'day' || saved === 'week' || saved === 'month') {
-      return saved as CalendarView;
+    if (!saved) return 'week';
+    
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed.viewMode && ['day', 'week', 'month'].includes(parsed.viewMode)) {
+        return parsed.viewMode as CalendarView;
+      }
+    } catch (e) {
+      // Legacy string format fallback
+      if (saved === 'day' || saved === 'week' || saved === 'month') {
+        return saved as CalendarView;
+      }
     }
     return 'week';
   });
 
   // Sync view preference to localStorage when it changes
   useEffect(() => {
-    if (user?.id && view) {
-      localStorage.setItem(`diary_view_${user.id}`, view);
+    if (user?.id && view && currentDate) {
+      const stateToSave = {
+        viewMode: view,
+        currentDate: format(currentDate, 'yyyy-MM-dd')
+      };
+      localStorage.setItem(`diary_view_${user.id}`, JSON.stringify(stateToSave));
     }
-  }, [view, user?.id]);
+  }, [view, currentDate, user?.id]);
 
   const [selectedPractitioner, setSelectedPractitioner] = useState<number | string | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
@@ -187,10 +215,10 @@ export const Diary: React.FC = () => {
     // When they differ (branch reassignment, or "All Branches" toggle), reset
     // the auto-select guard so the calendar snaps to the new scope immediately.
     let currentBranchId = own.clinic_branch_id ?? null;
-    if (isRestrictedPractitioner && practitionerBranchIds && practitionerBranchIds.length > 0) {
+    if (isBranchScopedUser && authorizedBranchIds && authorizedBranchIds.length > 0) {
       // If the currently assigned branch is null or not in the allowed list, default to the first allowed branch
-      if (currentBranchId == null || !practitionerBranchIds.includes(currentBranchId)) {
-        currentBranchId = practitionerBranchIds[0];
+      if (currentBranchId == null || !authorizedBranchIds.includes(currentBranchId)) {
+        currentBranchId = authorizedBranchIds[0];
       }
     }
 
@@ -215,7 +243,7 @@ export const Diary: React.FC = () => {
         setSelectedPractitioner(own.id);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPractitioner, isStaff, user?.practitioner_id, user?.id, practitioners, branches]);
 
   // ── Stale-selection guard ──────────────────────────────────────────────────
@@ -281,7 +309,7 @@ export const Diary: React.FC = () => {
       // Practitioner removed / deactivated — clean up stale entry.
       localStorage.removeItem(key);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practitioners, selectedClinicBranch, user?.id]);
 
   // ── Route / State Protection Guard ───────────────────────────────────────────
@@ -289,14 +317,14 @@ export const Diary: React.FC = () => {
   // once branches are loaded.
   useEffect(() => {
     if (selectedClinicBranch === null && branches.length > 0) {
-      if (isRestrictedPractitioner && practitionerBranchIds && practitionerBranchIds.length > 0) {
+      if (isBranchScopedUser && authorizedBranchIds && authorizedBranchIds.length > 0) {
         // Reset compare mode and switch to first assigned branch
-        setSelectedClinicBranch(practitionerBranchIds[0]);
+        setSelectedClinicBranch(authorizedBranchIds[0]);
         setCompareMode(false);
         setComparePractitioners([null, null]);
-        
+
         // Restore own practitioner context if applicable
-        if (cachedOwnBranchId === practitionerBranchIds[0]) {
+        if (cachedOwnBranchId === authorizedBranchIds[0]) {
           setSelectedPractitioner(cachedOwnId);
         } else {
           setSelectedPractitioner(null);
@@ -306,7 +334,7 @@ export const Diary: React.FC = () => {
         setSelectedClinicBranch(branches[0].id);
       }
     }
-  }, [selectedClinicBranch, branches, isRestrictedPractitioner, practitionerBranchIds, cachedOwnBranchId, cachedOwnId]);
+  }, [selectedClinicBranch, branches, isBranchScopedUser, authorizedBranchIds, cachedOwnBranchId, cachedOwnId]);
 
   // True when the currently selected branch tab is the user's "own" clinic:
   const isOwnAssignedClinic =
@@ -494,7 +522,7 @@ export const Diary: React.FC = () => {
   // Always derived from currentDate (the Diary's source of truth) + offset.
   // This is the fix for the synchronization bug: previously these were
   // hardcoded to new Date() (today) and never updated on Diary navigation.
-  const miniCalendarDate     = addMonths(currentDate, miniCalendarOffset);
+  const miniCalendarDate = addMonths(currentDate, miniCalendarOffset);
   const miniCalendarDateNext = addMonths(currentDate, miniCalendarOffset + 1);
 
   // ── Mini Calendar date selection ──────────────────────────────────────────
@@ -624,7 +652,7 @@ export const Diary: React.FC = () => {
     setAnchorRect(rect);
     setPendingSlot(slot);
     setShowSelectOptionModal(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rebookMode, rebookData]);
 
   // ── handleRebookDrop — creates a new appointment at the given slot using rebook data ──
@@ -642,7 +670,7 @@ export const Diary: React.FC = () => {
     const endH = Math.floor(endTotalMins / 60);
     const endM = endTotalMins % 60;
     const timeLabel = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    
+
     const dummyDate = new Date();
     dummyDate.setHours(hour, minutes, 0, 0);
     const displayTime = format(dummyDate, 'h:mm a');
@@ -656,21 +684,21 @@ export const Diary: React.FC = () => {
       : 'INITIAL';
 
     const data: CreateAppointmentData = {
-      clinic:           rebookData.clinic,
-      patient:          rebookData.patient,
-      practitioner:     slot.practitionerId ?? rebookData.practitioner ?? undefined,
-      service:          rebookData.service ?? undefined,
+      clinic: rebookData.clinic,
+      patient: rebookData.patient,
+      practitioner: slot.practitionerId ?? rebookData.practitioner ?? undefined,
+      service: rebookData.service ?? undefined,
       appointment_type: safeAppointmentType,
-      date:             format(slot.date, 'yyyy-MM-dd'),
-      start_time:       timeLabel,
-      end_time:         `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+      date: format(slot.date, 'yyyy-MM-dd'),
+      start_time: timeLabel,
+      end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
       duration_minutes: rebookData.duration_minutes,
-      chief_complaint:  rebookData.chief_complaint,
-      notes:            rebookData.notes,
-      patient_notes:    rebookData.patient_notes,
+      chief_complaint: rebookData.chief_complaint,
+      notes: rebookData.notes,
+      patient_notes: rebookData.patient_notes,
       // Inherit case from original appointment (null if original had none)
-      patient_case:     rebookData.patient_case ?? undefined,
-      is_rebook:        true,
+      patient_case: rebookData.patient_case ?? undefined,
+      is_rebook: true,
     };
 
     const proceedWithRebooking = async () => {
@@ -784,8 +812,8 @@ export const Diary: React.FC = () => {
 
               {/* Individual Branch Tabs */}
               {branches.map((branch) => {
-                const isUnauthorized = Boolean(isRestrictedPractitioner && practitionerBranchIds && !practitionerBranchIds.includes(branch.id));
-                
+                const isUnauthorized = Boolean(isBranchScopedUser && authorizedBranchIds && !authorizedBranchIds.includes(branch.id));
+
                 return (
                   <button
                     key={branch.id}
@@ -1237,19 +1265,18 @@ export const Diary: React.FC = () => {
                 rebookMode={rebookMode && !showRebookContinueModal}
                 rebookPreviewLabel={
                   rebookData
-                    ? `${rebookData.patient_name}${
-                        rebookData.service_name ? ` · ${rebookData.service_name}` : ''
-                      } · ${rebookData.duration_minutes} min`
+                    ? `${rebookData.patient_name}${rebookData.service_name ? ` · ${rebookData.service_name}` : ''
+                    } · ${rebookData.duration_minutes} min`
                     : undefined
                 }
                 multiPractitioners={
                   isMultiPractitionerMode
                     ? practitionerOptions.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        specialization: p.specialization ?? null,
-                        availability: p.availability,
-                      }))
+                      id: p.id,
+                      name: p.name,
+                      specialization: p.specialization ?? null,
+                      availability: p.availability,
+                    }))
                     : undefined
                 }
               />
@@ -1304,7 +1331,7 @@ export const Diary: React.FC = () => {
               const endMin = pendingSlot
                 ? pendingSlot.hour * 60 + pendingSlot.minutes + pendingSlot.duration
                 : 600;
-              const endH  = String(Math.floor(endMin / 60)).padStart(2, '0');
+              const endH = String(Math.floor(endMin / 60)).padStart(2, '0');
               const endMm = String(endMin % 60).padStart(2, '0');
               return (
                 <AddEventModal
@@ -1337,7 +1364,7 @@ export const Diary: React.FC = () => {
               const endMin = pendingSlot
                 ? pendingSlot.hour * 60 + pendingSlot.minutes + Math.max(pendingSlot.duration, 30)
                 : 600;
-              const endH  = String(Math.floor(endMin / 60)).padStart(2, '0');
+              const endH = String(Math.floor(endMin / 60)).padStart(2, '0');
               const endMm = String(endMin % 60).padStart(2, '0');
               return (
                 <AddNoteModal
@@ -1379,11 +1406,10 @@ export const Diary: React.FC = () => {
 
       {/* ── Rebook Mode floating banner ── */}
       {rebookMode && rebookData && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-10000 flex items-center gap-3 px-5 py-3 rounded-full shadow-2xl border select-none animate-fade-in transition-colors duration-200 ${
-          isRebookingInProgress
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-10000 flex items-center gap-3 px-5 py-3 rounded-full shadow-2xl border select-none animate-fade-in transition-colors duration-200 ${isRebookingInProgress
             ? 'bg-slate-700 border-slate-500 text-white'
             : 'bg-emerald-700 border-emerald-500 text-white'
-        }`}>
+          }`}>
           {isRebookingInProgress ? (
             /* Loading state — spinner while API call is in-flight */
             <>
@@ -1469,7 +1495,7 @@ export const Diary: React.FC = () => {
               await updatePatientCase(caseDetails.id, payload);
               toast.success('Case updated successfully!');
               setEditCaseOpen(false);
-              
+
               if (pendingCallback) {
                 pendingCallback();
                 clearPendingCallback();
@@ -1494,9 +1520,9 @@ interface MiniCalendarProps {
 }
 
 const MiniCalendar: React.FC<MiniCalendarProps> = ({ date, selectedDate, onDateSelect, view }) => {
-  const monthStart  = new Date(date.getFullYear(), date.getMonth(), 1);
-  const monthEnd    = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const startDay    = (monthStart.getDay() + 6) % 7; // Monday = 0
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const startDay = (monthStart.getDay() + 6) % 7; // Monday = 0
   const daysInMonth = monthEnd.getDate();
 
   // ── Week-range for Week View highlighting ──────────────────────────────────

@@ -13,6 +13,7 @@ import { getUpcomingAppointments } from '../appointment.api';
 interface AppointmentHoverCardProps {
   appointment: Appointment;
   anchorElement: HTMLElement;
+  mousePos?: { x: number; y: number } | null;
   onEnter:     () => void;
   onLeave:     () => void;
 }
@@ -36,6 +37,7 @@ const fmt12 = (time: string): string => {
 export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
   appointment: apt,
   anchorElement,
+  mousePos,
   onEnter,
   onLeave,
 }) => {
@@ -61,40 +63,39 @@ export const AppointmentHoverCard: React.FC<AppointmentHoverCardProps> = ({
       let top = 0;
       let left = 0;
 
-      const spaceRight = vw - rect.right;
-      const spaceLeft = rect.left;
-      
-      const fitsRight = spaceRight >= cardW + GAP;
-      const fitsLeft = spaceLeft >= cardW + GAP;
-
-      if (fitsRight || (!fitsLeft && spaceRight >= spaceLeft)) {
-        // Place on RIGHT
-        left = rect.right + GAP;
-        top = rect.top;
-        if (top + cardH > vh - GAP) {
-          top = Math.max(GAP, rect.bottom - cardH);
-        }
-      } else if (fitsLeft) {
-        // Place on LEFT
-        left = rect.left - cardW - GAP;
-        top = rect.top;
-        if (top + cardH > vh - GAP) {
-          top = Math.max(GAP, rect.bottom - cardH);
-        }
+      if (mousePos) {
+        // Place near the mouse cursor
+        left = mousePos.x + 15;
+        top = mousePos.y + 15;
       } else {
-        // Place BELOW or ABOVE (for very narrow screens)
-        left = rect.left + (rect.width / 2) - (cardW / 2);
-        left = Math.max(GAP, Math.min(left, vw - cardW - GAP)); // clamp horizontally
+        const spaceRight = vw - rect.right;
+        const spaceLeft = rect.left;
         
-        const spaceBelow = vh - rect.bottom;
-        const spaceAbove = rect.top;
-        
-        if (spaceBelow >= cardH + GAP || spaceBelow >= spaceAbove) {
-          top = rect.bottom + GAP;
+        const fitsRight = spaceRight >= cardW + GAP;
+        const fitsLeft = spaceLeft >= cardW + GAP;
+
+        if (fitsRight) {
+          // Place on RIGHT
+          left = rect.right + GAP;
+          top = rect.top;
+        } else if (fitsLeft) {
+          // Place on LEFT
+          left = rect.left - cardW - GAP;
+          top = rect.top;
         } else {
-          top = rect.top - cardH - GAP;
+          // Place on the side that has MORE space, but allow overlapping
+          if (spaceRight >= spaceLeft) {
+            left = rect.right + GAP;
+          } else {
+            left = rect.left - cardW - GAP;
+          }
+          top = rect.top;
         }
       }
+
+      // Universal viewport clamping
+      left = Math.max(GAP, Math.min(left, vw - cardW - GAP));
+      top = Math.max(GAP, Math.min(top, vh - cardH - GAP));
 
       setStyle({
         position: 'fixed',

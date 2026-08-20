@@ -155,6 +155,26 @@ def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
             error_message = '',
         )
 
+        try:
+            from apps.notifications.models import CommunicationLog
+            from apps.notifications.services.notification_service import broadcast_communication_log_updated
+            new_log = CommunicationLog.objects.create(
+                clinic=clinic,
+                patient=patient,
+                appointment=appointment,
+                practitioner=appointment.practitioner,
+                comm_type='APPOINTMENT_REMINDER',
+                channel='EMAIL',
+                status='SENT',
+                recipient=recipient_email,
+                subject=subject,
+                body_preview=text_content[:500] if text_content else '',
+                full_body=html_content,
+            )
+            broadcast_communication_log_updated(new_log)
+        except Exception as comm_e:
+            logger.warning("Failed to create CommunicationLog in email_service: %s", comm_e)
+
         logger.info(
             "Reminder sent → appointment_id=%s patient=%s email=%s",
             appointment.id, patient.id, recipient_email,

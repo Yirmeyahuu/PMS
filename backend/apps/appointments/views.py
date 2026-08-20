@@ -38,25 +38,7 @@ from rest_framework.exceptions import PermissionDenied
 import logging
 logger = logging.getLogger(__name__)
 
-def validate_practitioner_branch_access(user, requested_branch_id=None):
-    """
-    If the user is a PRACTITIONER (and not Admin/Manager), validate they have access
-    to the requested branch. If no branch is requested, return the list of allowed branches.
-    Raises PermissionDenied if the requested branch is unauthorized.
-    Returns: (list_of_allowed_branch_ids, bool_is_restricted_practitioner)
-    """
-    effective_roles = user.get_effective_roles()
-    if 'PRACTITIONER' in effective_roles and not user.is_admin and not user.is_manager:
-        practitioner_branches = list(user.branch_accesses.values_list('branch_id', flat=True))
-        if not practitioner_branches and user.clinic_branch_id:
-            practitioner_branches = [user.clinic_branch_id]
-            
-        if requested_branch_id is not None:
-            if requested_branch_id not in practitioner_branches:
-                raise PermissionDenied("You do not have permission to access this branch.")
-                
-        return practitioner_branches, True
-    return [], False
+from apps.accounts.utils.rbac import validate_branch_access
 
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -120,7 +102,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             try:
                 branch_id = int(clinic_branch_param)
                 if branch_id in all_branch_ids:
-                    validate_practitioner_branch_access(user, branch_id)
+                    validate_branch_access(user, branch_id)
                     queryset = queryset.filter(clinic_id=branch_id)
                 else:
                     return queryset.none()
@@ -128,7 +110,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 pass
         else:
             # If no branch specified, enforce practitioner scope across all returned data
-            practitioner_branches, is_restricted = validate_practitioner_branch_access(user)
+            practitioner_branches, is_restricted = validate_branch_access(user)
             if is_restricted:
                 if practitioner_branches:
                     queryset = queryset.filter(clinic_id__in=practitioner_branches)
@@ -1507,7 +1489,7 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
             try:
                 branch_id = int(clinic_branch_param)
                 if branch_id in all_branch_ids:
-                    validate_practitioner_branch_access(user, branch_id)
+                    validate_branch_access(user, branch_id)
                     queryset = queryset.filter(clinic_id=branch_id)
                 else:
                     return self.queryset.none()
@@ -1515,7 +1497,7 @@ class BlockAppointmentViewSet(viewsets.ModelViewSet):
                 pass
         else:
             # If no branch specified, enforce practitioner scope across all returned data
-            practitioner_branches, is_restricted = validate_practitioner_branch_access(user)
+            practitioner_branches, is_restricted = validate_branch_access(user)
             if is_restricted:
                 if practitioner_branches:
                     queryset = queryset.filter(clinic_id__in=practitioner_branches)
@@ -1626,7 +1608,7 @@ class CalendarNoteViewSet(viewsets.ModelViewSet):
             try:
                 branch_id = int(clinic_branch_param)
                 if branch_id in all_branch_ids:
-                    validate_practitioner_branch_access(user, branch_id)
+                    validate_branch_access(user, branch_id)
                     qs = qs.filter(clinic_id=branch_id)
                 else:
                     return CalendarNote.objects.none()
@@ -1634,7 +1616,7 @@ class CalendarNoteViewSet(viewsets.ModelViewSet):
                 pass
         else:
             # If no branch specified, enforce practitioner scope across all returned data
-            practitioner_branches, is_restricted = validate_practitioner_branch_access(user)
+            practitioner_branches, is_restricted = validate_branch_access(user)
             if is_restricted:
                 if practitioner_branches:
                     qs = qs.filter(clinic_id__in=practitioner_branches)
@@ -2195,6 +2177,22 @@ class PublicAppointmentConfirmView(APIView):
                 ).order_by('-created_at').first()
                 if updated_log:
                     broadcast_communication_log_updated(updated_log)
+            else:
+                # Fallback: if no CommunicationLog exists, create one to record the patient's reply
+                new_log = CommunicationLog.objects.create(
+                    clinic=appt.clinic,
+                    patient=appt.patient,
+                    appointment=appt,
+                    practitioner=appt.practitioner,
+                    comm_type='APPOINTMENT_REMINDER',
+                    channel='EMAIL',
+                    status='REPLIED',
+                    recipient=appt.patient.email if appt.patient else '',
+                    subject='Appointment Reminder (Legacy)',
+                    patient_reply='Y',
+                    replied_at=timezone.now(),
+                )
+                broadcast_communication_log_updated(new_log)
         except Exception as e:
             logger.warning('Failed to update CommunicationLog for confirm token #%s: %s', ct.id, e)
 
@@ -2404,6 +2402,22 @@ class PublicAppointmentCancelView(APIView):
                 ).order_by('-created_at').first()
                 if updated_log:
                     broadcast_communication_log_updated(updated_log)
+            else:
+                # Fallback: if no CommunicationLog exists, create one to record the patient's reply
+                new_log = CommunicationLog.objects.create(
+                    clinic=appt.clinic,
+                    patient=appt.patient,
+                    appointment=appt,
+                    practitioner=appt.practitioner,
+                    comm_type='APPOINTMENT_REMINDER',
+                    channel='EMAIL',
+                    status='REPLIED',
+                    recipient=appt.patient.email if appt.patient else '',
+                    subject='Appointment Reminder (Legacy)',
+                    patient_reply='N',
+                    replied_at=timezone.now(),
+                )
+                broadcast_communication_log_updated(new_log)
         except Exception as e:
             logger.warning('Failed to update CommunicationLog for cancel token #%s: %s', ct.id, e)
 

@@ -6,6 +6,7 @@ interface AppointmentSlot {
   hour: number;
   minutes: number;
   duration: number; // ✅ ADDED: duration field
+  anchorRect?: DOMRect;
 }
 
 export const useAppointmentModal = () => {

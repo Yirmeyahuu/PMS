@@ -1217,7 +1217,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
       onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: numericPractitionerId }, rect);
       return;
     }
-    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: element?.getBoundingClientRect() });
   };
 
   // ── Column-aware variants for multi-practitioner day view ─────────────────
@@ -1230,7 +1230,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
       onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: practId }, rect);
       return;
     }
-    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: element?.getBoundingClientRect() });
   };
 
   // Handles mouseUp on individual time slots inside a multi-prac column.
@@ -1425,6 +1425,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     <AppointmentHoverCard
       appointment={hoverState.appointment}
       anchorElement={hoverState.anchorElement}
+      mousePos={hoverState.mousePos}
       onEnter={onHoverCardEnter}
       onLeave={onHoverCardLeave}
     />
@@ -2189,12 +2190,13 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             onMouseDown={e => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
               if (onSlotAction) {
                 // Include the active practitioner filter so note/event creation
                 // from the occupied-slot strip also inherits practitioner ownership.
-                onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: numericPractitionerId });
+                onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: numericPractitionerId }, rect);
               } else {
-                openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+                openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: rect });
               }
             }}
             title="Click to add appointment, block, or note"
@@ -2273,10 +2275,11 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             onMouseDown={e => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
               if (onSlotAction) {
-                onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+                onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 }, rect);
               } else {
-                openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+                openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: rect });
               }
             }}
             title="Click to add appointment, block, or note"
@@ -2553,10 +2556,11 @@ const CalendarComponent: React.FC<CalendarProps> = ({
                 onMouseDown={e => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
                   if (onSlotAction) {
-                    onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: practId });
+                    onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: practId }, rect);
                   } else {
-                    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+                    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: rect });
                   }
                 }}
                 title="Click to add appointment, block, or note"
@@ -2982,10 +2986,11 @@ const CalendarComponent: React.FC<CalendarProps> = ({
                 onMouseDown={e => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
                   if (onSlotAction) {
-                    onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: practId });
+                    onSlotAction({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, practitionerId: practId }, rect);
                   } else {
-                    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15 });
+                    openModal({ date, time: slot.time, hour: slot.hour, minutes: slot.minutes, duration: 15, anchorRect: rect });
                   }
                 }}
                 title="Click to add appointment, block, or note"
@@ -3259,7 +3264,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     const weekDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     return (
-      <div {...calendarWrapperProps}>
+      <div {...calendarWrapperProps} className="h-full flex flex-col">
         <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
           {dragState.isDragging && (
             <div className="flex-shrink-0 bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-xs text-emerald-700 font-medium text-center animate-pulse">
@@ -3280,9 +3285,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             ))}
           </div>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 flex flex-col overflow-auto">
             {monthDays.map((week, wi) => (
-              <div key={wi} className="grid grid-cols-7 border-b border-gray-200 last:border-b-0">
+              <div key={wi} className="flex-1 grid grid-cols-7 border-b border-gray-200 last:border-b-0 min-h-[100px]">
                 {week.map(day => {
                   const dayAppts      = getAppointmentsForDay(day);
                   const dayBlockAppts = getBlockAppointmentsForDate(day);
@@ -3323,7 +3328,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
                         }
                         onDateChange(day);
                       }}
-                      className={`min-h-[120px] p-2 border-r border-gray-200 last:border-r-0 transition-colors relative cursor-pointer
+                      className={`p-2 border-r border-gray-200 last:border-r-0 transition-colors relative cursor-pointer
                         ${dayBgClass}
                         ${isDropTarget ? 'hover:bg-emerald-50 hover:border-emerald-300' : 'hover:brightness-95'}
                       `}

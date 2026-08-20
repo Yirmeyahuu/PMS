@@ -247,11 +247,25 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         
         # Security check: Only return content to authorized users
         if request and request.user:
-            # Allow practitioner, admins, or same-clinic staff
-            if (obj.practitioner.user == request.user or 
-                request.user.is_admin or 
-                (request.user.clinic == obj.clinic and request.user.is_staff)):
+            user = request.user
+            
+            # Allow practitioner who authored it
+            if obj.practitioner.user == user:
                 return obj.content
+                
+            # Allow Admins
+            if user.is_admin:
+                return obj.content
+                
+            # Allow Managers, Staff, and Finance if they have branch access
+            from apps.accounts.utils.rbac import validate_branch_access
+            try:
+                allowed_branches, is_restricted = validate_branch_access(user, requested_branch_id=obj.clinic_id)
+                effective_roles = user.get_effective_roles()
+                if any(r in effective_roles for r in ['ADMIN_ASSISTANT', 'STAFF', 'FINANCE']):
+                    return obj.content
+            except Exception:
+                pass
         
         return None
     
@@ -520,11 +534,25 @@ class ClinicalNoteVersionSerializer(serializers.ModelSerializer):
         # Security check: Only return content to authorized users
         if request and request.user:
             note = obj.clinical_note
-            # Allow practitioner, admins, or same-clinic staff
-            if (note.practitioner.user == request.user or 
-                request.user.is_admin or 
-                (request.user.clinic == note.clinic and request.user.is_staff)):
+            user = request.user
+            
+            # Allow practitioner who authored it
+            if note.practitioner.user == user:
                 return obj.content
+                
+            # Allow Admins
+            if user.is_admin:
+                return obj.content
+                
+            # Allow Managers, Staff, and Finance if they have branch access
+            from apps.accounts.utils.rbac import validate_branch_access
+            try:
+                allowed_branches, is_restricted = validate_branch_access(user, requested_branch_id=note.clinic_id)
+                effective_roles = user.get_effective_roles()
+                if any(r in effective_roles for r in ['ADMIN_ASSISTANT', 'STAFF', 'FINANCE']):
+                    return obj.content
+            except Exception:
+                pass
         
         return None
 class GlobalClinicalNoteAuditLogSerializer(serializers.ModelSerializer):

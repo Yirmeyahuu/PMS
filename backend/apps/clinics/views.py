@@ -125,12 +125,10 @@ class ClinicViewSet(viewsets.ModelViewSet):
             Q(id=main_clinic.id) | Q(parent_clinic=main_clinic)
         ).filter(is_deleted=False, is_active=True).order_by('-is_main_branch', 'name')
 
-        if not user.is_admin:
-            if user.is_manager:
-                allowed_branches = list(user.branch_accesses.values_list('branch_id', flat=True))
-                branches = branches.filter(id__in=allowed_branches)
-            else:
-                branches = branches.filter(id=user.clinic_id)
+        # We intentionally return all active branches for the clinic network.
+        # The frontend UI relies on the full list to render tabs, and will disable
+        # any tabs the user is not authorized to access based on their assigned scopes.
+        # Data access is securely enforced at the API layer (e.g. AppointmentViewSet).
 
         serializer = ClinicBranchSerializer(branches, many=True)
         result = {

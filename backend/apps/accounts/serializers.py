@@ -192,33 +192,31 @@ class UserSerializer(serializers.ModelSerializer):
                 )
             return []
             
-        if 'ADMIN_ASSISTANT' in effective_roles or 'PRACTITIONER' in effective_roles:
-            branches = obj.branch_accesses.select_related('branch').values(
-                'branch__id', 'branch__name', 'branch__city', 'branch__is_main_branch'
-            ).order_by('branch__name')
+        # For all other roles, they are branch scoped
+        branches = obj.branch_accesses.select_related('branch').values(
+            'branch__id', 'branch__name', 'branch__city', 'branch__is_main_branch'
+        ).order_by('branch__name')
+        
+        branch_list = [
+            {
+                'id': b['branch__id'],
+                'name': b['branch__name'],
+                'city': b['branch__city'],
+                'is_main_branch': b['branch__is_main_branch']
+            }
+            for b in branches
+        ]
+        
+        # Fallback for single-branch assigned users
+        if not branch_list and obj.clinic_branch:
+            branch_list = [{
+                'id': obj.clinic_branch.id,
+                'name': obj.clinic_branch.name,
+                'city': obj.clinic_branch.city,
+                'is_main_branch': obj.clinic_branch.is_main_branch
+            }]
             
-            branch_list = [
-                {
-                    'id': b['branch__id'],
-                    'name': b['branch__name'],
-                    'city': b['branch__city'],
-                    'is_main_branch': b['branch__is_main_branch']
-                }
-                for b in branches
-            ]
-            
-            # Fallback for single-branch assigned Practitioner
-            if not branch_list and 'PRACTITIONER' in effective_roles and obj.clinic_branch:
-                branch_list = [{
-                    'id': obj.clinic_branch.id,
-                    'name': obj.clinic_branch.name,
-                    'city': obj.clinic_branch.city,
-                    'is_main_branch': obj.clinic_branch.is_main_branch
-                }]
-                
-            return branch_list
-            
-        return []
+        return branch_list
 
     def get_is_manager(self, obj) -> bool:
         return obj.is_manager

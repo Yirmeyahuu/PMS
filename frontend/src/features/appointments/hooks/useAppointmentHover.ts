@@ -4,6 +4,7 @@ import type { Appointment } from '@/types';
 interface HoverState {
   appointment: Appointment | null;
   anchorElement: HTMLElement | null;
+  mousePos: { x: number; y: number } | null;
   visible:     boolean;
 }
 
@@ -11,6 +12,7 @@ export const useAppointmentHover = () => {
   const [hoverState, setHoverState] = useState<HoverState>({
     appointment: null,
     anchorElement: null,
+    mousePos: null,
     visible:     false,
   });
 
@@ -25,8 +27,10 @@ export const useAppointmentHover = () => {
   const onMouseEnter = useCallback((apt: Appointment, e: React.MouseEvent) => {
     clearTimers();
     const el = e.currentTarget as HTMLElement;
+    const x = e.clientX;
+    const y = e.clientY;
     timerRef.current = setTimeout(() => {
-      setHoverState({ appointment: apt, anchorElement: el, visible: true });
+      setHoverState({ appointment: apt, anchorElement: el, mousePos: { x, y }, visible: true });
     }, 1000);
   }, []);
 
@@ -49,7 +53,7 @@ export const useAppointmentHover = () => {
 
   const hideHover = useCallback(() => {
     clearTimers();
-    setHoverState({ appointment: null, anchorElement: null, visible: false });
+    setHoverState({ appointment: null, anchorElement: null, mousePos: null, visible: false });
   }, []);
 
   return {
