@@ -630,7 +630,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
     for (const apt of appointments) {
-      if ((apt as any).status === 'DELETED') continue; // Only filter out explicitly deleted, not cancelled
+      if ((apt as any).status === 'DELETED' || (apt as any).status === 'CANCELLED') continue; // Hide explicitly deleted or cancelled
       if (!map[apt.date]) map[apt.date] = [];
       map[apt.date].push(apt);
     }

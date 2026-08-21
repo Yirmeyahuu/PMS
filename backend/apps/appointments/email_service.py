@@ -168,7 +168,7 @@ def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
                 status='SENT',
                 recipient=recipient_email,
                 subject=subject,
-                body_preview=text_content[:500] if text_content else '',
+                body_preview=text_content[:2000] if text_content else '',
                 full_body=html_content,
             )
             broadcast_communication_log_updated(new_log)

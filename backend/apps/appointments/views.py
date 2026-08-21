@@ -146,7 +146,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 # (to handle edge case where all practitioners were removed)
                 if active_practitioner_ids:
                     queryset = queryset.filter(practitioner_id__in=active_practitioner_ids)
-            # else: Patient Profile query - show all appointments (don't filter)
+                
+                # Exclude cancelled appointments from the active Diary/Calendar
+                if self.action == 'list':
+                    queryset = queryset.exclude(status='CANCELLED')
+            # else: Patient Profile query - show all appointments (don't filter active practitioners or cancelled status)
 
         # Filter by date range
         start_date = (
@@ -1962,6 +1966,8 @@ class PublicRebookingLinkView(APIView):
         original.end_time = new_end_time
         original.duration_minutes = duration
         original.status = 'SCHEDULED'
+        original.arrival_status = 'NO_STATUS'
+        original.arrival_time = None
         original.confirmation_status = 'PENDING'
         original.patient_reply = ''
         original.reminder_sent = False
@@ -1975,8 +1981,8 @@ class PublicRebookingLinkView(APIView):
 
         original.save(update_fields=[
             'date', 'start_time', 'end_time', 'duration_minutes', 
-            'status', 'confirmation_status', 'patient_reply', 'notes',
-            'reminder_sent', 'reminder_sent_at'
+            'status', 'arrival_status', 'arrival_time', 'confirmation_status', 
+            'patient_reply', 'notes', 'reminder_sent', 'reminder_sent_at'
         ])
 
         # Emit calendar event so clients see the rebook instantly.
@@ -1988,18 +1994,19 @@ class PublicRebookingLinkView(APIView):
         except Exception:
             logger.exception('Failed to emit APPOINTMENT_UPDATED for rebooked appt #%s', original.id)
 
+        link.new_appointment = original
+
         link.is_used = True
         link.used_at = timezone.now()
-        link.new_appointment = original
         link.save(update_fields=['is_used', 'used_at', 'new_appointment'])
 
-        # Update the most recent APPOINTMENT_REMINDER communication log for this appointment
+        # Update the most recent communication log for this appointment
         try:
             from apps.notifications.models import CommunicationLog
             from apps.notifications.services.notification_service import broadcast_communication_log_updated
             updated_count = CommunicationLog.objects.filter(
                 appointment=original,
-                comm_type='APPOINTMENT_REMINDER',
+                comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP'],
                 status='SENT',
             ).order_by('-created_at').update(
                 status='REPLIED',
@@ -2009,7 +2016,7 @@ class PublicRebookingLinkView(APIView):
             if updated_count:
                 updated_log = CommunicationLog.objects.filter(
                     appointment=original,
-                    comm_type='APPOINTMENT_REMINDER'
+                    comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP']
                 ).order_by('-created_at').first()
                 if updated_log:
                     broadcast_communication_log_updated(updated_log)
@@ -2018,10 +2025,10 @@ class PublicRebookingLinkView(APIView):
 
         return Response({
             'detail': 'Appointment successfully booked!',
-            'appointment_id': original.id,
-            'date': str(original.date),
-            'start_time': original.start_time.strftime('%H:%M'),
-            'end_time': original.end_time.strftime('%H:%M'),
+            'appointment_id': link.new_appointment.id,
+            'date': str(link.new_appointment.date),
+            'start_time': link.new_appointment.start_time.strftime('%H:%M'),
+            'end_time': link.new_appointment.end_time.strftime('%H:%M'),
         }, status=status.HTTP_201_CREATED)
 
     def delete(self, request, token):

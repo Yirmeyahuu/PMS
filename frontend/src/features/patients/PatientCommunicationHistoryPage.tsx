@@ -10,6 +10,7 @@ import {
   communicationApi,
   type CommunicationLogEntry,
 } from '@/features/setup/services/communication.api';
+import { StructuredEmailPreview } from './components/StructuredEmailPreview';
 import { SystemBranding } from '@/config/branding';
 
 const PAGE_SIZE = 10;
@@ -177,11 +178,8 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
             <span className="text-[11.5px] text-gray-500">→ {log.recipient}</span>
             <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.created_at)}</span>
           </div>
-          <div className="ml-7 bg-gray-50 rounded-lg border border-gray-100 px-4 py-3 shadow-sm">
-            {log.body_preview
-              ? <p className="text-[12.5px] text-gray-700 leading-relaxed whitespace-pre-line"><Highlight text={log.body_preview} query={searchQuery} /></p>
-              : <p className="text-[12.5px] text-gray-400 italic">No preview available.</p>
-            }
+          <div className="ml-7 mt-2">
+            <StructuredEmailPreview text={log.body_preview} searchQuery={searchQuery} />
           </div>
           {log.error_message && (
             <div className="ml-7 mt-2 flex items-start gap-1.5 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">

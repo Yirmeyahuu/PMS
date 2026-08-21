@@ -156,7 +156,7 @@ def send_appointment_reminder_sms(appointment) -> tuple[bool, str]:
                 status='SENT',
                 recipient=to_number,
                 subject='SMS Appointment Reminder',
-                body_preview=body[:500] if body else '',
+                body_preview=body[:2000] if body else '',
                 full_body=body,
             )
             broadcast_communication_log_updated(new_log)
