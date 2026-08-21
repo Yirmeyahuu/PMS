@@ -1,4 +1,3 @@
-import React from 'react';
 import { CalendarDays, Clock, MapPin, User, Stethoscope, Building2, ClipboardList, Info } from 'lucide-react';
 
 function Highlight({ text, query }: { text: string; query: string }) {
