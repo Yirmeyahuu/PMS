@@ -119,6 +119,30 @@ class LetterViewSet(viewsets.ModelViewSet):
             qs = qs.filter(practitioner__user=user)
         return qs
 
+    def perform_update(self, serializer):
+        if 'content_html' in serializer.validated_data:
+            from .services import LetterGeneratorService
+            letter = self.get_object()
+            resolved_content = LetterGeneratorService.replace_variables(
+                serializer.validated_data['content_html'],
+                patient=letter.patient,
+                practitioner=letter.practitioner,
+                patient_case=letter.patient_case,
+                appointment=letter.appointment,
+                letter=letter
+            )
+            serializer.validated_data['content_html'] = resolved_content
+
+        letter = serializer.save()
+        # Regenerate PDF if content or layout changed
+        if any(field in serializer.validated_data for field in ['content_html', 'layout_letter_head', 'layout_remove_top_space', 'layout_date', 'layout_addressee', 'subject']):
+            try:
+                from .services import LetterGeneratorService
+                generator = LetterGeneratorService(letter)
+                generator.generate_pdf()
+            except Exception as e:
+                logger.error(f"Failed to regenerate PDF on letter update {letter.id}: {e}")
+
     @action(detail=False, methods=['post'])
     def generate(self, request):
         """
@@ -138,7 +162,7 @@ class LetterViewSet(viewsets.ModelViewSet):
         try:
             template = LetterTemplate.objects.get(id=template_id, clinic=request.user.clinic)
             patient = Patient.objects.get(id=patient_id, clinic=request.user.clinic)
-            practitioner = getattr(request.user, 'practitioner', None)
+            practitioner = getattr(request.user, 'practitioner_profile', None)
             
             # Fetch Case and Appointment
             from apps.patients.models import PatientCase
@@ -147,9 +171,14 @@ class LetterViewSet(viewsets.ModelViewSet):
             appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
 
             # Layout Controls Injection
+            layout_letter_head = request.data.get('layout_letter_head', template.layout_letter_head)
+            layout_remove_top_space = request.data.get('layout_remove_top_space', template.layout_remove_top_space)
+            layout_date = request.data.get('layout_date', template.layout_date)
+            layout_addressee = request.data.get('layout_addressee', template.layout_addressee)
+            
             layout_html = ""
             
-            if template.layout_letter_head:
+            if layout_letter_head:
                 layout_html += f"""
                 <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
                     <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
@@ -158,7 +187,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 </div>
                 """
 
-            if template.layout_date:
+            if layout_date:
                 from django.utils import timezone
                 layout_html += f"""
                 <div style="margin-bottom: 20px; font-family: sans-serif;">
@@ -166,7 +195,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 </div>
                 """
 
-            if template.layout_addressee and patient:
+            if layout_addressee and patient:
                 layout_html += f"""
                 <div style="margin-bottom: 30px; font-family: sans-serif;">
                     <p style="font-weight: bold; margin: 0;">{patient.get_full_name()}</p>
@@ -187,7 +216,13 @@ class LetterViewSet(viewsets.ModelViewSet):
             # Use provided content_html if given, otherwise render it
             custom_content = request.data.get('content_html')
             if custom_content is not None:
-                rendered_content = custom_content
+                rendered_content = LetterGeneratorService.replace_variables(
+                    custom_content,
+                    patient=patient,
+                    practitioner=practitioner,
+                    patient_case=patient_case,
+                    appointment=appointment
+                )
             else:
                 rendered_content = LetterGeneratorService.replace_variables(
                     template.content_html or '',
@@ -206,7 +241,7 @@ class LetterViewSet(viewsets.ModelViewSet):
             )
             
             # Wrap content if removing top space
-            top_margin = "0px" if template.layout_remove_top_space else "40px"
+            top_margin = "0px" if layout_remove_top_space else "40px"
             wrapper_start = f"<div style='padding-top: {top_margin};'>"
             wrapper_end = "</div>"
             
@@ -226,7 +261,11 @@ class LetterViewSet(viewsets.ModelViewSet):
                 template=template,
                 subject=subject,
                 content_html=rendered_content,
-                status='DRAFT'
+                status='DRAFT',
+                layout_letter_head=layout_letter_head,
+                layout_remove_top_space=layout_remove_top_space,
+                layout_date=layout_date,
+                layout_addressee=layout_addressee
             )
             
             # Save PDF file
@@ -283,12 +322,17 @@ class LetterViewSet(viewsets.ModelViewSet):
             appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
 
             # Layout Controls Injection
+            layout_letter_head = request.data.get('layout_letter_head', template.layout_letter_head)
+            layout_remove_top_space = request.data.get('layout_remove_top_space', template.layout_remove_top_space)
+            layout_date = request.data.get('layout_date', template.layout_date)
+            layout_addressee = request.data.get('layout_addressee', template.layout_addressee)
+            
             layout_html = ""
             
             # Clinic Letter Head is typically handled by rendering the PDF template wrapper in services,
             # but we can optionally inject it into the HTML here if layout_letter_head is true.
             # Actually, standard practice here is to prepend it:
-            if template.layout_letter_head:
+            if layout_letter_head:
                 layout_html += f"""
                 <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
                     <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
@@ -297,7 +341,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 </div>
                 """
 
-            if template.layout_date:
+            if layout_date:
                 from django.utils import timezone
                 layout_html += f"""
                 <div style="margin-bottom: 20px; font-family: sans-serif;">
@@ -305,7 +349,7 @@ class LetterViewSet(viewsets.ModelViewSet):
                 </div>
                 """
 
-            if template.layout_addressee and patient:
+            if layout_addressee and patient:
                 layout_html += f"""
                 <div style="margin-bottom: 30px; font-family: sans-serif;">
                     <p style="font-weight: bold; margin: 0;">{patient.get_full_name()}</p>
@@ -338,14 +382,21 @@ class LetterViewSet(viewsets.ModelViewSet):
             )
             
             # Wrap content if removing top space
-            top_margin = "0px" if template.layout_remove_top_space else "40px"
+            top_margin = "0px" if layout_remove_top_space else "40px"
             wrapper_start = f"<div style='padding-top: {top_margin};'>"
             wrapper_end = "</div>"
             
             # Optionally wrap in header/footer for preview display
             full_html = f"{wrapper_start}{layout_html}{rendered_header}\n<br>\n{rendered_content}\n<br>\n{rendered_footer}{wrapper_end}"
 
-            return Response({'content_html': full_html})
+            return Response({
+                'content_html': rendered_content, 
+                'full_html': full_html,
+                'layout_letter_head': layout_letter_head,
+                'layout_remove_top_space': layout_remove_top_space,
+                'layout_date': layout_date,
+                'layout_addressee': layout_addressee
+            })
 
         except Exception as e:
             logger.error(f"Letter preview error: {e}")
@@ -375,13 +426,21 @@ class LetterViewSet(viewsets.ModelViewSet):
     def send_email(self, request, pk=None):
         """Send letter via email with PDF attachment."""
         from django.utils import timezone
+        import threading
+        from django.core.mail import EmailMessage
+        from django.conf import settings
 
         letter = self.get_object()
+        
+        # Parse multipart form data
         recipients_raw = request.data.get('to', '')
+        subject = request.data.get('subject', f"Clinical Letter - {letter.subject}")
+        body = request.data.get('body', '')
+        
         if recipients_raw:
             recipients = [e.strip() for e in recipients_raw.replace(';', ',').split(',') if e.strip()]
         else:
-            recipients = [letter.patient.email] if letter.patient.email else []
+            recipients = [letter.patient.email] if letter.patient and letter.patient.email else []
 
         if not recipients:
             return Response(
@@ -389,13 +448,76 @@ class LetterViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        attachment_bytes = None
+        if 'attachment' in request.FILES:
+            attachment_bytes = request.FILES['attachment'].read()
+        elif letter.rendered_pdf:
+            try:
+                attachment_bytes = letter.rendered_pdf.read()
+            except Exception as e:
+                logger.error(f"Could not read rendered_pdf for letter {letter.id}: {e}")
+
+        def _send():
+            try:
+                clinic = request.user.clinic if hasattr(request.user, 'clinic') else None
+                from_email = getattr(clinic, 'email', None) or settings.DEFAULT_FROM_EMAIL
+                email_msg = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email=from_email,
+                    to=recipients,
+                )
+                if attachment_bytes:
+                    patient_slug = letter.patient.get_full_name().replace(' ', '-').lower() if letter.patient else 'patient'
+                    email_msg.attach(
+                        f"clinical-letter-{patient_slug}.pdf",
+                        attachment_bytes,
+                        'application/pdf',
+                    )
+                email_msg.send(fail_silently=True)
+            except Exception as e:
+                logger.error(f"Failed to send email for letter {letter.id}: {e}")
+
+        threading.Thread(target=_send, daemon=True).start()
+
         # Mark as sent
         letter.status = 'SENT'
         letter.sent_to = recipients
         letter.sent_at = timezone.now()
         letter.save(update_fields=['status', 'sent_to', 'sent_at'])
 
-        # TODO: Implement actual email sending with PDF attachment
         logger.info(f"Letter {letter.id} sent to {recipients}")
-
         return Response({'detail': f"Letter sent to {', '.join(recipients)}"})
+
+    @action(detail=True, methods=['post'])
+    def replicate(self, request, pk=None):
+        """Replicate a clinical letter."""
+        letter = self.get_object()
+        
+        # Deep copy
+        new_letter = Letter.objects.get(pk=letter.pk)
+        new_letter.pk = None
+        new_letter.status = 'DRAFT'
+        new_letter.is_signed = False
+        new_letter.signature_data = None
+        new_letter.sent_at = None
+        new_letter.sent_to = []
+        new_letter.created_by = request.user
+        
+        # Append ' (Copy)' to subject
+        new_letter.subject = f"{new_letter.subject} (Copy)"
+        
+        # We don't copy the rendered_pdf as it needs to be generated afresh,
+        # but wait, if it's identical initially, it should just be regenerated on next save.
+        new_letter.rendered_pdf = None
+        new_letter.save()
+
+        # Regenerate PDF for the new letter using its content
+        try:
+            generator = LetterGeneratorService(new_letter)
+            generator.generate_pdf()
+        except Exception as e:
+            logger.error(f"Failed to generate PDF for replicated letter {new_letter.id}: {e}")
+
+        serializer = self.get_serializer(new_letter)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

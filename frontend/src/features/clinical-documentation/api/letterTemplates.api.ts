@@ -7,6 +7,8 @@ export interface LetterTemplate {
   category: string;
   discipline?: string;
   clinic_branch?: number | null;
+  clinic_branch_name?: string;
+  updated_at?: string;
   layout_letter_head: boolean;
   layout_remove_top_space: boolean;
   layout_date: boolean;

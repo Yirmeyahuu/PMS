@@ -64,19 +64,24 @@ export const Indent = Extension.create({
 
         // Otherwise indent block
         const { selection } = state;
-        let hasChanged = false;
+        const nodes: { pos: number; node: any }[] = [];
         tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
           if (this.options.types.includes(node.type.name)) {
-            const currentIndent = node.attrs.indent || 0;
-            if (currentIndent < this.options.maxLevel) {
-              if (dispatch) {
-                tr.setNodeMarkup(pos, undefined, {
-                  ...node.attrs,
-                  indent: currentIndent + 1,
-                });
-              }
-              hasChanged = true;
+            nodes.push({ pos, node });
+          }
+        });
+
+        let hasChanged = false;
+        nodes.forEach(({ pos, node }) => {
+          const currentIndent = node.attrs.indent || 0;
+          if (currentIndent < this.options.maxLevel) {
+            if (dispatch) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                indent: currentIndent + 1,
+              });
             }
+            hasChanged = true;
           }
         });
         return hasChanged;
@@ -94,31 +99,26 @@ export const Indent = Extension.create({
 
         // Otherwise outdent block
         const { selection } = state;
-        let hasChanged = false;
+        const nodes: { pos: number; node: any }[] = [];
         tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
           if (this.options.types.includes(node.type.name)) {
-            const currentIndent = node.attrs.indent || 0;
-            if (currentIndent > this.options.minLevel) {
-              if (dispatch) {
-                tr.setNodeMarkup(pos, undefined, {
-                  ...node.attrs,
-                  indent: currentIndent - 1,
-                });
-              }
-              hasChanged = true;
-            }
+            nodes.push({ pos, node });
           }
         });
-        
-        if (!hasChanged && dispatch) {
-           console.log("[Indent Debug] Outdent failed. Node types in selection:", 
-              (() => {
-                 const types: string[] = [];
-                 tr.doc.nodesBetween(selection.from, selection.to, n => { types.push(n.type.name); });
-                 return types;
-              })()
-           );
-        }
+
+        let hasChanged = false;
+        nodes.forEach(({ pos, node }) => {
+          const currentIndent = node.attrs.indent || 0;
+          if (currentIndent > this.options.minLevel) {
+            if (dispatch) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                indent: currentIndent - 1,
+              });
+            }
+            hasChanged = true;
+          }
+        });
         
         return hasChanged;
       },

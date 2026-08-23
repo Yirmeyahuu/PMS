@@ -74,7 +74,7 @@ export const MergeField = Node.create<MergeFieldOptions>({
     return [
       'span',
       mergeAttributes({ 'data-type': 'merge-field', class: 'merge-field-tag' }, this.options.HTMLAttributes, HTMLAttributes),
-      node.attrs.id 
+      node.attrs.id || node.attrs.label || ' '
     ];
   },
 

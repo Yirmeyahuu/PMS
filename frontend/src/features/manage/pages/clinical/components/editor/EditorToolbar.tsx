@@ -25,61 +25,7 @@ interface EditorToolbarProps {
   editor: Editor | null;
 }
 
-const VARIABLE_GROUPS = [
-  {
-    label: 'Patient',
-    variables: [
-      { label: 'Patient First Name', value: '{{patient.first_name}}' },
-      { label: 'Patient Last Name', value: '{{patient.last_name}}' },
-      { label: 'Patient Full Name', value: '{{patient.full_name}}' },
-      { label: 'Patient DOB', value: '{{patient.dob}}' },
-      { label: 'Patient Email', value: '{{patient.email}}' },
-      { label: 'Patient Phone', value: '{{patient.phone}}' },
-      { label: 'Patient Address', value: '{{patient.address}}' },
-    ]
-  },
-  {
-    label: 'Practitioner',
-    variables: [
-      { label: 'Practitioner First Name', value: '{{practitioner.first_name}}' },
-      { label: 'Practitioner Last Name', value: '{{practitioner.last_name}}' },
-      { label: 'Practitioner Full Name', value: '{{practitioner.full_name}}' },
-      { label: 'Practitioner Title', value: '{{practitioner.title}}' },
-    ]
-  },
-  {
-    label: 'Clinic',
-    variables: [
-      { label: 'Clinic Name', value: '{{clinic.name}}' },
-      { label: 'Clinic Address', value: '{{clinic.address}}' },
-      { label: 'Clinic Phone', value: '{{clinic.phone}}' },
-      { label: 'Clinic Email', value: '{{clinic.email}}' },
-    ]
-  },
-  {
-    label: 'Appointment',
-    variables: [
-      { label: 'Appointment Date', value: '{{appointment.date}}' },
-      { label: 'Appointment Time', value: '{{appointment.time}}' },
-      { label: 'Appointment Type', value: '{{appointment.type}}' },
-    ]
-  },
-  {
-    label: 'Case',
-    variables: [
-      { label: 'Case Name', value: '{{case.name}}' },
-      { label: 'Case Number', value: '{{case.number}}' },
-      { label: 'Case Start Date', value: '{{case.start_date}}' },
-    ]
-  },
-  {
-    label: 'Date & Time',
-    variables: [
-      { label: 'Current Date', value: '{{date.today}}' },
-      { label: 'Current Time', value: '{{time.now}}' },
-    ]
-  }
-];
+
 
 const TableGridSelector = ({ onSelect }: { onSelect: (rows: number, cols: number) => void }) => {
   const [hovered, setHovered] = useState({ r: 0, c: 0 });
@@ -312,6 +258,457 @@ const TableToolsDropdown = ({ editor }: { editor: Editor }) => {
         </div>
       )}
     </div>
+  );
+};
+
+const LetterDropdown = ({ insertVariable }: { insertVariable: (id: string, label: string) => void }) => {
+  const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = (menu: string) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    setActiveSubMenu(menu);
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubMenu(null);
+    }, 300);
+  };
+
+  const addresseeItems = [
+    { label: 'Automatic', value: '{{addressee.automatic}}' },
+    { label: 'Company', value: '{{addressee.company}}' },
+    { label: 'Title', value: '{{addressee.title}}' },
+    { label: 'First Name', value: '{{addressee.first_name}}' },
+    { label: 'Last Name', value: '{{addressee.last_name}}' },
+    { label: 'Email', value: '{{addressee.email}}' },
+    { label: 'Work', value: '{{addressee.work}}' },
+    { label: 'Mobile', value: '{{addressee.mobile}}' },
+    { label: 'Home', value: '{{addressee.home}}' },
+  ];
+
+  const senderItems = [
+    { label: 'Automatic', value: '{{sender.automatic}}' },
+    { label: 'Title', value: '{{sender.title}}' },
+    { label: 'First Name', value: '{{sender.first_name}}' },
+    { label: 'Last Name', value: '{{sender.last_name}}' },
+    { label: 'Discipline', value: '{{sender.discipline}}' },
+    { label: 'Signature', value: '{{sender.signature}}' },
+  ];
+
+  return (
+    <Menu as="div" className="relative">
+      <Menu.Button className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+        Letter
+        <ChevronDown className="w-3 h-3 text-gray-500" />
+      </Menu.Button>
+      <Transition
+        as={React.Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu.Items className="absolute z-10 left-0 mt-1 w-48 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('addressee')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Addressee
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'addressee' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {addresseeItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('sender')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Sender
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'sender' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {senderItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
+};
+
+const ClientDropdown = ({ insertVariable }: { insertVariable: (id: string, label: string) => void }) => {
+  const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
+  const [activeThirdLevel, setActiveThirdLevel] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thirdLevelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = (menu: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setActiveSubMenu(menu);
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubMenu(null);
+      setActiveThirdLevel(null);
+    }, 300);
+  };
+
+  const handleThirdLevelEnter = (menu: string) => {
+    if (thirdLevelTimeoutRef.current) clearTimeout(thirdLevelTimeoutRef.current);
+    setActiveThirdLevel(menu);
+  };
+
+  const handleThirdLevelLeave = () => {
+    thirdLevelTimeoutRef.current = setTimeout(() => {
+      setActiveThirdLevel(null);
+    }, 300);
+  };
+
+  const profileItems = [
+    { label: 'Title', value: '{{patient.title}}' },
+    { label: 'First Name', value: '{{patient.first_name}}' },
+    { label: 'Middle Initial', value: '{{patient.middle_initial}}' },
+    { label: 'Last Name', value: '{{patient.last_name}}' },
+    { divider: true, id: 'd1' },
+    { label: 'Sex', value: '{{patient.sex}}' },
+    { label: 'Gender', value: '{{patient.gender}}' },
+    { label: 'Date of Birth', value: '{{patient.dob}}' },
+    { divider: true, id: 'd2' },
+    { label: 'Email', value: '{{patient.email}}' },
+    { label: 'Phone', value: '{{patient.phone}}' },
+    { label: 'Address', value: '{{patient.address}}' },
+  ];
+
+  const doctorItems = [
+    { label: 'Automatic', value: '{{patient.doctor.automatic}}' },
+    { label: 'Company', value: '{{patient.doctor.company}}' },
+    { label: 'Title', value: '{{patient.doctor.title}}' },
+    { label: 'First Name', value: '{{patient.doctor.first_name}}' },
+    { label: 'Last Name', value: '{{patient.doctor.last_name}}' },
+  ];
+
+  return (
+    <Menu as="div" className="relative">
+      <Menu.Button className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+        Client
+        <ChevronDown className="w-3 h-3 text-gray-500" />
+      </Menu.Button>
+      <Transition
+        as={React.Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu.Items className="absolute z-10 left-0 mt-1 w-48 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+          {/* Profile Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('profile')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Profile
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'profile' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1 overflow-visible">
+                {profileItems.map((v, i) => 
+                  v.divider ? (
+                    <div key={v.id || `div-${i}`} className="my-1 border-t border-gray-200" />
+                  ) : (
+                    <Menu.Item key={v.value}>
+                      {({ active }) => (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => insertVariable(v.value!, v.label!)}
+                          className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                        >
+                          {v.label}
+                        </button>
+                      )}
+                    </Menu.Item>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Health Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('health')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Health
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'health' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1 overflow-visible">
+                {/* Doctor Third-Level Submenu */}
+                <div
+                  className="relative"
+                  onMouseEnter={() => handleThirdLevelEnter('doctor')}
+                  onMouseLeave={handleThirdLevelLeave}
+                >
+                  <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+                    Doctor
+                    <span className="text-gray-400">&gt;</span>
+                  </div>
+                  {activeThirdLevel === 'doctor' && (
+                    <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                      {doctorItems.map((v) => (
+                        <Menu.Item key={v.value}>
+                          {({ active }) => (
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => insertVariable(v.value, v.label)}
+                              className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                            >
+                              {v.label}
+                            </button>
+                          )}
+                        </Menu.Item>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
+};
+
+const CaseDropdown = ({ insertVariable }: { insertVariable: (id: string, label: string) => void }) => {
+  const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = (menu: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setActiveSubMenu(menu);
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setActiveSubMenu(null);
+    }, 300);
+  };
+
+  const caseItems = [
+    { label: 'Title', value: '{{case.title}}' },
+    { label: 'Status', value: '{{case.status}}' },
+    { label: 'Date Created', value: '{{case.date_created}}' },
+    { label: 'Notes', value: '{{case.notes}}' },
+  ];
+
+  const sessionItems = [
+    { label: 'Approved Sessions', value: '{{case.sessions.approved_sessions}}' },
+    { label: 'Package Sessions', value: '{{case.sessions.package_sessions}}' },
+    { label: 'Sessions Used', value: '{{case.sessions.sessions_used}}' },
+    { label: 'Sessions Remaining', value: '{{case.sessions.sessions_remaining}}' },
+    { label: 'Session Allocation', value: '{{case.sessions.session_allocation}}' },
+  ];
+
+  const referralItems = [
+    { label: 'Doctor', value: '{{case.referral.doctor}}' },
+    { label: 'Referral Date', value: '{{case.referral.date}}' },
+    { label: 'Reference', value: '{{case.referral.reference}}' },
+  ];
+
+  const payerItems = [
+    { label: 'Name', value: '{{case.payer.name}}' },
+    { label: 'Reference', value: '{{case.payer.reference}}' },
+  ];
+
+  return (
+    <Menu as="div" className="relative">
+      <Menu.Button className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+        Case
+        <ChevronDown className="w-3 h-3 text-gray-500" />
+      </Menu.Button>
+      <Transition
+        as={React.Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu.Items className="absolute z-10 left-0 mt-1 w-48 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+          {/* Case Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('case')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Case
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'case' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {caseItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sessions Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('sessions')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Sessions
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'sessions' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {sessionItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Referral Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('referral')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Referral
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'referral' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {referralItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Payer Submenu */}
+          <div
+            className="relative"
+            onMouseEnter={() => handleMouseEnter('payer')}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-sky-50 cursor-default">
+              Payer
+              <span className="text-gray-400">&gt;</span>
+            </div>
+            {activeSubMenu === 'payer' && (
+              <div className="absolute left-full top-0 mt-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
+                {payerItems.map((v) => (
+                  <Menu.Item key={v.value}>
+                    {({ active }) => (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertVariable(v.value, v.label)}
+                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    )}
+                  </Menu.Item>
+                ))}
+              </div>
+            )}
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
   );
 };
 
@@ -594,38 +991,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
 
       {/* Dynamic Fields Dropdowns */}
       <div className="flex items-center gap-2 px-2">
-        {VARIABLE_GROUPS.map((group) => (
-          <Menu as="div" className="relative" key={group.label}>
-            <Menu.Button className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
-              {group.label}
-              <ChevronDown className="w-3 h-3 text-gray-500" />
-            </Menu.Button>
-            <Transition
-              as={React.Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <Menu.Items className="absolute z-10 left-0 mt-1 w-56 origin-top-left bg-white border border-gray-200 rounded-lg shadow-lg focus:outline-none py-1">
-                {group.variables.map((v) => (
-                  <Menu.Item key={v.value}>
-                    {({ active }) => (
-                      <button type="button" onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertVariable(v.value, v.label)}
-                        className={`w-full text-left px-4 py-2 text-sm ${active ? 'bg-sky-50 text-sky-700' : 'text-gray-700'}`}
-                      >
-                        {v.label}
-                      </button>
-                    )}
-                  </Menu.Item>
-                ))}
-              </Menu.Items>
-            </Transition>
-          </Menu>
-        ))}
+        <LetterDropdown insertVariable={insertVariable} />
+        <ClientDropdown insertVariable={insertVariable} />
+        <CaseDropdown insertVariable={insertVariable} />
       </div>
     </div>
   );

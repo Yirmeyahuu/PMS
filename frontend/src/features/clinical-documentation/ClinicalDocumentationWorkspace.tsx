@@ -7,6 +7,7 @@ import { WorkspaceRightPanel } from './components/WorkspaceRightPanel';
 import { WorkspaceLettersPanel } from './components/WorkspaceLettersPanel';
 import { ClinicalLetterEditor } from './components/ClinicalLetterEditor';
 import { ClinicalNoteEditor } from './components/ClinicalNoteEditor';
+import { ViewClinicalLetterModal } from './components/ViewClinicalLetterModal';
 
 const ClinicalWorkspaceLayout = () => {
   const navigate = useNavigate();
@@ -27,11 +28,12 @@ const ClinicalWorkspaceLayout = () => {
 
 
   const isNoteEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE';
-  const isLetterEditorActive = editorContext.type === 'NEW_LETTER';
+  const isLetterEditorActive = editorContext.type === 'NEW_LETTER' || editorContext.type === 'EDIT_LETTER';
   const isEditorActive = isNoteEditorActive || isLetterEditorActive;
 
   return (
-    <div className="h-[calc(100vh-88px)] w-full flex flex-col bg-slate-50/50 overflow-hidden rounded-2xl">
+    <>
+      <div className="h-[calc(100vh-88px)] w-full flex flex-col bg-slate-50/50 overflow-hidden rounded-2xl">
       <div className="px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0 flex items-center gap-2">
         <button 
           onClick={() => navigate(`/patients/${patient?.id}/cases`)}
@@ -92,6 +94,11 @@ const ClinicalWorkspaceLayout = () => {
       </div>
 
     </div>
+      
+      {editorContext.type === 'VIEW_LETTER' && editorContext.letterId && (
+        <ViewClinicalLetterModal letterId={editorContext.letterId} />
+      )}
+    </>
   );
 };
 

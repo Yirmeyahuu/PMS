@@ -13,6 +13,10 @@ export interface Letter {
   is_signed: boolean;
   sent_to: string[];
   content_html?: string;
+  layout_letter_head?: boolean;
+  layout_remove_top_space?: boolean;
+  layout_date?: boolean;
+  layout_addressee?: boolean;
 }
 
 export const getLetters = async (params: { patient?: string | number, patient_case?: number }): Promise<Letter[]> => {
@@ -24,6 +28,11 @@ export const getLetters = async (params: { patient?: string | number, patient_ca
   return response.data.results || response.data;
 };
 
+export const getLetter = async (id: number): Promise<Letter> => {
+  const response = await api.get(`/letters/letters/${id}/`);
+  return response.data;
+};
+
 export const generateLetter = async (data: {
   template_id: number;
   patient_id: string | number;
@@ -31,6 +40,10 @@ export const generateLetter = async (data: {
   patient_case_id?: number;
   appointment_id?: number;
   content_html?: string;
+  layout_letter_head?: boolean;
+  layout_remove_top_space?: boolean;
+  layout_date?: boolean;
+  layout_addressee?: boolean;
 }): Promise<Letter> => {
   const response = await api.post('/letters/letters/generate/', data);
   return response.data;
@@ -41,6 +54,10 @@ export const previewLetter = async (data: {
   patient_id: string | number;
   patient_case_id?: number;
   appointment_id?: number;
+  layout_letter_head?: boolean;
+  layout_remove_top_space?: boolean;
+  layout_date?: boolean;
+  layout_addressee?: boolean;
 }): Promise<{ content_html: string }> => {
   const response = await api.post('/letters/letters/preview/', data);
   return response.data;
@@ -59,5 +76,19 @@ export const assignLetterToCase = async (id: number, patientCaseId: number): Pro
 
 export const updateLetter = async (id: number, data: Partial<Letter>): Promise<Letter> => {
   const response = await api.patch(`/letters/letters/${id}/`, data);
+  return response.data;
+};
+
+export const replicateLetter = async (id: number): Promise<Letter> => {
+  const response = await api.post(`/letters/letters/${id}/replicate/`);
+  return response.data;
+};
+
+export const sendLetterEmail = async (id: number, data: FormData): Promise<{ detail: string }> => {
+  const response = await api.post(`/letters/letters/${id}/send_email/`, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
   return response.data;
 };

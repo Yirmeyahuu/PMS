@@ -210,6 +210,12 @@ class Letter(TimeStampedModel, SoftDeleteModel):
         help_text='Source template (audit reference only)',
     )
 
+    # Layout Controls (Overrides the template's defaults)
+    layout_letter_head = models.BooleanField(default=True)
+    layout_remove_top_space = models.BooleanField(default=False)
+    layout_date = models.BooleanField(default=True)
+    layout_addressee = models.BooleanField(default=True)
+
     # Content
     subject = models.CharField(max_length=255)
     content_html = models.TextField(

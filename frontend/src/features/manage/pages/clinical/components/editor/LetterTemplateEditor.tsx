@@ -18,6 +18,7 @@ import { CustomOrderedList } from './CustomOrderedList';
 import { CustomBulletList } from './CustomBulletList';
 import { Indent } from './Indent';
 import { FontSize } from './FontSize';
+import { CustomShortcuts } from './CustomShortcuts';
 import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
 
 import { LetterTemplateHeader } from './LetterTemplateHeader';
@@ -69,6 +70,7 @@ export const LetterTemplateEditor: React.FC<LetterTemplateEditorProps> = ({
       FontSize,
       Underline,
       MergeField,
+      CustomShortcuts,
     ],
     editorProps: {
       attributes: {

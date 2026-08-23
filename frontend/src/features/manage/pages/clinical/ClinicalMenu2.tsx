@@ -9,7 +9,7 @@ import { useLetterTemplates } from '@/features/manage/pages/clinical/hooks/useLe
 import type { ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { LetterTemplate } from '@/features/clinical-documentation/api/letterTemplates.api';
 
-export const ClinicalMenu2: React.FC = () => {
+export const ClinicalMenu2: React.FC<{ initialTab?: 'notes' | 'letters' }> = ({ initialTab = 'notes' }) => {
   const {
     templates,
     loading,
@@ -29,7 +29,7 @@ export const ClinicalMenu2: React.FC = () => {
     archiveTemplate: archiveLetterTemplate,
   } = useLetterTemplates();
 
-  const [activeTab, setActiveTab] = useState<'notes' | 'letters'>('notes');
+  const [activeTab] = useState<'notes' | 'letters'>(initialTab);
   const [editorMode, setEditorMode] = useState<'list' | 'create' | 'edit'>('list');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -120,31 +120,15 @@ export const ClinicalMenu2: React.FC = () => {
             <FileText className="w-6 h-6 text-sky-600" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Clinical Note Templates</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              {activeTab === 'notes' ? 'Clinical Note Templates' : 'Clinical Letter Templates'}
+            </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Build and manage reusable documentation templates
+              {activeTab === 'notes'
+                ? 'Build and manage reusable documentation templates'
+                : 'Build and manage reusable letter templates'}
             </p>
           </div>
-        </div>
-        
-        {/* Toggle Tabs */}
-        <div className="flex bg-gray-100 p-1 rounded-xl">
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === 'notes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Note Templates
-          </button>
-          <button
-            onClick={() => setActiveTab('letters')}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === 'letters' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Letter Templates
-          </button>
         </div>
 
         <button
@@ -156,45 +140,6 @@ export const ClinicalMenu2: React.FC = () => {
         </button>
       </div>
 
-
-      {/* Stats Bar */}
-      <div className="flex-shrink-0 grid grid-cols-4 gap-3 px-6 pb-4">
-        {[
-          {
-            label: 'Total Templates',
-            value: templates.length,
-            color: 'text-gray-900',
-            bg: 'bg-white',
-            border: 'border-gray-200',
-          },
-          {
-            label: 'Active',
-            value: templates.filter((t) => t.is_active && !t.is_archived).length,
-            color: 'text-green-700',
-            bg: 'bg-green-50',
-            border: 'border-green-200',
-          },
-          {
-            label: 'Archived',
-            value: templates.filter((t) => t.is_archived).length,
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
-            border: 'border-amber-200',
-          },
-          {
-            label: 'Disciplines',
-            value: new Set(templates.map((t) => t.discipline).filter(Boolean)).size,
-            color: 'text-sky-700',
-            bg: 'bg-sky-50',
-            border: 'border-sky-200',
-          },
-        ].map((stat) => (
-          <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-xl p-4 text-center`}>
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
-          </div>
-        ))}
-      </div>
 
       {/* Template List */}
       <div className="flex-1 overflow-hidden mx-6 mb-6 bg-white rounded-2xl border border-gray-200 shadow-sm">

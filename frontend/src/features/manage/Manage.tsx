@@ -19,6 +19,9 @@ import { Records } from './pages/communications/Records';
 import { Notifications } from './pages/communications/Notifications';
 import { ClinicalAuditLogs } from './pages/communications/ClinicalAuditLogs';
 
+const NoteTemplatesPage = () => <ClinicalMenu2 initialTab="notes" />;
+const LetterTemplatesPage = () => <ClinicalMenu2 initialTab="letters" />;
+
 // Maps each card id to its RBAC feature key
 // 'none'  → card items locked in grid (restrictedItemIds)
 // 'view'  → card is accessible; FeatureAccessGuard makes subpage read-only
@@ -57,7 +60,8 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     bgColor: 'bg-teal-50',
     items: [
       { id: 'clinical1', label: 'Clinic Link Portal',  path: 'clinical1', component: ClinicalMenu1 },
-      { id: 'clinical2', label: 'Clinical Templates',  path: 'clinical2', component: ClinicalMenu2 },
+      { id: 'clinical2', label: 'Note Templates',      path: 'clinical2', component: NoteTemplatesPage },
+      { id: 'clinical5', label: 'Letter Templates',    path: 'clinical5', component: LetterTemplatesPage },
       { id: 'clinical3', label: 'Clinic Services',     path: 'clinical3', component: ClinicServices },
       { id: 'clinical4', label: 'Clinic Profile',      path: 'clinical4', component: ClinicProfile },
     ],

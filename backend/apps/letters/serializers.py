@@ -57,6 +57,8 @@ class LetterSerializer(serializers.ModelSerializer):
             'practitioner', 'practitioner_name',
             'template', 'template_name',
             'subject', 'content_html', 'rendered_pdf',
+            'layout_letter_head', 'layout_remove_top_space',
+            'layout_date', 'layout_addressee',
             'status', 'is_signed', 'signed_at', 'signature_data',
             'sent_to', 'sent_at',
             'created_at', 'updated_at',
