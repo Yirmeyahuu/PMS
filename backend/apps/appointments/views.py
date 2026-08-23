@@ -223,6 +223,16 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if new_status in ('DNA', 'NO_SHOW') and old_status not in ('DNA', 'NO_SHOW'):
             try:
                 from apps.notifications.services.communication_service import send_dna_followup
+                from apps.notifications.models import CommunicationLog
+                CommunicationLog.objects.create(
+                    clinic=appointment.clinic,
+                    patient=appointment.patient,
+                    appointment=appointment,
+                    comm_type='DNA_EVENT',
+                    channel='SYSTEM',
+                    direction='SYSTEM',
+                    status='SENT',
+                )
                 send_dna_followup(appointment)
             except Exception as e:
                 logger.warning("DNA follow-up failed for appt #%s: %s", appointment.id, e)
@@ -313,6 +323,16 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             logger.info(f"[EDIT] Triggering DNA follow-up for appointment #{appointment.id}")
             try:
                 from apps.notifications.services.communication_service import send_dna_followup
+                from apps.notifications.models import CommunicationLog
+                CommunicationLog.objects.create(
+                    clinic=appointment.clinic,
+                    patient=appointment.patient,
+                    appointment=appointment,
+                    comm_type='DNA_EVENT',
+                    channel='SYSTEM',
+                    direction='SYSTEM',
+                    status='SENT',
+                )
                 result = send_dna_followup(appointment)
                 logger.info(f"[EDIT] DNA follow-up result: {result}")
             except Exception as exc:
@@ -1961,74 +1981,103 @@ class PublicRebookingLinkView(APIView):
                       datetime.combine(new_date, new_start_time)).total_seconds() // 60)
         )
 
-        original.date = new_date
-        original.start_time = new_start_time
-        original.end_time = new_end_time
-        original.duration_minutes = duration
-        original.status = 'SCHEDULED'
-        original.arrival_status = 'NO_STATUS'
-        original.arrival_time = None
-        original.confirmation_status = 'PENDING'
-        original.patient_reply = ''
-        original.reminder_sent = False
-        original.reminder_sent_at = None
+        # Create a new appointment instead of mutating the original
+        new_appointment = Appointment.objects.create(
+            clinic=original.clinic,
+            patient=original.patient,
+            practitioner=original.practitioner,
+            service=original.service,
+            location=original.location,
+            date=new_date,
+            start_time=new_start_time,
+            end_time=new_end_time,
+            duration_minutes=duration,
+            status='SCHEDULED',
+            arrival_status='NO_STATUS',
+            confirmation_status='PENDING',
+            notes=f'Rescheduled from {old_date_str} {old_time_str} via secure link'
+        )
 
-        reschedule_note = f'Rescheduled from {old_date_str} {old_time_str} to {date_str} {start_time_str} via secure link'
-        if original.notes:
-            original.notes = f"{original.notes}\n{reschedule_note}"
-        else:
-            original.notes = reschedule_note
-
-        original.save(update_fields=[
-            'date', 'start_time', 'end_time', 'duration_minutes', 
-            'status', 'arrival_status', 'arrival_time', 'confirmation_status', 
-            'patient_reply', 'notes', 'reminder_sent', 'reminder_sent_at'
-        ])
-
-        # Emit calendar event so clients see the rebook instantly.
+        # Emit calendar event so clients see the new appointment instantly.
         try:
-            main_clinic_id = original.clinic.main_clinic.id if original.clinic and original.clinic.main_clinic else None
+            main_clinic_id = new_appointment.clinic.main_clinic.id if new_appointment.clinic and new_appointment.clinic.main_clinic else None
             if main_clinic_id:
-                data = AppointmentSerializer(original, context={'request': request}).data
-                emit_calendar_event(main_clinic_id, 'APPOINTMENT_UPDATED', dict(data))
+                data = AppointmentSerializer(new_appointment, context={'request': request}).data
+                emit_calendar_event(main_clinic_id, 'APPOINTMENT_CREATED', dict(data))
         except Exception:
-            logger.exception('Failed to emit APPOINTMENT_UPDATED for rebooked appt #%s', original.id)
+            logger.exception('Failed to emit APPOINTMENT_CREATED for rebooked appt #%s', new_appointment.id)
 
-        link.new_appointment = original
-
+        link.new_appointment = new_appointment
         link.is_used = True
         link.used_at = timezone.now()
         link.save(update_fields=['is_used', 'used_at', 'new_appointment'])
 
-        # Update the most recent communication log for this appointment
+        # Log the patient response and reschedule confirmation
         try:
             from apps.notifications.models import CommunicationLog
             from apps.notifications.services.notification_service import broadcast_communication_log_updated
-            updated_count = CommunicationLog.objects.filter(
+            
+            # 1. Log patient response
+            log_response = CommunicationLog.objects.create(
+                clinic=original.clinic,
+                patient=original.patient,
                 appointment=original,
-                comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP'],
-                status='SENT',
-            ).order_by('-created_at').update(
-                status='REPLIED',
+                related_appointment=new_appointment,
+                comm_type='PATIENT_RESPONSE',
+                channel='SYSTEM',
+                direction='INBOUND',
+                status='DELIVERED',
                 patient_reply='RESCHEDULE',
                 replied_at=timezone.now(),
             )
-            if updated_count:
-                updated_log = CommunicationLog.objects.filter(
-                    appointment=original,
-                    comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP']
-                ).order_by('-created_at').first()
-                if updated_log:
-                    broadcast_communication_log_updated(updated_log)
+            broadcast_communication_log_updated(log_response)
+
+            # 2. Log reschedule confirmation
+            log_reschedule = CommunicationLog.objects.create(
+                clinic=original.clinic,
+                patient=original.patient,
+                appointment=original,
+                related_appointment=new_appointment,
+                comm_type='RESCHEDULE_CONFIRMATION',
+                channel='SYSTEM',
+                direction='SYSTEM',
+                status='SENT',
+                event_metadata={
+                    'old_date': old_date_str,
+                    'old_time': old_time_str,
+                    'new_date': str(new_date),
+                    'new_time': new_start_time.strftime('%H:%M')
+                }
+            )
+            broadcast_communication_log_updated(log_reschedule)
+
+            # 3. Update the old reminder log so it registers as replied
+            old_log = CommunicationLog.objects.filter(
+                appointment=original,
+                comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP'],
+                status__in=['SENT', 'DELIVERED']
+            ).order_by('-created_at').first()
+            if old_log:
+                old_log.status = 'REPLIED'
+                old_log.patient_reply = 'RESCHEDULE'
+                old_log.replied_at = timezone.now()
+                old_log.related_appointment = new_appointment
+                meta = old_log.event_metadata or {}
+                meta['new_date'] = str(new_date)
+                meta['new_time'] = new_start_time.strftime('%H:%M')
+                old_log.event_metadata = meta
+                old_log.save(update_fields=['status', 'patient_reply', 'replied_at', 'related_appointment', 'event_metadata'])
+                broadcast_communication_log_updated(old_log)
+
         except Exception as e:
-            logger.warning('Failed to update CommunicationLog for rebook token #%s: %s', link.id, e)
+            logger.warning('Failed to create/update CommunicationLogs for rebook token #%s: %s', link.id, e)
 
         return Response({
             'detail': 'Appointment successfully booked!',
-            'appointment_id': link.new_appointment.id,
-            'date': str(link.new_appointment.date),
-            'start_time': link.new_appointment.start_time.strftime('%H:%M'),
-            'end_time': link.new_appointment.end_time.strftime('%H:%M'),
+            'appointment_id': new_appointment.id,
+            'date': str(new_appointment.date),
+            'start_time': new_appointment.start_time.strftime('%H:%M'),
+            'end_time': new_appointment.end_time.strftime('%H:%M'),
         }, status=status.HTTP_201_CREATED)
 
     def delete(self, request, token):
@@ -2164,44 +2213,40 @@ class PublicAppointmentConfirmView(APIView):
         AppointmentCancelToken.objects.filter(appointment=appt, is_used=False).update(is_used=True, used_at=timezone.now())
         RebookingLink.objects.filter(appointment=appt, is_used=False).update(is_used=True, used_at=timezone.now())
 
-        # Update the most recent APPOINTMENT_REMINDER communication log for this appointment
+        # Log the patient response
         try:
             from apps.notifications.models import CommunicationLog
             from apps.notifications.services.notification_service import broadcast_communication_log_updated
-            updated_count = CommunicationLog.objects.filter(
+            
+            log_response = CommunicationLog.objects.create(
+                clinic=appt.clinic,
+                patient=appt.patient,
                 appointment=appt,
-                comm_type='APPOINTMENT_REMINDER',
-                status='SENT',
-            ).order_by('-created_at').update(
-                status='REPLIED',
+                practitioner=appt.practitioner,
+                comm_type='PATIENT_RESPONSE',
+                channel='SYSTEM',
+                direction='INBOUND',
+                status='DELIVERED',
                 patient_reply='Y',
                 replied_at=timezone.now(),
             )
-            if updated_count:
-                updated_log = CommunicationLog.objects.filter(
-                    appointment=appt,
-                    comm_type='APPOINTMENT_REMINDER'
-                ).order_by('-created_at').first()
-                if updated_log:
-                    broadcast_communication_log_updated(updated_log)
-            else:
-                # Fallback: if no CommunicationLog exists, create one to record the patient's reply
-                new_log = CommunicationLog.objects.create(
-                    clinic=appt.clinic,
-                    patient=appt.patient,
-                    appointment=appt,
-                    practitioner=appt.practitioner,
-                    comm_type='APPOINTMENT_REMINDER',
-                    channel='EMAIL',
-                    status='REPLIED',
-                    recipient=appt.patient.email if appt.patient else '',
-                    subject='Appointment Reminder (Legacy)',
-                    patient_reply='Y',
-                    replied_at=timezone.now(),
-                )
-                broadcast_communication_log_updated(new_log)
+            broadcast_communication_log_updated(log_response)
+
+            # Update the old reminder log so it registers as replied
+            old_log = CommunicationLog.objects.filter(
+                appointment=appt,
+                comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP'],
+                status__in=['SENT', 'DELIVERED']
+            ).order_by('-created_at').first()
+            if old_log:
+                old_log.status = 'REPLIED'
+                old_log.patient_reply = 'Y'
+                old_log.replied_at = timezone.now()
+                old_log.save(update_fields=['status', 'patient_reply', 'replied_at'])
+                broadcast_communication_log_updated(old_log)
+
         except Exception as e:
-            logger.warning('Failed to update CommunicationLog for confirm token #%s: %s', ct.id, e)
+            logger.warning('Failed to log PATIENT_RESPONSE for confirm token #%s: %s', ct.id, e)
 
         logger.info(
             'Appointment #%s confirmed via email link by patient %s',
@@ -2389,49 +2434,74 @@ class PublicAppointmentCancelView(APIView):
             'status', 'confirmation_status', 'patient_reply', 'patient_reply_at',
         ])
 
-        # Update the most recent APPOINTMENT_REMINDER communication log for this appointment
+        # Log the patient response and cancellation event
         try:
             from apps.notifications.models import CommunicationLog
             from apps.notifications.services.notification_service import broadcast_communication_log_updated
-            updated_count = CommunicationLog.objects.filter(
+            
+            # 1. Log patient response
+            log_response = CommunicationLog.objects.create(
+                clinic=appt.clinic,
+                patient=appt.patient,
                 appointment=appt,
-                comm_type='APPOINTMENT_REMINDER',
-                status='SENT',
-            ).order_by('-created_at').update(
-                status='REPLIED',
+                practitioner=appt.practitioner,
+                comm_type='PATIENT_RESPONSE',
+                channel='SYSTEM',
+                direction='INBOUND',
+                status='DELIVERED',
                 patient_reply='N',
                 replied_at=timezone.now(),
             )
-            if updated_count:
-                updated_log = CommunicationLog.objects.filter(
-                    appointment=appt,
-                    comm_type='APPOINTMENT_REMINDER'
-                ).order_by('-created_at').first()
-                if updated_log:
-                    broadcast_communication_log_updated(updated_log)
-            else:
-                # Fallback: if no CommunicationLog exists, create one to record the patient's reply
-                new_log = CommunicationLog.objects.create(
-                    clinic=appt.clinic,
-                    patient=appt.patient,
-                    appointment=appt,
-                    practitioner=appt.practitioner,
-                    comm_type='APPOINTMENT_REMINDER',
-                    channel='EMAIL',
-                    status='REPLIED',
-                    recipient=appt.patient.email if appt.patient else '',
-                    subject='Appointment Reminder (Legacy)',
-                    patient_reply='N',
-                    replied_at=timezone.now(),
-                )
-                broadcast_communication_log_updated(new_log)
+            broadcast_communication_log_updated(log_response)
+
+            # 2. Log cancellation event
+            log_cancellation = CommunicationLog.objects.create(
+                clinic=appt.clinic,
+                patient=appt.patient,
+                appointment=appt,
+                practitioner=appt.practitioner,
+                comm_type='CANCELLATION',
+                channel='SYSTEM',
+                direction='SYSTEM',
+                status='SENT',
+                event_metadata={
+                    'cancelled_by': 'Patient',
+                    'reason': 'Cancelled via email link'
+                }
+            )
+            broadcast_communication_log_updated(log_cancellation)
+
+            # 3. Update the old reminder log so it registers as replied
+            old_log = CommunicationLog.objects.filter(
+                appointment=appt,
+                comm_type__in=['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP'],
+                status__in=['SENT', 'DELIVERED']
+            ).order_by('-created_at').first()
+            if old_log:
+                old_log.status = 'REPLIED'
+                old_log.patient_reply = 'N'
+                old_log.replied_at = timezone.now()
+                old_log.save(update_fields=['status', 'patient_reply', 'replied_at'])
+                broadcast_communication_log_updated(old_log)
+
         except Exception as e:
-            logger.warning('Failed to update CommunicationLog for cancel token #%s: %s', ct.id, e)
+            logger.warning('Failed to log PATIENT_RESPONSE and CANCELLATION for cancel token #%s: %s', ct.id, e)
 
         logger.info(
             'Appointment #%s cancelled via email link by patient %s',
             appt.id, appt.patient_id,
         )
+
+        # ── Broadcast real-time calendar event ───────────────────────────
+        try:
+            from apps.appointments.calendar_events import emit_calendar_event
+            from apps.appointments.serializers import AppointmentSerializer
+            main_clinic_id = appt.clinic.main_clinic.id if appt.clinic else None
+            if main_clinic_id:
+                serializer = AppointmentSerializer(appt, context={'request': request})
+                emit_calendar_event(main_clinic_id, 'APPOINTMENT_UPDATED', dict(serializer.data))
+        except Exception as exc:
+            logger.warning('Calendar WS emit failed for appt #%s (public cancel): %s', appt.id, exc)
 
         return Response({
             'detail': 'Your appointment has been successfully cancelled.',

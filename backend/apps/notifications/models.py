@@ -185,11 +185,23 @@ class CommunicationLog(TimeStampedModel):
         ('INVOICE_EMAIL',           'Invoice Email'),
         ('RESCHEDULE_FOLLOWUP',     'Reschedule Follow-up'),
         ('SYSTEM_NOTIFICATION',     'System Notification'),
+        ('RESCHEDULE_REQUEST',      'Reschedule Request'),
+        ('RESCHEDULE_CONFIRMATION', 'Reschedule Confirmation'),
+        ('CANCELLATION',            'Cancellation Event'),
+        ('PATIENT_RESPONSE',        'Patient Response'),
+        ('DNA_EVENT',               'DNA Event'),
     ]
 
     CHANNEL_CHOICES = [
         ('EMAIL', 'Email'),
         ('SMS',   'SMS'),
+        ('SYSTEM','System'),
+    ]
+
+    DIRECTION_CHOICES = [
+        ('OUTBOUND', 'Outbound'),
+        ('INBOUND',  'Inbound'),
+        ('SYSTEM',   'System'),
     ]
 
     STATUS_CHOICES = [
@@ -230,9 +242,18 @@ class CommunicationLog(TimeStampedModel):
         related_name='communication_logs',
         help_text='Practitioner associated with this communication (if any)',
     )
+    related_appointment = models.ForeignKey(
+        'appointments.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='related_communication_logs',
+        help_text='Used to link original vs rescheduled appointments if necessary',
+    )
 
     comm_type = models.CharField(max_length=30, choices=COMM_TYPE_CHOICES, db_index=True)
-    channel   = models.CharField(max_length=5,  choices=CHANNEL_CHOICES)
+    channel   = models.CharField(max_length=10, choices=CHANNEL_CHOICES)
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default='OUTBOUND')
     status    = models.CharField(max_length=10, choices=STATUS_CHOICES, default='SENT')
 
     recipient       = models.CharField(max_length=200, help_text='Email or phone number')
@@ -242,6 +263,7 @@ class CommunicationLog(TimeStampedModel):
     error_message   = models.TextField(blank=True)
     patient_reply   = models.CharField(max_length=10, blank=True, help_text='Y or N')
     replied_at      = models.DateTimeField(null=True, blank=True)
+    event_metadata  = models.JSONField(default=dict, blank=True, help_text='Stores unstructured event transition data (e.g., old_date vs new_date)')
 
     # Delivery tracking timestamps
     delivered_at    = models.DateTimeField(null=True, blank=True)

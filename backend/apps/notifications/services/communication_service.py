@@ -88,9 +88,10 @@ def _log_communication(
     error_message: str = '',
 ) -> CommunicationLog:
     log = CommunicationLog.objects.create(
-        clinic=clinic.main_clinic,
+        clinic=clinic.main_clinic if hasattr(clinic, 'main_clinic') and clinic.main_clinic else clinic,
         patient=patient,
         appointment=appointment,
+        practitioner=appointment.practitioner if appointment else None,
         comm_type=comm_type,
         channel=channel,
         recipient=recipient,

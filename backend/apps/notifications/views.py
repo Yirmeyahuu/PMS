@@ -271,7 +271,7 @@ class CommunicationLogViewSet(viewsets.ReadOnlyModelViewSet):
         )
         qs = CommunicationLog.objects.filter(
             clinic_id__in=branch_ids
-        ).select_related('patient', 'appointment', 'practitioner', 'practitioner__user')
+        ).select_related('patient', 'appointment', 'related_appointment', 'practitioner', 'practitioner__user')
 
         # Date range filter
         date_from = self.request.query_params.get('date_from')
@@ -304,13 +304,17 @@ class CommunicationLogViewSet(viewsets.ReadOnlyModelViewSet):
                     Q(patient_reply='RESCHEDULE')
                 )
 
-        # RBAC: practitioners see only their own patients' communications
-        if user.role == 'PRACTITIONER':
-            try:
-                practitioner = user.practitioner_profile
-                qs = qs.filter(practitioner=practitioner)
-            except Exception:
-                qs = qs.none()
+        # UI Filter: Clean Patient History
+        ui_filter = self.request.query_params.get('ui_filter')
+        if ui_filter == 'patient_history':
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(comm_type='DNA_FOLLOWUP', patient_reply='') |
+                Q(comm_type='DNA_FOLLOWUP', patient_reply='RESCHEDULE') |
+                Q(comm_type='APPOINTMENT_REMINDER', patient_reply='Y') |
+                Q(comm_type='APPOINTMENT_REMINDER', patient_reply='N') |
+                Q(comm_type='APPOINTMENT_REMINDER', patient_reply='RESCHEDULE')
+            )
 
         # RBAC: finance role sees only invoice-related communications
         if user.role == 'FINANCE':

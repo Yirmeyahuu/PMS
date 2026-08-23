@@ -5,9 +5,9 @@ function Highlight({ text, query }: { text: string; query: string }) {
   const parts = text.split(new RegExp(`(${query})`, 'gi'));
   return (
     <>
-      {parts.map((part, i) => 
-        part.toLowerCase() === query.toLowerCase() 
-          ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded-sm px-0.5">{part}</mark> 
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase()
+          ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded-sm px-0.5">{part}</mark>
           : <span key={i}>{part}</span>
       )}
     </>
@@ -43,7 +43,7 @@ function parseEmail(rawText: string): ParsedEmail {
     const line = lines[i].trim();
 
     // Identify structural markers
-    if (line === 'YOUR APPOINTMENT' || line === 'APPOINTMENT DETAILS') {
+    if (line === 'YOUR APPOINTMENT' || line === 'APPOINTMENT DETAILS' || line === 'YOUR MISSED APPOINTMENT') {
       currentSection = 'details';
       parsed.isStructured = true;
       continue;
@@ -120,7 +120,7 @@ export function StructuredEmailPreview({ text, searchQuery = '' }: StructuredEma
   if (!parsed.isStructured) {
     // Strip confirmation links safely using regex as fallback
     const cleanedText = text.replace(/Will you proceed with your appointment as scheduled\?[\s\S]*?(?=If you have any questions|---|$)/i, '').trim();
-    
+
     return (
       <div className="text-[12.5px] text-gray-700 leading-relaxed whitespace-pre-line">
         <Highlight text={cleanedText} query={searchQuery} />

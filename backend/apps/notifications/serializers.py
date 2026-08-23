@@ -193,15 +193,23 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
         allow_null=True,
         default=None
     )
+    related_appointment_date = serializers.SerializerMethodField()
+    related_appointment_time = serializers.SerializerMethodField()
+    direction_display    = serializers.CharField(source='get_direction_display', read_only=True)
+    clinic_name          = serializers.SerializerMethodField()
 
     class Meta:
         model  = CommunicationLog
         fields = [
             'id',
             'clinic',
+            'clinic_name',
             'patient',
             'patient_name',
             'appointment',
+            'related_appointment',
+            'related_appointment_date',
+            'related_appointment_time',
             'appointment_color',
             'appointment_status',
             'practitioner',
@@ -210,6 +218,8 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
             'comm_type_display',
             'channel',
             'channel_display',
+            'direction',
+            'direction_display',
             'status',
             'status_display',
             'recipient',
@@ -218,6 +228,7 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
             'error_message',
             'patient_reply',
             'replied_at',
+            'event_metadata',
             'delivered_at',
             'opened_at',
             'bounced_at',
@@ -232,6 +243,21 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
         if obj.patient:
             return obj.patient.get_full_name()
         return ''
+
+    def get_clinic_name(self, obj) -> str:
+        if obj.clinic:
+            return obj.clinic.name
+        return ''
+
+    def get_related_appointment_date(self, obj):
+        if obj.related_appointment and obj.related_appointment.date:
+            return str(obj.related_appointment.date)
+        return None
+
+    def get_related_appointment_time(self, obj):
+        if obj.related_appointment and obj.related_appointment.start_time:
+            return obj.related_appointment.start_time.strftime('%H:%M')
+        return None
 
     def get_practitioner_name(self, obj) -> str:
         if obj.practitioner and obj.practitioner.user:

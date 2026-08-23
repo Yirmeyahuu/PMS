@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Mail, MessageSquare, Check, X, Send, Reply,
+  Mail, MessageSquare, Check, X, Send,
   Loader2, ChevronLeft, ChevronRight, MessageCircle,
   Building2, AlertCircle, Clock, CalendarDays,
   Search, XCircle, Filter
@@ -66,70 +66,58 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-// ── Status Pill ────────────────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { dot: string; pill: string; label: string }> = {
-  SENT:      { dot: 'bg-sky-400',     pill: 'bg-sky-50 border-sky-200 text-sky-700',             label: 'Sent' },
-  DELIVERED: { dot: 'bg-emerald-400', pill: 'bg-emerald-50 border-emerald-200 text-emerald-700', label: 'Delivered' },
-  FAILED:    { dot: 'bg-red-400',     pill: 'bg-red-50 border-red-200 text-red-700',             label: 'Failed' },
-  REPLIED:   { dot: 'bg-violet-400',  pill: 'bg-violet-50 border-violet-200 text-violet-700',   label: 'Replied' },
-};
-
-function StatusPill({ status }: { status: string }) {
-  const c = STATUS_CFG[status] || STATUS_CFG.SENT;
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium rounded-full border ${c.pill}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-      {c.label}
-    </span>
-  );
-}
-
-// ── Type Chip ──────────────────────────────────────────────────────────────
-const TYPE_CFG: Record<string, { bg: string; label: string }> = {
-  BOOKING_CONFIRMATION:   { bg: 'bg-emerald-100 text-emerald-700', label: 'Booking' },
-  RECURRING_CONFIRMATION: { bg: 'bg-teal-100 text-teal-700',       label: 'Recurring' },
-  APPOINTMENT_REMINDER:   { bg: 'bg-amber-100 text-amber-700',     label: 'Reminder' },
-  DNA_FOLLOWUP:           { bg: 'bg-red-100 text-red-700',          label: 'DNA' },
-  REBOOK_FOLLOWUP:        { bg: 'bg-violet-100 text-violet-700',   label: 'Rebook' },
-  INACTIVE_CHECKIN:       { bg: 'bg-pink-100 text-pink-700',        label: 'Check-in' },
-  CANCELLATION_NOTICE:    { bg: 'bg-gray-100 text-gray-600',        label: 'Cancelled' },
-};
-
-function TypeChip({ type }: { type: string }) {
-  const c = TYPE_CFG[type] || { bg: 'bg-gray-100 text-gray-600', label: type };
-  return (
-    <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ${c.bg}`}>
-      {c.label}
-    </span>
-  );
-}
-
 // ── Delivery Timeline (compact) ────────────────────────────────────────────
-const TIMELINE_STEPS = [
-  { key: 'SENT',      Icon: Send },
-  { key: 'DELIVERED', Icon: Check },
-  { key: 'REPLIED',   Icon: Reply },
-];
-const STEP_ORDER: Record<string, number> = { SENT: 1, DELIVERED: 2, REPLIED: 3 };
+function getCommunicationDisplayType(log: CommunicationLogEntry) {
+  const isDNA = log.comm_type === 'DNA_FOLLOWUP';
+  const isReminder = log.comm_type === 'APPOINTMENT_REMINDER';
+  const clinicText = log.clinic_name ? ` | ${log.clinic_name}` : '';
 
-function DeliveryDots({ status }: { status: string }) {
-  const failed = status === 'FAILED';
-  const level = failed ? 0 : (STEP_ORDER[status] ?? 1);
-  return (
-    <div className="flex items-center gap-1">
-      {TIMELINE_STEPS.map((step, i) => (
-        <div
-          key={step.key}
-          title={step.key}
-          className={`w-1.5 h-1.5 rounded-full ${
-            failed && i === 0 ? 'bg-red-400'
-            : !failed && level > i ? 'bg-sky-400'
-            : 'bg-gray-200'
-          }`}
-        />
-      ))}
-    </div>
-  );
+  if (isDNA && log.patient_reply === '') {
+    return {
+      title: `DNA Follow-up: Reschedule Your Appointment${clinicText}`,
+      category: 'DNA',
+      status: 'Awaiting Response',
+      icon: Clock,
+      color: '#F97316' // Orange
+    };
+  }
+  if (isDNA && log.patient_reply === 'RESCHEDULE') {
+    return {
+      title: `DNA Follow-up: ${log.patient_name || 'Patient'} Rescheduled the Appointment${clinicText}`,
+      category: 'DNA',
+      status: 'Rescheduled',
+      icon: CalendarDays,
+      color: '#3B82F6' // Blue
+    };
+  }
+  if (isReminder && log.patient_reply === 'Y') {
+    return {
+      title: `Booking: Appointment Confirmed${clinicText}`,
+      category: 'Booking',
+      status: 'Confirmed',
+      icon: Check,
+      color: '#10B981' // Green
+    };
+  }
+  if (isReminder && log.patient_reply === 'N') {
+    return {
+      title: `Booking: Appointment Cancelled${clinicText}`,
+      category: 'Booking',
+      status: 'Cancelled',
+      icon: X,
+      color: '#EF4444' // Red
+    };
+  }
+  if (isReminder && log.patient_reply === 'RESCHEDULE') {
+    return {
+      title: `Booking: Appointment Rescheduled${clinicText}`,
+      category: 'Booking',
+      status: 'Rescheduled',
+      icon: CalendarDays,
+      color: '#3B82F6' // Blue
+    };
+  }
+  return null; // Fallback for unexpected data
 }
 
 // ── Inline Thread (expandable row) ────────────────────────────────────────
@@ -142,11 +130,12 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
     : false;
 
   const confirmed = log.patient_reply === 'Y' || isConfirmedAppt;
-  const rescheduled = log.patient_reply === 'RESCHEDULE';
-  const declined  = (log.patient_reply === 'N' || isCancelledAppt) && !rescheduled;
+  const rescheduled = log.patient_reply === 'RESCHEDULE' || log.comm_type === 'RESCHEDULE_CONFIRMATION' || log.comm_type === 'RESCHEDULE_REQUEST';
+  const isFollowupLog = ['DNA_FOLLOWUP', 'REBOOK_FOLLOWUP'].includes(log.comm_type);
+  const declined  = (log.patient_reply === 'N' || (isCancelledAppt && !isFollowupLog)) && !rescheduled;
   
   const isPending = !confirmed && !declined && !rescheduled && (log.status === 'SENT' || log.status === 'DELIVERED');
-  const isAwaitingReply = log.comm_type === 'APPOINTMENT_REMINDER' && isPending;
+  const isAwaitingReply = ['APPOINTMENT_REMINDER', 'DNA_FOLLOWUP', 'REBOOK_FOLLOWUP'].includes(log.comm_type) && isPending;
   
   let cardColor = log.appointment_color;
   if (log.appointment) {
@@ -169,25 +158,54 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
       <div className="ml-11 space-y-4">
 
         {/* Outbound message */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded-full bg-linear-to-br from-sky-500 to-sky-700 flex items-center justify-center shrink-0 shadow-sm border border-white/20">
-              <Building2 className="w-2.5 h-2.5 text-white" />
+        {(!log.direction || log.direction === 'OUTBOUND') && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-5 h-5 rounded-full bg-linear-to-br from-sky-500 to-sky-700 flex items-center justify-center shrink-0 shadow-sm border border-white/20">
+                <Building2 className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span className="text-[11.5px] font-semibold text-gray-800">{SystemBranding.companyName}</span>
+              <span className="text-[11.5px] text-gray-500">→ {log.recipient}</span>
+              <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.created_at)}</span>
             </div>
-            <span className="text-[11.5px] font-semibold text-gray-800">{SystemBranding.companyName}</span>
-            <span className="text-[11.5px] text-gray-500">→ {log.recipient}</span>
-            <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.created_at)}</span>
-          </div>
-          <div className="ml-7 mt-2">
-            <StructuredEmailPreview text={log.body_preview} searchQuery={searchQuery} />
-          </div>
-          {log.error_message && (
-            <div className="ml-7 mt-2 flex items-start gap-1.5 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-px" />
-              <p className="text-[11px] text-red-600">{log.error_message}</p>
+            <div className="ml-7 mt-2">
+              <StructuredEmailPreview text={log.body_preview} searchQuery={searchQuery} />
             </div>
-          )}
-        </div>
+            {log.error_message && (
+              <div className="ml-7 mt-2 flex items-start gap-1.5 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-px" />
+                <p className="text-[11px] text-red-600">{log.error_message}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* System Event Metadata */}
+        {log.direction === 'SYSTEM' && log.event_metadata && Object.keys(log.event_metadata || {}).length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-5 h-5 rounded-full bg-linear-to-br from-gray-500 to-gray-700 flex items-center justify-center shrink-0 shadow-sm border border-white/20">
+                <Building2 className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span className="text-[11.5px] font-semibold text-gray-800">System Event</span>
+              <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.created_at)}</span>
+            </div>
+            <div className="ml-7 mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {log.comm_type === 'RESCHEDULE_CONFIRMATION' && (
+                <div className="text-[12px] text-gray-700 space-y-1">
+                  <p><span className="font-semibold text-gray-500">From:</span> {log.event_metadata.old_date} at {log.event_metadata.old_time}</p>
+                  <p><span className="font-semibold text-gray-500">To:</span> {log.event_metadata.new_date} at {log.event_metadata.new_time}</p>
+                </div>
+              )}
+              {log.comm_type === 'CANCELLATION' && (
+                <div className="text-[12px] text-gray-700 space-y-1">
+                  <p><span className="font-semibold text-gray-500">Cancelled By:</span> {log.event_metadata.cancelled_by || 'System'}</p>
+                  {log.event_metadata.reason && <p><span className="font-semibold text-gray-500">Reason:</span> {log.event_metadata.reason}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Patient reply / Status Update */}
         {(log.patient_reply || confirmed || declined || rescheduled) && (
@@ -195,7 +213,9 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
             <div className="flex items-center gap-2 mb-2">
               <Avatar name={log.patient_name || '?'} size="sm" />
               <span className="text-[11.5px] font-semibold text-gray-800">{log.patient_name || 'Patient'}</span>
-              <span className="text-[11.5px] text-gray-500">{log.patient_reply ? 'replied' : 'status updated'}</span>
+              <span className="text-[11.5px] text-gray-500">
+                {log.direction === 'INBOUND' ? 'responded' : log.patient_reply ? 'replied' : 'status updated'}
+              </span>
               {log.replied_at && (
                 <span className="text-[11px] text-gray-400 ml-auto">{formatFull(log.replied_at)}</span>
               )}
@@ -238,8 +258,14 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
                     <CalendarDays className="w-3 h-3 text-white" />
                   </div>
                   <div>
-                    <p className="text-[12px] font-semibold text-blue-800">Needs Rescheduling</p>
-                    <p className="text-[11px] text-blue-600">Patient opted to reschedule</p>
+                    <p className="text-[12px] font-semibold text-blue-800">Rescheduled Appointment</p>
+                    <p className="text-[11px] text-blue-600">
+                      {log.related_appointment_date && log.related_appointment_time
+                        ? `rescheduled to ${log.related_appointment_date} at ${log.related_appointment_time}`
+                        : log.event_metadata?.new_date 
+                        ? `rescheduled to ${log.event_metadata.new_date} at ${log.event_metadata.new_time}`
+                        : 'Patient opted to reschedule'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -272,7 +298,7 @@ export function PatientCommunicationHistoryPage() {
   const [total, setTotal]         = useState(0);
   const [page, setPage]           = useState(1);
   const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(false);
+  const [error, setError]         = useState<string | null>(null);
   const [expanded, setExpanded]   = useState<number | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
@@ -286,7 +312,7 @@ export function PatientCommunicationHistoryPage() {
   const fetchLogs = useCallback(async (p: number, q: string, dType: string, dVal: string, status: string) => {
     if (!patientId) return;
     setLoading(true);
-    setError(false);
+    setError(null);
 
     let date_from;
     let date_to;
@@ -296,7 +322,6 @@ export function PatientCommunicationHistoryPage() {
       date_to = dVal;
     } else if (dType === 'MONTH' && dVal) {
       date_from = `${dVal}-01`;
-      // approximate end of month by adding 32 days and setting to day 0
       const nextMonth = new Date(date_from);
       nextMonth.setMonth(nextMonth.getMonth() + 1);
       nextMonth.setDate(0);
@@ -307,6 +332,7 @@ export function PatientCommunicationHistoryPage() {
     }
 
     try {
+      setLoading(true);
       const result = await communicationApi.getLogs({ 
         patient: patientId, 
         page: p, 
@@ -315,11 +341,14 @@ export function PatientCommunicationHistoryPage() {
         date_from,
         date_to,
         appointment_status: status === 'ALL' ? undefined : status,
+        ui_filter: 'patient_history' // Ensures backend only returns the 5 specific outcomes
       });
       setLogs(result.results);
       setTotal(result.count);
-    } catch {
-      setError(true);
+      console.log('[Communication History API] Fetched logs:', result.results);
+    } catch (err: any) {
+      console.error('[Communication History API] Failed to fetch:', err);
+      setError(err?.message || 'An error occurred while fetching communication logs.');
     } finally {
       setLoading(false);
     }
@@ -486,54 +515,24 @@ export function PatientCommunicationHistoryPage() {
         <>
           <div>
             {logs.map(log => {
+              const display = getCommunicationDisplayType(log);
+              if (!display) return null; // Should be handled by backend, but safe fallback
+
               const isOpen = expanded === log.id;
-              const isRescheduled = log.patient_reply === 'RESCHEDULE';
-              const isConfirmed = log.appointment_status 
-                ? ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(log.appointment_status) 
-                : log.patient_reply === 'Y';
-              const isDeclined  = log.appointment_status 
-                ? ['CANCELLED', 'DNA', 'NO_SHOW'].includes(log.appointment_status) && !isRescheduled
-                : log.patient_reply === 'N';
-
-              const isPending = !isConfirmed && !isDeclined && !isRescheduled && (log.status === 'SENT' || log.status === 'DELIVERED');
-
-              let cardColor = log.appointment_color;
-              let triangleColor = '';
+              const cardColor = display.color;
               
-              if (log.appointment) {
-                if (isConfirmed) cardColor = '#10B981'; // Green
-                else if (isRescheduled) cardColor = '#3B82F6'; // Blue
-                else if (isDeclined) cardColor = '#EF4444'; // Red
-                else if (isPending) cardColor = '#F97316'; // Orange
-                
-                if (log.comm_type === 'APPOINTMENT_REMINDER') {
-                  triangleColor = cardColor || ''; // Make triangle match the card color for reminders
-                }
-              }
-
-              let rowStyle = {};
-              let rowClasses = `
+              const rowClasses = `
                 relative overflow-hidden w-full text-left px-4 py-3.5 border-b border-gray-50
                 flex items-center gap-3 transition-colors focus-visible:outline-none
                 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500
+                border-l-4 hover:brightness-95
               `;
+              const rowStyle = { 
+                borderLeftColor: cardColor,
+                backgroundColor: isOpen ? `${cardColor}1A` : `${cardColor}0D` // 10% and 5% opacity
+              };
 
-              // Accent border + light background tint based on cardColor
-              if (cardColor) {
-                rowClasses += ' border-l-4';
-                rowStyle = { 
-                  borderLeftColor: cardColor,
-                  backgroundColor: isOpen ? `${cardColor}1A` : `${cardColor}0D` // 10% and 5% opacity
-                };
-              } else {
-                rowClasses += ' border-l-4 border-l-transparent';
-              }
-
-              if (!cardColor) {
-                rowClasses += isOpen ? ' bg-sky-50/40' : ' bg-white hover:bg-gray-50/80';
-              } else {
-                rowClasses += ' hover:brightness-95';
-              }
+              const StatusIcon = display.icon;
 
               return (
                 <div key={log.id}>
@@ -545,21 +544,23 @@ export function PatientCommunicationHistoryPage() {
                     style={rowStyle}
                   >
                     {/* Status Triangle Ribbon */}
-                    {triangleColor && (
-                      <div 
-                        className="absolute top-0 right-0 w-0 h-0 z-10" 
-                        style={{
-                           borderTop: `28px solid ${triangleColor}`,
-                           borderLeft: '28px solid transparent'
-                        }}
-                      />
-                    )}
+                    <div 
+                      className="absolute top-0 right-0 w-0 h-0 z-10" 
+                      style={{
+                          borderTop: `28px solid ${cardColor}`,
+                          borderLeft: '28px solid transparent'
+                      }}
+                    />
 
                     <Avatar name={log.patient_name || '?'} />
                     
                     <div className="flex-1 min-w-0 pr-6"> {/* Added pr-6 to prevent overlapping with triangle */}
                       <div className="flex items-center gap-2 mb-1">
-                        <TypeChip type={log.comm_type} />
+                        <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          display.category === 'DNA' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {display.category}
+                        </span>
                         <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 shrink-0">
                           {log.channel === 'SMS'
                             ? <MessageSquare className="w-2.5 h-2.5 text-amber-500" />
@@ -571,32 +572,16 @@ export function PatientCommunicationHistoryPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {log.subject && (
-                          <p className="text-[13px] text-gray-800 font-medium truncate flex-1">
-                            <Highlight text={log.subject} query={searchQuery} />
-                          </p>
-                        )}
+                        <p className="text-[13px] text-gray-800 font-medium truncate flex-1">
+                          <Highlight text={display.title} query={searchQuery} />
+                        </p>
                         <div className="flex items-center gap-2 shrink-0 ml-auto">
-                          <DeliveryDots status={log.status} />
-                          <StatusPill status={log.status} />
-                          {isConfirmed && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 rounded-full">
-                              <Check className="w-2.5 h-2.5" />
-                              Confirmed
-                            </span>
-                          )}
-                          {isDeclined && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 rounded-full">
-                              <X className="w-2.5 h-2.5" />
-                              Cancelled
-                            </span>
-                          )}
-                          {isRescheduled && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-full">
-                              <CalendarDays className="w-2.5 h-2.5" />
-                              Rescheduled
-                            </span>
-                          )}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full`}
+                            style={{ backgroundColor: `${cardColor}20`, color: cardColor }}
+                          >
+                            <StatusIcon className="w-2.5 h-2.5" />
+                            {display.status}
+                          </span>
                         </div>
                       </div>
                     </div>
