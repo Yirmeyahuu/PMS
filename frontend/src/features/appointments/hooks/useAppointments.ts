@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAppointments, getPortalBookingsForDiary } from '../appointment.api';
 import { format } from 'date-fns';
 import type { Appointment } from '@/types';
@@ -22,11 +22,13 @@ export const useAppointments = ({
   const [portalBookings, setPortalBookings] = useState<PortalBookingDiaryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
+  const fetchIdRef = useRef(0);
 
   const startDateStr = format(startDate, 'yyyy-MM-dd');
   const endDateStr   = format(endDate,   'yyyy-MM-dd');
 
   const fetchAppointments = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -51,6 +53,8 @@ export const useAppointments = ({
         getAppointments(apptParams),
         getPortalBookingsForDiary(portalParams),
       ]);
+
+      if (fetchIdRef.current !== fetchId) return;
 
       const allAppointments: Appointment[] = apptResponse.results;
 
@@ -78,12 +82,15 @@ export const useAppointments = ({
       setPortalBookings(filteredBookings);
 
     } catch (err: any) {
+      if (fetchIdRef.current !== fetchId) return;
       console.error('Failed to fetch appointments:', err);
       const msg = err.response?.data?.detail || 'Failed to load appointments';
       setError(msg);
       toast.error(msg);
     } finally {
-      setLoading(false);
+      if (fetchIdRef.current === fetchId) {
+        setLoading(false);
+      }
     }
   }, [startDateStr, endDateStr, practitionerId, clinicBranchId]);
 

@@ -1,5 +1,14 @@
 import api from '@/lib/axios';
 
+export interface ClinicProfile {
+  name: string;
+  branch_name: string;
+  logo: string | null;
+  address: string;
+  phone: string;
+  email: string;
+}
+
 export interface Letter {
   id: number;
   subject: string;
@@ -17,6 +26,7 @@ export interface Letter {
   layout_remove_top_space?: boolean;
   layout_date?: boolean;
   layout_addressee?: boolean;
+  clinic_profile?: ClinicProfile;
 }
 
 export const getLetters = async (params: { patient?: string | number, patient_case?: number }): Promise<Letter[]> => {
@@ -58,7 +68,7 @@ export const previewLetter = async (data: {
   layout_remove_top_space?: boolean;
   layout_date?: boolean;
   layout_addressee?: boolean;
-}): Promise<{ content_html: string }> => {
+}): Promise<{ content_html: string; clinic_profile?: ClinicProfile }> => {
   const response = await api.post('/letters/letters/preview/', data);
   return response.data;
 };

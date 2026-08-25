@@ -139,7 +139,7 @@ class PatientMergeService:
     @classmethod
     def _validate_merge(cls, primary: Patient, duplicate: Patient):
         """Enforces all safety rules for merging."""
-        if primary.clinic_id != duplicate.clinic_id:
+        if primary.clinic.main_clinic != duplicate.clinic.main_clinic:
             raise ValidationError("Cannot merge patients across different clinics.")
 
         if duplicate.is_archived or duplicate.is_merged:

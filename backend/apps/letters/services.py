@@ -157,7 +157,19 @@ class LetterGeneratorService:
             if '<html' not in html_content.lower():
                 # Convert newlines to <br> to preserve plain text formatting
                 html_content = html_content.replace('\n', '<br>')
-                html_content = f"<html><body><div style='font-family: sans-serif; white-space: pre-wrap;'>{html_content}</div></body></html>"
+                html_content = f"""
+                <html>
+                <head>
+                <style>
+                    body {{ font-family: sans-serif; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }}
+                    p {{ margin-top: 0; margin-bottom: 8px; }}
+                    h1 {{ font-size: 20px; margin-top: 16px; margin-bottom: 8px; }}
+                    h2 {{ font-size: 18px; margin-top: 14px; margin-bottom: 8px; }}
+                    h3 {{ font-size: 16px; margin-top: 12px; margin-bottom: 8px; }}
+                    small, .text-small {{ font-size: 12px; }}
+                </style>
+                </head>
+                <body><div>{html_content}</div></body></html>"""
                 
             pisa_status = pisa.CreatePDF(
                 html_content,
@@ -165,9 +177,37 @@ class LetterGeneratorService:
             )
             
             if pisa_status.err:
-                raise Exception("PDF Generation Error")
+                raise Exception('PDF generation failed')
                 
             return result.getvalue()
         except ImportError:
             # Fallback if xhtml2pdf is not available
             return b"%PDF-1.4\n%Fallback Dummy PDF\n"
+        except Exception as e:
+            print(f"Error generating PDF: {e}")
+            raise
+
+    @classmethod
+    def get_clinic_profile(cls, clinic, request=None):
+        """
+        Retrieves the unified clinic profile using the Invoice system's logic (InvoicePrintSettings).
+        This ensures the Letterhead displays the correct Branch information.
+        """
+        if not clinic:
+            return None
+            
+        from apps.billing.models import InvoicePrintSettings
+        print_settings = InvoicePrintSettings.get_for_clinic(clinic)
+        
+        logo_url = print_settings.logo_url
+        if not logo_url and clinic.logo:
+            logo_url = request.build_absolute_uri(clinic.logo.url) if request else clinic.logo.url
+            
+        return {
+            'name': print_settings.clinic_name or clinic.name,
+            'branch_name': clinic.name,
+            'logo': logo_url,
+            'address': print_settings.clinic_address or clinic.address,
+            'phone': print_settings.clinic_phone or clinic.phone,
+            'email': print_settings.clinic_email or clinic.email,
+        }

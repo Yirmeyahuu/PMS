@@ -297,8 +297,14 @@ const CalendarComponent: React.FC<CalendarProps> = ({
 }) => {
   // Staff entries have string ids (e.g. 'staff-5') — appointment hooks need a numeric id or null.
   // Pass null for String ids so appointment filtering is effectively disabled for Staff.
-  const numericPractitionerId: number | null =
-    typeof selectedPractitionerId === 'number' ? selectedPractitionerId : null;
+  const numericPractitionerId: number | null = useMemo(() => {
+    if (typeof selectedPractitionerId === 'number') return selectedPractitionerId;
+    if (typeof selectedPractitionerId === 'string' && selectedPractitionerId !== '') {
+      const parsed = Number(selectedPractitionerId);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return null;
+  }, [selectedPractitionerId]);
 
   // ── AVAILABILITY HELPER FUNCTIONS ──────────────────────────────────────────
   // Whether the allAvailabilities map has any entries

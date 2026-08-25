@@ -160,15 +160,18 @@ class LetterViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            main_clinic = request.user.clinic.main_clinic
+            branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+
             template = LetterTemplate.objects.get(id=template_id, clinic=request.user.clinic)
-            patient = Patient.objects.get(id=patient_id, clinic=request.user.clinic)
+            patient = Patient.objects.get(id=patient_id, clinic_id__in=branch_ids)
             practitioner = getattr(request.user, 'practitioner_profile', None)
             
             # Fetch Case and Appointment
             from apps.patients.models import PatientCase
             from apps.appointments.models import Appointment
-            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
-            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
+            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic_id__in=branch_ids).first() if patient_case_id else None
+            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic_id__in=branch_ids).first() if appointment_id else None
 
             # Layout Controls Injection
             layout_letter_head = request.data.get('layout_letter_head', template.layout_letter_head)
@@ -178,12 +181,18 @@ class LetterViewSet(viewsets.ModelViewSet):
             
             layout_html = ""
             
-            if layout_letter_head:
+            clinic_profile = LetterGeneratorService.get_clinic_profile(appointment.clinic if appointment and appointment.clinic else request.user.clinic, request=request)
+            
+            if layout_letter_head and clinic_profile:
+                logo_img = f'<img src="{clinic_profile["logo"]}" style="max-height: 96px; max-width: 200px; margin-right: 24px; vertical-align: middle; border-radius: 4px;" />' if clinic_profile.get("logo") else ""
                 layout_html += f"""
-                <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
-                    <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
-                    <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
-                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone} | {request.user.clinic.email}</p>
+                <div style="margin-bottom: 40px; border-bottom: 1px solid #1e293b; padding-bottom: 24px; font-family: sans-serif; display: flex; align-items: center;">
+                    {logo_img}
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px;">
+                        <h2 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: bold; text-transform: uppercase;">{clinic_profile['name']}</h2>
+                        <p style="color: #334155; font-size: 12px; margin: 0;">{clinic_profile['address']}</p>
+                        <p style="color: #334155; font-size: 12px; margin: 0;">{clinic_profile['phone']} | {clinic_profile['email']}</p>
+                    </div>
                 </div>
                 """
 
@@ -312,14 +321,17 @@ class LetterViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            main_clinic = request.user.clinic.main_clinic
+            branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+
             template = LetterTemplate.objects.get(id=template_id, clinic=request.user.clinic)
-            patient = Patient.objects.get(id=patient_id, clinic=request.user.clinic)
-            practitioner = getattr(request.user, 'practitioner', None)
+            patient = Patient.objects.get(id=patient_id, clinic_id__in=branch_ids)
+            practitioner = getattr(request.user, 'practitioner_profile', None)
             
             from apps.patients.models import PatientCase
             from apps.appointments.models import Appointment
-            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic=request.user.clinic).first() if patient_case_id else None
-            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic=request.user.clinic).first() if appointment_id else None
+            patient_case = PatientCase.objects.filter(id=patient_case_id, patient__clinic_id__in=branch_ids).first() if patient_case_id else None
+            appointment = Appointment.objects.filter(id=appointment_id, patient__clinic_id__in=branch_ids).first() if appointment_id else None
 
             # Layout Controls Injection
             layout_letter_head = request.data.get('layout_letter_head', template.layout_letter_head)
@@ -329,15 +341,18 @@ class LetterViewSet(viewsets.ModelViewSet):
             
             layout_html = ""
             
-            # Clinic Letter Head is typically handled by rendering the PDF template wrapper in services,
-            # but we can optionally inject it into the HTML here if layout_letter_head is true.
-            # Actually, standard practice here is to prepend it:
-            if layout_letter_head:
+            clinic_profile = LetterGeneratorService.get_clinic_profile(appointment.clinic if appointment and appointment.clinic else request.user.clinic, request=request)
+            
+            if layout_letter_head and clinic_profile:
+                logo_img = f'<img src="{clinic_profile["logo"]}" style="max-height: 96px; max-width: 200px; margin-right: 24px; vertical-align: middle; border-radius: 4px;" />' if clinic_profile.get("logo") else ""
                 layout_html += f"""
-                <div style="margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; font-family: sans-serif;">
-                    <h2 style="margin: 0; color: #333;">{request.user.clinic.name}</h2>
-                    <p style="color: #666; font-size: 12px; margin: 5px 0 0 0;">{request.user.clinic.address}</p>
-                    <p style="color: #666; font-size: 12px; margin: 2px 0 0 0;">{request.user.clinic.phone} | {request.user.clinic.email}</p>
+                <div style="margin-bottom: 40px; border-bottom: 1px solid #1e293b; padding-bottom: 24px; font-family: sans-serif; display: flex; align-items: center;">
+                    {logo_img}
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px;">
+                        <h2 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: bold; text-transform: uppercase;">{clinic_profile['name']}</h2>
+                        <p style="color: #334155; font-size: 12px; margin: 0;">{clinic_profile['address']}</p>
+                        <p style="color: #334155; font-size: 12px; margin: 0;">{clinic_profile['phone']} | {clinic_profile['email']}</p>
+                    </div>
                 </div>
                 """
 
@@ -392,6 +407,7 @@ class LetterViewSet(viewsets.ModelViewSet):
             return Response({
                 'content_html': rendered_content, 
                 'full_html': full_html,
+                'clinic_profile': clinic_profile,
                 'layout_letter_head': layout_letter_head,
                 'layout_remove_top_space': layout_remove_top_space,
                 'layout_date': layout_date,

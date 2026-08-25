@@ -26,18 +26,19 @@ import { CustomShortcuts } from '../../manage/pages/clinical/components/editor/C
 import { MergeField } from '../../manage/pages/clinical/components/editor/MergeField';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
+import type { ClinicProfile } from '../api/letters.api';
 
 export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointmentId?: number }) => {
   const { editorContext, setEditorContext, selectedCaseId, triggerRefresh } = useClinicalWorkspace();
   const { patient } = usePatientProfileContext();
-  
+
   const [subject, setSubject] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const initialTemplateId = editorContext.type === 'NEW_LETTER' ? editorContext.templateId : null;
   const editingLetterId = editorContext.type === 'EDIT_LETTER' ? editorContext.letterId : null;
-  
+
   const [activeTemplateId, setActiveTemplateId] = useState<number | null>(initialTemplateId);
   const [availableTemplates, setAvailableTemplates] = useState<LetterTemplate[]>([]);
 
@@ -109,7 +110,7 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
         let currentRemoveTopSpace = layoutRemoveTopSpace;
         let currentDate = layoutDate;
         let currentAddressee = layoutAddressee;
-        
+
         if (t && subject === '') {
           setSubject(t.name);
           currentLetterHead = t.layout_letter_head ?? true;
@@ -140,10 +141,10 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
         setIsPreviewLoading(false);
       }
     };
-    
+
     // Only run when templates are loaded if activeTemplateId is set, and we are NOT editing
     if (!editingLetterId && (availableTemplates.length > 0 || !activeTemplateId)) {
-       fetchPreview();
+      fetchPreview();
     }
   }, [activeTemplateId, patient, selectedCaseId, initialAppointmentId, editor, availableTemplates.length, editingLetterId]);
 
@@ -156,12 +157,12 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
           const letter = await getLetter(editingLetterId);
           setSubject(letter.subject);
           setActiveTemplateId(letter.template || null);
-          
+
           setLayoutLetterHead(letter.layout_letter_head ?? true);
           setLayoutRemoveTopSpace(letter.layout_remove_top_space ?? false);
           setLayoutDate(letter.layout_date ?? true);
           setLayoutAddressee(letter.layout_addressee ?? true);
-          
+
           editor.commands.setContent(letter.content_html || '');
         } catch (err) {
           console.error('Failed to load letter for editing', err);
@@ -177,13 +178,13 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     const newId = value ? parseInt(value, 10) : null;
-    
+
     if (editor && !editor.isEmpty) {
       if (!confirm('Changing templates will discard your current changes. Proceed?')) {
         return;
       }
     }
-    
+
     setActiveTemplateId(newId);
     if (!newId) {
       editor?.commands.setContent('');
@@ -203,7 +204,7 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
 
     try {
       setIsGenerating(true);
-      
+
       let savedLetterId: number;
 
       if (editingLetterId) {
@@ -284,7 +285,7 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
           </div>
         ) : (
           <div className="flex flex-col gap-4 max-w-6xl mx-auto w-full">
-            
+
             {/* Subject and Template Input */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4">
               <div className="flex-1">
@@ -320,7 +321,7 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
                   <EditorToolbar editor={editor} />
                 </div>
                 <div className="bg-slate-100 p-8 flex justify-center overflow-y-auto">
-                  <div 
+                  <div
                     className="w-[794px] min-h-[1123px] bg-white shadow-md rounded-sm p-12 cursor-text flex flex-col gap-6"
                     onClick={() => editor?.commands.focus()}
                     style={{
@@ -328,8 +329,8 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
                     }}
                   >
                     {/* Inline Document Checklist */}
-                    <div 
-                      className="p-3 bg-slate-50 border border-slate-200/60 rounded-lg flex items-center justify-between text-sm text-slate-600 print:hidden" 
+                    <div
+                      className="p-3 bg-slate-50 border border-slate-200/60 rounded-lg flex items-center justify-between text-sm text-slate-600 print:hidden"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-6">
@@ -355,7 +356,6 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
                         <span className="text-xs font-medium">Layout Overrides</span>
                       </div>
                     </div>
-
                     {/* Visual representation of Date (Not part of EditorContent) */}
                     {layoutDate && (
                       <div className="mb-5 font-sans">
@@ -378,7 +378,7 @@ export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointm
                       </div>
                     )}
 
-                    <EditorContent editor={editor} />
+                    <EditorContent editor={editor} className="clinical-letter-document flex-1" />
                   </div>
                 </div>
               </div>

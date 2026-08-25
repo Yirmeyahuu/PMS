@@ -216,8 +216,8 @@ export const GenerateLetterModal = ({
                       <EditorToolbar editor={editor} />
                     </div>
                     <div className="flex-1 overflow-y-auto bg-gray-100 p-4">
-                      <div className="max-w-[800px] mx-auto bg-white shadow border border-gray-200 min-h-full">
-                         <EditorContent editor={editor} />
+                      <div className="max-w-[800px] mx-auto bg-white shadow border border-gray-200 min-h-full clinical-letter-document">
+                         <EditorContent editor={editor} className="flex-1" />
                       </div>
                     </div>
                   </div>

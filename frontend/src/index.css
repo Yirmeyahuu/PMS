@@ -281,3 +281,42 @@ textarea,
 .tableWrapper {
   overflow-x: auto;
 }
+
+/* ── Clinical Letter Document Typography ── */
+.clinical-letter-document .tiptap {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.clinical-letter-document .tiptap p {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.clinical-letter-document .tiptap h1 {
+  font-size: 20px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.clinical-letter-document .tiptap h2 {
+  font-size: 18px;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.clinical-letter-document .tiptap h3 {
+  font-size: 16px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.clinical-letter-document .tiptap small, 
+.clinical-letter-document .tiptap .text-small {
+  font-size: 12px;
+}
+
+.clinical-letter-document .tiptap p:empty::before {
+  content: "";
+  display: inline-block;
+}

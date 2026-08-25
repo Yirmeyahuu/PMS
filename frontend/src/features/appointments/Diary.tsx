@@ -232,7 +232,13 @@ export const Diary: React.FC = () => {
       if (!hasAutoSelectedBranch.current) {
         hasAutoSelectedBranch.current = true;
         setSelectedClinicBranch(currentBranchId);
-        setSelectedPractitioner(own.id);
+        
+        // Peek at localStorage: if a saved preference exists, skip auto-select
+        // so the trailing restore effect can handle it without a flicker.
+        const key = `diary_practitioner_${user?.id}_${currentBranchId}`;
+        if (localStorage.getItem(key) === null) {
+          setSelectedPractitioner(own.id);
+        }
       }
     } else {
       // All-branches practitioner (e.g. Admin with no branch).
@@ -240,7 +246,11 @@ export const Diary: React.FC = () => {
       if (!hasAutoSelectedBranch.current && branches.length > 0) {
         hasAutoSelectedBranch.current = true;
         setSelectedClinicBranch(branches[0].id);
-        setSelectedPractitioner(own.id);
+        
+        const key = `diary_practitioner_${user?.id}_${branches[0].id}`;
+        if (localStorage.getItem(key) === null) {
+          setSelectedPractitioner(own.id);
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,7 +314,8 @@ export const Diary: React.FC = () => {
     // Validate: practitioner must still be accessible in the current list.
     const isValid = practitioners.some(p => String(p.id) === String(savedId));
     if (isValid) {
-      setSelectedPractitioner(savedId as number | string);
+      const isNumeric = savedId !== null && savedId !== '' && !isNaN(Number(savedId));
+      setSelectedPractitioner(isNumeric ? Number(savedId) : (savedId as string));
     } else {
       // Practitioner removed / deactivated — clean up stale entry.
       localStorage.removeItem(key);
@@ -323,11 +334,14 @@ export const Diary: React.FC = () => {
         setCompareMode(false);
         setComparePractitioners([null, null]);
 
-        // Restore own practitioner context if applicable
-        if (cachedOwnBranchId === authorizedBranchIds[0]) {
-          setSelectedPractitioner(cachedOwnId);
-        } else {
-          setSelectedPractitioner(null);
+        // Restore own practitioner context if applicable (unless user has a saved preference)
+        const key = `diary_practitioner_${user?.id}_${authorizedBranchIds[0]}`;
+        if (localStorage.getItem(key) === null) {
+          if (cachedOwnBranchId === authorizedBranchIds[0]) {
+            setSelectedPractitioner(cachedOwnId);
+          } else {
+            setSelectedPractitioner(null);
+          }
         }
       } else {
         // For Admins/Owners, just pick the first available branch
@@ -472,16 +486,19 @@ export const Diary: React.FC = () => {
     setCompareMode(false);
     setComparePractitioners([null, null]);
 
-    if ((isPractitioner || isStaff) && cachedOwnBranchId !== null) {
-      // Branch-assigned: restore own practitioner filter on home branch, clear elsewhere.
-      if (branchId === cachedOwnBranchId) {
-        setSelectedPractitioner(cachedOwnId);
+    const key = `diary_practitioner_${user?.id}_${branchId}`;
+    if (localStorage.getItem(key) === null) {
+      if ((isPractitioner || isStaff) && cachedOwnBranchId !== null) {
+        // Branch-assigned: restore own practitioner filter on home branch, clear elsewhere.
+        if (branchId === cachedOwnBranchId) {
+          setSelectedPractitioner(cachedOwnId);
+        } else {
+          setSelectedPractitioner(null);
+        }
       } else {
+        // Admin or unassigned Practitioner: always clear filter when switching branches
         setSelectedPractitioner(null);
       }
-    } else {
-      // Admin or unassigned Practitioner: always clear filter when switching branches
-      setSelectedPractitioner(null);
     }
   };
 
@@ -747,7 +764,8 @@ export const Diary: React.FC = () => {
   const effectivePractitionerId: number | null = useMemo(() => {
     // If an explicit filter is active, respect it regardless of view.
     if (selectedPractitioner != null) {
-      return typeof selectedPractitioner === 'number' ? selectedPractitioner : null;
+      const isNumeric = selectedPractitioner !== '' && !isNaN(Number(selectedPractitioner));
+      return isNumeric ? Number(selectedPractitioner) : null;
     }
     // In Week View, a PRACTITIONER with no filter selected defaults to themselves.
     if (view === 'week' && loggedInPractitionerNumericId != null) {

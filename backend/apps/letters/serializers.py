@@ -47,6 +47,7 @@ class LetterSerializer(serializers.ModelSerializer):
     case_title = serializers.CharField(
         source='patient_case.title', read_only=True, default=None
     )
+    clinic_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = Letter
@@ -57,6 +58,7 @@ class LetterSerializer(serializers.ModelSerializer):
             'practitioner', 'practitioner_name',
             'template', 'template_name',
             'subject', 'content_html', 'rendered_pdf',
+            'clinic_profile',
             'layout_letter_head', 'layout_remove_top_space',
             'layout_date', 'layout_addressee',
             'status', 'is_signed', 'signed_at', 'signature_data',
@@ -73,6 +75,13 @@ class LetterSerializer(serializers.ModelSerializer):
         if obj.practitioner and obj.practitioner.user:
             return obj.practitioner.user.get_full_name()
         return None
+
+    def get_clinic_profile(self, obj):
+        from .services import LetterGeneratorService
+        # Use appointment branch if available, fallback to letter's clinic
+        clinic = obj.appointment.clinic if obj.appointment and obj.appointment.clinic else obj.clinic
+        request = self.context.get('request')
+        return LetterGeneratorService.get_clinic_profile(clinic, request=request)
 
     def create(self, validated_data):
         request = self.context.get('request')

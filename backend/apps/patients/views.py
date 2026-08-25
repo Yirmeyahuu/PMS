@@ -1158,16 +1158,23 @@ class PublicPortalCheckEmailView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data['email']
+        email = serializer.validated_data['email'].strip().lower()
         date_of_birth = serializer.validated_data['date_of_birth']
 
-        # Look for existing active patient by exact email AND DOB
+        # Determine the full clinic network
+        try:
+            main_clinic = portal_link.clinic.main_clinic
+            branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+        except AttributeError:
+            branch_ids = [portal_link.clinic.id] if portal_link.clinic else []
+
+        # Look for existing active patient by exact email AND DOB across the entire clinic network
         patient = Patient.objects.filter(
-            clinic=portal_link.clinic,
+            clinic_id__in=branch_ids,
             email__iexact=email,
             date_of_birth=date_of_birth,
             is_deleted=False,
-        ).first()
+        ).order_by('-created_at').first()
 
         if patient:
             # Mask phone: e.g. "09171234567" -> "********4567"
@@ -1200,14 +1207,22 @@ class PublicPortalBookView(APIView):
         
         is_returning = data.get('is_returning_patient') in (True, 'true', 'True', 1, '1')
         if is_returning:
-            email = data.get('patient_email')
+            email = (data.get('patient_email') or '').strip().lower()
             dob = data.get('patient_date_of_birth')
+            
+            # Determine the full clinic network
+            try:
+                main_clinic = portal_link.clinic.main_clinic
+                branch_ids = list(main_clinic.get_all_branches().values_list('id', flat=True))
+            except AttributeError:
+                branch_ids = [portal_link.clinic.id] if portal_link.clinic else []
+
             patient = Patient.objects.filter(
-                clinic=portal_link.clinic,
+                clinic_id__in=branch_ids,
                 email__iexact=email,
                 date_of_birth=dob,
                 is_deleted=False
-            ).first()
+            ).order_by('-created_at').first()
             if patient:
                 data['patient_first_name'] = patient.first_name
                 data['patient_last_name'] = patient.last_name
@@ -2199,6 +2214,7 @@ class PatientMergeExecuteView(APIView):
     def post(self, request, *args, **kwargs):
         from .serializers import PatientMergeSerializer
         from .services.merge_service import PatientMergeService
+        from django.core.exceptions import ValidationError
 
         serializer = PatientMergeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

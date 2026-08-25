@@ -35,7 +35,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         # Read-only actions needed by all authenticated users (e.g. Diary branch tabs)
-        if self.action in ('my_clinic', 'branches', 'list', 'retrieve'):
+        if self.action in ('my_clinic', 'branches', 'list', 'retrieve', 'branch_profile'):
             return [IsAuthenticated()]
         return super().get_permissions()
 

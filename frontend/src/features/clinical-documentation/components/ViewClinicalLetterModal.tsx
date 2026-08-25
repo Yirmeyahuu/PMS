@@ -27,6 +27,7 @@ import { CustomBulletList } from '@/features/manage/pages/clinical/components/ed
 import { Indent } from '@/features/manage/pages/clinical/components/editor/Indent';
 import { FontSize } from '@/features/manage/pages/clinical/components/editor/FontSize';
 import { MergeField } from '@/features/manage/pages/clinical/components/editor/MergeField';
+import { ClinicLetterhead } from './ClinicLetterhead';
 
 interface ViewClinicalLetterModalProps {
   letterId: number;
@@ -35,7 +36,7 @@ interface ViewClinicalLetterModalProps {
 export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = ({ letterId }) => {
   const { setEditorContext } = useClinicalWorkspace();
   const { patient, cases } = usePatientProfileContext();
-  
+
   const [letter, setLetter] = useState<Letter | null>(null);
   const [clinic, setClinic] = useState<ClinicProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +84,7 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
         ]);
         setLetter(fetchedLetter);
         setClinic(fetchedClinic);
-        
+
         if (editor) {
           editor.commands.setContent(fetchedLetter.content_html || '<p></p>');
         }
@@ -111,7 +112,7 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
       toast.loading('Replicating letter...', { id: 'replicate-toast' });
       const newLetter = await replicateLetter(letterId);
       toast.success('New Clinical Letter created.', { id: 'replicate-toast' });
-      
+
       setEditorContext({ type: 'VIEW_LETTER', letterId: newLetter.id });
     } catch (err) {
       console.error('Failed to replicate letter:', err);
@@ -145,11 +146,14 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
             </style>
           </head>
           <body>
-            ${letter?.layout_letter_head ? `
-              <div class="letter-head">
-                  <h2>${clinic?.name || 'Clinic'}</h2>
-                  <p>${clinic?.address || ''}</p>
-                  <p>${clinic?.phone || ''} | ${clinic?.email || ''}</p>
+            ${letter?.layout_letter_head && letter.clinic_profile ? `
+              <div class="letter-head" style="margin-bottom: 40px; border-bottom: 1px solid #1e293b; padding-bottom: 24px; font-family: sans-serif; display: flex; align-items: center;">
+                  ${letter.clinic_profile.logo ? `<img src="${letter.clinic_profile.logo}" style="max-height: 96px; max-width: 200px; margin-right: 24px; object-fit: contain; border-radius: 4px;" />` : ''}
+                  <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px;">
+                      <h2 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: bold; text-transform: uppercase;">${letter.clinic_profile.name}</h2>
+                      <p style="color: #334155; font-size: 12px; margin: 0;">${letter.clinic_profile.address}</p>
+                      <p style="color: #334155; font-size: 12px; margin: 0;">${letter.clinic_profile.phone} | ${letter.clinic_profile.email}</p>
+                  </div>
               </div>
             ` : ''}
             
@@ -201,11 +205,11 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
 
   const caseTitle = cases.find(c => c.id === letter.patient_case)?.title || 'No Case Attached';
   const createdDate = new Date(letter.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
-      
+
       <div className="relative w-full max-w-5xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 bg-white border-b border-gray-100 flex items-start justify-between shrink-0">
@@ -236,7 +240,7 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
 
         {/* Content - Native Document Viewer */}
         <div className="flex-1 bg-slate-100 p-4 sm:p-8 flex justify-center overflow-y-auto">
-          <div 
+          <div
             className="w-[794px] min-h-[1123px] bg-white shadow-md rounded-sm p-12 flex flex-col gap-6"
             style={{
               backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0px, transparent 1099px, #f3f4f6 1099px, #f3f4f6 1123px)'
@@ -244,11 +248,7 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
           >
             {/* Visual representation of Letterhead */}
             {letter.layout_letter_head && (
-              <div className="mb-5 border-b border-slate-200 pb-4 font-sans">
-                <h2 className="text-2xl font-bold text-slate-800 m-0">{clinic?.name || 'Clinic Name'}</h2>
-                <p className="text-sm text-slate-500 mt-1 m-0">{clinic?.address || ''}</p>
-                <p className="text-sm text-slate-500 mt-0.5 m-0">{clinic?.phone || ''} | {clinic?.email || ''}</p>
-              </div>
+              <ClinicLetterhead profile={letter.clinic_profile} />
             )}
 
             {/* Visual representation of Date */}
@@ -274,8 +274,8 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
             )}
 
             {/* Read-Only TipTap Editor */}
-            <div className={`flex-1 ${letter.layout_remove_top_space ? 'mt-0' : 'mt-8'}`}>
-              <EditorContent editor={editor} />
+            <div className={`flex-1 clinical-letter-document ${letter.layout_remove_top_space ? 'mt-0' : 'mt-8'}`}>
+              <EditorContent editor={editor} className="flex-1" />
             </div>
           </div>
         </div>

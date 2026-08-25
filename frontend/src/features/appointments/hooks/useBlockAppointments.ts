@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getBlockAppointments } from '../appointment.api';
 import { format } from 'date-fns';
 import type { BlockAppointment } from '@/types';
@@ -18,11 +18,13 @@ export const useBlockAppointments = ({
   const [blockAppointments, setBlockAppointments] = useState<BlockAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchIdRef = useRef(0);
 
   const startDateStr = format(startDate, 'yyyy-MM-dd');
   const endDateStr = format(endDate, 'yyyy-MM-dd');
 
   const fetchBlockAppointments = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -36,16 +38,22 @@ export const useBlockAppointments = ({
       }
 
       const data = await getBlockAppointments(params);
+      
+      if (fetchIdRef.current !== fetchId) return;
+      
       // Handle paginated response - API returns { count, results, ... }
       const items = Array.isArray(data) ? data : (data.results || []);
       setBlockAppointments(items as BlockAppointment[]);
     } catch (err: any) {
+      if (fetchIdRef.current !== fetchId) return;
       console.error('Failed to fetch block appointments:', err);
       const msg = err.response?.data?.detail || 'Failed to load blocked events';
       setError(msg);
       toast.error(msg);
     } finally {
-      setLoading(false);
+      if (fetchIdRef.current === fetchId) {
+        setLoading(false);
+      }
     }
   }, [startDateStr, endDateStr, clinicBranchId]);
 
