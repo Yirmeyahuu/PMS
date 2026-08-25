@@ -26,8 +26,6 @@ import { CustomShortcuts } from '../../manage/pages/clinical/components/editor/C
 import { MergeField } from '../../manage/pages/clinical/components/editor/MergeField';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
-import type { ClinicProfile } from '../api/letters.api';
-
 export const ClinicalLetterEditor = ({ initialAppointmentId }: { initialAppointmentId?: number }) => {
   const { editorContext, setEditorContext, selectedCaseId, triggerRefresh } = useClinicalWorkspace();
   const { patient } = usePatientProfileContext();

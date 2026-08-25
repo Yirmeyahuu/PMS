@@ -6,8 +6,6 @@ import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { SendLetterEmailModal } from './SendLetterEmailModal';
 import { replicateLetter, getLetter } from '../api/letters.api';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
-import { getMyClinic } from '@/features/clinics/clinic.api';
-import type { ClinicProfile } from '@/features/clinics/clinic.api';
 
 // TipTap Imports for Read-Only rendering
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -38,7 +36,6 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
   const { patient, cases } = usePatientProfileContext();
 
   const [letter, setLetter] = useState<Letter | null>(null);
-  const [clinic, setClinic] = useState<ClinicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isReplicating, setIsReplicating] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -78,12 +75,8 @@ export const ViewClinicalLetterModal: React.FC<ViewClinicalLetterModalProps> = (
     const fetchLetter = async () => {
       try {
         setLoading(true);
-        const [fetchedLetter, fetchedClinic] = await Promise.all([
-          getLetter(letterId),
-          getMyClinic()
-        ]);
+        const fetchedLetter = await getLetter(letterId);
         setLetter(fetchedLetter);
-        setClinic(fetchedClinic);
 
         if (editor) {
           editor.commands.setContent(fetchedLetter.content_html || '<p></p>');
