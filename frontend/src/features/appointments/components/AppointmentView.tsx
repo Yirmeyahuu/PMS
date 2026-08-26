@@ -479,9 +479,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
               <label className="block text-xs text-gray-500 mb-1.5">Case Status</label>
               <select value={editStatus} onChange={e => setEditStatus(e.target.value as PatientCaseStatus)} className={fieldCls}>
                 <option value="OPEN">Open</option>
-                <option value="MONITORING">Monitoring</option>
                 <option value="DISCHARGED">Discharged</option>
-                <option value="CLOSED">Closed</option>
               </select>
             </div>
 

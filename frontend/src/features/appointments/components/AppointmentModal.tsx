@@ -510,9 +510,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                             <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
                             <select value={inlineCaseData.status} onChange={e => setInlineCaseData({...inlineCaseData, status: e.target.value})} className={inputBase}>
                               <option value="OPEN">Open</option>
-                              <option value="MONITORING">Monitoring</option>
                               <option value="DISCHARGED">Discharged</option>
-                              <option value="CLOSED">Closed</option>
                             </select>
                           </div>
                           <div>

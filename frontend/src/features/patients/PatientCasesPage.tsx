@@ -36,8 +36,17 @@ export const PatientCasesPage = () => {
       const isArchived = Boolean(c.is_archived);
       if (viewMode === 'ACTIVE' && isArchived) return false;
       if (viewMode === 'ARCHIVED' && !isArchived) return false;
-      
-      const matchesFilter = filter === 'ALL' || c.status === filter;
+      let matchesFilter = false;
+      if (filter === 'ALL') {
+        matchesFilter = true;
+      } else if (filter === 'OPEN') {
+        matchesFilter = c.status === 'OPEN' || c.status === 'MONITORING';
+      } else if (filter === 'DISCHARGED') {
+        matchesFilter = c.status === 'DISCHARGED' || c.status === 'CLOSED';
+      } else {
+        matchesFilter = c.status === filter;
+      }
+
       const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             c.description?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesFilter && matchesSearch;
@@ -101,7 +110,7 @@ export const PatientCasesPage = () => {
         <div className="bg-white border border-gray-200 rounded-2xl p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-1 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
-              {(['ALL', 'OPEN', 'MONITORING', 'DISCHARGED', 'CLOSED'] as const).map((status) => (
+              {(['ALL', 'OPEN', 'DISCHARGED'] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setFilter(status)}

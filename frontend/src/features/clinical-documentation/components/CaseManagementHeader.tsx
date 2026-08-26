@@ -241,9 +241,7 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
                     }`}
                   >
                     <option value="OPEN">Open</option>
-                    <option value="MONITORING">Monitoring</option>
                     <option value="DISCHARGED">Discharged</option>
-                    <option value="CLOSED">Closed</option>
                   </select>
                 </div>
                 {selectedCase.primary_practitioner_name && (
