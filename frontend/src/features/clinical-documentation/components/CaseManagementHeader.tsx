@@ -19,7 +19,7 @@ import { getPractitioners, type Practitioner } from '@/features/clinics/clinic.a
 import type { PatientCase, PatientCaseStatus } from '@/types/patient';
 
 const STATUS_CONFIG: Record<PatientCaseStatus, { label: string; className: string }> = {
-  OPEN:       { label: 'Open',       className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  OPEN:       { label: 'Active',       className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   MONITORING: { label: 'Monitoring', className: 'bg-amber-50 text-amber-700 border-amber-200' },
   DISCHARGED: { label: 'Discharged', className: 'bg-purple-50 text-purple-700 border-purple-200' },
   CLOSED:     { label: 'Closed',     className: 'bg-gray-100 text-gray-500 border-gray-200' },
@@ -240,7 +240,7 @@ export const CaseManagementHeader: React.FC<CaseManagementHeaderProps> = ({
                       STATUS_CONFIG[selectedCase.status].className
                     }`}
                   >
-                    <option value="OPEN">Open</option>
+                    <option value="OPEN">Active</option>
                     <option value="DISCHARGED">Discharged</option>
                   </select>
                 </div>

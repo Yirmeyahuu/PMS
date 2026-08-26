@@ -71,7 +71,7 @@ export const CaseDetailsPage = () => {
             <h1 className="text-xl font-heading text-gray-900 flex items-center gap-3">
               {caseData.title}
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(caseData.status)}`}>
-                {caseData.status.charAt(0) + caseData.status.slice(1).toLowerCase()}
+                {caseData.status === 'OPEN' ? 'Active' : caseData.status.charAt(0) + caseData.status.slice(1).toLowerCase()}
               </span>
             </h1>
             <p className="text-sm text-gray-500 mt-1">

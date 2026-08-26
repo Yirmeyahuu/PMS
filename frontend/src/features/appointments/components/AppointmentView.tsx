@@ -237,7 +237,7 @@ const ServicePicker: React.FC<{
 
 // ── ClinicalCaseWorkspace (Column 2 of Client Tab) ───────────────────────────
 const CASE_STATUS_STYLES: Record<PatientCaseStatus, { label: string; dot: string; cls: string }> = {
-  OPEN: { label: 'Open', dot: 'bg-emerald-400', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  OPEN: { label: 'Active', dot: 'bg-emerald-400', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   MONITORING: { label: 'Monitoring', dot: 'bg-amber-400', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   DISCHARGED: { label: 'Discharged', dot: 'bg-purple-400', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
   CLOSED: { label: 'Closed', dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
@@ -478,7 +478,7 @@ const ClinicalCaseWorkspace = React.forwardRef<
             <div>
               <label className="block text-xs text-gray-500 mb-1.5">Case Status</label>
               <select value={editStatus} onChange={e => setEditStatus(e.target.value as PatientCaseStatus)} className={fieldCls}>
-                <option value="OPEN">Open</option>
+                <option value="OPEN">Active</option>
                 <option value="DISCHARGED">Discharged</option>
               </select>
             </div>

@@ -130,7 +130,7 @@ export const CaseModal = ({ isOpen, onClose, mode, initialValues, onSave, practi
                     onChange={(e) => setStatus(e.target.value as PatientCaseStatus)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
-                    <option value="OPEN">Open</option>
+                    <option value="OPEN">Active</option>
                     <option value="DISCHARGED">Discharged</option>
                   </select>
                 </div>

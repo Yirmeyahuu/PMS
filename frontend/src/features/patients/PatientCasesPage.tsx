@@ -120,7 +120,7 @@ export const PatientCasesPage = () => {
                       : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {status.charAt(0) + status.slice(1).toLowerCase()}
+                  {status === 'OPEN' ? 'Active' : status.charAt(0) + status.slice(1).toLowerCase()}
                 </button>
               ))}
             </div>
@@ -179,7 +179,7 @@ export const PatientCasesPage = () => {
                     {c.title}
                   </h3>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(c.status)}`}>
-                    {c.status.charAt(0) + c.status.slice(1).toLowerCase()}
+                    {c.status === 'OPEN' ? 'Active' : c.status.charAt(0) + c.status.slice(1).toLowerCase()}
                   </span>
                 </div>
                 
