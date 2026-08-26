@@ -33,7 +33,7 @@ import type { PatientCase, PatientCaseStatus, PatientCasePayer } from '@/types/p
 import { CaseModal, type CaseFormData } from '@/features/patients/CaseModal';
 import type { Practitioner } from '@/features/clinics/clinic.api';
 
-import { AppointmentEditForm }    from './AppointmentEditForm';
+import { AppointmentEditForm } from './AppointmentEditForm';
 import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
 import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
@@ -45,9 +45,9 @@ import {
 } from '../appointment.api';
 import toast from 'react-hot-toast';
 
-import { useAppointmentEdit }     from '../hooks/useAppointmentEdit';
+import { useAppointmentEdit } from '../hooks/useAppointmentEdit';
 import { communicationRecordsApi } from '@/features/manage/services/communications.api';
-import { usePractitioners }       from '@/features/clinics/hooks/usePractitioners';
+import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import type { AppointmentEditPayload } from '../appointment.api';
 
@@ -78,40 +78,40 @@ const TIME_SLOTS_15: { value: string; label: string }[] = (() => {
 })();
 
 const INVOICE_STATUS_STYLES: Record<string, string> = {
-  DRAFT:          'bg-gray-100 text-gray-600 border-gray-200',
-  PENDING:        'bg-yellow-50 text-yellow-700 border-yellow-200',
-  PAID:           'bg-green-50 text-green-700 border-green-200',
+  DRAFT: 'bg-gray-100 text-gray-600 border-gray-200',
+  PENDING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  PAID: 'bg-green-50 text-green-700 border-green-200',
   PARTIALLY_PAID: 'bg-blue-50 text-blue-700 border-blue-200',
-  OVERDUE:        'bg-red-50 text-red-700 border-red-200',
-  CANCELLED:      'bg-gray-100 text-gray-400 border-gray-200',
+  OVERDUE: 'bg-red-50 text-red-700 border-red-200',
+  CANCELLED: 'bg-gray-100 text-gray-400 border-gray-200',
 };
 
 type Tab = 'client' | 'appointment' | 'status' | 'clinical_notes' | 'invoice' | 'communications';
 
 interface AppointmentViewProps {
-  isOpen:      boolean;
-  onClose:     () => void;
+  isOpen: boolean;
+  onClose: () => void;
   appointment: Appointment | null;
-  onUpdated?:  (appointment: Appointment) => void;
+  onUpdated?: (appointment: Appointment) => void;
   onRecurringCreated?: () => void;
   /** Called when the user initiates rebook mode from this appointment's dropdown */
   onRebook?: (appointment: Appointment) => void;
 }
 
 interface EditableItem {
-  id?:         number;
+  id?: number;
   description: string;
-  quantity:    number;   // always number
-  unit_price:  number;
+  quantity: number;   // always number
+  unit_price: number;
   service_id?: number;
-  _key:        string;
+  _key: string;
 }
 
 const newBlankItem = (): EditableItem => ({
   description: '',
-  quantity:    1,
-  unit_price:  0,
-  _key:        crypto.randomUUID(),
+  quantity: 1,
+  unit_price: 0,
+  _key: crypto.randomUUID(),
 });
 
 // ── Appointment Summary Card ──────────────────────────────────────────────────
@@ -187,7 +187,7 @@ const AppointmentSummary: React.FC<{ appointment: Appointment }> = ({ appointmen
 const ServicePicker: React.FC<{
   services: ClinicService[];
   onSelect: (svc: ClinicService) => void;
-  onClose:  () => void;
+  onClose: () => void;
 }> = ({ services, onSelect, onClose }) => {
   const [search, setSearch] = useState('');
   const filtered = services.filter(s =>
@@ -237,35 +237,35 @@ const ServicePicker: React.FC<{
 
 // ── ClinicalCaseWorkspace (Column 2 of Client Tab) ───────────────────────────
 const CASE_STATUS_STYLES: Record<PatientCaseStatus, { label: string; dot: string; cls: string }> = {
-  OPEN:       { label: 'Open',       dot: 'bg-emerald-400', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  MONITORING: { label: 'Monitoring', dot: 'bg-amber-400',   cls: 'bg-amber-50 text-amber-700 border-amber-200'       },
-  DISCHARGED: { label: 'Discharged', dot: 'bg-purple-400',  cls: 'bg-purple-50 text-purple-700 border-purple-200'    },
-  CLOSED:     { label: 'Closed',     dot: 'bg-gray-400',    cls: 'bg-gray-100 text-gray-500 border-gray-200'         },
+  OPEN: { label: 'Open', dot: 'bg-emerald-400', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  MONITORING: { label: 'Monitoring', dot: 'bg-amber-400', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  DISCHARGED: { label: 'Discharged', dot: 'bg-purple-400', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+  CLOSED: { label: 'Closed', dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
 const ClinicalCaseWorkspace = React.forwardRef<
   { save(): void },
   {
-    appointment:          Appointment;
-    patientCases:         PatientCase[];
-    practitioners:        Practitioner[];
+    appointment: Appointment;
+    patientCases: PatientCase[];
+    practitioners: Practitioner[];
     loadingPractitioners: boolean;
-    onCasesChanged:       () => void;
-    onDirtyChange:        (dirty: boolean) => void;
-    onSaved:              (updated: Appointment) => void;
+    onCasesChanged: () => void;
+    onDirtyChange: (dirty: boolean) => void;
+    onSaved: (updated: Appointment) => void;
   }
 >(({ appointment, patientCases, practitioners, loadingPractitioners, onCasesChanged, onDirtyChange, onSaved }, ref) => {
   const queryClient = useQueryClient();
-  const [selectedCaseId,  setSelectedCaseId]  = useState<string>(
+  const [selectedCaseId, setSelectedCaseId] = useState<string>(
     appointment.patient_case ? String(appointment.patient_case) : ''
   );
-  const [editPayer,       setEditPayer]        = useState<PatientCasePayer | ''>(patientCases[0]?.payer ?? '');
-  const [editStatus,      setEditStatus]       = useState<PatientCaseStatus>(patientCases[0]?.status ?? 'OPEN');
-  const [editAlertNotes,  setEditAlertNotes]   = useState<string>(patientCases[0]?.alert_notes ?? '');
-  const [saveError,       setSaveError]        = useState<string | null>(null);
-  const [savedOk,         setSavedOk]          = useState(false);
-  const [showCreateModal, setShowCreateModal]  = useState(false);
-  const [showEditModal,   setShowEditModal]    = useState(false);
+  const [editPayer, setEditPayer] = useState<PatientCasePayer | ''>(patientCases[0]?.payer ?? '');
+  const [editStatus, setEditStatus] = useState<PatientCaseStatus>(patientCases[0]?.status ?? 'OPEN');
+  const [editAlertNotes, setEditAlertNotes] = useState<string>(patientCases[0]?.alert_notes ?? '');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedOk, setSavedOk] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const selectedCase = patientCases.find(c => String(c.id) === selectedCaseId) ?? null;
 
@@ -299,8 +299,8 @@ const ClinicalCaseWorkspace = React.forwardRef<
   }, [patientCases, selectedCaseId]);
 
   const isDirty = !!selectedCase && (
-    editPayer      !== (selectedCase.payer      ?? '') ||
-    editStatus     !== selectedCase.status             ||
+    editPayer !== (selectedCase.payer ?? '') ||
+    editStatus !== selectedCase.status ||
     editAlertNotes !== (selectedCase.alert_notes ?? '')
   );
 
@@ -308,8 +308,8 @@ const ClinicalCaseWorkspace = React.forwardRef<
     if (!selectedCase) return;
     setSaveError(null);
     apiUpdatePatientCase(Number(selectedCase.id), {
-      payer:      editPayer || undefined,
-      status:     editStatus,
+      payer: editPayer || undefined,
+      status: editStatus,
       alert_notes: editAlertNotes || undefined,
     }).then(() => {
       setSavedOk(true);
@@ -322,16 +322,16 @@ const ClinicalCaseWorkspace = React.forwardRef<
 
   const handleCreateCase = (data: CaseFormData) => {
     apiCreatePatientCase({
-      patient:     appointment.patient,
-      title:       data.title,
+      patient: appointment.patient,
+      title: data.title,
       description: data.description,
-      status:      data.status,
+      status: data.status,
       primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
       primary_practitioner_name: data.primaryPractitionerName || undefined,
-      payer:       data.payer || undefined,
-      alert_notes:  data.alertNotes || undefined,
+      payer: data.payer || undefined,
+      alert_notes: data.alertNotes || undefined,
       approved_sessions: data.approvedSessions,
-      referred_by:  data.referredBy || undefined,
+      referred_by: data.referredBy || undefined,
       referral_info: data.referralInfo || undefined,
     }).then(async (created) => {
       try {
@@ -352,15 +352,15 @@ const ClinicalCaseWorkspace = React.forwardRef<
   const handleEditCase = (data: CaseFormData) => {
     if (!selectedCase) return;
     apiUpdatePatientCase(Number(selectedCase.id), {
-      title:                   data.title,
-      description:             data.description,
-      status:                  data.status,
-      primary_practitioner:    data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
+      title: data.title,
+      description: data.description,
+      status: data.status,
+      primary_practitioner: data.primaryPractitionerId ? Number(data.primaryPractitionerId) : undefined,
       primary_practitioner_name: data.primaryPractitionerName || undefined,
-      payer:       data.payer || undefined,
-      alert_notes:  data.alertNotes || undefined,
+      payer: data.payer || undefined,
+      alert_notes: data.alertNotes || undefined,
       approved_sessions: data.approvedSessions,
-      referred_by:  data.referredBy || undefined,
+      referred_by: data.referredBy || undefined,
       referral_info: data.referralInfo || undefined,
     }).then(() => {
       setEditStatus(data.status);
@@ -532,9 +532,9 @@ const ClinicalCaseWorkspace = React.forwardRef<
         onClose={() => setShowCreateModal(false)}
         mode="create"
         initialValues={{
-            primary_practitioner:      appointment.practitioner ?? null,
-            primary_practitioner_name: appointment.practitioner_name ?? null,
-          }}
+          primary_practitioner: appointment.practitioner ?? null,
+          primary_practitioner_name: appointment.practitioner_name ?? null,
+        }}
         lockPractitioner
         onSave={handleCreateCase}
         practitioners={practitioners}
@@ -560,16 +560,16 @@ const ClinicalCaseWorkspace = React.forwardRef<
 const InlineAppointmentCard = React.forwardRef<
   { save(): Promise<void> },
   {
-    appointment:          Appointment;
-    practitioners:        { id: number | string; name: string; specialization: string | null; role?: string; roles?: string[]; discipline?: string | null }[];
+    appointment: Appointment;
+    practitioners: { id: number | string; name: string; specialization: string | null; role?: string; roles?: string[]; discipline?: string | null }[];
     loadingPractitioners: boolean;
-    isTerminal:           boolean;
-    onSaved:              (updated: Appointment) => void;
-    queryClient:          ReturnType<typeof useQueryClient>;
-    onDirtyChange:        (dirty: boolean) => void;
+    isTerminal: boolean;
+    onSaved: (updated: Appointment) => void;
+    queryClient: ReturnType<typeof useQueryClient>;
+    onDirtyChange: (dirty: boolean) => void;
   }
 >(({ appointment, practitioners, loadingPractitioners, isTerminal, onSaved, queryClient, onDirtyChange }, ref) => {
-  const [editService,      setEditService]      = useState<number | ''>(appointment.service ?? '');
+  const [editService, setEditService] = useState<number | ''>(appointment.service ?? '');
   const [editPractitioner, setEditPractitioner] = useState<number | ''>(appointment.practitioner ?? '');
 
   // Derive the currently-selected practitioner object and their discipline
@@ -590,10 +590,10 @@ const InlineAppointmentCard = React.forwardRef<
   // never shows unfiltered services.
   const filteredServices = shouldFetchServices ? services : [];
 
-  const [editStartTime,    setEditStartTime]    = useState(appointment.start_time.slice(0, 5));
-  const [editEndTime,      setEditEndTime]      = useState(appointment.end_time.slice(0, 5));
-  const [editNotes,        setEditNotes]        = useState(appointment.notes || '');
-  const [saveError,        setSaveError]        = useState<string | null>(null);
+  const [editStartTime, setEditStartTime] = useState(appointment.start_time.slice(0, 5));
+  const [editEndTime, setEditEndTime] = useState(appointment.end_time.slice(0, 5));
+  const [editNotes, setEditNotes] = useState(appointment.notes || '');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setEditService(appointment.service ?? '');
@@ -654,11 +654,11 @@ const InlineAppointmentCard = React.forwardRef<
   };
 
   const isDirty =
-    String(editService)      !== String(appointment.service      ?? '') ||
+    String(editService) !== String(appointment.service ?? '') ||
     String(editPractitioner) !== String(appointment.practitioner ?? '') ||
-    editStartTime            !== appointment.start_time.slice(0, 5)     ||
-    editEndTime              !== appointment.end_time.slice(0, 5)       ||
-    editNotes                !== (appointment.notes || '');
+    editStartTime !== appointment.start_time.slice(0, 5) ||
+    editEndTime !== appointment.end_time.slice(0, 5) ||
+    editNotes !== (appointment.notes || '');
 
   const handleSave = async () => {
     setSaveError(null);
@@ -667,13 +667,13 @@ const InlineAppointmentCard = React.forwardRef<
 
       const timeChanged =
         editStartTime !== appointment.start_time.slice(0, 5) ||
-        editEndTime   !== appointment.end_time.slice(0, 5);
+        editEndTime !== appointment.end_time.slice(0, 5);
 
       if (timeChanged) {
         updated = await apiRescheduleAppointment(appointment.id, {
-          date:       appointment.date,
+          date: appointment.date,
           start_time: editStartTime,
-          end_time:   editEndTime,
+          end_time: editEndTime,
         });
       }
 
@@ -884,26 +884,26 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
   });
   const patientCases = Array.isArray(apiPatientCases) ? apiPatientCases : [];
   const isPackageBilling = appointment?.patient_case && patientCases.find(c => c.id === appointment.patient_case)?.session_source === 'PACKAGE';
-  
+
   const { data: casePaymentSummary } = useQuery<CasePaymentSummary | null>({
     queryKey: ['case-payment-summary', appointment?.patient_case],
     queryFn: () => appointment?.patient_case ? getCasePaymentSummary(appointment.patient_case) : Promise.resolve(null),
     enabled: !!appointment?.patient_case && !!isPackageBilling,
   });
 
-  const [isEditing,   setIsEditing]   = useState(false);
-  const [editItems,   setEditItems]   = useState<EditableItem[]>([]);
-  const [editNotes,   setEditNotes]   = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editItems, setEditItems] = useState<EditableItem[]>([]);
+  const [editNotes, setEditNotes] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
-  const [pickerIdx,   setPickerIdx]   = useState<number | null>(null);
-  const [saveError,   setSaveError]   = useState<string | null>(null);
-  
+  const [pickerIdx, setPickerIdx] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   const { data: invoice, isLoading, error: fetchError, refetch } = useQuery<Invoice | null>({
     queryKey: ['appointment-invoice', appointment.id, invoiceIdToFetch],
-    queryFn:  async () => {
+    queryFn: async () => {
       if (invoiceIdToFetch) return billingApi.getInvoice(invoiceIdToFetch);
       return billingApi.getByAppointment(appointment.id);
     },
@@ -915,19 +915,19 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
 
   const { data: clinicServices = [] } = useQuery<ClinicService[]>({
     queryKey: ['clinic-services'],
-    queryFn:  () => billingApi.getClinicServices(),
+    queryFn: () => billingApi.getClinicServices(),
     staleTime: 5 * 60 * 1000,
   });
 
   const createMutation = useMutation({
     mutationFn: (items?: EditableItem[]) =>
       billingApi.createFromAppointment({
-        appointment:  appointment.id,
+        appointment: appointment.id,
         invoice_date: format(new Date(), 'yyyy-MM-dd'),
         items: items?.map(i => ({
           description: i.description,
-          quantity:    i.quantity,
-          unit_price:  i.unit_price,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
         })),
       }),
     onSuccess: () => {
@@ -942,27 +942,27 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!invoice) throw new Error('No invoice');
-      const keepIds  = new Set(editItems.filter(i => i.id).map(i => i.id!));
+      const keepIds = new Set(editItems.filter(i => i.id).map(i => i.id!));
       const toDelete = invoice.items.filter(i => !keepIds.has(i.id));
       for (const item of toDelete) await billingApi.deleteItem(item.id);
       for (const item of editItems.filter(i => i.id)) {
         await billingApi.updateItem(item.id!, {
           description: item.description,
-          quantity:    String(item.quantity) as any,
-          unit_price:  String(item.unit_price) as any,
+          quantity: String(item.quantity) as any,
+          unit_price: String(item.unit_price) as any,
         });
       }
       for (const item of editItems.filter(i => !i.id)) {
         if (!item.description.trim()) continue;
         await billingApi.addItem(invoice.id, {
-          invoice:     invoice.id,
+          invoice: invoice.id,
           description: item.description,
-          quantity:    item.quantity,
-          unit_price:  item.unit_price,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
         });
       }
       await billingApi.updateInvoice(invoice.id, {
-        notes:    editNotes,
+        notes: editNotes,
         due_date: editDueDate || null,
       } as any);
     },
@@ -978,17 +978,17 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
       else setSaveError('Failed to save changes. Please try again.');
     },
   });
-  
+
   const startEditing = useCallback(() => {
     if (!invoice) return;
     setEditItems(invoice.items.map(item => ({
-      id:          item.id,
+      id: item.id,
       description: item.description,
       // FIX: Parse string to number
-      quantity:    parseInt(String(item.quantity), 10) || 1,
+      quantity: parseInt(String(item.quantity), 10) || 1,
       // FIX: Parse string to number
-      unit_price:  parseFloat(String(item.unit_price)) || 0,
-      _key:        String(item.id),
+      unit_price: parseFloat(String(item.unit_price)) || 0,
+      _key: String(item.id),
     })));
     setEditNotes(invoice.notes || '');
     setEditDueDate(invoice.due_date || '');
@@ -998,9 +998,9 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
 
 
   const cancelEditing = () => { setIsEditing(false); setPickerIdx(null); setSaveError(null); };
-  const updateItem    = (key: string, patch: Partial<EditableItem>) =>
+  const updateItem = (key: string, patch: Partial<EditableItem>) =>
     setEditItems(prev => prev.map(i => i._key === key ? { ...i, ...patch } : i));
-  const removeItem    = (key: string) =>
+  const removeItem = (key: string) =>
     setEditItems(prev => prev.filter(i => i._key !== key));
   const addServiceItem = (svc: ClinicService, idx: number) =>
     setEditItems(prev => prev.map((item, i) =>
@@ -1046,7 +1046,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
               </span>
             </div>
           )}
-          <button 
+          <button
             onClick={() => navigate(`/billing/generate-invoice/${appointment.id}`)}
             disabled={createMutation.isPending}
             className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-semibold">
@@ -1249,7 +1249,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
         {[
           { label: 'Subtotal', value: invoice.subtotal },
           { label: 'Discount', value: invoice.discount_amount },
-          { label: 'Tax',      value: invoice.tax_amount },
+          { label: 'Tax', value: invoice.tax_amount },
         ].map(({ label, value }) => (
           <div key={label} className="flex items-center justify-between text-sm">
             <span className="text-gray-500">{label}</span>
@@ -1331,16 +1331,16 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
   onRecurringCreated,
   onRebook,
 }) => {
-  const [activeTab,             setActiveTab]             = useState<Tab>('client');
-  const [showCancelModal,       setShowCancelModal]       = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('client');
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [showAppointmentDropdown, setShowAppointmentDropdown] = useState(false);
-  const [showRecurringModal,     setShowRecurringModal]     = useState(false);
-  const [casesVersion,           setCasesVersion]           = useState(0);
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
+  const [casesVersion, setCasesVersion] = useState(0);
   const caseWorkspaceRef = useRef<{ save(): void } | null>(null);
-  const inlineApptRef    = useRef<{ save(): Promise<void> } | null>(null);
-  const [caseDirty,      setCaseDirty]   = useState(false);
-  const [apptDirty,      setApptDirty]   = useState(false);
-  const [isSavingAll,    setIsSavingAll] = useState(false);
+  const inlineApptRef = useRef<{ save(): Promise<void> } | null>(null);
+  const [caseDirty, setCaseDirty] = useState(false);
+  const [apptDirty, setApptDirty] = useState(false);
+  const [isSavingAll, setIsSavingAll] = useState(false);
   const appointmentDropdownRef = useRef<HTMLDivElement>(null);
 
   // Query client for invalidation
@@ -1419,6 +1419,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   const handleViewFullProfile = () => {
     if (patient) {
+      console.log('Navigating to full profile for patient:', patient.id);
       onClose();
       navigate(`/clients/${patient.id}`);
     }
@@ -1457,7 +1458,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   if (!isOpen || !appointment) return null;
 
-  const statusColors  = APPOINTMENT_STATUS_COLORS[appointment.status]
+  const statusColors = APPOINTMENT_STATUS_COLORS[appointment.status]
     ?? APPOINTMENT_STATUS_COLORS['CANCELLED']; // safe fallback for any unknown status
 
   const typeLabel = appointment.service_name
@@ -1468,12 +1469,12 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
   const formattedDate = format(new Date(appointment.date), 'EEEE, MMMM d, yyyy');
   const formattedTime = `${fmt12(appointment.start_time)} - ${fmt12(appointment.end_time)}`;
-  const isCancelled   = appointment.status === 'CANCELLED';
-  const isCompleted   = appointment.status === 'COMPLETED';
-  const isDNA         = appointment.arrival_status === 'DNA' || appointment.status === 'DNA';
-  const isTerminal    = isCancelled || isCompleted;
+  const isCancelled = appointment.status === 'CANCELLED';
+  const isCompleted = appointment.status === 'COMPLETED';
+  const isDNA = appointment.arrival_status === 'DNA' || appointment.status === 'DNA';
+  const isTerminal = isCancelled || isCompleted;
 
-const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = {};
+  const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = {};
   (Array.isArray(patientCases) ? patientCases : []).forEach((caseItem: PatientCase) => {
     const notes = getCaseNotes(appointment.patient, String(caseItem.id), patientNotes);
     const noteCount = getCaseNoteCount(appointment.patient, String(caseItem.id), patientNotes);
@@ -1490,7 +1491,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
   const formatDuration = (minutes: number): string => {
     if (minutes < 60) return `${minutes} min`;
     const hours = Math.floor(minutes / 60);
-    const mins  = minutes % 60;
+    const mins = minutes % 60;
     return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
   };
 
@@ -1548,9 +1549,8 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                isCancelled ? 'bg-red-100' : 'bg-sky-600'
-              }`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isCancelled ? 'bg-red-100' : 'bg-sky-600'
+                }`}>
                 <Calendar className={`w-5 h-5 ${isCancelled ? 'text-red-500' : 'text-white'}`} />
               </div>
               <div>
@@ -1582,10 +1582,10 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
               { key: 'appointment', label: 'Appointment', icon: Calendar, isDropdown: true },
               { key: 'status', label: 'Status', icon: ClipboardList },
               { key: 'clinical_notes', label: 'Clinical Notes', icon: FileText },
-              { 
-                key: 'invoice', 
-                label: hasInvoice ? 'View Invoice' : 'Generate Invoice', 
-                icon: Receipt 
+              {
+                key: 'invoice',
+                label: hasInvoice ? 'View Invoice' : 'Generate Invoice',
+                icon: Receipt
               },
               { key: 'communications', label: 'Communications', icon: Mailbox },
             ] as { key: Tab; label: string; icon: React.ElementType; isDropdown?: boolean }[]).map(tab => (
@@ -1604,11 +1604,10 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       if (isEditing) cancelEdit();
                     }
                   }}
-                  className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${
-                    activeTab === tab.key
-                      ? 'border-sky-500 text-sky-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${activeTab === tab.key
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.label}
@@ -1678,9 +1677,10 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                     )}
                     <button
                       onClick={() => {
+                        console.log('View Appointment List clicked. Navigating to:', `/patients/${appointment.patient}/appointments`);
                         setShowAppointmentDropdown(false);
                         onClose();
-                        navigate(`/clients/${appointment.patient}`);
+                        navigate(`/patients/${appointment.patient}/appointments`);
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition-colors"
                     >
@@ -1948,7 +1948,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                           <div>
                             <p className="text-xs text-sky-600 font-medium">Duration</p>
                             <p className="text-sm font-semibold text-gray-900">
-                              {formatDuration((() => { const [sH,sM] = appointment.start_time.split(':').map(Number); const [eH,eM] = appointment.end_time.split(':').map(Number); return Math.max((eH*60+eM)-(sH*60+sM), 15); })())}
+                              {formatDuration((() => { const [sH, sM] = appointment.start_time.split(':').map(Number); const [eH, eM] = appointment.end_time.split(':').map(Number); return Math.max((eH * 60 + eM) - (sH * 60 + sM), 15); })())}
                             </p>
                           </div>
                         </div>
@@ -2030,7 +2030,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                         { label: 'Created at', value: format(new Date(appointment.created_at), 'MMM d, yyyy h:mm a') },
                         ...(appointment.updated_by_name ? [
                           { label: 'Last updated by', value: appointment.updated_by_name },
-                          { label: 'Updated at',      value: format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a') },
+                          { label: 'Updated at', value: format(new Date(appointment.updated_at), 'MMM d, yyyy h:mm a') },
                         ] : []),
                       ].map(({ label, value }) => (
                         <div key={label} className="flex items-center justify-between">
@@ -2085,7 +2085,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
 
                             const statusLabel = newStatus === 'ARRIVED' ? 'Arrived'
                               : newStatus === 'DNA' ? 'Did Not Arrive'
-                              : 'No Status';
+                                : 'No Status';
                             toast.success(`Arrival status updated → ${statusLabel}`);
                           } catch (err) {
                             console.error('Failed to update arrival status:', err);
@@ -2209,7 +2209,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
             {/* ── Communications Tab ── */}
             {activeTab === 'communications' && (
               <div className="space-y-4">
-                
+
                 {/* Manual Staff Actions */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
@@ -2226,24 +2226,23 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       View all Communication <ExternalLink className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                          Status: 
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${
-                            appointment.confirmation_status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' : 
+                          Status:
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${appointment.confirmation_status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' :
                             appointment.confirmation_status === 'DECLINED' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {appointment.confirmation_status === 'CONFIRMED' ? 'Confirmed' : 
-                             appointment.confirmation_status === 'DECLINED' ? 'Declined' : 'Pending'}
+                            }`}>
+                            {appointment.confirmation_status === 'CONFIRMED' ? 'Confirmed' :
+                              appointment.confirmation_status === 'DECLINED' ? 'Declined' : 'Pending'}
                           </span>
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {appointment.confirmation_status === 'CONFIRMED' ? 'The patient has confirmed their attendance.' :
-                           appointment.confirmation_status === 'DECLINED' ? 'The patient has declined this appointment.' :
-                           'Waiting for the patient to reply to their reminder.'}
+                            appointment.confirmation_status === 'DECLINED' ? 'The patient has declined this appointment.' :
+                              'Waiting for the patient to reply to their reminder.'}
                         </p>
                       </div>
                     </div>
@@ -2255,7 +2254,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                   <p className="text-xs font-bold text-sky-800 uppercase tracking-wide mb-4">
                     Communication Log
                   </p>
-                  
+
                   {isLoadingLogs ? (
                     <div className="flex justify-center py-6">
                       <RefreshCw className="w-5 h-5 text-sky-400 animate-spin" />
@@ -2271,20 +2270,20 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                       <Mailbox className="w-8 h-8 text-sky-200 mb-3" />
                       <p className="text-sm font-semibold text-gray-700 mb-1">No communications yet.</p>
                       <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
-                        Communication activity for this appointment<br/>will appear here.
+                        Communication activity for this appointment<br />will appear here.
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {communicationLogs.map((log: any, idx: number) => {
-                        
+
                         const isConfirmedAppt = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(appointment.status);
                         const isCancelledAppt = ['CANCELLED', 'DNA', 'NO_SHOW'].includes(appointment.status);
 
                         const confirmed = log.patient_reply === 'Y' || isConfirmedAppt;
                         const rescheduled = log.patient_reply === 'RESCHEDULE';
-                        const declined  = (log.patient_reply === 'N' || isCancelledAppt) && !rescheduled;
-                        
+                        const declined = (log.patient_reply === 'N' || isCancelledAppt) && !rescheduled;
+
                         let cardColor = '#F97316'; // default pending orange
                         let bgCardColor = 'bg-orange-50';
                         let textCardColor = 'text-orange-700';
@@ -2307,8 +2306,8 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                         }
 
                         return (
-                          <div 
-                            key={log.id || idx} 
+                          <div
+                            key={log.id || idx}
                             className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative"
                           >
                             <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: cardColor }} />
@@ -2329,7 +2328,7 @@ const caseMetrics: Record<string, { noteCount: number; lastUpdated: string }> = 
                                   {format(new Date(log.created_at), 'MMM d, yyyy h:mm a')}
                                 </span>
                               </div>
-                              
+
                               <div className="bg-gray-50 rounded-lg p-3 mt-3 space-y-1.5 border border-gray-100">
                                 <div className="flex justify-between">
                                   <span className="text-[11px] text-gray-500">Sent:</span>

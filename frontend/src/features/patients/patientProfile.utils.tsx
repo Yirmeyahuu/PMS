@@ -131,3 +131,55 @@ export const getSimplifiedAppointmentStatus = (
     icon: <FileText className="w-3 h-3" />,
   };
 };
+
+export const getStrictAppointmentStatus = (
+  appointment: Appointment
+): SimplifiedAppointmentStatus => {
+  if (appointment.status === 'CANCELLED' || appointment.arrival_status === 'DNA' || appointment.status === 'NO_SHOW') {
+    return {
+      label: 'Cancelled',
+      color: 'bg-red-50 text-red-700',
+      icon: <XCircle className="w-3 h-3" />,
+    };
+  }
+
+  // If a patient explicitly replied to reschedule, or it's a known rebook:
+  if (appointment.patient_reply === 'RESCHEDULE') {
+    return {
+      label: 'Rescheduled',
+      color: 'bg-blue-50 text-blue-700',
+      icon: <Clock className="w-3 h-3" />,
+    };
+  }
+
+  if (appointment.status === 'CONFIRMED') {
+    return {
+      label: 'Confirmed',
+      color: 'bg-green-50 text-green-700',
+      icon: <CheckCircle className="w-3 h-3" />,
+    };
+  }
+
+  // All other active statuses fallback to Pending
+  return {
+    label: 'Pending',
+    color: 'bg-orange-50 text-orange-700',
+    icon: <AlertCircle className="w-3 h-3" />,
+  };
+};
+
+export const getPaymentStatus = (appointment: Appointment): SimplifiedAppointmentStatus => {
+  if (appointment.has_invoice) {
+    return {
+      label: 'Invoiced',
+      color: 'bg-emerald-50 text-emerald-700',
+      icon: <CheckCircle className="w-3 h-3" />,
+    };
+  }
+
+  return {
+    label: 'Uninvoiced',
+    color: 'bg-gray-100 text-gray-600',
+    icon: <AlertCircle className="w-3 h-3" />,
+  };
+};

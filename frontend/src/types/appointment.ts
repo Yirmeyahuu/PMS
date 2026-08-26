@@ -1,6 +1,7 @@
 export interface Appointment {
   id:         number;
   clinic:     number;
+  clinic_name?: string | null;
   branch_id:  number | null;
   patient:    number;
   patient_name: string;
@@ -19,6 +20,8 @@ export interface Appointment {
   appointment_type: string;
 
   patient_case: number | null;
+  patient_case_title?: string | null;
+  patient_case_payer?: string | null;
   case_remaining_sessions: number | null;
   case_is_unlimited: boolean;
   case_session_number?: number | null;

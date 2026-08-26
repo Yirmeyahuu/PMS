@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   CheckSquare,
-  Clock,
   Loader2,
   Square,
   XCircle,
@@ -16,7 +15,9 @@ import {
   APPOINTMENT_TYPE_LABELS,
   getAppointmentIdsWithNotes,
   getDaysUntilAppointment,
-  getSimplifiedAppointmentStatus,
+  getStrictAppointmentStatus,
+  getPaymentStatus,
+  formatDate,
 } from './patientProfile.utils.tsx';
 import type { Appointment } from '@/types';
 
@@ -140,102 +141,82 @@ const AppointmentRow = ({
   onSelect,
   onClick,
 }: AppointmentRowProps) => {
-  const statusConfig = getSimplifiedAppointmentStatus(appointment, hasClinicalNote);
+  const strictStatus = getStrictAppointmentStatus(appointment);
+  const paymentStatus = getPaymentStatus(appointment);
   const cardStyle   = getCardStatusStyle(appointment, hasClinicalNote);
 
   // Build the card's inline styles — applied on top of Tailwind base classes
-  const cardInlineStyle: React.CSSProperties = {
-    paddingLeft: isSelectableForCancellation ? '2.5rem' : '1rem',
-    ...(cardStyle && !isSelected
-      ? {
-          borderLeft: cardStyle.borderLeft,
-          background: cardStyle.background,
-        }
-      : {}),
+  const rowStyle: React.CSSProperties = {
+    background: cardStyle?.background || '#ffffff',
+  };
+  const borderLeftStyle: React.CSSProperties = {
+    borderLeft: cardStyle?.borderLeft || '4px solid transparent',
   };
 
-  // Badge inline style — overrides the color pair from statusConfig when we have a cardStyle
-  const badgeInlineStyle: React.CSSProperties = cardStyle
-    ? { background: cardStyle.badgeBg, color: cardStyle.badgeColor }
-    : {};
-
   return (
-    <div className="relative">
-      {isSelectableForCancellation && (
-        <button
-          type="button"
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10"
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect(appointment.id);
-          }}
-        >
-          {isSelected ? (
-            <CheckSquare className="w-5 h-5 text-sky-600" />
-          ) : (
-            <Square className="w-5 h-5 text-gray-400 hover:text-sky-500" />
-          )}
-        </button>
-      )}
-
-      <button
-        type="button"
-        onClick={() => onClick(appointment)}
-        className={`w-full text-left flex items-center gap-4 px-4 py-3 rounded-lg border hover:border-sky-300 hover:brightness-95 transition-all group ${
-          isSelectableForCancellation
-            ? isSelected
-              ? 'bg-sky-50 border-sky-300'
-              : cardStyle
-                ? 'border-transparent'
-                : 'bg-white border-gray-200'
-            : cardStyle
-              ? 'border-transparent opacity-80'
-              : 'bg-white border-gray-200 opacity-60'
-        }`}
-        style={cardInlineStyle}
-      >
-        <div className="shrink-0 w-11 text-center">
-          <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">
-            {new Date(appointment.date).toLocaleDateString('en-US', { month: 'short' })}
-          </p>
-          <p className="text-lg font-bold text-gray-900 leading-tight">{new Date(appointment.date).getDate()}</p>
-          <p className="text-[10px] text-gray-400 leading-none">{new Date(appointment.date).getFullYear()}</p>
-        </div>
-
-        <div className="w-px h-9 bg-gray-200 shrink-0" />
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-gray-900 truncate">
-              {APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
-            </p>
-            <span
-              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-              style={cardStyle ? badgeInlineStyle : undefined}
+    <tr
+      onClick={() => onClick(appointment)}
+      className="group cursor-pointer transition-colors border-b border-gray-100 last:border-b-0 hover:brightness-95"
+      style={rowStyle}
+    >
+      <td className="px-4 py-3 whitespace-nowrap" style={borderLeftStyle}>
+        <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+          {isSelectableForCancellation ? (
+            <button
+              type="button"
+              className="z-10 focus:outline-none"
+              onClick={() => onSelect(appointment.id)}
             >
-              {/* When no cardStyle override, fall back to statusConfig Tailwind classes */}
-              {!cardStyle && <span className={`inline-flex items-center gap-1 ${statusConfig.color}`}>{statusConfig.icon}</span>}
-              {cardStyle && statusConfig.icon}
-              {statusConfig.label}
-            </span>
-          </div>
-
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
-            <Clock className="w-3 h-3 inline mr-1" />
-            {formatTime12h(appointment.start_time)} – {formatTime12h(appointment.end_time)}
-            {appointment.practitioner_name && <> • {appointment.practitioner_name}</>}
-          </p>
-
-          {appointment.cancellation_reason && (
-            <p className="text-xs text-red-500 mt-0.5 truncate">Reason: {appointment.cancellation_reason}</p>
+              {isSelected ? (
+                <CheckSquare className="w-5 h-5 text-sky-600" />
+              ) : (
+                <Square className="w-5 h-5 text-gray-400 hover:text-sky-500" />
+              )}
+            </button>
+          ) : (
+            <div className="w-5 h-5" />
           )}
         </div>
-
-        <span className="shrink-0 text-xs text-gray-300 group-hover:text-sky-500 transition-colors font-medium">
-          View →
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
+        {formatDate(appointment.date)}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+        {formatTime12h(appointment.start_time)}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600 max-w-[150px] truncate" title={appointment.clinic_name || '—'}>
+        {appointment.clinic_name || '—'}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-900 font-medium max-w-[200px] truncate" title={APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}>
+        {APPOINTMENT_TYPE_LABELS[appointment.appointment_type] || appointment.appointment_type}
+        {appointment.cancellation_reason && (
+          <span className="block text-xs text-red-500 font-normal truncate mt-0.5" title={appointment.cancellation_reason}>
+            Reason: {appointment.cancellation_reason}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+        {appointment.practitioner_name || '—'}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600 max-w-[150px] truncate" title={appointment.patient_case_title || '—'}>
+        {appointment.patient_case_title || '—'}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+        {appointment.patient_case_payer || '—'}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap">
+        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${strictStatus.color}`}>
+          {strictStatus.icon}
+          {strictStatus.label}
         </span>
-      </button>
-    </div>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap">
+        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${paymentStatus.color}`}>
+          {paymentStatus.icon}
+          {paymentStatus.label}
+        </span>
+      </td>
+    </tr>
   );
 };
 
@@ -490,21 +471,56 @@ export const PatientAppointmentsPage = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {paginatedAppointments.map((appointment) => (
-                <AppointmentRow
-                  key={appointment.id}
-                  appointment={appointment}
-                  hasClinicalNote={appointmentIdsWithNotes.has(appointment.id)}
-                  isSelectableForCancellation={isSelectableForCancellation(appointment, appointmentIdsWithNotes.has(appointment.id))}
-                  isSelected={selectedAppointmentIds.has(appointment.id)}
-                  onSelect={handleToggleSelect}
-                  onClick={(nextAppointment) => {
-                    setSelectedAppointment(nextAppointment);
-                    setIsDetailOpen(true);
-                  }}
-                />
-              ))}
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">
+                      <div className="flex items-center gap-1">
+                        {cancellableAppointments.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSelectAll}
+                            className="text-gray-400 hover:text-sky-600 focus:outline-none transition-colors"
+                            title={allSelected ? 'Deselect All' : 'Select All'}
+                          >
+                            {allSelected ? (
+                              <CheckSquare className="w-5 h-5" />
+                            ) : (
+                              <Square className="w-5 h-5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Consultation Type</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Practitioner</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Case</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Payer</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {paginatedAppointments.map((appointment) => (
+                    <AppointmentRow
+                      key={appointment.id}
+                      appointment={appointment}
+                      hasClinicalNote={appointmentIdsWithNotes.has(appointment.id)}
+                      isSelectableForCancellation={isSelectableForCancellation(appointment, appointmentIdsWithNotes.has(appointment.id))}
+                      isSelected={selectedAppointmentIds.has(appointment.id)}
+                      onSelect={handleToggleSelect}
+                      onClick={(nextAppointment) => {
+                        setSelectedAppointment(nextAppointment);
+                        setIsDetailOpen(true);
+                      }}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

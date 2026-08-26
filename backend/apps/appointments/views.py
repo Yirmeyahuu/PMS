@@ -51,6 +51,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         'service',                             # avoids extra queries for service_name/color/duration
         'location',
         'clinic',
+        'patient_case',
         'created_by',
         'updated_by',
         'cancelled_by',

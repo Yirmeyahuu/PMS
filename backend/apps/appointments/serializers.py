@@ -20,6 +20,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     # ── Expose the branch_id consistently ────────────────────────────────────
     branch_id = serializers.SerializerMethodField()
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True, allow_null=True)
 
     # Include arrival_status and arrival_time in the response
     arrival_status = serializers.CharField(read_only=True)
@@ -37,6 +38,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_case = serializers.PrimaryKeyRelatedField(
         queryset=PatientCase.objects.all(), required=False, allow_null=True
     )
+    patient_case_title = serializers.CharField(source='patient_case.title', read_only=True)
+    patient_case_payer = serializers.CharField(source='patient_case.payer', read_only=True)
     is_rebook = serializers.BooleanField(write_only=True, required=False, default=False)
     case_remaining_sessions = serializers.SerializerMethodField()
     case_is_unlimited = serializers.SerializerMethodField()
@@ -49,11 +52,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Appointment
         fields = [
-            'id', 'clinic', 'branch_id', 'patient', 'patient_name',
+            'id', 'clinic', 'clinic_name', 'branch_id', 'patient', 'patient_name',
             'practitioner', 'practitioner_name', 'practitioner_avatar',
             'location', 'location_name',
             'service', 'service_name', 'service_color', 'service_duration',
-            'appointment_type', 'patient_case', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
+            'appointment_type', 'patient_case', 'patient_case_title', 'patient_case_payer', 'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
             'effective_session_limit', 'session_limit_source', 'session_display',
             'status', 'arrival_status', 'arrival_time',
             'date', 'start_time', 'end_time', 'duration_minutes',
@@ -71,9 +74,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'branch_id', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
+            'id', 'branch_id', 'clinic_name', 'patient_name', 'practitioner_name', 'practitioner_avatar', 'location_name',
             'service_name', 'service_color', 'service_duration',
             'created_by_name', 'updated_by_name', 'has_invoice', 'is_covered_by_package', 'package_invoice_id',
+            'patient_case_title', 'patient_case_payer',
             'case_remaining_sessions', 'case_is_unlimited', 'package_invoices_count', 'case_session_number', 'case_approved_sessions',
             'effective_session_limit', 'session_limit_source', 'session_display',
             'created_at', 'updated_at',
