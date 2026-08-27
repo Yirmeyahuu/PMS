@@ -367,6 +367,9 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         Returns a tuple: (items: list, meta: dict)
         """
+        from django.db.models import Prefetch
+        from apps.notifications.models import CommunicationLog
+
         clinic, main_clinic, all_branch_ids = self._get_clinic_and_branch_ids(request)
         start, end = self._get_date_range(request)
 
@@ -392,6 +395,13 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'clinic',
                 'cancelled_by',
             )
+            .prefetch_related(
+                Prefetch(
+                    'communication_logs',
+                    queryset=CommunicationLog.objects.filter(comm_type='CANCELLATION').order_by('-created_at'),
+                    to_attr='cancellation_logs'
+                )
+            )
         )
 
         # Optional filters
@@ -411,8 +421,19 @@ class ReportViewSet(viewsets.ModelViewSet):
         items = []
         for appt in qs.order_by('date', 'start_time'):
             cancelled_by_name = None
+            reason = appt.cancellation_reason or None
+            cancelled_at = appt.cancelled_at.isoformat() if appt.cancelled_at else None
+
             if appt.cancelled_by:
                 cancelled_by_name = appt.cancelled_by.get_full_name()
+            elif hasattr(appt, 'cancellation_logs') and appt.cancellation_logs:
+                latest_log = appt.cancellation_logs[0]
+                if not cancelled_at:
+                    cancelled_at = latest_log.created_at.isoformat()
+                if latest_log.event_metadata:
+                    cancelled_by_name = latest_log.event_metadata.get('cancelled_by', 'Patient')
+                    if not reason:
+                        reason = latest_log.event_metadata.get('reason')
 
             items.append({
                 'appointment_id':    appt.id,
@@ -429,9 +450,9 @@ class ReportViewSet(viewsets.ModelViewSet):
                     if appt.practitioner and appt.practitioner.user else ''
                 ),
                 'branch_name':       appt.clinic.name if appt.clinic else None,
-                'cancelled_at':      appt.cancelled_at.isoformat() if appt.cancelled_at else None,
+                'cancelled_at':      cancelled_at,
                 'cancelled_by':      cancelled_by_name,
-                'reason':            appt.cancellation_reason or None,
+                'reason':            reason,
             })
 
         cancelled_count = sum(1 for i in items if i['status'] == 'CANCELLED')
@@ -513,10 +534,12 @@ class ReportViewSet(viewsets.ModelViewSet):
                     queryset=(
                         Appointment.objects
                         .filter(clinic_id__in=all_branch_ids, is_deleted=False)
+                        .select_related('clinic', 'practitioner__user')
                         .order_by('date', 'start_time')
                     ),
                     to_attr='all_appointments',
-                )
+                ),
+                'cases'
             )
             .order_by('last_name', 'first_name')
         )
@@ -530,54 +553,48 @@ class ReportViewSet(viewsets.ModelViewSet):
             ).distinct()
 
         items = []
+        patient_count = 0
+        new_clients_count = 0
+
         for patient in patients_qs:
+            patient_count += 1
+            is_new = start <= patient.created_at.date() <= end
+            if is_new:
+                new_clients_count += 1
+                
             range_appts = [a for a in patient.all_appointments if start <= a.date <= end]
-            upcoming_appts = [
-                a for a in patient.all_appointments
-                if a.date >= today and a.status in ('SCHEDULED', 'CONFIRMED', 'CHECKED_IN')
+            
+            patient_cases = [
+                {'title': c.title, 'status': c.status}
+                for c in patient.cases.all()
             ]
-
-            upcoming_list = []
-            for appt in upcoming_appts[:10]:
-                upcoming_list.append({
-                    'appointment_id':    appt.id,
-                    'date':              str(appt.date),
-                    'start_time':        str(appt.start_time),
-                    'appointment_type':  appt.appointment_type,
-                    'status':            appt.status,
-                    'practitioner_name': (
-                        appt.practitioner.user.get_full_name()
-                        if appt.practitioner and appt.practitioner.user else ''
-                    ),
-                    'service_name': appt.service.name if appt.service else '',
-                })
-
+            
+            prac_names = set()
+            branches = set()
+            for appt in range_appts:
+                if appt.practitioner and appt.practitioner.user:
+                    prac_names.add(appt.practitioner.user.get_full_name())
+                if appt.clinic:
+                    branches.add(appt.clinic.name)
+            
             items.append({
                 'patient_id':         patient.id,
                 'patient_name':       patient.get_full_name(),
                 'patient_number':     patient.patient_number,
-                'gender':             patient.gender,
-                'date_of_birth':      str(patient.date_of_birth) if patient.date_of_birth else None,
-                'phone':              patient.phone or None,
-                'email':              patient.email or None,
-                'registered_on':      str(patient.created_at.date()),
-                'is_new_this_period': start <= patient.created_at.date() <= end,
-                'total_bookings':     len(patient.all_appointments),
-                'range_bookings':     len(range_appts),
-                'upcoming_bookings':  upcoming_list,
+                'is_new_this_period': is_new,
+                'cases':              patient_cases,
+                'date_created':       str(patient.created_at.date()),
+                'practitioners':      sorted(list(prac_names)),
+                'branches':           sorted(list(branches)),
             })
-
-        new_clients_count    = sum(1 for i in items if i['is_new_this_period'])
-        total_range_bookings = sum(i['range_bookings'] for i in items)
 
         return Response({
             'report_type':          'CLIENTS_CASES',
             'tab':                  'CLINIC',
             'start_date':           str(start),
             'end_date':             str(end),
-            'total_patients':       len(items),
+            'total_patients':       patient_count,
             'new_clients_count':    new_clients_count,
-            'total_range_bookings': total_range_bookings,
             'results':              items,
         })
 
@@ -599,6 +616,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 status='COMPLETED',
                 date__range=[start, end],
             )
+            .select_related('clinic', 'patient', 'practitioner__user', 'service', 'patient_case')
             .prefetch_related(
                 Prefetch(
                     'clinical_note',
@@ -616,6 +634,7 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         missing_items  = []
         unsigned_items = []
+        signed_items   = []
 
         for appt in qs.order_by('date', 'start_time'):
             try:
@@ -640,8 +659,8 @@ class ReportViewSet(viewsets.ModelViewSet):
                     if appt.practitioner and appt.practitioner.user else ''
                 ),
                 'service_name':      appt.service.name if appt.service else '',
-                'branch_name':       appt.branch.name  if appt.branch  else None,
-                'days_since':        days_since,
+                'branch_name':       appt.clinic.name  if appt.clinic  else None,
+                'case_title':        appt.patient_case.title if appt.patient_case else None,
             }
 
             if note is None:
@@ -651,11 +670,12 @@ class ReportViewSet(viewsets.ModelViewSet):
                 row['note_status'] = 'UNSIGNED_DRAFT'
                 row['note_id']     = note.id
                 unsigned_items.append(row)
+            else:
+                row['note_status'] = 'SIGNED'
+                row['note_id']     = note.id
+                signed_items.append(row)
 
-        results = missing_items[:]
-        if include_unsigned:
-            results += unsigned_items
-
+        results = missing_items + unsigned_items + signed_items
         results.sort(key=lambda x: (x['date'], x['start_time']), reverse=True)
 
         return Response({
@@ -1283,6 +1303,9 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         branch_id       = request.query_params.get('branch_id')
         practitioner_id = request.query_params.get('practitioner_id')
+        start_date      = request.query_params.get('start_date')
+        end_date        = request.query_params.get('end_date')
+
         if branch_id:
             try:
                 qs = qs.filter(clinic_id=int(branch_id))
@@ -1293,6 +1316,11 @@ class ReportViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(appointment__practitioner_id=int(practitioner_id))
             except (ValueError, TypeError):
                 pass
+                
+        if start_date:
+            qs = qs.filter(invoice_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(invoice_date__lte=end_date)
 
         bucket_totals = {'CURRENT': 0.0, '0_30': 0.0, '31_60': 0.0, '61_90': 0.0, '90_plus': 0.0}
         items = []
@@ -1301,6 +1329,14 @@ class ReportViewSet(viewsets.ModelViewSet):
         for inv in qs:
             days_overdue = (today - inv.invoice_date).days
             balance      = float(inv.balance_due)
+
+            if balance <= 0:
+                continue
+
+            if float(inv.amount_paid) > 0:
+                unified_status = 'PARTIALLY_PAID'
+            else:
+                unified_status = 'OPEN'
 
             if days_overdue <= 0:
                 bucket = 'CURRENT'
@@ -1328,7 +1364,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'total_amount':       float(inv.total_amount),
                 'amount_paid':        float(inv.amount_paid),
                 'balance_due':        balance,
-                'status':             inv.status,
+                'status':             unified_status,
                 'days_overdue':       days_overdue,
                 'bucket':             bucket,
                 'appointment_id':     inv.appointment_id,
@@ -1343,68 +1379,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                 '90_plus':            balance if bucket == '90_plus' else 0.0,
             })
 
-        unbilled_appts = (
-            Appointment.objects
-            .filter(
-                clinic_id__in=all_branch_ids,
-                status__in=['COMPLETED', 'CHECKED_IN', 'IN_PROGRESS'],
-                is_deleted=False,
-            )
-            .exclude(
-                billing_invoices__is_deleted=False
-            )
-            .select_related('patient', 'practitioner__user', 'clinic')
-        )
-
-        if branch_id:
-            try:
-                unbilled_appts = unbilled_appts.filter(clinic_id=int(branch_id))
-            except (ValueError, TypeError):
-                pass
-
-        for appt in unbilled_appts:
-            days_outstanding = (today - appt.date).days
-
-            if days_outstanding <= 0:
-                bucket = 'CURRENT'
-            elif days_outstanding <= 30:
-                bucket = '0_30'
-            elif days_outstanding <= 60:
-                bucket = '31_60'
-            elif days_outstanding <= 90:
-                bucket = '61_90'
-            else:
-                bucket = '90_plus'
-
-            bucket_totals[bucket] = round(bucket_totals[bucket] + 0.0, 2)
-
-            items.append({
-                'id':                 appt.id,
-                'source':             'unbilled_appointment',
-                'invoice_id':         None,
-                'invoice_number':     None,
-                'invoice_date':       None,
-                'due_date':           None,
-                'patient_id':         appt.patient_id,
-                'patient_name':       appt.patient.get_full_name() if appt.patient else '',
-                'patient_number':     appt.patient.patient_number if appt.patient else '',
-                'total_amount':       0.0,
-                'amount_paid':        0.0,
-                'balance_due':        0.0,
-                'status':             'UNBILLED',
-                'days_overdue':       days_outstanding,
-                'bucket':             bucket,
-                'appointment_id':     appt.id,
-                'appointment_date':   str(appt.date),
-                'appointment_type':  appt.appointment_type if appt.appointment_type else '',
-                'practitioner_name':  appt.practitioner.user.get_full_name() if appt.practitioner and appt.practitioner.user else '',
-                'practitioner_id':    appt.practitioner_id,
-                'CURRENT':           0.0,
-                '0_30':               0.0,
-                '31_60':              0.0,
-                '61_90':              0.0,
-                '90_plus':            0.0,
-            })
+        # Unbilled appointments are completely removed as they do not represent an ageing debt.
 
         debt_entries = (
             AgeingDebtEntry.objects
@@ -1417,8 +1392,16 @@ class ReportViewSet(viewsets.ModelViewSet):
             .order_by('due_date', 'invoice_number')
         )
 
+        if start_date:
+            debt_entries = debt_entries.filter(invoice_date__gte=start_date)
+        if end_date:
+            debt_entries = debt_entries.filter(invoice_date__lte=end_date)
+
         for entry in debt_entries:
             balance = float(entry.balance_due)
+            if balance <= 0:
+                continue
+                
             bucket = entry.bucket or 'CURRENT'
             if bucket not in bucket_totals:
                 bucket_totals[bucket] = 0.0

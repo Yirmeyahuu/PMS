@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { Clock, AlertTriangle, DollarSign, Plus, Pencil, Search, X } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Clock, AlertTriangle, DollarSign, Plus, Search, X } from 'lucide-react';
 import {
   ReportHeader,
   StatCard,
@@ -9,7 +9,6 @@ import {
   PrintButton,
   openPrintWindow,
   formatDate,
-  StatusBadge,
 } from '../../components/ReportShared';
 import {
   getAgeingDebts,
@@ -22,21 +21,9 @@ import { EditAgeingDebtModal } from './components/EditAgeingDebtModal';
 const formatPeso = (n: number) =>
   '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const BUCKET_STYLES: Record<string, string> = {
-  CURRENT: 'bg-blue-50 text-blue-700 border-blue-200',
-  '0_30':  'bg-yellow-50 text-yellow-700 border-yellow-200',
-  '31_60': 'bg-orange-50 text-orange-700 border-orange-200',
-  '61_90': 'bg-red-50 text-red-700 border-red-200',
-  '90_plus': 'bg-rose-100 text-rose-800 border-rose-300',
-};
 
-const BUCKET_LABELS: Record<string, string> = {
-  CURRENT: 'Current',
-  '0_30':  '1-30 Days',
-  '31_60': '31-60 Days',
-  '61_90': '61-90 Days',
-  '90_plus': '90+ Days',
-};
+
+
 
 
 
@@ -58,26 +45,8 @@ function buildPrintHtml(data: AgeingDebtsResponse): string {
       <td>${d.appointment_type || '—'}</td>
       <td>${d.practitioner_name || '—'}</td>
       <td>${d.due_date ? formatDate(d.due_date) : '—'}</td>
-      <td>${d.days_overdue > 0 ? `${d.days_overdue}d` : '—'}</td>
-      <td style="text-align:right">${formatPeso(d.balance_due)}</td>
-      <td>
-        <span style="
-          display:inline-flex;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:600;
-          background:${
-            d.bucket === 'CURRENT' ? '#dbeafe' :
-            d.bucket === '0_30' ? '#fef9c3' :
-            d.bucket === '31_60' ? '#ffedd5' :
-            d.bucket === '61_90' ? '#fee2e2' : '#ffe4e6'
-          };color:${
-            d.bucket === 'CURRENT' ? '#1d4ed8' :
-            d.bucket === '0_30' ? '#a16207' :
-            d.bucket === '31_60' ? '#c2410c' :
-            d.bucket === '61_90' ? '#b91c1c' : '#9f1239'
-          }">
-          ${BUCKET_LABELS[d.bucket] ?? d.bucket}
-        </span>
-      </td>
-      <td>${d.status.replace(/_/g, ' ')}</td>
+      <td style="text-align:right; font-weight:bold">${formatPeso(d.balance_due)}</td>
+      <td>${d.days_overdue} days</td>
     </tr>
   `).join('');
 
@@ -99,18 +68,24 @@ function buildPrintHtml(data: AgeingDebtsResponse): string {
     <table>
       <thead>
         <tr>
-          <th>Client</th><th>Reference</th><th>Appt Date</th><th>Appt Type</th><th>Practitioner</th><th>Due Date</th><th>Age</th>
-          <th style="text-align:right">Balance</th><th>Bucket</th><th>Status</th>
+          <th style="text-align:left">Client</th>
+          <th style="text-align:left">Reference</th>
+          <th style="text-align:left">Appt Date</th>
+          <th style="text-align:left">Appt Type</th>
+          <th style="text-align:left">Practitioner</th>
+          <th style="text-align:left">Due Date</th>
+          <th style="text-align:right">Outstanding</th>
+          <th style="text-align:left">Age</th>
         </tr>
       </thead>
       <tbody>
-        ${debts.length > 0 ? rowsHtml : '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:16px">No overdue invoices found</td></tr>'}
+        ${debts.length > 0 ? rowsHtml : '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:16px">No overdue invoices found</td></tr>'}
       </tbody>
       <tfoot>
         <tr style="font-weight:700; background:#fef2f2">
-          <td colspan="4">Totals</td>
+          <td colspan="6" style="text-align:left">Totals</td>
           <td style="text-align:right; color:#dc2626">${formatPeso(summary.total_outstanding)}</td>
-          <td colspan="2"></td>
+          <td colspan="1"></td>
         </tr>
       </tfoot>
     </table>
@@ -129,14 +104,24 @@ export const AgeingDebtsReport: React.FC = () => {
   const [showAddModal,    setShowAddModal]    = useState(false);
   const [editEntry,      setEditEntry]       = useState<any | null>(null);
   const [searchQuery,     setSearchQuery]     = useState('');
-  const [filterStatus,    setFilterStatus]    = useState('ALL');
   const [filterBucket,    setFilterBucket]    = useState('ALL');
+  const [startDate,       setStartDate]       = useState('');
+  const [endDate,         setEndDate]         = useState('');
+  const [currentPage,     setCurrentPage]     = useState(1);
+  const itemsPerPage = 15;
 
   const runReport = useCallback(async () => {
+    if (startDate && endDate && startDate > endDate) {
+      setError("Start date cannot be after end date.");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const res = await getAgeingDebts();
+      const res = await getAgeingDebts({
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      });
       setData(res);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? err?.message ?? 'Failed to load report.');
@@ -144,7 +129,7 @@ export const AgeingDebtsReport: React.FC = () => {
       setIsLoading(false);
       setHasRun(true);
     }
-  }, []);
+  }, [startDate, endDate]);
 
   const handlePrint = () => {
     if (!data) return;
@@ -173,7 +158,6 @@ export const AgeingDebtsReport: React.FC = () => {
   const bt = data?.summary.bucket_totals;
 
   const filteredDebts = debts.filter(d => {
-    if (filterStatus !== 'ALL' && d.status !== filterStatus) return false;
     if (filterBucket !== 'ALL' && d.bucket !== filterBucket) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -185,6 +169,41 @@ export const AgeingDebtsReport: React.FC = () => {
     }
     return true;
   });
+
+  // Reset to first page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterBucket]);
+
+  const totalPages = Math.ceil(filteredDebts.length / itemsPerPage) || 1;
+  const currentItems = filteredDebts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const paginationUI = (
+    <div className="flex items-center justify-between text-sm w-full">
+      <div className="text-gray-500">
+        Showing <span className="font-medium text-gray-900">{filteredDebts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-gray-900">{Math.min(currentPage * itemsPerPage, filteredDebts.length)}</span> of <span className="font-medium text-gray-900">{filteredDebts.length}</span> entries
+      </div>
+      <div className="flex gap-1">
+        <button
+          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className="px-3 py-1 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Previous
+        </button>
+        <div className="flex items-center px-3 py-1 font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-md">
+          {currentPage} / {totalPages}
+        </div>
+        <button
+          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className="px-3 py-1 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 
 
   return (
@@ -247,20 +266,21 @@ export const AgeingDebtsReport: React.FC = () => {
                 </button>
               )}
             </div>
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="OPEN">Open</option>
-              <option value="PARTIALLY_PAID">Partially Paid</option>
-              <option value="PAID">Paid</option>
-              <option value="WRITTEN_OFF">Written Off</option>
-              <option value="PENDING">Pending</option>
-              <option value="OVERDUE">Overdue</option>
-              <option value="UNBILLED">Unbilled</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+              />
+              <span className="text-gray-400">—</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+              />
+            </div>
             <select
               value={filterBucket}
               onChange={e => setFilterBucket(e.target.value)}
@@ -341,7 +361,7 @@ export const AgeingDebtsReport: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-8 text-center">
               <p className="text-sm text-gray-500">No entries match the current filters.</p>
               <button
-                onClick={() => { setSearchQuery(''); setFilterStatus('ALL'); setFilterBucket('ALL'); }}
+                onClick={() => { setSearchQuery(''); setFilterBucket('ALL'); setStartDate(''); setEndDate(''); }}
                 className="mt-2 text-xs text-orange-600 hover:text-orange-700 font-medium underline underline-offset-2"
               >
                 Clear filters
@@ -350,7 +370,14 @@ export const AgeingDebtsReport: React.FC = () => {
           ) : filteredDebts.length === 0 ? (
             <ReportEmpty message="No outstanding debts found. All invoices are paid." />
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <>
+              <div className="flex justify-end mb-4">
+                <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+                  {paginationUI}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -363,13 +390,10 @@ export const AgeingDebtsReport: React.FC = () => {
                       <th className="text-left px-4 py-3 font-semibold text-gray-600">Due Date</th>
                       <th className="text-right px-4 py-3 font-semibold text-gray-600">Outstanding</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-600">Age</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Bucket</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {filteredDebts.map((d) => (
+                    {currentItems.map((d) => (
                       <tr key={`${d.source}-${d.id}`} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900">{d.patient_name}</div>
@@ -400,42 +424,8 @@ export const AgeingDebtsReport: React.FC = () => {
                         <td className="px-4 py-3 text-right font-bold text-red-700">
                           {formatPeso(d.balance_due)}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${BUCKET_STYLES[d.bucket] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                            {BUCKET_LABELS[d.bucket] ?? d.bucket}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {d.source === 'debt_entry' ? (
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${
-                              d.status === 'OPEN' ? 'bg-gray-50 text-gray-700 border-gray-200' :
-                              d.status === 'PARTIALLY_PAID' ? 'bg-teal-50 text-teal-700 border-teal-200' :
-                              d.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-200' :
-                              d.status === 'WRITTEN_OFF' ? 'bg-red-50 text-red-700 border-red-200' :
-                              'bg-gray-50 text-gray-600 border-gray-200'
-                            }`}>
-                              {d.status.replace(/_/g, ' ')}
-                            </span>
-                          ) : d.source === 'unbilled_appointment' ? (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium border bg-purple-50 text-purple-700 border-purple-200">
-                              Unbilled
-                            </span>
-                          ) : (
-                            <StatusBadge status={d.status} />
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {d.source === 'debt_entry' ? (
-                            <button
-                              onClick={() => setEditEntry(d)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              Edit
-                            </button>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">Invoice</span>
-                          )}
+                        <td className="px-4 py-3 text-xs text-gray-600 font-medium">
+                          {d.days_overdue} days
                         </td>
                       </tr>
                     ))}
@@ -446,12 +436,22 @@ export const AgeingDebtsReport: React.FC = () => {
                       <td className="px-4 py-3 text-right text-red-700 text-base">
                         {formatPeso(filteredDebts.reduce((s, d) => s + d.balance_due, 0))}
                       </td>
-                      <td colSpan={4}></td>
+                      <td colSpan={1}></td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             </div>
+
+            <div className="flex justify-start mt-4 mb-4">
+              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+                {paginationUI}
+              </div>
+            </div>
+            
+            {/* Padding space to prevent UI elements from hiding behind screens */}
+            <div className="h-12 w-full" />
+            </>
           )}
         </div>
       )}

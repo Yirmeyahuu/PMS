@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { FileText, FileMinus, FileWarning, Stethoscope, Building2, AlertTriangle } from 'lucide-react';
+import { FileText, FileMinus, FileWarning, Stethoscope, Building2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   getClinicalNotes,
   type ClinicalNotesResponse,
@@ -7,45 +7,36 @@ import {
 } from '../../reports.api';
 import {
   DateRangePicker, StatCard, ReportLoading, ReportError, ReportEmpty,
-  ReportHeader, AppointmentTypeBadge,
+  ReportHeader,
   formatDate, formatTime, todayISO, monthStart,
 } from '../../components/ReportShared';
 import toast from 'react-hot-toast';
 
-const NOTE_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  MISSING:       { label: 'No Note',      color: 'bg-red-50 text-red-700 border border-red-200',         icon: <FileMinus className="w-3 h-3" /> },
-  UNSIGNED_DRAFT: { label: 'Unsigned Draft', color: 'bg-yellow-50 text-yellow-700 border border-yellow-200', icon: <FileWarning className="w-3 h-3" /> },
-};
-
-const getDaysSeverity = (days: number) => {
-  if (days <= 3)  return 'bg-green-50 text-green-700 border border-green-200';
-  if (days <= 7)  return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-  if (days <= 14) return 'bg-orange-50 text-orange-700 border border-orange-200';
-  return 'bg-red-50 text-red-700 border border-red-200';
-};
-
 export const ClinicalNotes: React.FC = () => {
-  const [startDate,        setStartDate]        = useState(monthStart());
-  const [endDate,          setEndDate]          = useState(todayISO());
-  const [includeUnsigned,  setIncludeUnsigned]  = useState(false);
-  const [data,             setData]             = useState<ClinicalNotesResponse | null>(null);
-  const [isLoading,        setIsLoading]        = useState(false);
-  const [error,            setError]            = useState<string | null>(null);
-  const [hasRun,           setHasRun]           = useState(false);
-  const [activeFilter,     setActiveFilter]     = useState<'ALL' | 'MISSING' | 'UNSIGNED_DRAFT'>('ALL');
+  const [startDate, setStartDate] = useState(monthStart());
+  const [endDate, setEndDate] = useState(todayISO());
+  const [includeUnsigned, setIncludeUnsigned] = useState(false);
+  const [data, setData] = useState<ClinicalNotesResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'MISSING' | 'CREATED'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   const run = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await getClinicalNotes({
-        start_date:       startDate,
-        end_date:         endDate,
+        start_date: startDate,
+        end_date: endDate,
         include_unsigned: includeUnsigned,
       });
       setData(result);
       setHasRun(true);
       setActiveFilter('ALL');
+      setCurrentPage(1);
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Failed to generate report';
       setError(msg);
@@ -56,11 +47,52 @@ export const ClinicalNotes: React.FC = () => {
   }, [startDate, endDate, includeUnsigned]);
 
   const filteredResults = (data?.results ?? []).filter((item) => {
-    if (activeFilter === 'ALL')            return true;
-    if (activeFilter === 'MISSING')        return item.note_status === 'MISSING';
-    if (activeFilter === 'UNSIGNED_DRAFT') return item.note_status === 'UNSIGNED_DRAFT';
+    if (activeFilter === 'ALL') return true;
+    if (activeFilter === 'MISSING') return item.note_status === 'MISSING';
+    if (activeFilter === 'CREATED') return item.note_status === 'UNSIGNED_DRAFT' || item.note_status === 'SIGNED';
     return true;
   });
+
+  const totalPages = Math.ceil(filteredResults.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentItems = filteredResults.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const paginationUI = (
+    <>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-4">
+        <p className="text-sm text-gray-700">
+          Showing <span className="font-medium">{filteredResults.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+          <span className="font-medium">{Math.min(startIndex + itemsPerPage, filteredResults.length)}</span> of{' '}
+          <span className="font-medium">{filteredResults.length}</span> results
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 mr-2">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -148,51 +180,52 @@ export const ClinicalNotes: React.FC = () => {
               />
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-2 mb-4 flex-wrap">
-              {(['ALL', 'MISSING', 'UNSIGNED_DRAFT'] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeFilter === f
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {f === 'ALL'
-                    ? `All (${data.total_count})`
-                    : f === 'MISSING'
-                    ? `No Note (${data.missing_note_count})`
-                    : `Unsigned Drafts (${data.unsigned_note_count})`}
-                </button>
-              ))}
+            {/* Filter Dropdown */}
+            <div className="flex gap-2 mb-4 items-center">
+              <label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Note Status Filter:</label>
+              <select
+                id="status-filter"
+                value={activeFilter}
+                onChange={(e) => setActiveFilter(e.target.value as any)}
+                className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm py-2 pl-3 pr-10 border"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="MISSING">No Notes Yet</option>
+                <option value="CREATED">Note Created</option>
+              </select>
             </div>
 
             {/* Table */}
+            <div className="flex justify-end mb-4">
+              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+                {paginationUI}
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Patient</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Service</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date of Appointment</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Time of Appointment</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Clinic Branch</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner Assigned</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Consultation / Appointment / Services Type</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Note Status</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Days Since</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Case</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredResults.map((item: ClinicalNotesMissingItem) => {
-                      const noteConfig = NOTE_STATUS_CONFIG[item.note_status];
+                    {currentItems.map((item: ClinicalNotesMissingItem) => {
+                      const statusLabel = item.note_status === 'MISSING' ? 'No Notes Yet' : 'Note Created';
+                      const statusColor = item.note_status === 'MISSING'
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-green-50 text-green-700 border-green-200';
+
                       return (
                         <tr key={item.appointment_id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-gray-900">{formatDate(item.date)}</p>
-                            <p className="text-xs text-gray-400">{formatTime(item.start_time)} – {formatTime(item.end_time)}</p>
-                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <div className="w-7 h-7 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -204,35 +237,46 @@ export const ClinicalNotes: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5 text-gray-700">
-                              <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                              <span className="text-sm">{item.practitioner_name || '—'}</span>
-                            </div>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-medium text-gray-900">{formatDate(item.date)}</span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-sm text-gray-900">{formatTime(item.start_time)} – {formatTime(item.end_time)}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <p className="text-sm text-gray-700">{item.service_name || '—'}</p>
-                            {item.branch_name && (
-                              <p className="text-xs text-gray-400 flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />{item.branch_name}
-                              </p>
+                            {item.branch_name ? (
+                              <div className="flex items-center gap-1 text-gray-600 text-sm">
+                                <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                <span className="line-clamp-2">{item.branch_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <AppointmentTypeBadge type={item.appointment_type} />
-                          </td>
-                          <td className="px-4 py-3">
-                            {noteConfig && (
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${noteConfig.color}`}>
-                                {noteConfig.icon}
-                                {noteConfig.label}
-                              </span>
+                            {item.practitioner_name ? (
+                              <div className="flex items-center gap-1.5 text-gray-700 text-sm">
+                                <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                <span className="whitespace-nowrap">{item.practitioner_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold ${getDaysSeverity(item.days_since)}`}>
-                              {item.days_since}d
+                          <td className="px-4 py-3">
+                            <p className="text-sm text-gray-700">{item.service_name || item.appointment_type || '—'}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                              {statusLabel}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {item.case_title ? (
+                              <span className="text-sm text-gray-700">{item.case_title}</span>
+                            ) : (
+                              <span className="text-gray-400 text-sm italic">No case assigned</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -240,12 +284,12 @@ export const ClinicalNotes: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                <p className="text-xs text-gray-500">
-                  Showing <strong>{filteredResults.length}</strong> of <strong>{data.total_count}</strong> records
-                </p>
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between pb-6">
+                {paginationUI}
               </div>
             </div>
+            {/* Added padding to prevent bottom pagination from being cut off */}
+            <div className="h-12 w-full" />
           </>
         )}
       </div>

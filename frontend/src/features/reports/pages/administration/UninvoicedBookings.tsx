@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { FileX, Clock, Stethoscope, Building2, AlertTriangle, FileText } from 'lucide-react';
+import { FileX, Stethoscope, Building2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   getUninvoicedBookings,
   type UninvoicedBookingsResponse,
@@ -7,13 +7,11 @@ import {
 } from '../../reports.api';
 import {
   DateRangePicker,
-  StatCard,
   ReportLoading,
   ReportError,
   ReportEmpty,
   ReportHeader,
   AppointmentTypeBadge,
-  InvoiceStatusBadge,
   StatusBadge,
   PrintButton,
   openPrintWindow,
@@ -31,39 +29,21 @@ import toast from 'react-hot-toast';
 function buildUninvoicedPrintHtml(
   data: UninvoicedBookingsResponse,
   displayedResults: UninvoicedBookingItem[],
-  activeFilter:     string,
   statusFilter:     string,
 ): string {
   const { start_date, end_date, generated_at } = data;
 
   const total          = displayedResults.length;
-  const overdue        = displayedResults.filter((r) => (r.days_since_completed ?? 0) > 7).length;
-  const thisWeek       = displayedResults.filter((r) => r.days_since_completed !== null && (r.days_since_completed ?? 0) <= 7).length;
-  const noInvoice      = displayedResults.filter((r) => r.invoice_status === null).length;
-
   const statHtml = `
-    <div class="stats">
+    <div class="stats" style="grid-template-columns: repeat(1, 1fr);">
       <div class="stat">
         <div class="stat-value">${total}</div>
-        <div class="stat-label">Total Uninvoiced</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">${overdue}</div>
-        <div class="stat-label">Overdue (&gt;7 days)</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">${thisWeek}</div>
-        <div class="stat-label">This Week (≤7 days)</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">${noInvoice}</div>
-        <div class="stat-label">No Invoice at All</div>
+        <div class="stat-label">Total Uninvoiced Bookings</div>
       </div>
     </div>
   `;
 
   const filterNote = [
-    activeFilter !== 'ALL' ? `Invoice filter: ${activeFilter.replace('_', ' ')}` : '',
     statusFilter !== 'ALL' ? `Appt. status: ${statusFilter.replace('_', ' ')}` : '',
   ].filter(Boolean).join(' · ');
 
@@ -71,45 +51,29 @@ function buildUninvoicedPrintHtml(
     const fmtDate  = formatDate(item.date);
     const fmtStart = formatTime(item.start_time);
     const fmtEnd   = formatTime(item.end_time);
-    const days     = item.days_since_completed;
-
-    let daysBadge = '—';
-    let daysCls   = '';
-    if (days !== null) {
-      daysCls   = days > 14 ? 'badge-red' : days > 7 ? 'badge-orange' : days > 3 ? 'badge-yellow' : 'badge-green';
-      daysBadge = `<span class="badge ${daysCls}">${days}d ago</span>`;
-    }
-
-    const invoiceBadge = item.invoice_status
-      ? `<span class="badge badge-gray">${item.invoice_status}</span>`
-      : `<span class="badge badge-red">No Invoice</span>`;
-
     return `
       <tr>
-        <td>
-          <div class="time-primary">${fmtDate}</div>
-          <div class="time-secondary">${fmtStart} – ${fmtEnd}</div>
-        </td>
         <td>
           <div class="patient-name">${item.patient_name}</div>
           <div class="patient-num">#${item.patient_number}</div>
         </td>
-        <td>${item.practitioner_name || '—'}</td>
+        <td>
+          <div class="time-primary">${fmtDate}</div>
+        </td>
+        <td>
+          <div class="time-primary">${fmtStart} – ${fmtEnd}</div>
+        </td>
         <td>${item.branch_name || '—'}</td>
+        <td>${item.practitioner_name || '—'}</td>
         <td>${item.appointment_type.replace(/_/g, ' ')}</td>
         <td>${item.appointment_status.replace(/_/g, ' ')}</td>
-        <td>
-          ${invoiceBadge}
-          ${item.invoice_number ? `<div class="patient-num">${item.invoice_number}</div>` : ''}
-        </td>
-        <td>${daysBadge}</td>
       </tr>
     `;
   }).join('');
 
   const emptyRow = `
     <tr>
-      <td colspan="8" style="text-align:center; padding: 24px; color: #9ca3af;">
+      <td colspan="7" style="text-align:center; padding: 24px; color: #9ca3af;">
         No records to display.
       </td>
     </tr>
@@ -173,14 +137,13 @@ function buildUninvoicedPrintHtml(
       <table>
         <thead>
           <tr>
-            <th>Date</th>
             <th>Patient</th>
-            <th>Practitioner</th>
+            <th>Date</th>
+            <th>Time</th>
             <th>Branch</th>
+            <th>Practitioner</th>
             <th>Type</th>
             <th>Appt. Status</th>
-            <th>Invoice</th>
-            <th>Days Since</th>
           </tr>
         </thead>
         <tbody>
@@ -207,8 +170,9 @@ export const UninvoicedBookings: React.FC = () => {
   const [isPrinting,   setIsPrinting]   = useState(false);
   const [error,        setError]        = useState<string | null>(null);
   const [hasRun,       setHasRun]       = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'NO_INVOICE' | 'DRAFT' | 'PENDING'>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const itemsPerPage = 15;
 
   // ── Run report ──────────────────────────────────────────────────────────────
   const run = useCallback(async () => {
@@ -231,7 +195,7 @@ export const UninvoicedBookings: React.FC = () => {
 
       setData(result);
       setHasRun(true);
-      setActiveFilter('ALL');
+      setCurrentPage(1);
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Failed to generate report';
       setError(msg);
@@ -241,22 +205,30 @@ export const UninvoicedBookings: React.FC = () => {
     }
   }, [startDate, endDate, statusFilter]);
 
-  // ── Filter (invoice-level) ───────────────────────────────────────────────────
-  const filteredResults = (data?.results ?? []).filter((item) => {
-    if (activeFilter === 'ALL')        return true;
-    if (activeFilter === 'NO_INVOICE') return item.invoice_status === null;
-    if (activeFilter === 'DRAFT')      return item.invoice_status === 'DRAFT';
-    if (activeFilter === 'PENDING')    return item.invoice_status === 'PENDING';
-    return true;
-  });
+  // Automatically fetch when status filter changes, but only if we've already run the report once
+  React.useEffect(() => {
+    if (hasRun) {
+      run();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
-  // ── Print — uses filteredResults already in state ────────────────────────────
+  // ── Filter & Pagination ───────────────────────────────────────────────────────
+  const filteredResults = data?.results ?? [];
+
+  const totalItems = filteredResults.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredResults.slice(indexOfFirstItem, indexOfLastItem);
   // No extra API call needed. What you see = what you print.
   const handlePrint = useCallback(() => {
     if (!data) return;
     setIsPrinting(true);
     try {
-      const html = buildUninvoicedPrintHtml(data, filteredResults, activeFilter, statusFilter);
+      const html = buildUninvoicedPrintHtml(data, filteredResults, statusFilter);
       openPrintWindow(html, 'Uninvoiced Bookings Report');
     } catch (err: any) {
       toast.error('Failed to generate print preview');
@@ -265,20 +237,40 @@ export const UninvoicedBookings: React.FC = () => {
       setIsPrinting(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, filteredResults, activeFilter, statusFilter]);
+  }, [data, filteredResults, statusFilter]);
 
-  // ── Color helpers ─────────────────────────────────────────────────────────────
-  const getDaysBadgeCls = (days: number | null): string => {
-    if (days === null) return 'bg-gray-100 text-gray-500';
-    if (days <= 3)  return 'bg-green-50  text-green-700  border border-green-200';
-    if (days <= 7)  return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-    if (days <= 14) return 'bg-orange-50 text-orange-700 border border-orange-200';
-    return 'bg-red-50 text-red-700 border border-red-200';
-  };
 
-  const noInvoiceCount = data?.results.filter((r) => r.invoice_status === null).length  ?? 0;
-  const draftCount     = data?.results.filter((r) => r.invoice_status === 'DRAFT').length  ?? 0;
-  const pendingCount   = data?.results.filter((r) => r.invoice_status === 'PENDING').length ?? 0;
+  const paginationUI = (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+      <p className="text-xs text-gray-500">
+        Showing <strong>{totalItems === 0 ? 0 : indexOfFirstItem + 1}</strong> to{' '}
+        <strong>{Math.min(indexOfLastItem, totalItems)}</strong> of{' '}
+        <strong>{totalItems}</strong> uninvoiced bookings
+      </p>
+
+      {totalPages > 1 && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={validCurrentPage === 1}
+            className="p-1 rounded-md text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-gray-600 font-medium px-2">
+            Page {validCurrentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={validCurrentPage === totalPages}
+            className="p-1 rounded-md text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -294,27 +286,27 @@ export const UninvoicedBookings: React.FC = () => {
           isLoading={isLoading}
         />
 
-        {/* ── Appointment Status Filter pills ── */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500 font-medium flex-shrink-0">Appt. Status:</span>
-          {(['ALL', 'COMPLETED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'SCHEDULED'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {s === 'ALL' ? 'All Statuses' : s.replace(/_/g, ' ')}
-            </button>
-          ))}
+        {/* ── Appointment Status Filter dropdown ── */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="statusFilter" className="text-xs text-gray-500 font-medium flex-shrink-0">Appt. Status:</label>
+          <select
+            id="statusFilter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-sm border-gray-300 rounded-lg shadow-sm focus:border-sky-500 focus:ring-sky-500 py-1.5 px-3 bg-white cursor-pointer"
+          >
+            <option value="ALL">- ALL STATUS -</option>
+            <option value="COMPLETED">COMPLETED</option>
+            <option value="CONFIRMED">CONFIRMED</option>
+            <option value="CHECKED_IN">CHECKED IN</option>
+            <option value="IN_PROGRESS">IN PROGRESS</option>
+            <option value="SCHEDULED">SCHEDULED</option>
+          </select>
         </div>
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-6 pt-5 pb-24">
 
         {isLoading ? (
           <ReportLoading />
@@ -357,98 +349,34 @@ export const UninvoicedBookings: React.FC = () => {
               }
             />
 
-            {/* ── Stats (based on full result set) ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-              <StatCard
-                label="Total Uninvoiced"
-                value={data.total_count}
-                color="text-red-700"
-                bg="bg-red-50"
-                border="border-red-200"
-                icon={<FileX className="w-4 h-4" />}
-              />
-              <StatCard
-                label="No Invoice"
-                value={noInvoiceCount}
-                color="text-rose-700"
-                bg="bg-rose-50"
-                border="border-rose-200"
-                icon={<AlertTriangle className="w-4 h-4" />}
-              />
-              <StatCard
-                label="Draft / Pending"
-                value={draftCount + pendingCount}
-                color="text-yellow-700"
-                bg="bg-yellow-50"
-                border="border-yellow-200"
-                icon={<FileText className="w-4 h-4" />}
-              />
-              <StatCard
-                label="Overdue (&gt;7 days)"
-                value={data.results.filter((r) => (r.days_since_completed ?? 0) > 7).length}
-                color="text-orange-700"
-                bg="bg-orange-50"
-                border="border-orange-200"
-                icon={<Clock className="w-4 h-4" />}
-              />
-            </div>
-
-            {/* ── Invoice-level Filter Tabs ── */}
-            <div className="flex gap-2 mb-4 flex-wrap">
-              {([
-                { key: 'ALL',        label: `All (${data.total_count})` },
-                { key: 'NO_INVOICE', label: `No Invoice (${noInvoiceCount})` },
-                { key: 'DRAFT',      label: `Draft Only (${draftCount})` },
-                { key: 'PENDING',    label: `Pending (${pendingCount})` },
-              ] as const).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveFilter(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeFilter === key
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* ── Table ── */}
+            {/* ── Table & Top Pagination ── */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-end">
+                {paginationUI}
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Patient</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Branch</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Appt. Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Invoice</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Days Since</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Clinic Branch</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner Assigned</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Consultation/Appointment Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Appointment Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredResults.length === 0 ? (
+                    {currentItems.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
                           No results match the selected filter.
                         </td>
                       </tr>
                     ) : (
-                      filteredResults.map((item: UninvoicedBookingItem) => (
+                      currentItems.map((item: UninvoicedBookingItem) => (
                         <tr key={item.appointment_id} className="hover:bg-gray-50 transition-colors">
-
-                          {/* Date */}
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-gray-900">{formatDate(item.date)}</p>
-                            <p className="text-xs text-gray-400">
-                              {formatTime(item.start_time)} – {formatTime(item.end_time)}
-                            </p>
-                          </td>
 
                           {/* Patient */}
                           <td className="px-4 py-3">
@@ -463,12 +391,16 @@ export const UninvoicedBookings: React.FC = () => {
                             </div>
                           </td>
 
-                          {/* Practitioner */}
+                          {/* Date */}
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5 text-gray-700">
-                              <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                              <span className="text-sm">{item.practitioner_name || '—'}</span>
-                            </div>
+                            <p className="font-medium text-gray-900">{formatDate(item.date)}</p>
+                          </td>
+
+                          {/* Time */}
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">
+                              {formatTime(item.start_time)} – {formatTime(item.end_time)}
+                            </p>
                           </td>
 
                           {/* Branch */}
@@ -483,6 +415,14 @@ export const UninvoicedBookings: React.FC = () => {
                             )}
                           </td>
 
+                          {/* Practitioner */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5 text-gray-700">
+                              <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm">{item.practitioner_name || '—'}</span>
+                            </div>
+                          </td>
+
                           {/* Type */}
                           <td className="px-4 py-3">
                             <AppointmentTypeBadge type={item.appointment_type} />
@@ -493,23 +433,6 @@ export const UninvoicedBookings: React.FC = () => {
                             <StatusBadge status={item.appointment_status} />
                           </td>
 
-                          {/* Invoice Status */}
-                          <td className="px-4 py-3">
-                            <InvoiceStatusBadge status={item.invoice_status} />
-                            {item.invoice_number && (
-                              <p className="text-xs text-gray-400 mt-0.5">{item.invoice_number}</p>
-                            )}
-                          </td>
-
-                          {/* Days Since */}
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold ${getDaysBadgeCls(item.days_since_completed)}`}>
-                              {item.days_since_completed !== null
-                                ? `${item.days_since_completed}d`
-                                : '—'}
-                            </span>
-                          </td>
-
                         </tr>
                       ))
                     )}
@@ -518,11 +441,9 @@ export const UninvoicedBookings: React.FC = () => {
               </div>
 
               {/* Table footer */}
-              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                <p className="text-xs text-gray-500">
-                  Showing <strong>{filteredResults.length}</strong> of{' '}
-                  <strong>{data.total_count}</strong> uninvoiced bookings
-                </p>
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                {paginationUI}
+                
                 <p className="text-xs text-gray-400">
                   {formatDate(data.start_date)} – {formatDate(data.end_date)}
                 </p>

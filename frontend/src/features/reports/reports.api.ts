@@ -151,29 +151,21 @@ export const getCancellationsPrint = async (
 
 // ─── Clients & Cases ──────────────────────────────────────────────────────────
 
-export interface UpcomingBooking {
-  appointment_id:    number;
-  date:              string;
-  start_time:        string;
-  appointment_type:  string;
-  status:            string;
-  practitioner_name: string;
-  service_name:      string;
+export interface PatientCaseMinimal {
+  title:  string;
+  status: string;
 }
 
 export interface ClientCaseItem {
   patient_id:         number;
   patient_name:       string;
   patient_number:     string;
-  gender:             string;
-  date_of_birth:      string | null;
-  phone:              string | null;
-  email:              string | null;
-  registered_on:      string;
   is_new_this_period: boolean;
-  total_bookings:     number;
-  range_bookings:     number;
-  upcoming_bookings:  UpcomingBooking[];
+  cases:              PatientCaseMinimal[];
+
+  date_created:       string;
+  practitioners:      string[];
+  branches:           string[];
 }
 
 export interface ClientCasesResponse {
@@ -183,7 +175,6 @@ export interface ClientCasesResponse {
   end_date:              string;
   total_patients:        number;
   new_clients_count:     number;
-  total_range_bookings:  number;
   results:               ClientCaseItem[];
 }
 
@@ -207,7 +198,7 @@ export interface ClinicalNotesMissingItem {
   end_time:          string;
   appointment_type:  string;
   status:            string;
-  note_status:       'MISSING' | 'UNSIGNED_DRAFT';
+  note_status:       'MISSING' | 'UNSIGNED_DRAFT' | 'SIGNED';
   note_id?:          number;
   patient_id:        number;
   patient_name:      string;
@@ -215,7 +206,7 @@ export interface ClinicalNotesMissingItem {
   practitioner_name: string;
   service_name:      string;
   branch_name:       string | null;
-  days_since:        number;
+  case_title:        string | null;
 }
 
 export interface ClinicalNotesResponse {
@@ -452,6 +443,8 @@ export interface AgeingDebtsResponse {
 export interface AgeingDebtsParams {
   branch_id?:       number;
   practitioner_id?: number;
+  start_date?:      string;
+  end_date?:        string;
 }
 
 export const getAgeingDebts = async (
@@ -477,7 +470,7 @@ export interface AgeingDebtEntryItem {
   balance_due:    number;
   category:       string;
   category_display: string;
-  status:         string;
+  status:         'OPEN' | 'PARTIALLY_PAID';
   status_display: string;
   bucket:         string;
   bucket_display: string;

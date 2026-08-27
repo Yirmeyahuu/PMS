@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { UserX, XCircle, AlertTriangle, Stethoscope, Building2, Info, MessageSquare } from 'lucide-react';
+import { UserX, XCircle, AlertTriangle, Stethoscope, Building2, Info, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   getCancellations,
   getCancellationsPrint,
@@ -14,7 +14,6 @@ import {
   ReportError,
   ReportEmpty,
   ReportHeader,
-  StatusBadge,
   AppointmentTypeBadge,
   PrintButton,
   openPrintWindow,
@@ -54,32 +53,30 @@ function buildCancellationsPrintHtml(data: CancellationsPrintResponse): string {
   `;
 
   const rowsHtml = results.map((item) => {
-    const statusCls = item.status === 'CANCELLED' ? 'badge-red' : 'badge-orange';
     const reasonHtml = item.reason
       ? `<span class="reason-text">${item.reason}</span>`
       : `<span class="no-reason">No reason provided</span>`;
     const cancelledAtHtml = item.cancelled_at
-      ? `<div class="time-secondary">${new Date(item.cancelled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'})}</div>`
+      ? `<div class="time-secondary" style="color: #ef4444; margin-top: 2px;">Cancelled: ${formatDateTime(item.cancelled_at)}</div>`
       : '';
 
     return `
       <tr>
         <td>
-          <div class="time-primary">${formatDate(item.date)}</div>
-          <div class="time-secondary">${formatTime(item.start_time)}</div>
-          ${cancelledAtHtml}
-        </td>
-        <td>
           <div class="patient-name">${item.patient_name}</div>
           <div class="patient-num">#${item.patient_number}</div>
         </td>
-        <td>${item.practitioner_name || '—'}</td>
-        <td>${item.branch_name || '—'}</td>
-        <td>${item.appointment_type.replace(/_/g, ' ')}</td>
         <td>
-          <span class="badge ${statusCls}">${item.status.replace(/_/g, ' ')}</span>
-          ${item.cancelled_by ? `<div class="patient-num">by ${item.cancelled_by}</div>` : ''}
+          <div class="time-primary">${formatDate(item.date)}</div>
+          ${cancelledAtHtml}
         </td>
+        <td>
+          <div class="time-secondary">${formatTime(item.start_time)}</div>
+        </td>
+        <td>${item.branch_name || '—'}</td>
+        <td>${item.practitioner_name || '—'}</td>
+        <td>${item.appointment_type.replace(/_/g, ' ')}</td>
+        <td>${item.cancelled_by || '—'}</td>
         <td>${reasonHtml}</td>
       </tr>
     `;
@@ -100,12 +97,13 @@ function buildCancellationsPrintHtml(data: CancellationsPrintResponse): string {
     <table>
       <thead>
         <tr>
-          <th>Date</th>
           <th>Patient</th>
-          <th>Practitioner</th>
-          <th>Branch</th>
-          <th>Type</th>
-          <th>Status</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Clinic Branch</th>
+          <th>Practitioner Assigned</th>
+          <th>Consultation Type</th>
+          <th>Cancelled By</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -132,6 +130,8 @@ export const Cancellations: React.FC = () => {
   const [error,        setError]        = useState<string | null>(null);
   const [hasRun,       setHasRun]       = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'CANCELLED' | 'NO_SHOW'>('ALL');
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const itemsPerPage = 15;
 
   // ── Run report ──────────────────────────────────────────────────────────────
   const run = useCallback(async () => {
@@ -146,6 +146,7 @@ export const Cancellations: React.FC = () => {
       setData(result);
       setHasRun(true);
       setActiveFilter('ALL');
+      setCurrentPage(1);
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Failed to generate report';
       setError(msg);
@@ -181,7 +182,47 @@ export const Cancellations: React.FC = () => {
     return true;
   });
 
+  const totalItems = filteredResults.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredResults.slice(indexOfFirstItem, indexOfLastItem);
+
   const withReasonCount    = filteredResults.filter((r) => r.reason).length;
+
+  const paginationUI = (
+    <div className="flex flex-col sm:flex-row items-center justify-between w-full">
+      <p className="text-xs text-gray-500">
+        Showing <strong>{totalItems === 0 ? 0 : indexOfFirstItem + 1}</strong> to{' '}
+        <strong>{Math.min(indexOfLastItem, totalItems)}</strong> of{' '}
+        <strong>{totalItems}</strong> records
+      </p>
+
+      {totalPages > 1 && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={validCurrentPage === 1}
+            className="p-1 rounded-md text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-gray-600 font-medium px-2">
+            Page {validCurrentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={validCurrentPage === totalPages}
+            className="p-1 rounded-md text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -290,25 +331,33 @@ export const Cancellations: React.FC = () => {
               />
             </div>
 
-            {/* ── Filter Tabs ── */}
-            <div className="flex gap-2 mb-4">
-              {([
-                { key: 'ALL',       label: `All (${data.total_count})` },
-                { key: 'CANCELLED', label: `Cancelled (${data.cancelled_count})` },
-                { key: 'NO_SHOW',   label: `No Show (${data.no_show_count})` },
-              ] as const).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveFilter(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeFilter === key
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            {/* ── Filter Tabs and Top Pagination ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div className="flex gap-2">
+                {([
+                  { key: 'ALL',       label: `All (${data.total_count})` },
+                  { key: 'CANCELLED', label: `Cancelled (${data.cancelled_count})` },
+                  { key: 'NO_SHOW',   label: `No Show (${data.no_show_count})` },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setActiveFilter(key);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeFilter === key
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="w-full sm:w-auto">
+                {paginationUI}
+              </div>
             </div>
 
             {/* ── Table ── */}
@@ -317,30 +366,19 @@ export const Cancellations: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Patient</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Branch</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Clinic Branch</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Practitioner Assigned</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Consultation Type</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Cancelled By</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Reason</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredResults.map((item: CancellationItem) => (
+                    {currentItems.map((item: CancellationItem) => (
                       <tr key={item.appointment_id} className="hover:bg-gray-50 transition-colors">
-
-                        {/* Date */}
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{formatDate(item.date)}</p>
-                          <p className="text-xs text-gray-400">{formatTime(item.start_time)}</p>
-                          {item.cancelled_at && (
-                            <p className="text-xs text-red-400 mt-0.5">
-                              Cancelled: {formatDateTime(item.cancelled_at)}
-                            </p>
-                          )}
-                        </td>
 
                         {/* Patient */}
                         <td className="px-4 py-3">
@@ -355,12 +393,19 @@ export const Cancellations: React.FC = () => {
                           </div>
                         </td>
 
-                        {/* Practitioner */}
+                        {/* Date */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 text-gray-700">
-                            <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm">{item.practitioner_name || '—'}</span>
-                          </div>
+                          <p className="font-medium text-gray-900">{formatDate(item.date)}</p>
+                          {item.cancelled_at && (
+                            <p className="text-xs text-red-400 mt-0.5">
+                              Cancelled: {formatDateTime(item.cancelled_at)}
+                            </p>
+                          )}
+                        </td>
+
+                        {/* Time */}
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-900">{formatTime(item.start_time)}</p>
                         </td>
 
                         {/* Branch */}
@@ -375,14 +420,17 @@ export const Cancellations: React.FC = () => {
                           )}
                         </td>
 
+                        {/* Practitioner */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 text-gray-700">
+                            <Stethoscope className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm">{item.practitioner_name || '—'}</span>
+                          </div>
+                        </td>
+
                         {/* Type */}
                         <td className="px-4 py-3">
                           <AppointmentTypeBadge type={item.appointment_type} />
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3">
-                          <StatusBadge status={item.status} />
                         </td>
 
                         {/* Cancelled By */}
@@ -419,13 +467,7 @@ export const Cancellations: React.FC = () => {
 
               {/* Table footer */}
               <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                <p className="text-xs text-gray-500">
-                  Showing <strong>{filteredResults.length}</strong> of{' '}
-                  <strong>{data.total_count}</strong> records
-                </p>
-                <p className="text-xs text-gray-400">
-                  {formatDate(data.start_date)} – {formatDate(data.end_date)}
-                </p>
+                {paginationUI}
               </div>
             </div>
           </>
