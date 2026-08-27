@@ -63,7 +63,7 @@ export interface IntakeForm {
   created_at: string;
 }
 
-export type PatientCaseStatus = 'OPEN' | 'MONITORING' | 'DISCHARGED' | 'CLOSED';
+export type PatientCaseStatus = 'OPEN' | 'DISCHARGED';
 export type PatientCasePayer = 'PRIVATE' | 'HMO' | 'INSURANCE' | 'CORPORATE' | '';
 
 export interface PatientCaseSessionLog {

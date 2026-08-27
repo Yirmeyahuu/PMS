@@ -7,7 +7,7 @@ console.warn('DEPRECATED: patientCases.storage.ts is deprecated. Use patientCase
 
 import type { ClinicalNote } from '@/types/clinicalTemplate';
 
-export type PatientCaseStatus = 'OPEN' | 'MONITORING' | 'CLOSED' | 'DISCHARGED';
+export type PatientCaseStatus = 'OPEN' | 'DISCHARGED';
 
 export interface PatientCase {
   id: string;

@@ -6,7 +6,7 @@ export const ClinicalNoteRedirect = () => {
   const { patientId } = useParams();
 
   // Find the first active case, or fallback to the first case, or null
-  const activeCase = cases.find(c => c.status === 'OPEN' || c.status === 'MONITORING') || cases[0];
+  const activeCase = cases.find(c => c.status === 'OPEN') || cases[0];
 
   if (activeCase) {
     return <Navigate to={`/patients/${patientId}/cases/${activeCase.id}/clinical-documentation`} replace />;

@@ -49,9 +49,7 @@ export const CaseDetailsPage = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'OPEN': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'MONITORING': return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'DISCHARGED': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'CLOSED': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };

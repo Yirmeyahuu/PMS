@@ -519,10 +519,8 @@ class PatientCase(TimeStampedModel):
     """Patient clinical cases for organizing clinical notes."""
 
     STATUS_CHOICES = [
-        ('OPEN', 'Open'),
-        ('MONITORING', 'Monitoring'),
+        ('OPEN', 'Active'),
         ('DISCHARGED', 'Discharged'),
-        ('CLOSED', 'Closed'),
     ]
 
     PAYER_CHOICES = [

@@ -40,9 +40,9 @@ export const PatientCasesPage = () => {
       if (filter === 'ALL') {
         matchesFilter = true;
       } else if (filter === 'OPEN') {
-        matchesFilter = c.status === 'OPEN' || c.status === 'MONITORING';
+        matchesFilter = c.status === 'OPEN';
       } else if (filter === 'DISCHARGED') {
-        matchesFilter = c.status === 'DISCHARGED' || c.status === 'CLOSED';
+        matchesFilter = c.status === 'DISCHARGED';
       } else {
         matchesFilter = c.status === filter;
       }
@@ -56,9 +56,7 @@ export const PatientCasesPage = () => {
   const getStatusColor = (status: PatientCaseStatus) => {
     switch (status) {
       case 'OPEN': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'MONITORING': return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'DISCHARGED': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'CLOSED': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
