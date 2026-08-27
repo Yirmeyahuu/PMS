@@ -121,7 +121,7 @@ export const AppointmentCaseResolution: React.FC = () => {
     }
   };
 
-  const activeCases = patientCases.filter(c => c.status !== 'CLOSED');
+  const activeCases = patientCases.filter(c => c.status === 'OPEN');
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative">
