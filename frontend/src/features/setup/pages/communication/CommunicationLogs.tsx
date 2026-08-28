@@ -14,13 +14,6 @@ import { SystemBranding } from '@/config/branding';
 const PAGE_SIZE = 20;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getInitials(name: string): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  return parts.length === 1
-    ? parts[0].charAt(0).toUpperCase()
-    : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
 
 function formatRelative(dateStr: string): string {
   const date = new Date(dateStr);
@@ -63,29 +56,7 @@ function groupByPatient(logs: CommunicationLogEntry[]): PatientGroup[] {
   return Array.from(map.values());
 }
 
-// ── Avatar ─────────────────────────────────────────────────────────────────
-const AVATAR_PALETTE = [
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-amber-100 text-amber-700',
-  'bg-pink-100 text-pink-700',
-  'bg-indigo-100 text-indigo-700',
-];
-
-function avatarColor(name: string) {
-  const n = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_PALETTE[n % AVATAR_PALETTE.length];
-}
-
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const sizeMap = { sm: 'w-6 h-6 text-[10px]', md: 'w-8 h-8 text-[11px]', lg: 'w-10 h-10 text-[13px]' };
-  return (
-    <div className={`rounded-full flex items-center justify-center font-bold shrink-0 ${sizeMap[size]} ${avatarColor(name)}`}>
-      {getInitials(name)}
-    </div>
-  );
-}
+import { PatientAvatar } from '@/features/patients/components/PatientAvatar';
 
 // ── Status Pill ────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { dot: string; pill: string; label: string }> = {
@@ -252,7 +223,7 @@ function PatientGroupItem({
           ${hasSelected ? 'bg-sky-50/40' : ''}
         `}
       >
-        <Avatar name={group.patientName} />
+        <PatientAvatar name={group.patientName} className="w-8 h-8" />
         <span className="text-[13px] font-semibold text-gray-800 truncate flex-1">
           {group.patientName}
         </span>
@@ -320,7 +291,7 @@ function ThreadView({ log }: { log: CommunicationLogEntry }) {
       {/* Header */}
       <div className="px-4 py-2.5 bg-white border-b border-gray-100 shrink-0">
         <div className="flex items-start gap-3.5">
-          <Avatar name={log.patient_name || '?'} size="lg" />
+          <PatientAvatar name={log.patient_name || '?'} className="w-10 h-10" />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -397,7 +368,7 @@ function ThreadView({ log }: { log: CommunicationLogEntry }) {
         {replied && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Avatar name={log.patient_name || '?'} size="sm" />
+              <PatientAvatar name={log.patient_name || '?'} className="w-6 h-6" />
               <span className="text-[12px] font-semibold text-gray-700">
                 {log.patient_name || 'Patient'}
               </span>

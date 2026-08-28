@@ -11,6 +11,7 @@ import {
   type CommStatus,
 } from '../../services/communications.api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { PatientAvatar } from '@/features/patients/components/PatientAvatar';
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -308,15 +309,17 @@ export const CommunicationDetailModal: React.FC<CommunicationDetailModalProps> =
                         className={`flex gap-2.5 ${reply.sender_type === 'PATIENT' ? 'flex-row' : 'flex-row-reverse'}`}
                       >
                         {/* Avatar */}
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
-                          reply.sender_type === 'PATIENT'
-                            ? 'bg-sky-100 text-sky-700'
-                            : reply.sender_type === 'SYSTEM'
-                            ? 'bg-gray-100 text-gray-500'
-                            : 'bg-teal-100 text-teal-700'
-                        }`}>
-                          {reply.sender_name?.charAt(0) || '?'}
-                        </div>
+                        {reply.sender_type === 'PATIENT' ? (
+                          <PatientAvatar name={reply.sender_name || '?'} className="w-7 h-7" />
+                        ) : (
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
+                            reply.sender_type === 'SYSTEM'
+                              ? 'bg-gray-100 text-gray-500'
+                              : 'bg-teal-100 text-teal-700'
+                          }`}>
+                            {reply.sender_name?.charAt(0) || '?'}
+                          </div>
+                        )}
                         {/* Bubble */}
                         <div className={`max-w-[78%] rounded-xl px-3.5 py-2.5 ${
                           reply.sender_type === 'PATIENT'

@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, Edit, ChevronLeft, ChevronRight, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Patient } from '@/types';
+import { PatientAvatar } from './components/PatientAvatar';
 
 interface PatientListProps {
   patients:    Patient[];
@@ -101,13 +102,11 @@ export const PatientList: React.FC<PatientListProps> = ({
 
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold shrink-0 ${
-                          isArchived
-                            ? 'bg-linear-to-r from-amber-400 to-amber-500'
-                            : 'bg-linear-to-r from-green-500 to-green-600'
-                        }`}>
-                          {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
-                        </div>
+                        <PatientAvatar 
+                          avatarUrl={patient.avatar}
+                          name={patient.full_name}
+                          className="w-10 h-10 border border-gray-200"
+                        />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-gray-900">{patient.full_name}</span>

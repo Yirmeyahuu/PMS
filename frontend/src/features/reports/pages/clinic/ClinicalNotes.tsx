@@ -8,9 +8,11 @@ import {
 import {
   DateRangePicker, StatCard, ReportLoading, ReportError, ReportEmpty,
   ReportHeader,
+  PrintButton, openPrintWindow,
   formatDate, formatTime, todayISO, monthStart,
 } from '../../components/ReportShared';
 import toast from 'react-hot-toast';
+import { PatientAvatar } from '@/features/patients/components/PatientAvatar';
 
 export const ClinicalNotes: React.FC = () => {
   const [startDate, setStartDate] = useState(monthStart());
@@ -228,9 +230,7 @@ export const ClinicalNotes: React.FC = () => {
                         <tr key={item.appointment_id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {item.patient_name.charAt(0)}
-                              </div>
+                              <PatientAvatar name={item.patient_name} className="w-7 h-7" />
                               <div>
                                 <p className="font-medium text-gray-900 text-sm">{item.patient_name}</p>
                                 <p className="text-xs text-gray-400">#{item.patient_number}</p>

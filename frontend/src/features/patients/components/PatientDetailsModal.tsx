@@ -2,6 +2,7 @@ import React from 'react';
 import { X, User, Phone, MapPin, Heart, Calendar, Edit, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Patient } from '@/types';
+import { PatientAvatar } from './PatientAvatar';
 
 interface PatientDetailsModalProps {
   isOpen: boolean;
@@ -59,9 +60,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {/* Avatar */}
-                <div className="w-12 h-12 bg-sky-600 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0">
-                  {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
-                </div>
+                <PatientAvatar avatarUrl={patient.avatar} name={patient.full_name} className="w-12 h-12 rounded-xl" />
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-bold text-gray-900">{patient.full_name}</h2>

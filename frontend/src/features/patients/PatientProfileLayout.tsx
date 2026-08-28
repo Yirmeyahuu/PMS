@@ -4,6 +4,7 @@ import { Navigate, NavLink, Outlet, useParams, useLocation } from 'react-router-
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
 import { ClinicalNoteNavItem } from './components/ClinicalNoteNavItem';
 import { PatientProfileProvider, usePatientProfileContext } from './context/PatientProfileContext';
+import { PatientAvatar } from './components/PatientAvatar';
 
 interface NavItemProps {
   label: string;
@@ -46,11 +47,16 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
           <aside className="w-full lg:w-64 xl:w-72 flex-shrink-0 overflow-y-auto">
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
               <div className="text-center border-b border-gray-100 pb-4 mb-4">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-sky-500 to-sky-700 text-white flex items-center justify-center text-xl font-bold shadow-sm">
-                  {loadingPatient || !patient
-                    ? '...'
-                    : `${patient.first_name.charAt(0)}${patient.last_name.charAt(0)}`
-                  }
+                <div className="mx-auto flex justify-center mb-3">
+                  {loadingPatient || !patient ? (
+                    <div className="w-20 h-20 rounded-full bg-gray-200 animate-pulse" />
+                  ) : (
+                    <PatientAvatar
+                      avatarUrl={patient.avatar}
+                      name={patient.full_name}
+                      className="w-20 h-20 border-2 border-white shadow-sm"
+                    />
+                  )}
                 </div>
                 <h2 className="mt-3 font-heading text-base text-gray-900">
                   {loadingPatient ? 'Loading...' : patient?.full_name ?? 'Unknown Patient'}

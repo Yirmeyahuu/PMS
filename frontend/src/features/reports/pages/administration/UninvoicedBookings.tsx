@@ -21,6 +21,7 @@ import {
   monthStart,
 } from '../../components/ReportShared';
 import toast from 'react-hot-toast';
+import { PatientAvatar } from '@/features/patients/components/PatientAvatar';
 
 // ─── Print HTML builder ───────────────────────────────────────────────────────
 // Builds print HTML from whatever rows are currently displayed in the table.
@@ -381,9 +382,7 @@ export const UninvoicedBookings: React.FC = () => {
                           {/* Patient */}
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 bg-gradient-to-br from-sky-400 to-sky-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {item.patient_name.charAt(0).toUpperCase()}
-                              </div>
+                              <PatientAvatar name={item.patient_name} className="w-7 h-7" />
                               <div>
                                 <p className="font-medium text-gray-900 text-sm">{item.patient_name}</p>
                                 <p className="text-xs text-gray-400">#{item.patient_number}</p>

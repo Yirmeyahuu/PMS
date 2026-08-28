@@ -3,6 +3,7 @@ import { X, Mail, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useClinicSettings } from '@/hooks/useClinicSettings';
 import { getClinicEmailRecipients, type ClinicEmailRecipient } from '@/features/clinics/clinic.api';
+import { PatientAvatar } from './PatientAvatar';
 
 interface SendInvoiceEmailModalProps {
   isOpen: boolean;
@@ -271,13 +272,7 @@ export const SendInvoiceEmailModal: React.FC<SendInvoiceEmailModalProps> = ({
                           type="button"
                         >
                           <div className="flex-1 min-w-0 flex items-center gap-3">
-                            {suggestion.avatarUrl ? (
-                              <img src={suggestion.avatarUrl} alt={suggestion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-100" />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                {suggestion.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                            <PatientAvatar avatarUrl={suggestion.avatarUrl} name={suggestion.name} className="w-8 h-8" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</p>
                               <p className="text-xs text-gray-500 truncate">{suggestion.email}</p>

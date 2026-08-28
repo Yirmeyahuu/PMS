@@ -8,9 +8,11 @@ import {
 import {
   DateRangePicker, StatCard, ReportLoading, ReportError, ReportEmpty,
   ReportHeader,
+  PrintButton, openPrintWindow,
   formatDate, todayISO, monthStart,
 } from '../../components/ReportShared';
 import toast from 'react-hot-toast';
+import { PatientAvatar } from '@/features/patients/components/PatientAvatar';
 
 export const ClientCases: React.FC = () => {
   const [startDate,   setStartDate]   = useState(monthStart());
@@ -217,13 +219,7 @@ export const ClientCases: React.FC = () => {
                         {/* Patient */}
                         <td className="px-4 py-3 align-top min-w-[200px]">
                           <div className="flex items-start gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5 ${
-                              item.is_new_this_period
-                                ? 'bg-gradient-to-br from-green-400 to-green-600'
-                                : 'bg-gradient-to-br from-sky-400 to-sky-600'
-                            }`}>
-                              {item.patient_name.charAt(0).toUpperCase()}
-                            </div>
+                            <PatientAvatar name={item.patient_name} className="w-8 h-8 mt-0.5" />
                             <div>
                               <p className="font-medium text-gray-900 text-sm leading-tight">{item.patient_name}</p>
                               <p className="text-xs text-gray-400 mt-0.5">#{item.patient_number}</p>

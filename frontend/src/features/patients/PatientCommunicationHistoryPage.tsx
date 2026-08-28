@@ -12,37 +12,11 @@ import {
 } from '@/features/setup/services/communication.api';
 import { StructuredEmailPreview } from './components/StructuredEmailPreview';
 import { SystemBranding } from '@/config/branding';
+import { usePatientProfileContext } from './context/PatientProfileContext';
 
 const PAGE_SIZE = 10;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function getInitials(name: string): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  return parts.length === 1
-    ? parts[0].charAt(0).toUpperCase()
-    : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
-
-const AVATAR_PALETTE = [
-  'bg-sky-100 text-sky-700', 'bg-violet-100 text-violet-700',
-  'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700',
-  'bg-pink-100 text-pink-700', 'bg-indigo-100 text-indigo-700',
-];
-
-function avatarColor(name: string) {
-  const n = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_PALETTE[n % AVATAR_PALETTE.length];
-}
-
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
-  const sizeMap = { sm: 'w-6 h-6 text-[10px]', md: 'w-8 h-8 text-[11px]' };
-  return (
-    <div className={`rounded-full flex items-center justify-center font-bold shrink-0 ${sizeMap[size]} ${avatarColor(name)}`}>
-      {getInitials(name)}
-    </div>
-  );
-}
+import { PatientAvatar } from './components/PatientAvatar';
 
 function formatFull(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -121,7 +95,7 @@ function getCommunicationDisplayType(log: CommunicationLogEntry) {
 }
 
 // ── Inline Thread (expandable row) ────────────────────────────────────────
-function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; searchQuery?: string }) {
+function InlineThread({ log, searchQuery = '', avatarUrl }: { log: CommunicationLogEntry; searchQuery?: string; avatarUrl?: string | null }) {
   const isConfirmedAppt = log.appointment_status 
     ? ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(log.appointment_status) 
     : false;
@@ -211,7 +185,7 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
         {(log.patient_reply || confirmed || declined || rescheduled) && (
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Avatar name={log.patient_name || '?'} size="sm" />
+              <PatientAvatar name={log.patient_name || '?'} avatarUrl={avatarUrl} className="w-6 h-6" />
               <span className="text-[11.5px] font-semibold text-gray-800">{log.patient_name || 'Patient'}</span>
               <span className="text-[11.5px] text-gray-500">
                 {log.direction === 'INBOUND' ? 'responded' : log.patient_reply ? 'replied' : 'status updated'}
@@ -293,6 +267,7 @@ function InlineThread({ log, searchQuery = '' }: { log: CommunicationLogEntry; s
 // ── Main component ──────────────────────────────────────────────────────────
 export function PatientCommunicationHistoryPage() {
   const { patientId } = useParams<{ patientId: string }>();
+  const { patient } = usePatientProfileContext();
 
   const [logs, setLogs]           = useState<CommunicationLogEntry[]>([]);
   const [total, setTotal]         = useState(0);
@@ -552,7 +527,7 @@ export function PatientCommunicationHistoryPage() {
                       }}
                     />
 
-                    <Avatar name={log.patient_name || '?'} />
+                    <PatientAvatar name={log.patient_name || '?'} avatarUrl={patient?.avatar} />
                     
                     <div className="flex-1 min-w-0 pr-6"> {/* Added pr-6 to prevent overlapping with triangle */}
                       <div className="flex items-center gap-2 mb-1">
@@ -588,7 +563,7 @@ export function PatientCommunicationHistoryPage() {
                   </button>
 
                   {/* Expandable thread */}
-                  {isOpen && <InlineThread log={log} searchQuery={searchQuery} />}
+                  {isOpen && <InlineThread log={log} searchQuery={searchQuery} avatarUrl={patient?.avatar} />}
                 </div>
               );
             })}
