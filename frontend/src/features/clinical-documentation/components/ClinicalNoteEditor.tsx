@@ -24,7 +24,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
   } = useClinicalWorkspace();
 
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string>('all');
+
   
   const [showConfirmReplace, setShowConfirmReplace] = useState(false);
   const [pendingSaveParams, setPendingSaveParams] = useState<{ isFinalize: boolean } | null>(null);

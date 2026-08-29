@@ -226,10 +226,9 @@ export const WorkspaceRightPanel = () => {
               appointments={appointments} 
               onDeleteSuccess={handleRefreshFeed}
             />
-            {showUploadModal && (
+            {showUploadModal && patient && (
               <UploadDocumentModal
                 patientId={patient.id}
-                cases={cases}
                 preSelectedCaseId={selectedCaseId || undefined}
                 onClose={() => setShowUploadModal(false)}
                 onSuccess={() => {

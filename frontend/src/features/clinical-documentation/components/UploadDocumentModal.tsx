@@ -3,29 +3,18 @@ import { createPortal } from 'react-dom';
 import { X, Upload, File as FileIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { uploadCaseDocument } from '../api/caseDocuments.api';
-import type { PatientCase } from '@/types/patient';
+
 
 interface UploadDocumentModalProps {
   patientId: string | number;
-  cases: PatientCase[];
   preSelectedCaseId?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const CATEGORIES = [
-  { value: 'CLINICAL_NOTE', label: 'Clinical Note' },
-  { value: 'LETTER', label: 'Letter' },
-  { value: 'REPORT', label: 'Report' },
-  { value: 'LAB_RESULT', label: 'Lab Result' },
-  { value: 'IMAGING', label: 'Imaging' },
-  { value: 'REFERRAL', label: 'Referral' },
-  { value: 'INSURANCE', label: 'Insurance' },
-  { value: 'ATTACHMENT', label: 'Attachment' },
-  { value: 'OTHER', label: 'Other' },
-];
 
-export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClose, onSuccess }: UploadDocumentModalProps) => {
+
+export const UploadDocumentModal = ({ patientId, preSelectedCaseId, onClose, onSuccess }: UploadDocumentModalProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

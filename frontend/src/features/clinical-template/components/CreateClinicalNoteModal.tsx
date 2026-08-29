@@ -312,6 +312,8 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   };
 
   const executeSave = async () => {
+    if (!selectedTemplate || !selectedAppointment) return;
+
     const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
     setSaving(true);
     try {
@@ -335,7 +337,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         content,
         appointment: selectedAppointment,
         patient_case: patientCaseId,
-        status: status,
+        status: 'drafted',
       };
 
       // Only add practitioner if we have a valid ID

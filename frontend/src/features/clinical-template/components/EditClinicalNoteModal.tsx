@@ -57,6 +57,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
   const [selectedCaseId, setSelectedCaseId] = useState<number | ''>('');
   const [amendmentReason, setAmendmentReason] = useState<string>('');
   const [status, setStatus] = useState<'drafted' | 'finalized'>('drafted');
+  const isSigned = status === 'finalized';
 
   // Fetch note data and templates on mount
   const fetchData = useCallback(async () => {

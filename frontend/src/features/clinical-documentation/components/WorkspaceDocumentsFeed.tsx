@@ -1,9 +1,9 @@
 import React from 'react';
-import { Files, Calendar, ShieldCheck, FileCheck, FileText, Download } from 'lucide-react';
+import { Files, Calendar, ShieldCheck, FileText, Download } from 'lucide-react';
 import type { CaseDocument } from '../api/caseDocuments.api';
 import type { PatientConsentDocumentRecord } from '@/features/patients/patient.api';
 import type { Appointment } from '@/types';
-import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
+
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { ViewConsentFormModal } from '@/features/patients/components/ViewConsentFormModal';
 
@@ -14,7 +14,6 @@ interface WorkspaceDocumentsFeedProps {
 }
 
 export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ documents, appointments, onDeleteSuccess }) => {
-  const { setEditorContext } = useClinicalWorkspace();
   const [viewingConsent, setViewingConsent] = React.useState<PatientConsentDocumentRecord | null>(null);
   const [previewDoc, setPreviewDoc] = React.useState<CaseDocument | null>(null);
 
