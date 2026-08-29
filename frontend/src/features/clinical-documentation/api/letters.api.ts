@@ -19,7 +19,7 @@ export interface Letter {
   patient_case: number | null;
   template: number | null;
   practitioner_name?: string;
-  is_signed: boolean;
+  note_type?: string[];
   sent_to: string[];
   content_html?: string;
   layout_letter_head?: boolean;

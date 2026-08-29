@@ -62,7 +62,39 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
             'file', 'file_name', 'file_size', 'mime_type',
             'version', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'clinic', 'uploaded_by', 'file_size', 'version', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'clinic', 'uploaded_by', 'file_name', 'file_size', 'mime_type', 'version', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request or not request.user:
+            return attrs
+            
+        patient = attrs.get('patient')
+        if patient and patient.clinic != request.user.clinic:
+            raise serializers.ValidationError({"patient": "You do not have permission to attach documents to this patient."})
+            
+        patient_case = attrs.get('patient_case')
+        if patient_case and patient_case.patient != patient:
+            raise serializers.ValidationError({"patient_case": "The selected case does not belong to this patient."})
+            
+        file_obj = attrs.get('file')
+        if file_obj:
+            if file_obj.size > 5 * 1024 * 1024:
+                raise serializers.ValidationError({"file": "File is too large. The maximum allowed file size is 5 MB."})
+                
+            valid_types = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ]
+            
+            ext = file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else ''
+            valid_exts = ['pdf', 'doc', 'docx']
+            
+            if file_obj.content_type not in valid_types or ext not in valid_exts:
+                raise serializers.ValidationError({"file": "Unsupported file type. Only PDF, DOC, and DOCX files are allowed."})
+                
+        return attrs
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -75,5 +107,6 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
             validated_data['file_size'] = file_obj.size
             if not validated_data.get('file_name'):
                 validated_data['file_name'] = file_obj.name
+            validated_data['mime_type'] = file_obj.content_type
             
         return super().create(validated_data)

@@ -1,32 +1,29 @@
 import React from 'react';
-import { Files, Calendar, ShieldCheck, FileCheck } from 'lucide-react';
+import { Files, Calendar, ShieldCheck, FileCheck, FileText, Download } from 'lucide-react';
 import type { CaseDocument } from '../api/caseDocuments.api';
 import type { PatientConsentDocumentRecord } from '@/features/patients/patient.api';
 import type { Appointment } from '@/types';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { ViewConsentFormModal } from '@/features/patients/components/ViewConsentFormModal';
 
 interface WorkspaceDocumentsFeedProps {
   documents: (CaseDocument | (PatientConsentDocumentRecord & { category: string, description?: string }))[];
   appointments: Appointment[];
+  onDeleteSuccess?: () => void;
 }
 
-export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ documents, appointments }) => {
+export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ documents, appointments, onDeleteSuccess }) => {
   const { setEditorContext } = useClinicalWorkspace();
   const [viewingConsent, setViewingConsent] = React.useState<PatientConsentDocumentRecord | null>(null);
+  const [previewDoc, setPreviewDoc] = React.useState<CaseDocument | null>(null);
 
   if (documents.length === 0) {
     return (
       <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
         <Files className="w-12 h-12 mx-auto mb-4 opacity-20" />
         <h3 className="text-lg font-medium text-slate-600 mb-2">No Documents Found</h3>
-        <p className="text-sm mb-6">There are no uploaded files, consent forms, or attachments for this case.</p>
-        <button
-          className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium text-sm transition-colors"
-          onClick={() => setEditorContext({ type: 'IDLE' })}
-        >
-          Upload Document
-        </button>
+        <p className="text-sm">There are no uploaded files, consent forms, or attachments for this case.</p>
       </div>
     );
   }
@@ -55,42 +52,55 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
     return appointments.find(a => a.id === id);
   };
 
-  const getIconForType = (type?: string) => {
-    if (type === 'DATA_PRIVACY_CONSENT') return <ShieldCheck className="w-5 h-5 text-indigo-600" />;
-    if (type === 'CLINIC_CONSENT') return <FileCheck className="w-5 h-5 text-emerald-600" />;
-    return <Files className="w-5 h-5 text-sky-600" />;
-  };
-
   const renderDocCard = (doc: any) => {
-    const isConsent = 'appointment_id' in doc;
-    const icon = getIconForType(isConsent ? doc.type : undefined);
+    const isConsent = 'consent_document_name' in doc;
+    const type = isConsent ? 'consent' : 'case';
     
     return (
       <div 
         key={doc.id} 
-        className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-slate-300 transition-colors flex items-start gap-4 cursor-pointer group"
-        onClick={() => {
-          if (isConsent) {
-            setViewingConsent(doc as PatientConsentDocumentRecord);
-          } else if (doc.file) {
-            window.open(doc.file, '_blank');
-          }
-        }}
+        className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-slate-300 transition-colors flex items-center justify-between group"
       >
-        <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-slate-100 transition-colors">
-          {icon}
+        <div 
+          onClick={(e) => {
+            if (type === 'case') {
+              e.preventDefault();
+              setPreviewDoc(doc as CaseDocument);
+            } else {
+              setViewingConsent(doc as PatientConsentDocumentRecord);
+            }
+          }}
+          className="flex-1 min-w-0 cursor-pointer flex items-center gap-4"
+        >
+          <div className={`p-2 rounded-lg shrink-0 ${isConsent ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+            {isConsent ? <ShieldCheck className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-semibold text-slate-900 truncate">
+              {isConsent ? doc.consent_document_name : doc.title}
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+              {isConsent && (
+                <>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-700">
+                    Consent Form
+                  </span>
+                  <span>•</span>
+                </>
+              )}
+              <span>{new Date(doc.created_at || doc.signed_at).toLocaleDateString()}</span>
+            </p>
+          </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-slate-900 truncate" title={doc.title}>{doc.title}</h4>
-          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${isConsent ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
-              {isConsent ? 'Signed' : doc.category?.replace('_', ' ')}
-            </span>
-            <span>•</span>
-            <span>{new Date(doc.created_at || doc.signed_at).toLocaleDateString()}</span>
-          </p>
-          {doc.description && <p className="text-xs text-slate-600 mt-2 line-clamp-2">{doc.description}</p>}
-        </div>
+        <a 
+          href={type === 'case' ? doc.file : doc.signed_document_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors shrink-0 ml-2"
+          title="Download"
+        >
+          <Download className="w-4 h-4" />
+        </a>
       </div>
     );
   };
@@ -153,6 +163,17 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
           consent={viewingConsent}
           onClose={() => setViewingConsent(null)}
           onSendEmail={() => {}}
+        />
+      )}
+
+      {previewDoc && (
+        <DocumentPreviewModal 
+          document={previewDoc} 
+          onClose={() => setPreviewDoc(null)} 
+          onDeleteSuccess={() => {
+            setPreviewDoc(null);
+            if (onDeleteSuccess) onDeleteSuccess();
+          }}
         />
       )}
     </div>

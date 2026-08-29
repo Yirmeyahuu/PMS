@@ -93,7 +93,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             'id', 'patient', 'patient_name', 'practitioner', 'practitioner_name', 'practitioner_avatar',
             'appointment', 'appointment_date', 'appointment_time', 'appointment_service', 'appointment_practitioner',
             'clinic', 'template', 'template_name', 'template_version', 'patient_case',
-            'date', 'note_type', 'is_signed', 'signed_at', 'is_draft', 'last_autosave',
+            'date', 'note_type', 'status', 'signed_at', 'last_autosave',
             'version_number', 'amendment_reason',
             'content', 'decrypted_content', 'chart_annotation_data', 'created_at', 'updated_at'
         ]
@@ -109,7 +109,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         }
         read_only_fields = [
             'id', 'signed_at', 'last_autosave', 'created_at', 'updated_at',
-            'template_version', 'is_signed', 'version_number'
+            'template_version', 'version_number'
         ]
     
     def get_practitioner_avatar(self, obj) -> str | None:
@@ -204,9 +204,9 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             # Auto-set clinic from user if still not set
             if not attrs.get('clinic') and hasattr(request.user, 'clinic'):
                 attrs['clinic'] = request.user.clinic
-            # All clinical notes are final - no draft status needed
-            if 'is_draft' not in attrs:
-                attrs['is_draft'] = False
+            # Default to drafted if not provided
+            if 'status' not in attrs:
+                attrs['status'] = 'drafted'
             # Auto-set note_type to 'CLINICAL' if not provided
             if 'note_type' not in attrs:
                 attrs['note_type'] = 'CLINICAL'
@@ -238,6 +238,16 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
                 pass
             validated['extracted_content'] = final_content if final_content is not None else {}
             validated['has_content_update'] = True
+            
+        # Prevent finalized notes from being reverted to drafted
+        if self.instance and self.instance.status == 'finalized':
+            if validated.get('status') == 'drafted':
+                raise serializers.ValidationError({'status': 'A finalized clinical note cannot be reverted to a draft.'})
+                
+        # If finalizing, optionally set signed_at
+        if validated.get('status') == 'finalized' and not getattr(self.instance, 'signed_at', None):
+            from django.utils import timezone
+            validated['signed_at'] = timezone.now()
             
         return validated
     
@@ -410,7 +420,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         has_content_update = validated_data.pop('has_content_update', False)
 
         # Prevent editing signed notes
-        if instance.is_signed:
+        if instance.status == 'finalized':
             raise serializers.ValidationError('Cannot edit a signed clinical note')
 
         # Update fields

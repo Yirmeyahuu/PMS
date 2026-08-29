@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, FileText, Loader2, Save, Calendar, ClipboardList, Plus, History } from 'lucide-react';
+import { ConfirmReplaceModal } from '@/features/clinical-documentation/components/ConfirmReplaceModal';
 import { getActiveTemplates, createNote, getNotes, getNote } from '../clinical-templates.api';
 import type { ClinicalNote } from '@/types/clinicalTemplate';
 import { PreviewPreviousNoteModal } from './PreviewPreviousNoteModal';
@@ -57,6 +58,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   preselectedTemplateId,
   copyFromNoteId,
 }) => {
+  const [showConfirmReplace, setShowConfirmReplace] = useState(false);
   const [step, setStep] = useState<'template' | 'form'>('template');
   const [templates, setTemplates] = useState<ClinicalTemplate[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -123,8 +125,8 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         }
       }
       
-      const signedNotes = (notesData || []).filter((n: any) => n.is_signed || !n.is_draft);
-      const drafts = (notesData || []).filter((n: any) => !n.is_signed || n.is_draft);
+      const signedNotes = (notesData || []).filter((n: any) => n.status === 'finalized');
+      const drafts = (notesData || []).filter((n: any) => n.status === 'drafted');
       
       setTemplates(templatesData);
       setPatientCases(casesData);
@@ -302,14 +304,15 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
     // Check for existing draft in the selected appointment
     const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
     if (existingDraft) {
-      const confirmReplace = window.confirm(
-        'A draft note already exists for this session. Do you want to replace it with this new note?'
-      );
-      if (!confirmReplace) {
-        return; // Abort save if user declines
-      }
+      setShowConfirmReplace(true);
+      return;
     }
 
+    executeSave();
+  };
+
+  const executeSave = async () => {
+    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
     setSaving(true);
     try {
       // Get practitioner from selected appointment
@@ -332,6 +335,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
         content,
         appointment: selectedAppointment,
         patient_case: patientCaseId,
+        status: status,
       };
 
       // Only add practitioner if we have a valid ID
@@ -377,7 +381,9 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       }
       
       toast.error(message);
+    } finally {
       setSaving(false);
+      setShowConfirmReplace(false);
     }
   };
 
@@ -394,8 +400,13 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-0">
+      <ConfirmReplaceModal 
+        isOpen={showConfirmReplace} 
+        onConfirm={executeSave}
+        onCancel={() => setShowConfirmReplace(false)}
+      />
+      <div className="bg-white rounded-xl shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col relative overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>

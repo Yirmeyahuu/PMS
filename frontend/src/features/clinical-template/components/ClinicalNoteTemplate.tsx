@@ -303,7 +303,7 @@ export const ClinicalNoteTemplate = forwardRef<HTMLDivElement, ClinicalNoteTempl
           }}
         >
           <div>
-            {data.is_signed && (
+            {data.status === 'finalized' && (
               <>
                 <p style={{ fontSize: '10px', color: '#374151', margin: 0 }}>
                   Signed by:{' '}

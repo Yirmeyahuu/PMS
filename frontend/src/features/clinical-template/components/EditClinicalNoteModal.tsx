@@ -56,7 +56,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
   const [patientName, setPatientName] = useState<string>('');
   const [selectedCaseId, setSelectedCaseId] = useState<number | ''>('');
   const [amendmentReason, setAmendmentReason] = useState<string>('');
-  const [isSigned, setIsSigned] = useState<boolean>(false);
+  const [status, setStatus] = useState<'drafted' | 'finalized'>('drafted');
 
   // Fetch note data and templates on mount
   const fetchData = useCallback(async () => {
@@ -71,7 +71,7 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
       setPatientName(noteData.patient_name);
       setNoteDate(noteData.date);
       setSelectedAppointment(noteData.appointment);
-      setIsSigned(noteData.is_signed);
+      setStatus(noteData.status);
       if (noteData.patient_case) {
         setSelectedCaseId(noteData.patient_case);
       }
@@ -89,6 +89,18 @@ export const EditClinicalNoteModal: React.FC<EditClinicalNoteModalProps> = ({
       const sortedAppointments = (appointmentsData.results || []).sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
+
+      // Ensure the note's original appointment is in the list
+      if (noteData.appointment && !sortedAppointments.some(a => a.id === noteData.appointment)) {
+        sortedAppointments.unshift({
+          id: noteData.appointment,
+          date: noteData.appointment_date || '',
+          start_time: noteData.appointment_time || '',
+          practitioner_name: noteData.appointment_practitioner || '',
+          service_name: noteData.appointment_service || '',
+        } as any);
+      }
+
       setAppointments(sortedAppointments);
 
       // If note has template, set it and load content

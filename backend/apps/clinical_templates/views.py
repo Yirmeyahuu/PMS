@@ -111,7 +111,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
     serializer_class = ClinicalNoteSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['patient', 'practitioner', 'date', 'is_draft', 'is_signed', 'template', 'appointment', 'patient_case']
+    filterset_fields = ['patient', 'practitioner', 'date', 'status', 'template', 'appointment', 'patient_case']
     search_fields = ['patient__first_name', 'patient__last_name']
     ordering_fields = ['date', 'created_at']
     
@@ -325,7 +325,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         """
         note = self.get_object()
         
-        if note.is_signed:
+        if note.status == 'finalized':
             return Response(
                 {'detail': 'Cannot modify signed notes'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -612,7 +612,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
             'template_name': note.template.name if note.template else 'Clinical Note',
             'template_category': note.template.category if note.template else 'CLINICAL',
             'note_type': note.note_type,
-            'is_signed': note.is_signed,
+            'status': note.status,
             'signed_at': note.signed_at.isoformat() if note.signed_at else None,
             'created_at': note.created_at.isoformat() if note.created_at else None,
             'sections': sections,

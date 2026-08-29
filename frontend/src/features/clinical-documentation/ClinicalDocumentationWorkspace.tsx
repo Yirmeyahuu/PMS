@@ -27,7 +27,7 @@ const ClinicalWorkspaceLayout = () => {
   }, [caseId, selectedCaseId, setSelectedCaseId]);
 
 
-  const isNoteEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE';
+  const isNoteEditorActive = editorContext.type === 'NEW_NOTE' || editorContext.type === 'COPY_NOTE' || editorContext.type === 'EDIT_NOTE';
   const isLetterEditorActive = editorContext.type === 'NEW_LETTER' || editorContext.type === 'EDIT_LETTER';
   const isEditorActive = isNoteEditorActive || isLetterEditorActive;
 

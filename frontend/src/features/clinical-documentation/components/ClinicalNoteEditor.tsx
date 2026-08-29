@@ -3,6 +3,7 @@ import { ChevronLeft, FileText, Loader2, Save, Calendar, ClipboardList } from 'l
 import { getActiveTemplates, createNote, getNote, getNotes } from '@/features/clinical-template/clinical-templates.api';
 import { getAppointments, getAppointment } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
+import { ConfirmReplaceModal } from '@/features/clinical-documentation/components/ConfirmReplaceModal';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import type { ClinicalTemplate, CreateClinicalNoteData, TemplateSection, TemplateField, ClinicalNote } from '@/types/clinicalTemplate';
@@ -23,6 +24,10 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
   } = useClinicalWorkspace();
 
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<string>('all');
+  
+  const [showConfirmReplace, setShowConfirmReplace] = useState(false);
+  const [pendingSaveParams, setPendingSaveParams] = useState<{ isFinalize: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
@@ -67,8 +72,8 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
         }
       }
 
-      const signedNotes = (notesData || []).filter((n: any) => n.is_signed || !n.is_draft);
-      const drafts = (notesData || []).filter((n: any) => !n.is_signed || n.is_draft);
+      const signedNotes = (notesData || []).filter((n: any) => n.status === 'finalized');
+      const drafts = (notesData || []).filter((n: any) => n.status === 'drafted');
 
       setExistingNotes(signedNotes);
       setAllDrafts(drafts);
@@ -96,7 +101,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
   }, [patient, selectedCaseId]);
 
   useEffect(() => {
-    if (editorContext.type !== 'NEW_NOTE' && editorContext.type !== 'COPY_NOTE') return;
+    if (editorContext.type !== 'NEW_NOTE' && editorContext.type !== 'COPY_NOTE' && editorContext.type !== 'EDIT_NOTE') return;
 
     fetchData().then(async (result) => {
       if (!result) return;
@@ -122,9 +127,10 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       setIsSessionLocked(isAutoSelected);
 
 
-      if (editorContext.type === 'COPY_NOTE') {
+      if (editorContext.type === 'COPY_NOTE' || editorContext.type === 'EDIT_NOTE') {
         try {
-          const sourceNote = await getNote(editorContext.sourceNoteId);
+          const sourceNoteId = editorContext.type === 'COPY_NOTE' ? editorContext.sourceNoteId : editorContext.noteId;
+          const sourceNote = await getNote(sourceNoteId);
           const template = fetchedTemplates.find((t: ClinicalTemplate) => t.id === sourceNote.template);
           if (template) {
             setSelectedTemplate(template);
@@ -139,8 +145,26 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
             }
             setContent(mergedValues);
           }
+          
+          if (editorContext.type === 'EDIT_NOTE') {
+            if (sourceNote.appointment) {
+              // Ensure the appointment is in the list
+              if (!sortedAppointments.some((a: Appointment) => a.id === sourceNote.appointment)) {
+                sortedAppointments.unshift({
+                  id: sourceNote.appointment,
+                  date: sourceNote.appointment_date || '',
+                  start_time: sourceNote.appointment_time || '',
+                  practitioner_name: sourceNote.appointment_practitioner || '',
+                  service_name: sourceNote.appointment_service || '',
+                } as any);
+              }
+              setSelectedAppointment(sourceNote.appointment);
+              setNoteDate(sourceNote.date);
+              setIsSessionLocked(true);
+            }
+          }
         } catch (err) {
-          toast.error('Failed to copy note');
+          toast.error(editorContext.type === 'COPY_NOTE' ? 'Failed to copy note' : 'Failed to load note');
           setEditorContext({ type: 'IDLE' });
         }
       } else if (editorContext.type === 'NEW_NOTE') {
@@ -194,23 +218,29 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
     const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
     if (existingDraft && !isFinalize) {
-      const confirmReplace = window.confirm(
-        'A draft note already exists for this session. Do you want to replace it with this new note?'
-      );
-      if (!confirmReplace) return;
+      setPendingSaveParams({ isFinalize });
+      setShowConfirmReplace(true);
+      return;
     }
+
+    executeSave(isFinalize);
+  };
+
+  const executeSave = async (isFinalize: boolean = false) => {
+    if (!patient || !selectedAppointment || !selectedTemplate) return;
+    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
 
     setSaving(true);
     try {
       const apptDetails = appointments.find(a => a.id === selectedAppointment);
-      const noteData: CreateClinicalNoteData & { is_signed?: boolean } = {
+      const noteData: CreateClinicalNoteData = {
         patient: patient.id,
         template: selectedTemplate.id,
         date: noteDate,
         content,
         appointment: selectedAppointment,
         patient_case: selectedCaseId || undefined,
-        is_signed: isFinalize,
+        status: isFinalize ? 'finalized' : 'drafted',
       };
 
       if (apptDetails?.practitioner) {
@@ -250,6 +280,8 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
       toast.error(message);
     } finally {
       setSaving(false);
+      setShowConfirmReplace(false);
+      setPendingSaveParams(null);
     }
   };
 
@@ -293,6 +325,19 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* Meta Information */}
+        
+        <ConfirmReplaceModal 
+          isOpen={showConfirmReplace} 
+          onConfirm={() => {
+            if (pendingSaveParams) {
+              executeSave(pendingSaveParams.isFinalize);
+            }
+          }}
+          onCancel={() => {
+            setShowConfirmReplace(false);
+            setPendingSaveParams(null);
+          }}
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
           <div>
             <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
@@ -368,6 +413,13 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
       {/* Footer Actions */}
       <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
+        <button
+          onClick={() => setEditorContext({ type: 'IDLE' })}
+          disabled={saving}
+          className="px-4 py-2 text-sm font-medium text-slate-700 bg-transparent hover:bg-slate-200 transition-colors rounded-lg disabled:opacity-50"
+        >
+          Cancel
+        </button>
         <button
           onClick={() => handleSave(false)}
           disabled={saving || !selectedAppointment}

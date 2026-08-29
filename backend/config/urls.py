@@ -118,5 +118,13 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    from django.urls import re_path
+    from django.views.static import serve
+    from django.views.decorators.clickjacking import xframe_options_exempt
+    import re
+    
+    media_url = re.escape(settings.MEDIA_URL.lstrip('/'))
+    urlpatterns += [
+        re_path(r'^%s(?P<path>.*)$' % media_url, xframe_options_exempt(serve), {'document_root': settings.MEDIA_ROOT}),
+    ]
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

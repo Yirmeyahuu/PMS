@@ -13,15 +13,15 @@ class ClinicalTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(ClinicalNote)
 class ClinicalNoteAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'practitioner', 'date', 'is_signed', 'is_draft', 'created_at']
-    list_filter = ['is_signed', 'is_draft', 'date', 'clinic']
+    list_display = ['patient', 'practitioner', 'date', 'status', 'created_at']
+    list_filter = ['status', 'date', 'clinic']
     search_fields = ['patient__first_name', 'patient__last_name']
     readonly_fields = ['encrypted_content', 'signed_at', 'created_at', 'updated_at']
     ordering = ['-date', '-created_at']
     
     def has_change_permission(self, request, obj=None):
         # Prevent editing signed notes
-        if obj and obj.is_signed:
+        if obj and obj.status == 'finalized':
             return False
         return super().has_change_permission(request, obj)
 

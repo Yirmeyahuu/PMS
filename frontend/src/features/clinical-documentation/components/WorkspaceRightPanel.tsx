@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { History, Loader2 } from 'lucide-react';
+import { History, Loader2, Plus } from 'lucide-react';
 import { getNotes, getActiveTemplates } from '@/features/clinical-template/clinical-templates.api';
 import { getCaseDocuments, type CaseDocument } from '../api/caseDocuments.api';
 import { getPatientConsentDocuments, type PatientConsentDocumentRecord } from '@/features/patients/patient.api';
@@ -8,6 +8,7 @@ import { usePatientProfileContext } from '@/features/patients/context/PatientPro
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { ClinicalNoteFeedItem } from './ClinicalNoteFeedItem';
 import { WorkspaceDocumentsFeed } from './WorkspaceDocumentsFeed';
+import { UploadDocumentModal } from './UploadDocumentModal';
 import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 
@@ -21,6 +22,7 @@ export const WorkspaceRightPanel = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedNoteIds, setExpandedNoteIds] = useState<Set<number>>(new Set());
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!patient) return;
@@ -209,8 +211,33 @@ export const WorkspaceRightPanel = () => {
             )}
           </div>
         ) : activeRightTab === 'documents' ? (
-          <div className="max-w-4xl mx-auto">
-            <WorkspaceDocumentsFeed documents={documents} appointments={appointments} />
+          <div className="max-w-4xl mx-auto flex flex-col min-h-full">
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Documents
+              </button>
+            </div>
+            <WorkspaceDocumentsFeed 
+              documents={documents} 
+              appointments={appointments} 
+              onDeleteSuccess={handleRefreshFeed}
+            />
+            {showUploadModal && (
+              <UploadDocumentModal
+                patientId={patient.id}
+                cases={cases}
+                preSelectedCaseId={selectedCaseId || undefined}
+                onClose={() => setShowUploadModal(false)}
+                onSuccess={() => {
+                  setShowUploadModal(false);
+                  handleRefreshFeed();
+                }}
+              />
+            )}
           </div>
         ) : null}
       </div>

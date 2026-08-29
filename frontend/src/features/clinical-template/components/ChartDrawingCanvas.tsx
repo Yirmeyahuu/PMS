@@ -122,9 +122,14 @@ export const ChartDrawingCanvas: React.FC<ChartDrawingCanvasProps> = ({
   );
 
   // ── Drawing handlers ──────────────────────────────────────────────────────
+  const BASE_WIDTH = 700;
+
   const getPos = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     const stage = e.target.getStage();
-    return stage?.getPointerPosition() ?? null;
+    const pos = stage?.getPointerPosition() ?? null;
+    if (!pos) return null;
+    const scale = canvasWidth / BASE_WIDTH;
+    return { x: pos.x / scale, y: pos.y / scale };
   };
 
   const handlePointerDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -279,7 +284,7 @@ export const ChartDrawingCanvas: React.FC<ChartDrawingCanvasProps> = ({
             </Layer>
 
             {/* Layer 2: Saved strokes + current in-progress stroke */}
-            <Layer>
+            <Layer scale={{ x: canvasWidth / 700, y: canvasWidth / 700 }}>
               {strokes.map((stroke, i) => (
                 <Line
                   key={i}

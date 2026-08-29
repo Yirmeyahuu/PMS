@@ -51,8 +51,7 @@ export const getNotes = async (filters?: {
   patient?: number;
   practitioner?: number;
   appointment?: number;
-  is_signed?: boolean;
-  is_draft?: boolean;
+  status?: 'drafted' | 'finalized';
   patient_case?: number;
 }): Promise<ClinicalNote[]> => {
   const params = new URLSearchParams();
@@ -60,8 +59,7 @@ export const getNotes = async (filters?: {
   if (filters?.practitioner) params.append('practitioner', String(filters.practitioner));
   if (filters?.appointment) params.append('appointment', String(filters.appointment));
   if (filters?.patient_case) params.append('patient_case', String(filters.patient_case));
-  if (filters?.is_signed !== undefined) params.append('is_signed', String(filters.is_signed));
-  if (filters?.is_draft !== undefined) params.append('is_draft', String(filters.is_draft));
+  if (filters?.status) params.append('status', filters.status);
 
   const response = await axiosInstance.get(`${BASE_URL}/notes/?${params.toString()}`);
   return response.data.results ?? response.data;
@@ -172,7 +170,7 @@ export interface PrintNoteResponse {
   template_name: string;
   template_category: string;
   note_type: string;
-  is_signed: boolean;
+  status: 'drafted' | 'finalized';
   signed_at: string | null;
   created_at: string | null;
   sections: Array<{

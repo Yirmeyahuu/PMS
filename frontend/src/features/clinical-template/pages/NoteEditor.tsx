@@ -39,12 +39,12 @@ export const NoteEditor: React.FC = () => {
   const { lastSaved, isAutoSaving } = useAutoSave({
     data: formValues,
     onSave: async (data) => {
-      if (!isNewNote && !note?.is_signed) {
+      if (!isNewNote && note?.status !== 'finalized') {
         await saveNote({ content: data }, true);
       }
     },
     interval: 30000,
-    enabled: !isNewNote && !note?.is_signed,
+    enabled: !isNewNote && note?.status !== 'finalized',
   });
 
   const handleFieldChange = useCallback((fieldId: string, value: any) => {
@@ -135,14 +135,14 @@ export const NoteEditor: React.FC = () => {
 
             <div className="flex items-center gap-2">
               {/* Auto-save indicator */}
-              {!note?.is_signed && lastSaved && (
+              {note?.status !== 'finalized' && lastSaved && (
                 <div className="text-sm text-gray-500">
                   {isAutoSaving ? 'Saving...' : `Saved ${lastSaved}`}
                 </div>
               )}
 
               {/* Save Button */}
-              {!note?.is_signed && (
+              {note?.status !== 'finalized' && (
                 <button
                   onClick={handleSave}
                   disabled={saving}
@@ -154,7 +154,7 @@ export const NoteEditor: React.FC = () => {
               )}
 
               {/* Sign Button */}
-              {!note?.is_signed && (
+              {note?.status !== 'finalized' && (
                 <button
                   onClick={handleSign}
                   disabled={isSigning || saving}
@@ -166,7 +166,7 @@ export const NoteEditor: React.FC = () => {
               )}
 
               {/* Signed Badge */}
-              {note?.is_signed && (
+              {note?.status === 'finalized' && (
                 <div className="px-4 py-2 bg-green-100 text-green-700 rounded-lg flex items-center gap-2">
                   <FileSignature className="w-4 h-4" />
                   Signed
@@ -188,7 +188,7 @@ export const NoteEditor: React.FC = () => {
           </div>
 
           {/* Warning for signed notes */}
-          {note?.is_signed && (
+          {note?.status === 'finalized' && (
             <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-amber-800">
@@ -207,7 +207,7 @@ export const NoteEditor: React.FC = () => {
               values={formValues}
               onChange={handleFieldChange}
               errors={errors}
-              disabled={note?.is_signed}
+              disabled={note?.status === 'finalized'}
             />
           )}
         </div>

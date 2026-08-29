@@ -196,7 +196,7 @@ export const PatientClinicalNotesPage = () => {
                         <span className="text-sm font-semibold text-gray-900">
                           {note.template_name || 'Clinical Note'}
                         </span>
-                        {note.is_signed && (
+                        {note.status === 'finalized' && (
                           <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">
                             Signed
                           </span>
@@ -259,17 +259,19 @@ export const PatientClinicalNotesPage = () => {
                           )}
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setEditingNoteId(note.id);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                          title="Edit Clinical Note"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        {note.status !== 'finalized' && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setEditingNoteId(note.id);
+                            }}
+                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="Edit Clinical Note"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </article>

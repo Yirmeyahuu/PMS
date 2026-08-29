@@ -93,9 +93,8 @@ export interface ClinicalNote {
   template_version: number | null;
   date: string;
   note_type: string;
-  is_signed: boolean;
+  status: 'drafted' | 'finalized';
   signed_at: string | null;
-  is_draft: boolean;
   last_autosave: string | null;
   version_number?: number;
   amendment_reason?: string;
@@ -113,5 +112,6 @@ export interface CreateClinicalNoteData {
   template: number;
   date: string;
   content: Record<string, any>;
+  status?: 'drafted' | 'finalized';
   patient_case?: number;
 }

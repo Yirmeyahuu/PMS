@@ -13,8 +13,7 @@ const MAX_ATTACHMENTS = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, onClose, defaultModule = 'OTHER' }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<Partial<CreateFeedbackPayload>>({
+  const [formData, setFormData] = useState<Omit<CreateFeedbackPayload, 'browser' | 'os' | 'user_agent' | 'page_url'>>({
     type: 'BUG',
     priority: 'MEDIUM',
     module: defaultModule,
@@ -22,6 +21,8 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
     description: '',
   });
   const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update formData when defaultModule changes (e.g., URL changes while modal is closed)
@@ -34,27 +35,33 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
       
       if (files.length + selectedFiles.length > MAX_ATTACHMENTS) {
-        toast.error(`You can only attach a maximum of ${MAX_ATTACHMENTS} files.`);
+        setFileError(`You can only attach a maximum of ${MAX_ATTACHMENTS} files.`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
 
       const validFiles = selectedFiles.filter(file => {
         if (file.size > MAX_FILE_SIZE) {
-          toast.error(`File ${file.name} is too large. Max size is 5MB.`);
+          setFileError(`File ${file.name} is too large. Max size is 5MB.`);
           return false;
         }
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-          toast.error(`File ${file.name} is not a valid image format (JPG, PNG, WEBP).`);
+        
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!validExts.includes(ext || '')) {
+          setFileError(`File ${file.name} is not a valid image format. Only JPG, PNG, and WEBP are allowed.`);
           return false;
         }
         return true;
       });
 
       setFiles(prev => [...prev, ...validFiles]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -231,6 +238,12 @@ export const UserFeedbackModal: React.FC<UserFeedbackModalProps> = ({ isOpen, on
                 </button>
               )}
             </div>
+            
+            {fileError && (
+              <p className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                {fileError}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end space-x-3 pt-4 border-t">

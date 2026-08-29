@@ -152,7 +152,7 @@ export const PreviewPreviousNoteModal: React.FC<PreviewPreviousNoteModalProps> =
                     Status
                   </div>
                   <div className="text-sm font-medium text-gray-900">
-                    {sourceNote.is_signed ? 'Signed & Locked' : 'Draft'}
+                    {sourceNote.status === 'finalized' ? 'Signed & Locked' : 'Drafted'}
                   </div>
                 </div>
               </div>

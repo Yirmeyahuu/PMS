@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, File as FileIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { uploadCaseDocument } from '../api/caseDocuments.api';
@@ -27,15 +28,38 @@ const CATEGORIES = [
 export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClose, onSuccess }: UploadDocumentModalProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('OTHER');
-  const [patientCaseId, setPatientCaseId] = useState<number | ''>(preSelectedCaseId || '');
-  const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Focus trap / escape listener
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
+      
+      // Validation
+      const ext = selected.name.split('.').pop()?.toLowerCase();
+      const validExts = ['pdf', 'doc', 'docx'];
+      if (!validExts.includes(ext || '')) {
+        setFileError(`Unsupported file type. Only PDF, DOC, and DOCX files are allowed.`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      if (selected.size > 5 * 1024 * 1024) {
+        setFileError(`File is too large. The maximum allowed file size is 5 MB.`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       setFile(selected);
       if (!title) {
         setTitle(selected.name.split('.')[0]); // Default title to filename without extension
@@ -58,23 +82,36 @@ export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClo
       setIsSubmitting(true);
       await uploadCaseDocument(
         patientId,
-        patientCaseId === '' ? null : patientCaseId,
+        preSelectedCaseId || null,
         file,
         title,
-        category,
-        description
+        'OTHER',
+        ''
       );
       toast.success('Document uploaded successfully');
       onSuccess();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to upload document');
+      let errorMessage = 'Failed to upload document';
+      if (error.response?.data) {
+        const data = error.response.data;
+        if (typeof data === 'object') {
+          // DRF sends errors like { file: ["Error message"], patient: ["Error message"] }
+          const firstKey = Object.keys(data)[0];
+          if (firstKey && Array.isArray(data[firstKey])) {
+            errorMessage = `${firstKey}: ${data[firstKey][0]}`;
+          } else if (data.error) {
+            errorMessage = data.error;
+          }
+        }
+      }
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-900">Upload Document</h2>
@@ -105,17 +142,24 @@ export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClo
                       {file ? file.name : 'Upload a file'}
                     </span>
                   </div>
-                  {!file && <p className="text-xs text-slate-500">PDF, PNG, JPG up to 10MB</p>}
+                  {!file && <p className="text-xs text-slate-500">PDF, DOC, DOCX up to 5MB</p>}
                   {file && <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
                 </div>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 onChange={handleFileChange}
               />
             </div>
+            
+            {fileError && (
+              <p className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                {fileError}
+              </p>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Title *</label>
@@ -129,43 +173,6 @@ export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClo
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {CATEGORIES.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assign to Case (Optional)</label>
-              <select
-                value={patientCaseId}
-                onChange={(e) => setPatientCaseId(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">-- No Case --</option>
-                {cases.map(c => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                placeholder="Add any notes about this document..."
-              />
-            </div>
           </div>
         </form>
 
@@ -187,6 +194,7 @@ export const UploadDocumentModal = ({ patientId, cases, preSelectedCaseId, onClo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

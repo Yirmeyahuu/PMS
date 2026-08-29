@@ -138,7 +138,7 @@ export const ClinicalNotePrintTemplate: React.FC<ClinicalNotePrintTemplateProps>
           <img src={SystemBranding.logoColored} alt={SystemBranding.companyName} className="h-3.5 object-contain opacity-70 grayscale hover:grayscale-0 transition-all" />
           <span>on {new Date().toLocaleDateString('en-PH')}</span>
         </div>
-        {note.is_signed && note.signed_at && (
+        {note.status === 'finalized' && note.signed_at && (
           <p className="mt-2 font-medium text-emerald-700">
             Digitally signed by {note.practitioner_name} on {new Date(note.signed_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </p>

@@ -166,15 +166,15 @@ export const PatientUnassignedNotesPage = () => {
                       <p className="font-semibold text-sm text-gray-900 group-hover:text-sky-700 transition-colors">
                         {note.template_name || 'Clinical Note'}
                       </p>
-                      {note.is_signed && (
+                      {note.status === 'finalized' && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle className="w-2.5 h-2.5" />
                           Signed
                         </span>
                       )}
-                      {note.is_draft && (
+                      {note.status === 'drafted' && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                          Draft
+                          Drafted
                         </span>
                       )}
                     </div>

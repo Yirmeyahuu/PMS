@@ -46,7 +46,7 @@ class CanEditClinicalNote(permissions.BasePermission):
     """
     Only the assigned practitioner can edit their own notes.
     Admins and Staff can edit any note.
-    Signed notes can be edited by the practitioner, admin, or staff.
+    Finalized notes CANNOT be edited by anyone.
     """
     
     def has_object_permission(self, request, view, obj):
@@ -65,16 +65,19 @@ class CanEditClinicalNote(permissions.BasePermission):
                 return obj_clinic == user_clinic or obj_clinic == user_clinic.parent_clinic
             return False
         
-        # Edit/Delete: Admin or Staff can edit any note, or practitioner can edit their own note
+        # Edit/Delete: Reject if note is finalized
+        if hasattr(obj, 'status') and obj.status == 'finalized':
+            return False
+            
         # Admin can edit any note
         if user.is_admin:
             return True
-        
+            
         # Staff can edit any note
         if user.role == 'STAFF':
             return True
         
-        # Practitioner can edit their own note (even if signed)
+        # Practitioner can edit their own note
         if hasattr(obj, 'practitioner') and obj.practitioner and hasattr(obj.practitioner, 'user'):
             return obj.practitioner.user == user
         

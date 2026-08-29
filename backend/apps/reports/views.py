@@ -666,7 +666,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             if note is None:
                 row['note_status'] = 'MISSING'
                 missing_items.append(row)
-            elif not note.is_signed:
+            elif note.status != 'finalized':
                 row['note_status'] = 'UNSIGNED_DRAFT'
                 row['note_id']     = note.id
                 unsigned_items.append(row)

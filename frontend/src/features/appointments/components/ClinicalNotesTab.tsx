@@ -103,7 +103,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ appointmentI
                   <p className="text-sm font-semibold text-gray-900">
                     {note.template_name || 'Clinical Note'}
                   </p>
-                  {note.is_signed ? (
+                  {note.status === 'finalized' ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                       Signed
                     </span>

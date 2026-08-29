@@ -201,11 +201,13 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
     note_type = models.CharField(max_length=20, default='CLINICAL')
     
     # Status
-    is_signed = models.BooleanField(default=False)
+    STATUS_CHOICES = [
+        ('drafted', 'Drafted'),
+        ('finalized', 'Finalized/Signed'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='drafted')
     signed_at = models.DateTimeField(null=True, blank=True)
     
-    # Draft support
-    is_draft = models.BooleanField(default=True)
     last_autosave = models.DateTimeField(null=True, blank=True)
 
     # Chart annotation stroke data (non-encrypted, structural doodle JSON)
@@ -223,7 +225,7 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
             models.Index(fields=['patient', 'date']),
             models.Index(fields=['practitioner', 'date']),
             models.Index(fields=['clinic', 'date']),
-            models.Index(fields=['is_draft', 'is_signed']),
+            models.Index(fields=['status']),
             models.Index(fields=['appointment']),
             models.Index(fields=['patient_case']),
         ]
@@ -248,10 +250,9 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
             raise ValidationError('Only the assigned practitioner can sign this note')
         
         from django.utils import timezone
-        self.is_signed = True
-        self.is_draft = False
+        self.status = 'finalized'
         self.signed_at = timezone.now()
-        self.save(update_fields=['is_signed', 'is_draft', 'signed_at'])
+        self.save(update_fields=['status', 'signed_at'])
 
 
 class ClinicalNoteVersion(TimeStampedModel):
