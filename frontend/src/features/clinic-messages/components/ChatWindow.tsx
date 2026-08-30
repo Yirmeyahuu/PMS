@@ -5,6 +5,7 @@ import { TypingIndicator } from './TypingIndicator';
 import { useMessages }     from '../hooks/useMessages';
 import { useWebSocket }    from '../hooks/useWebSocket';
 import type { Conversation, MessageItem } from '../types/messages.types';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Props {
   conversation:  Conversation;
@@ -58,19 +59,15 @@ export const ChatWindow = ({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUser]);
 
-  const initials = other?.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) ?? '?';
-
   return (
     <div className="flex flex-col h-full">
       {/* Chat header */}
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-100 bg-white flex-shrink-0">
-        {other?.avatar ? (
-          <img src={other.avatar} alt={other.full_name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
-            {initials}
-          </div>
-        )}
+        <UserAvatar
+          avatarUrl={other?.avatar ?? null}
+          name={other?.full_name ?? ''}
+          className="w-9 h-9 flex-shrink-0"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800 truncate leading-tight">
             {other?.full_name ?? 'Unknown'}

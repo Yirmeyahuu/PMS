@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Check, Search, X, User } from 'lucide-react';
 import type { ClinicUser } from '../hooks/useClinicUsers';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface UserSelectorProps {
   users: ClinicUser[];
@@ -9,55 +10,6 @@ interface UserSelectorProps {
   disabled?: boolean;
   error?: string;
 }
-
-// Helper to get avatar URL - handles both Cloudinary and local media
-const getAvatarUrl = (avatar: string | null | undefined): string | null => {
-  if (!avatar) return null;
-  
-  // If already a full URL (Cloudinary in production), return as-is
-  if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-    return avatar;
-  }
-  
-  // Local development: prepend backend base URL
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  return `${baseUrl}${avatar.startsWith('/') ? '' : '/'}${avatar}`;
-};
-
-// Avatar component with fallback to initials
-const UserAvatar: React.FC<{ user: ClinicUser; size?: 'sm' | 'md' }> = ({ user, size = 'md' }) => {
-  const [imageError, setImageError] = useState(false);
-  const avatarUrl = getAvatarUrl(user.avatar);
-  
-  const sizeClasses = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm';
-  
-  // Get initials from name
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-  
-  if (!avatarUrl || imageError) {
-    // Fallback to initials
-    return (
-      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold shrink-0`}>
-        {getInitials(user.name)}
-      </div>
-    );
-  }
-  
-  return (
-    <img
-      src={avatarUrl}
-      alt={user.name}
-      onError={() => setImageError(true)}
-      className={`${sizeClasses} rounded-full object-cover shrink-0 border-2 border-white shadow-sm`}
-    />
-  );
-};
 
 export const UserSelector: React.FC<UserSelectorProps> = ({
   users,
@@ -208,7 +160,11 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                       `}
                     >
                       {/* Avatar */}
-                      <UserAvatar user={user} size="md" />
+                      <UserAvatar
+                        avatarUrl={(user as any).avatar_url ?? user.avatar}
+                        name={user.name}
+                        className="w-10 h-10 shrink-0 border-2 border-white shadow-sm"
+                      />
 
                       {/* User Info */}
                       <div className="min-w-0 flex-1">
@@ -261,7 +217,11 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
               if (!user) return null;
               return (
                 <div key={userId} className="ring-2 ring-white rounded-full">
-                  <UserAvatar user={user} size="sm" />
+                  <UserAvatar
+                    avatarUrl={(user as any).avatar_url ?? (user as any).avatar}
+                    name={user.name}
+                    className="w-8 h-8"
+                  />
                 </div>
               );
             })}

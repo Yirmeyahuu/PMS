@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
 import type { Participant } from '../types/messages.types';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Props {
   contacts:  Participant[];
@@ -8,17 +9,6 @@ interface Props {
   onSelect:  (contact: Participant) => void;
   onBack:    () => void;
 }
-
-const Avatar = ({ name, src }: { name: string; src: string | null }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  return src ? (
-    <img src={src} alt={name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-  ) : (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
-      {initials}
-    </div>
-  );
-};
 
 export const ContactList = ({ contacts, isLoading, onSelect, onBack }: Props) => {
   const [search, setSearch] = useState('');
@@ -98,7 +88,11 @@ export const ContactList = ({ contacts, isLoading, onSelect, onBack }: Props) =>
                   onClick={() => onSelect(contact)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white transition-colors"
                 >
-                  <Avatar name={contact.full_name} src={contact.avatar} />
+                  <UserAvatar
+                    avatarUrl={contact.avatar}
+                    name={contact.full_name}
+                    className="w-9 h-9"
+                  />
                   <div className="text-left min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-800 truncate">{contact.full_name}</p>
                     <p className="text-xs text-gray-400 truncate">

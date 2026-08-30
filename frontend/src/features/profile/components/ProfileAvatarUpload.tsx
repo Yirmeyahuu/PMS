@@ -56,7 +56,7 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
   const isBusy     = isUploading || isRemoving || disabled;
 
   // Default avatar fallback
-  const DEFAULT_AVATAR = '/assets/default-avatar/default-profile.jpg';
+  const DEFAULT_AVATAR = '/users-default-profile/default-profile.jpg';
 
   return (
     <div className="flex flex-col items-center gap-4">

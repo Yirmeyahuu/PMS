@@ -3,6 +3,7 @@ import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
 import { SystemBranding } from '@/config/branding';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface ClinicalNotePrintTemplateProps {
   note: ClinicalNote;
@@ -58,13 +59,11 @@ export const ClinicalNotePrintTemplate: React.FC<ClinicalNotePrintTemplateProps>
         
         <div className="flex items-center justify-between pt-5 border-t border-slate-200/60">
           <div className="flex items-center gap-3">
-            {note.practitioner_avatar ? (
-              <img src={note.practitioner_avatar} alt={note.practitioner_name} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-slate-200" />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-primary-gradient flex items-center justify-center text-white font-bold shadow-sm border-2 border-white ring-1 ring-slate-200 text-lg">
-                {note.practitioner_name?.charAt(0) || 'P'}
-              </div>
-            )}
+            <UserAvatar
+              avatarUrl={note.practitioner_avatar}
+              name={note.practitioner_name ?? 'Practitioner'}
+              className="w-12 h-12 border-2 border-white shadow-sm ring-1 ring-slate-200"
+            />
             <div>
               <p className="font-bold text-slate-900 text-lg">{note.practitioner_name || 'Practitioner'}</p>
               <p className="text-sm text-slate-500 font-medium">Attending Practitioner</p>

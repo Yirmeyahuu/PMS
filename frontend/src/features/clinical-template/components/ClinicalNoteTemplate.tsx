@@ -94,39 +94,20 @@ export const ClinicalNoteTemplate = forwardRef<HTMLDivElement, ClinicalNoteTempl
           }}
         >
           {/* Avatar */}
-          {data.practitioner_avatar ? (
-            <img
-              src={data.practitioner_avatar}
-              alt={data.practitioner_name}
-              crossOrigin="anonymous"
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2px solid #0284c7',
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: '#e0f2fe',
-                border: '2px solid #0284c7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                fontWeight: 700,
-                color: '#0284c7',
-                flexShrink: 0,
-              }}
-            >
-              {data.practitioner_initials || data.practitioner_name?.substring(0, 2).toUpperCase() || '??'}
-            </div>
-          )}
+          <img
+            src={data.practitioner_avatar || '/users-default-profile/default-profile.jpg'}
+            alt={data.practitioner_name}
+            crossOrigin="anonymous"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/users-default-profile/default-profile.jpg'; }}
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '2px solid #0284c7',
+              flexShrink: 0,
+            }}
+          />
 
           {/* Practitioner info */}
           <div style={{ flex: 1 }}>

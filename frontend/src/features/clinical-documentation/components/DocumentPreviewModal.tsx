@@ -1,9 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, FileText, Trash2, Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { deleteCaseDocument, type CaseDocument } from '../api/caseDocuments.api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
+import { getLetter } from '../api/letters.api';
+
+// TipTap Imports for Read-Only rendering
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import { CustomTableHeader } from '@/features/manage/pages/clinical/components/editor/CustomTableHeader';
+import { CustomTableCell } from '@/features/manage/pages/clinical/components/editor/CustomTableCell';
+import { TrailingNode } from '@/features/manage/pages/clinical/components/editor/TrailingNode';
+import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+import Color from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Underline from '@tiptap/extension-underline';
+import { CustomOrderedList } from '@/features/manage/pages/clinical/components/editor/CustomOrderedList';
+import { CustomBulletList } from '@/features/manage/pages/clinical/components/editor/CustomBulletList';
+import { Indent } from '@/features/manage/pages/clinical/components/editor/Indent';
+import { FontSize } from '@/features/manage/pages/clinical/components/editor/FontSize';
+import { MergeField } from '@/features/manage/pages/clinical/components/editor/MergeField';
 
 interface DocumentPreviewModalProps {
   document: CaseDocument;
@@ -14,10 +34,77 @@ interface DocumentPreviewModalProps {
 export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }: DocumentPreviewModalProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const isPdf = doc.mime_type === 'application/pdf' || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf'));
+  const [isLetterLoading, setIsLetterLoading] = useState(false);
+  const [letterContent, setLetterContent] = useState<string>('');
+  
+  const isLetter = doc.source_type === 'LETTER';
+  const isPdf = !isLetter && (doc.mime_type === 'application/pdf' || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf')));
+  
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        orderedList: false,
+        bulletList: false,
+      }),
+      CustomOrderedList,
+      CustomBulletList,
+      Indent,
+      Table.configure({ resizable: true }),
+      TableRow,
+      CustomTableHeader,
+      CustomTableCell,
+      TrailingNode,
+      Image.configure({ inline: true, allowBase64: true }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Color,
+      TextStyle,
+      FontSize,
+      Underline,
+      MergeField,
+    ],
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px]',
+      },
+    },
+    editable: false,
+    content: '<p></p>',
+  });
+
+  useEffect(() => {
+    if (isLetter && doc.source_id) {
+      let mounted = true;
+      const fetchLetter = async () => {
+        setIsLetterLoading(true);
+        try {
+          const letter = await getLetter(doc.source_id!);
+          if (mounted) {
+            setLetterContent(letter.content_html || '<p></p>');
+          }
+        } catch (err) {
+          console.error('Failed to load letter content', err);
+          if (mounted) toast.error('Failed to load letter content');
+        } finally {
+          if (mounted) setIsLetterLoading(false);
+        }
+      };
+      fetchLetter();
+      return () => { mounted = false; };
+    }
+  }, [isLetter, doc.source_id]);
+
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && letterContent) {
+      // Need a small timeout to ensure editor is fully ready in React Strict Mode
+      setTimeout(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(letterContent);
+        }
+      }, 0);
+    }
+  }, [editor, letterContent]);
   
   const handleDownload = () => {
-    // Open the file in a new tab which usually triggers a download for non-PDFs
     window.open(doc.file, '_blank');
   };
 
@@ -66,6 +153,7 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
             <button 
               onClick={handleDownload}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+              title={isLetter ? "Download PDF" : "Download"}
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Download</span>
@@ -80,15 +168,33 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 bg-slate-100 overflow-hidden relative flex flex-col items-center justify-center">
-          {isPdf ? (
+        <div className="flex-1 bg-slate-100 overflow-hidden relative flex flex-col">
+          {isLetter ? (
+            <div className="flex-1 overflow-y-auto p-8 flex justify-center">
+              <div className="w-full max-w-3xl bg-white shadow-sm border border-slate-200 p-12 min-h-full">
+                {isLetterLoading ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                    <p>Loading letter content...</p>
+                  </div>
+                ) : !letterContent ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                    <FileText className="w-12 h-12 mb-4 opacity-20" />
+                    <p>No letter content available for preview.</p>
+                  </div>
+                ) : (
+                  <EditorContent editor={editor} className="letter-preview-content" />
+                )}
+              </div>
+            </div>
+          ) : isPdf ? (
             <iframe 
               src={`${doc.file}#view=FitH`} 
               title={doc.file_name}
               className="w-full h-full border-none"
             />
           ) : (
-            <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center mx-4">
+            <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center mx-auto my-auto">
               <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-8 h-8" />
               </div>

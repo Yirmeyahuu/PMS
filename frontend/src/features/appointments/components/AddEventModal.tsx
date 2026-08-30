@@ -4,11 +4,12 @@ import { format } from 'date-fns';
 import { createBlockAppointment } from '../appointment.api';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
 import { useBlockConflictDetection } from '../hooks/useBlockConflictDetection';
-import { useClinicUsers, type ClinicUser } from '../hooks/useClinicUsers';
+import { useClinicUsers } from '../hooks/useClinicUsers';
 import { ConflictModal } from './ConflictModal';
 import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
 import type { BlockAppointment, Appointment, CreateBlockAppointmentData } from '@/types';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -31,49 +32,6 @@ interface FormData {
   notes: string;
   selected_user_ids: number[];
 }
-
-// Helper to get avatar URL
-const getAvatarUrl = (avatar: string | null | undefined): string | null => {
-  if (!avatar) return null;
-  if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-    return avatar;
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  return `${baseUrl}${avatar.startsWith('/') ? '' : '/'}${avatar}`;
-};
-
-// Avatar component with fallback to initials
-const UserAvatar: React.FC<{ user: ClinicUser; size?: 'sm' | 'md' }> = ({ user, size = 'md' }) => {
-  const [imageError, setImageError] = useState(false);
-  const avatarUrl = getAvatarUrl(user.avatar);
-
-  const sizeClasses = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-9 h-9 text-sm';
-
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-
-  if (!avatarUrl || imageError) {
-    return (
-      <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-semibold shrink-0`}>
-        {getInitials(user.name)}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={avatarUrl}
-      alt={user.name}
-      onError={() => setImageError(true)}
-      className={`${sizeClasses} rounded-full object-cover shrink-0 border-2 border-white shadow-sm`}
-    />
-  );
-};
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
@@ -612,7 +570,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                         </div>
 
                         {/* Avatar */}
-                        <UserAvatar user={user} size="md" />
+                        <UserAvatar
+                          avatarUrl={(user as any).avatar_url ?? user.avatar}
+                          name={user.name}
+                          className="w-9 h-9 shrink-0 border-2 border-white shadow-sm"
+                        />
 
                         {/* User Info */}
                         <div className="min-w-0 flex-1">

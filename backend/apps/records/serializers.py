@@ -70,8 +70,12 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
             return attrs
             
         patient = attrs.get('patient')
-        if patient and patient.clinic != request.user.clinic:
-            raise serializers.ValidationError({"patient": "You do not have permission to attach documents to this patient."})
+        if patient:
+            user_main = request.user.clinic.main_clinic if request.user.clinic else None
+            patient_main = patient.clinic.main_clinic if patient.clinic else None
+            
+            if not user_main or user_main != patient_main:
+                raise serializers.ValidationError({"patient": "You do not have permission to attach documents to this patient."})
             
         patient_case = attrs.get('patient_case')
         if patient_case and patient_case.patient != patient:

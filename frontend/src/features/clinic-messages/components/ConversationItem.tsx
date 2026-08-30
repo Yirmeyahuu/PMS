@@ -1,23 +1,12 @@
 import type { Conversation } from '../types/messages.types';
 import { formatDistanceToNow } from 'date-fns';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Props {
   conversation: Conversation;
   isActive:     boolean;
   onClick:      () => void;
 }
-
-const Avatar = ({ name, src, size = 9 }: { name: string; src: string | null; size?: number }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const sizeClass = `w-${size} h-${size}`;
-  return src ? (
-    <img src={src} alt={name} className={`${sizeClass} rounded-full object-cover flex-shrink-0`} />
-  ) : (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0`}>
-      {initials}
-    </div>
-  );
-};
 
 export const ConversationItem = ({ conversation, isActive, onClick }: Props) => {
   const other = conversation.other_participant;
@@ -36,7 +25,11 @@ export const ConversationItem = ({ conversation, isActive, onClick }: Props) => 
     >
       {/* Avatar with unread badge */}
       <div className="relative flex-shrink-0">
-        <Avatar name={other?.full_name ?? '?'} src={other?.avatar ?? null} size={9} />
+        <UserAvatar
+          avatarUrl={other?.avatar ?? null}
+          name={other?.full_name ?? ''}
+          className="w-9 h-9"
+        />
         {conversation.unread_count > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
             {conversation.unread_count > 9 ? '9+' : conversation.unread_count}

@@ -6,6 +6,7 @@ import type { ClinicalNote, ClinicalTemplate, TemplateSection, TemplateField } f
 import { ClinicalNoteTemplate } from './ClinicalNoteTemplate';
 import { SendClinicalNoteModal } from './SendClinicalNoteModal';
 import { ClinicalNoteHistoryModal } from './ClinicalNoteHistoryModal';
+import { UserAvatar } from '@/components/UserAvatar';
 import toast from 'react-hot-toast';
 import { useClinicSettings } from '@/hooks/useClinicSettings';
 
@@ -145,15 +146,6 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
     }
   };
 
-  // Generate initials for avatar
-  const getInitials = (name: string) => {
-    if (!name) return '?';
-    const parts = name.split(' ');
-    return parts.length > 1 
-      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() 
-      : name.substring(0, 2).toUpperCase();
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -253,17 +245,11 @@ export const ViewClinicalNoteModal: React.FC<ViewClinicalNoteModalProps> = ({
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
                   {/* Practitioner Avatar */}
-                  {note.practitioner_avatar ? (
-                    <img 
-                      src={note.practitioner_avatar} 
-                      alt={note.practitioner_name}
-                      className="w-14 h-14 rounded-full object-cover border-2 border-sky-500 shadow-sm"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-sky-100 border-2 border-sky-500 flex items-center justify-center text-sky-600 font-bold text-xl shadow-sm">
-                      {getInitials(note.practitioner_name)}
-                    </div>
-                  )}
+                  <UserAvatar
+                    avatarUrl={note.practitioner_avatar}
+                    name={note.practitioner_name ?? ''}
+                    className="w-14 h-14 border-2 border-sky-500 shadow-sm"
+                  />
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-900 text-lg">{note.practitioner_name}</h3>
                     <p className="text-sm text-gray-500">{note.template_name}</p>

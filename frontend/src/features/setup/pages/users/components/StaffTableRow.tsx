@@ -2,6 +2,7 @@ import React from 'react';
 import { Edit2, Trash2, Mail, Phone, ToggleLeft, ToggleRight } from 'lucide-react';
 import type { StaffMember } from '../../../types/staff.types';
 import { DISCIPLINE_OPTIONS } from '../../../types/staff.types';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Props {
   staff:          StaffMember;
@@ -35,7 +36,6 @@ export const StaffTableRow: React.FC<Props> = ({
   const disciplineLabel =
     DISCIPLINE_OPTIONS.find(d => d.value === staff.discipline)?.label ?? staff.discipline;
 
-  const initials = `${staff.first_name[0] ?? ''}${staff.last_name[0] ?? ''}`.toUpperCase();
   const effectiveRoles = staff.roles && staff.roles.length > 0 ? staff.roles : [staff.role];
   const isMe     = currentUserId != null && staff.id === currentUserId;
   const isAdmin  = effectiveRoles.includes('ADMIN');
@@ -49,9 +49,11 @@ export const StaffTableRow: React.FC<Props> = ({
       {/* Name + Avatar */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-sky-100 border border-sky-200 flex items-center justify-center text-xs font-bold text-sky-700 flex-shrink-0">
-            {initials}
-          </div>
+          <UserAvatar
+            avatarUrl={(staff as any).avatar_url ?? (staff as any).avatar}
+            name={`${staff.first_name} ${staff.last_name}`}
+            className="w-8 h-8 border border-sky-200"
+          />
           <div>
             <div className="flex items-center gap-1.5">
               <p className="font-medium text-gray-900 text-sm leading-tight">

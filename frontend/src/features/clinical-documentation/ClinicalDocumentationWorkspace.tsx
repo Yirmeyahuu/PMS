@@ -92,7 +92,6 @@ const ClinicalWorkspaceLayout = () => {
           </div>
         </div>
       </div>
-
     </div>
       
       {editorContext.type === 'VIEW_LETTER' && editorContext.letterId && (

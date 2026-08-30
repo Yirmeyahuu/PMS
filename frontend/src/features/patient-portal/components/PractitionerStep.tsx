@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, User } from 'lucide-react';
 import type { PortalPractitioner } from '../types/portal';
+import { UserAvatar } from '@/components/UserAvatar';
 
 // ── Discipline label map (mirrors DISCIPLINE_OPTIONS in staff.types.ts) ───────
 const DISCIPLINE_LABELS: Record<string, string> = {
@@ -160,12 +161,12 @@ export const PractitionerStep: React.FC<PractitionerStepProps> = ({
                         }`}
                       >
                         {/* Avatar */}
-                        <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">
-                          {p.avatar_url ? (
-                            <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="w-10 h-10 text-gray-400" />
-                          )}
+                        <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                          <UserAvatar
+                            avatarUrl={p.avatar_url}
+                            name={p.full_name}
+                            className="w-full h-full"
+                          />
                         </div>
 
                         {/* Info block */}

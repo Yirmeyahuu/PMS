@@ -6,6 +6,7 @@ import { useLogoutConfirm } from '@/hooks/useLogoutConfirm';
 import { usePermissions } from '@/hooks/usePermissions';
 import { sidebarItems } from './sidebarItems';
 import MESLogo from '@/assets/malasakit/Icon - Colored.svg';
+import { UserAvatar } from '@/components/UserAvatar';
 
 export const TopNavigation: React.FC = () => {
   const navigate = useNavigate();
@@ -113,13 +114,11 @@ export const TopNavigation: React.FC = () => {
                 <p className="text-xs text-white/80">{roleLabel}</p>
               </div>
               <div className="w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center overflow-hidden flex-shrink-0">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white font-bold text-sm">
-                    {user?.first_name?.[0]}{user?.last_name?.[0]}
-                  </span>
-                )}
+                <UserAvatar
+                  avatarUrl={user?.avatar_url}
+                  name={user ? `${user.first_name} ${user.last_name}` : ''}
+                  className="w-9 h-9"
+                />
               </div>
             </div>
 
@@ -206,13 +205,11 @@ export const TopNavigation: React.FC = () => {
         <div className="p-4 border-t border-gray-100 bg-gray-50">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-care-blue/20 border border-care-blue/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-care-blue font-bold">
-                  {user?.first_name?.[0]}{user?.last_name?.[0]}
-                </span>
-              )}
+              <UserAvatar
+                avatarUrl={user?.avatar_url}
+                name={user ? `${user.first_name} ${user.last_name}` : ''}
+                className="w-10 h-10"
+              />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm text-gray-900 truncate">

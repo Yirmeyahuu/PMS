@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import type { MessageItem } from '../types/messages.types';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface Props {
   message:       MessageItem;
@@ -8,19 +9,16 @@ interface Props {
 
 export const ChatMessage = ({ message, currentUserId }: Props) => {
   const isMine   = message.sender_id === currentUserId;
-  const initials = message.sender_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div className={`flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
       {!isMine && (
         <div className="flex-shrink-0 mb-1">
-          {message.sender_avatar ? (
-            <img src={message.sender_avatar} alt={message.sender_name} className="w-7 h-7 rounded-full object-cover" />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-[10px] font-semibold text-white">
-              {initials}
-            </div>
-          )}
+          <UserAvatar
+            avatarUrl={message.sender_avatar ?? null}
+            name={message.sender_name}
+            className="w-7 h-7"
+          />
         </div>
       )}
 

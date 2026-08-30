@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, FileText, CheckCircle, Copy, X, ChevronDown, ChevronRight, Printer, Mail, Edit } from 'lucide-react';
+import { Loader2, Save, FileText, Copy, X, ChevronDown, ChevronRight, Printer, Mail, Edit } from 'lucide-react';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { createNote, updateNote } from '@/features/clinical-template/clinical-templates.api';
 import { SendNoteEmailModal } from './SendNoteEmailModal';
 import { PrintNoteModal } from './PrintNoteModal';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
+import { UserAvatar } from '@/components/UserAvatar';
 import { useQuery } from '@tanstack/react-query';
 import { getMyClinic } from '@/features/clinics/clinic.api';
 import type { ClinicalTemplate, ClinicalNote } from '@/types/clinicalTemplate';
@@ -200,13 +201,11 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
           onClick={() => !isNewNote && onToggleExpand?.()}
         >
           <div className="flex items-center gap-3.5">
-            {practitionerAvatar ? (
-              <img src={practitionerAvatar} alt={practitionerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm ring-2 ring-white" />
-            ) : (
-              <div className="w-11 h-11 rounded-full bg-primary-gradient flex items-center justify-center text-white font-bold border border-white shadow-sm ring-2 ring-white text-lg">
-                {practitionerName.charAt(0)}
-              </div>
-            )}
+            <UserAvatar
+              avatarUrl={practitionerAvatar}
+              name={practitionerName}
+              className="w-11 h-11 border border-slate-200 shadow-sm ring-2 ring-white"
+            />
             <div>
               <h4 className="text-base font-bold text-slate-800 tracking-tight">{practitionerName}</h4>
               <p className="text-xs text-slate-500 font-medium tracking-wide uppercase mt-0.5">{clinicBranchName}</p>
@@ -216,11 +215,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
           <div className="flex items-center gap-3">
             {!isNewNote && note && (
               <div className="flex items-center gap-2 mr-2">
-                {note.status === 'finalized' ? (
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
-                    <CheckCircle className="w-3.5 h-3.5" /> Finalized/Signed
-                  </span>
-                ) : (
+                {note.status !== 'finalized' && (
                   <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
                     Drafted
                   </span>

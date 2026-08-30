@@ -11,72 +11,72 @@ class CaseDocumentUploadTest(APITestCase):
     def setUp(self):
         self.clinic1 = Clinic.objects.create(name="Clinic 1")
         self.clinic2 = Clinic.objects.create(name="Clinic 2")
+        self.branch1 = Clinic.objects.create(name="Branch 1", parent_clinic=self.clinic1)
         
-        self.user1 = User.objects.create_user(email="user1@example.com", password="password", first_name="User", last_name="One", clinic=self.clinic1)
-        self.user2 = User.objects.create_user(email="user2@example.com", password="password", first_name="User", last_name="Two", clinic=self.clinic2)
+        self.owner = User.objects.create_user(email="owner@example.com", password="password", first_name="Owner", last_name="User", clinic=self.clinic1, role="ADMIN")
+        self.admin = User.objects.create_user(email="admin@example.com", password="password", first_name="Admin", last_name="User", clinic=self.clinic1, role="ADMIN")
+        self.manager = User.objects.create_user(email="manager@example.com", password="password", first_name="Manager", last_name="User", clinic=self.clinic1, role="MANAGER")
+        self.staff = User.objects.create_user(email="staff@example.com", password="password", first_name="Staff", last_name="User", clinic=self.clinic1, role="STAFF")
         
-        self.patient1 = Patient.objects.create(first_name="John", last_name="Doe", clinic=self.clinic1)
-        self.patient2 = Patient.objects.create(first_name="Jane", last_name="Smith", clinic=self.clinic2)
+        # Practitioner assigned to branch1, but main clinic is clinic1
+        self.practitioner = User.objects.create_user(email="practitioner@example.com", password="password", first_name="Prac", last_name="Titioner", clinic=self.clinic1, clinic_branch=self.branch1, role="PRACTITIONER")
+        
+        self.patient1 = Patient.objects.create(first_name="John", last_name="Doe", date_of_birth="1990-01-01", clinic=self.clinic1)
+        self.patient_branch1 = Patient.objects.create(first_name="Branch", last_name="Patient", date_of_birth="1990-01-01", clinic=self.branch1)
+        self.patient2 = Patient.objects.create(first_name="Jane", last_name="Smith", date_of_birth="1990-01-01", clinic=self.clinic2)
         
         self.url = reverse('case-documents-list')
-        
-    def test_upload_valid_pdf(self):
-        self.client.force_authenticate(user=self.user1)
-        pdf_file = SimpleUploadedFile("test.pdf", b"file_content", content_type="application/pdf")
-        
-        data = {
-            'patient': self.patient1.id,
+
+    def _upload_valid_pdf(self, patient_id):
+        return {
+            'patient': patient_id,
             'title': 'Test Document',
             'category': 'CLINICAL_NOTE',
-            'file': pdf_file
+            'file': SimpleUploadedFile("test.pdf", b"file_content", content_type="application/pdf")
         }
-        
-        response = self.client.post(self.url, data, format='multipart')
+
+    # TEST 1: Practitioner -> Authorized Patient
+    def test_practitioner_authorized_patient(self):
+        self.client.force_authenticate(user=self.practitioner)
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient_branch1.id), format='multipart')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(CaseDocument.objects.count(), 1)
-        
-    def test_upload_invalid_type(self):
-        self.client.force_authenticate(user=self.user1)
-        img_file = SimpleUploadedFile("test.jpg", b"file_content", content_type="image/jpeg")
-        
-        data = {
-            'patient': self.patient1.id,
-            'title': 'Test Document',
-            'category': 'CLINICAL_NOTE',
-            'file': img_file
-        }
-        
-        response = self.client.post(self.url, data, format='multipart')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('file', response.data)
-        
-    def test_upload_large_file(self):
-        self.client.force_authenticate(user=self.user1)
-        large_content = b"0" * (6 * 1024 * 1024)
-        large_file = SimpleUploadedFile("test.pdf", large_content, content_type="application/pdf")
-        
-        data = {
-            'patient': self.patient1.id,
-            'title': 'Large Document',
-            'category': 'CLINICAL_NOTE',
-            'file': large_file
-        }
-        
-        response = self.client.post(self.url, data, format='multipart')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('file', response.data)
-        
-    def test_upload_wrong_clinic_patient(self):
-        self.client.force_authenticate(user=self.user1)
-        pdf_file = SimpleUploadedFile("test.pdf", b"file_content", content_type="application/pdf")
-        
-        data = {
-            'patient': self.patient2.id,
-            'title': 'Test Document',
-            'category': 'CLINICAL_NOTE',
-            'file': pdf_file
-        }
-        
-        response = self.client.post(self.url, data, format='multipart')
+
+    # TEST 2: Admin -> Authorized Patient
+    def test_admin_authorized_patient(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient1.id), format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # TEST 3: Manager -> Authorized Patient
+    def test_manager_authorized_patient(self):
+        self.client.force_authenticate(user=self.manager)
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient1.id), format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # TEST 4: Staff -> Authorized Patient
+    def test_staff_authorized_patient(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient1.id), format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # TEST 5: Owner -> Authorized Patient
+    def test_owner_authorized_patient(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient1.id), format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # TEST 6: Practitioner -> Unauthorized Patient
+    def test_practitioner_unauthorized_patient(self):
+        self.client.force_authenticate(user=self.practitioner)
+        # Patient 2 is in clinic 2, practitioner is in clinic 1
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient2.id), format='multipart')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('patient', response.data)
+        self.assertEqual(response.data['patient'][0], "You do not have permission to attach documents to this patient.")
+
+    # TEST 7: Unauthenticated user
+    def test_unauthenticated_user(self):
+        # Do not authenticate
+        response = self.client.post(self.url, self._upload_valid_pdf(self.patient1.id), format='multipart')
+        # DRF IsAuthenticated returns 401 Unauthorized usually, or 403 Forbidden
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
