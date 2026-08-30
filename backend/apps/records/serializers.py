@@ -114,3 +114,27 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
             validated_data['mime_type'] = file_obj.content_type
             
         return super().create(validated_data)
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        file_url = rep.get('file')
+        
+        # If the file is stored in Cloudinary and is a PDF, generate a signed URL
+        # to bypass Cloudinary's "Strict delivery of PDF and ZIP files" security setting.
+        if file_url and 'res.cloudinary.com' in file_url:
+            is_pdf = instance.mime_type == 'application/pdf' or (instance.file_name and instance.file_name.lower().endswith('.pdf'))
+            if is_pdf:
+                try:
+                    from cloudinary.utils import cloudinary_url
+                    public_id = instance.file.name
+                    # Cloudinary strict delivery requires the URL to end with .pdf
+                    if not public_id.lower().endswith('.pdf'):
+                        public_id += '.pdf'
+                    
+                    signed_url, _ = cloudinary_url(public_id, sign_url=True, secure=True)
+                    rep['file'] = signed_url
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Failed to sign Cloudinary URL: {e}")
+                    
+        return rep
