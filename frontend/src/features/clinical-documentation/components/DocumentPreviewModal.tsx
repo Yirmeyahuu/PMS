@@ -39,6 +39,13 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
   
   const isLetter = doc.source_type === 'LETTER';
   const isPdf = !isLetter && (doc.mime_type === 'application/pdf' || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf')));
+  const isImage = !isLetter && !isPdf && (doc.mime_type?.startsWith('image/') || (doc.file_name && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_name)));
+  
+  // Ensure URL uses HTTPS in production to prevent Mixed Content blocking in iframes
+  // Only upgrade if the current app is served via HTTPS
+  const secureFileUrl = doc.file 
+    ? (window.location.protocol === 'https:' ? doc.file.replace(/^http:\/\//i, 'https://') : doc.file) 
+    : '';
   
   const editor = useEditor({
     extensions: [
@@ -105,7 +112,7 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
   }, [editor, letterContent]);
   
   const handleDownload = () => {
-    window.open(doc.file, '_blank');
+    window.open(secureFileUrl, '_blank');
   };
 
   const confirmDelete = async () => {
@@ -187,9 +194,13 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
                 )}
               </div>
             </div>
+          ) : isImage ? (
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <img src={secureFileUrl} alt={doc.file_name} className="max-w-full max-h-full object-contain rounded-lg shadow-sm" />
+            </div>
           ) : isPdf ? (
             <iframe 
-              src={`${doc.file}#view=FitH`} 
+              src={`${secureFileUrl}#view=FitH`} 
               title={doc.file_name}
               className="w-full h-full border-none"
             />
