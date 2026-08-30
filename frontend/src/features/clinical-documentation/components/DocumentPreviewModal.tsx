@@ -43,9 +43,14 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
   
   // Ensure URL uses HTTPS in production to prevent Mixed Content blocking in iframes
   // Only upgrade if the current app is served via HTTPS
-  const secureFileUrl = doc.file 
+  let secureFileUrl = doc.file 
     ? (window.location.protocol === 'https:' ? doc.file.replace(/^http:\/\//i, 'https://') : doc.file) 
     : '';
+    
+  // Cloudinary requires the .pdf extension to serve PDF files correctly (otherwise returns 401)
+  if (isPdf && secureFileUrl && !secureFileUrl.toLowerCase().includes('.pdf')) {
+    secureFileUrl = `${secureFileUrl}.pdf`;
+  }
   
   const editor = useEditor({
     extensions: [
