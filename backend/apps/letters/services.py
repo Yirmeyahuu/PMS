@@ -181,8 +181,8 @@ class LetterGeneratorService:
                 
             return result.getvalue()
         except ImportError:
-            # Fallback if xhtml2pdf is not available
-            return b"%PDF-1.4\n%Fallback Dummy PDF\n"
+            # If xhtml2pdf is not available, raise an error instead of returning a dummy PDF that fails downstream validation
+            raise ImportError("xhtml2pdf is not installed. Please install it to generate PDF letters.")
         except Exception as e:
             print(f"Error generating PDF: {e}")
             raise
