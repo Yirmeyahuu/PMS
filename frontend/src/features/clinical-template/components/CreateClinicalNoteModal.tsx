@@ -73,7 +73,7 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
   const [saving, setSaving] = useState(false);
   const [previousNote, setPreviousNote] = useState<ClinicalNote | null>(null);
   const [allNotes, setAllNotes] = useState<ClinicalNote[]>([]);
-  const [allDrafts, setAllDrafts] = useState<ClinicalNote[]>([]);
+  const [, setAllDrafts] = useState<ClinicalNote[]>([]);
   const [patientCases, setPatientCases] = useState<PatientCase[]>([]);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 

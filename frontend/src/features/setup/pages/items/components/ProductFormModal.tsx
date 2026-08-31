@@ -60,7 +60,7 @@ export const ProductFormModal: React.FC<Props> = ({
         barcode:           product.barcode,
         description:       product.description,
         item_type:         product.item_type,
-        category:          product.category?.id || null,
+        category:          product.category,
         cost_price:        product.cost_price,
         selling_price:     product.selling_price,
         unit:              product.unit,

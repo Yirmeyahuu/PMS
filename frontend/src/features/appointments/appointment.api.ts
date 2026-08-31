@@ -23,6 +23,7 @@ export interface AppointmentFilters {
   end_date?: string;
   page?: number;
   page_size?: number;
+  ordering?: string;
 }
 
 // ── Edit payload — service added ──────────────────────────────────────────────
@@ -108,6 +109,7 @@ export const getAppointments = async (
   if (filters?.end_date)         params.append('end_date',         filters.end_date);
   if (filters?.page)             params.append('page',             String(filters.page));
   if (filters?.page_size)        params.append('page_size',        String(filters.page_size));
+  if (filters?.ordering)         params.append('ordering',         filters.ordering);
 
   const response = await axiosInstance.get<PaginatedResponse<Appointment>>(
     `/appointments/?${params.toString()}`

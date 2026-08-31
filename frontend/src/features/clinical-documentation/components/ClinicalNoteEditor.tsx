@@ -35,7 +35,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
   const [existingNotes, setExistingNotes] = useState<ClinicalNote[]>([]);
-  const [allDrafts, setAllDrafts] = useState<ClinicalNote[]>([]);
+  const [, setAllDrafts] = useState<ClinicalNote[]>([]);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
 
   // Get current case title
@@ -105,7 +105,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
     fetchData().then(async (result) => {
       if (!result) return;
-      const { templatesData: fetchedTemplates, sortedAppointments, signedNotes } = result;
+      const { templatesData: fetchedTemplates, sortedAppointments } = result;
 
       // Initialize Appointment and Date
       let defaultApptId: number | null = null;
