@@ -149,13 +149,6 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         from django.db.models import Q
         queryset = queryset.filter(Q(patient_case__isnull=True) | Q(patient_case__is_archived=False))
         
-        # 2. Role-based scoping: Pure Practitioners see only their own notes
-        effective_roles = user.get_effective_roles()
-        has_elevated_roles = any(r in effective_roles for r in ['ADMIN', 'ADMIN_ASSISTANT', 'STAFF', 'FINANCE'])
-        
-        if 'PRACTITIONER' in effective_roles and not has_elevated_roles:
-            queryset = queryset.filter(practitioner__user=user)
-        
         # If filtering by patient, log that too
         patient_filter = self.request.query_params.get('patient')
         if patient_filter:
@@ -683,13 +676,6 @@ class GlobalClinicalNoteAuditViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             else:
                 return self.queryset.none()
-            
-        # 2. Role-based scoping: Pure Practitioners see only their own notes
-        effective_roles = user.get_effective_roles()
-        has_elevated_roles = any(r in effective_roles for r in ['ADMIN', 'ADMIN_ASSISTANT', 'STAFF', 'FINANCE'])
-        
-        if 'PRACTITIONER' in effective_roles and not has_elevated_roles:
-            qs = qs.filter(clinical_note__practitioner__user=user)
             
         # 3. Optional date range filtering
         start_date = self.request.query_params.get('start_date')
