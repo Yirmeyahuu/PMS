@@ -14,8 +14,6 @@ import { usePatientProfileContext } from '../context/PatientProfileContext';
 import { InvoiceList, InvoiceDetailModal, AddPaymentModal, PrintInvoiceModal } from '@/features/billing/Invoices';
 import { SendInvoiceEmailModal } from '../components/SendInvoiceEmailModal';
 import { MasterInvoiceCard } from '../components/MasterInvoiceCard';
-import { getAppointments } from '@/features/appointments/appointment.api';
-import type { Appointment } from '@/types/appointment';
 import { format } from 'date-fns';
 
 export const PatientInvoicesPage: React.FC = () => {
@@ -29,11 +27,8 @@ export const PatientInvoicesPage: React.FC = () => {
   const [pageSize] = useState(20);
 
   // Outstanding Balance Monitoring
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
   const [apptPage, setApptPage] = useState(1);
-  const [apptTotalPages, setApptTotalPages] = useState(1);
-  const [isLoadingAppts, setIsLoadingAppts] = useState(true);
 
   // Modals
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -93,29 +88,6 @@ export const PatientInvoicesPage: React.FC = () => {
     fetchAllInvoices();
   }, [patientId]);
 
-  // Fetch appointments for monitoring table
-  useEffect(() => {
-    if (!patientId) return;
-    const fetchAppts = async () => {
-      setIsLoadingAppts(true);
-      try {
-        const response = await getAppointments({
-          patient: patientId,
-          page: apptPage,
-          page_size: 15,
-          ordering: '-date',
-          status: ['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW', 'ARRIVED', 'DNA'] // Excludes CANCELLED
-        });
-        setAppointments(response.results || []);
-        setApptTotalPages(Math.ceil(response.count / 15));
-      } catch (error) {
-        console.error('Failed to fetch appointments for monitoring:', error);
-      } finally {
-        setIsLoadingAppts(false);
-      }
-    };
-    fetchAppts();
-  }, [patientId, apptPage]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     try {

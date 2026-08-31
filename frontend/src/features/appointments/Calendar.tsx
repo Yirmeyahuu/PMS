@@ -747,12 +747,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     return notesByDate[dateStr] ?? [];
   }, [notesByDate]);
 
-  // Helper to get style for block appointment
-  // Calculate block appointment position based on current view
-  // For Day view with filtered slots, offset is based on duty_start_time
-  // For Week view, offset is always 6 AM (all hours shown)
-  // Uses h-5 (1.25rem) per 15-minute slot for Nookal-style grid
-  const getBlockAppointmentStyle = (block: BlockAppointment, forDayView = false) => {
+  const getBlockAppointmentStyle = (block: BlockAppointment) => {
     const [sH, sM] = block.start_time.split(':').map(Number);
     const [eH, eM] = block.end_time.split(':').map(Number);
     
@@ -769,7 +764,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   };
 
   // ── Note position style (mirrors getBlockAppointmentStyle) ────────────────
-  const getNoteStyle = (note: CalendarNote, forDayView = false) => {
+  const getNoteStyle = (note: CalendarNote) => {
     const [sH, sM] = note.start_time.split(':').map(Number);
     const [eH, eM] = note.end_time.split(':').map(Number);
     // Always use 6 AM baseline offset for consistent rendering
@@ -1064,7 +1059,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   // For Day view with filtered slots, offset is based on duty_start_time
   // For Week view, offset is always 6 AM (all hours shown)
   // Uses h-5 (1.25rem) per 15-minute slot for Nookal-style grid
-  const getAppointmentStyle = (apt: Appointment, forDayView = false) => {
+  const getAppointmentStyle = (apt: Appointment) => {
     const [sH, sM] = apt.start_time.split(':').map(Number);
     const [eH, eM] = apt.end_time.split(':').map(Number);
     // Always derive duration from start/end times — never trust duration_minutes
