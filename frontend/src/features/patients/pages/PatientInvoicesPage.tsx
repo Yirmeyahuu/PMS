@@ -282,7 +282,7 @@ export const PatientInvoicesPage: React.FC = () => {
               </span>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {masterInvoices.map((inv) => (
                 <MasterInvoiceCard 
                   key={inv.id} 
@@ -354,82 +354,87 @@ export const PatientInvoicesPage: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b border-gray-200">
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Appointment Date</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Time</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Type</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Session Allocation</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Primary Practitioner</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-right">Outstanding Balance</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase w-1/6">Appointment Date</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase w-1/6">Time</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase w-1/4">Session Allocation</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase w-1/4">Primary Practitioner</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-right w-1/6">Outstanding Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {isLoadingAppts ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                      Loading appointments...
-                    </td>
-                  </tr>
-                ) : appointments.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                      No appointments found.
-                    </td>
-                  </tr>
-                ) : (
-                  appointments.map(appt => {
-                    let outstandingBalance = 0;
-                    let isPackageBalance = false;
-                    
-                    if (appt.patient_case) {
-                      const masterInv = allInvoices.find(inv => inv.patient_case === appt.patient_case && inv.status !== 'CANCELLED');
-                      if (masterInv && Number(masterInv.balance_due) > 0) {
-                        outstandingBalance = Number(masterInv.balance_due);
-                        isPackageBalance = true;
-                      }
-                    } else {
-                      const stdInv = allInvoices.find(inv => inv.appointment === appt.id && inv.status !== 'CANCELLED');
-                      if (stdInv && Number(stdInv.balance_due) > 0) {
-                        outstandingBalance = Number(stdInv.balance_due);
-                      }
-                    }
+                {(() => {
+                  const unpaidInvoices = allInvoices.filter(inv => 
+                    inv.status !== 'CANCELLED' && 
+                    inv.status !== 'PAID' && 
+                    Number(inv.balance_due) > 0
+                  );
+                  
+                  const startIndex = (apptPage - 1) * 15;
+                  const paginatedInvoices = unpaidInvoices.slice(startIndex, startIndex + 15);
 
+                  if (allInvoices.length === 0) {
                     return (
-                      <tr key={appt.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                          {format(new Date(appt.date), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {appt.start_time} - {appt.end_time}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {appt.appointment_type}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {appt.patient_case ? appt.session_display || 'Packaged' : 'Un-packaged'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {appt.practitioner_name || 'Unassigned'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-medium">
-                          {outstandingBalance > 0 ? (
-                            <div className="flex flex-col items-end">
-                              <span className="text-red-600">₱{outstandingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                              {isPackageBalance && (
-                                <span className="text-[10px] text-gray-400 font-normal uppercase">(Package Balance)</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          Loading data...
                         </td>
                       </tr>
                     );
-                  })
-                )}
+                  }
+
+                  if (paginatedInvoices.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          No outstanding balances found.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return paginatedInvoices.map(inv => {
+                    const isMaster = !!inv.patient_case;
+                    const date = inv.appointment_date || inv.invoice_date || '-';
+                    const timeStr = inv.appointment_start_time || '-';
+                    let formattedTime = '-';
+                    if (timeStr !== '-') {
+                      const [hours, minutes] = timeStr.split(':');
+                      const h = parseInt(hours, 10);
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const h12 = h % 12 || 12;
+                      formattedTime = `${h12}:${minutes} ${ampm}`;
+                    }
+                    
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                          {date !== '-' ? format(new Date(date), 'MMM dd, yyyy') : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formattedTime}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {isMaster ? (inv.package_name ? `Package: ${inv.package_name}` : 'Package') : 'Standard Transaction'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {inv.appointment_practitioner_name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium">
+                          <div className="flex flex-col items-end">
+                            <span className="text-red-600">₱{Number(inv.balance_due).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            {isMaster && (
+                              <span className="text-[10px] text-gray-400 font-normal uppercase">(Package Balance)</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-50 border-t border-gray-200">
-                  <td colSpan={5} className="px-4 py-4 text-sm font-bold text-gray-900 text-right uppercase tracking-wider">
+                  <td colSpan={4} className="px-4 py-4 text-sm font-bold text-gray-900 text-right uppercase tracking-wider">
                     Total Outstanding Balance
                   </td>
                   <td className="px-4 py-4 text-sm font-bold text-red-600 text-right">
@@ -452,30 +457,41 @@ export const PatientInvoicesPage: React.FC = () => {
             </table>
           </div>
           
-          {/* Appointments Pagination */}
-          {apptTotalPages > 1 && (
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-              <span className="text-xs text-gray-500">
-                Page {apptPage} of {apptTotalPages}
-              </span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setApptPage(p => Math.max(1, p - 1))}
-                  disabled={apptPage === 1}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
-                >
-                  Prev
-                </button>
-                <button
-                  onClick={() => setApptPage(p => Math.min(apptTotalPages, p + 1))}
-                  disabled={apptPage === apptTotalPages}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
-                >
-                  Next
-                </button>
+          {/* Invoices Pagination */}
+          {(() => {
+            const unpaidInvoices = allInvoices.filter(inv => 
+              inv.status !== 'CANCELLED' && 
+              inv.status !== 'PAID' && 
+              Number(inv.balance_due) > 0
+            );
+            const dynamicTotalPages = Math.max(1, Math.ceil(unpaidInvoices.length / 15));
+
+            if (dynamicTotalPages <= 1) return null;
+
+            return (
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  Page {apptPage} of {dynamicTotalPages}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setApptPage(p => Math.max(1, p - 1))}
+                    disabled={apptPage === 1}
+                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => setApptPage(p => Math.min(dynamicTotalPages, p + 1))}
+                    disabled={apptPage === dynamicTotalPages}
+                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
