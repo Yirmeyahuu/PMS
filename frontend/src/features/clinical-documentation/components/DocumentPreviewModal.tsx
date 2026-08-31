@@ -50,10 +50,7 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
     ? (window.location.protocol === 'https:' ? doc.file.replace(/^http:\/\//i, 'https://') : doc.file) 
     : '';
     
-  // Cloudinary requires the .pdf extension to serve PDF files correctly (otherwise returns 401)
-  if (isPdf && secureFileUrl && !secureFileUrl.toLowerCase().includes('.pdf')) {
-    secureFileUrl = `${secureFileUrl}.pdf`;
-  }
+
   
   const editor = useEditor({
     extensions: [

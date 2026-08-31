@@ -756,21 +756,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     const [sH, sM] = block.start_time.split(':').map(Number);
     const [eH, eM] = block.end_time.split(':').map(Number);
     
-    let startSlotIndex: number;
-    let endSlotIndex: number;
-    
-    if (forDayView && practitionerAvailability) {
-      // Day view with filtered slots: offset based on duty_start_time
-      const dutyStartMins = timeToMinutes(practitionerAvailability.duty_start_time);
-      const blockStartMins = sH * 60 + sM;
-      const blockEndMins = eH * 60 + eM;
-      startSlotIndex = Math.floor((blockStartMins - dutyStartMins) / 15);
-      endSlotIndex = Math.floor((blockEndMins - dutyStartMins) / 15);
-    } else {
-      // Week view or no availability: offset from 6 AM (original behavior)
-      startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
-      endSlotIndex = (eH - 6) * 4 + Math.floor(eM / 15);
-    }
+    // Always use 6 AM baseline offset for consistent rendering
+    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+    const endSlotIndex = (eH - 6) * 4 + Math.floor(eM / 15);
     
     const durationSlots = Math.max(endSlotIndex - startSlotIndex, 1);
     // h-5 = 1.25rem per slot
@@ -784,16 +772,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   const getNoteStyle = (note: CalendarNote, forDayView = false) => {
     const [sH, sM] = note.start_time.split(':').map(Number);
     const [eH, eM] = note.end_time.split(':').map(Number);
-    let startSlotIndex: number;
-    let endSlotIndex:   number;
-    if (forDayView && practitionerAvailability) {
-      const dutyStartMins = timeToMinutes(practitionerAvailability.duty_start_time);
-      startSlotIndex = Math.floor((sH * 60 + sM - dutyStartMins) / 15);
-      endSlotIndex   = Math.floor((eH * 60 + eM - dutyStartMins) / 15);
-    } else {
-      startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
-      endSlotIndex   = (eH - 6) * 4 + Math.floor(eM / 15);
-    }
+    // Always use 6 AM baseline offset for consistent rendering
+    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
+    const endSlotIndex   = (eH - 6) * 4 + Math.floor(eM / 15);
     const durationSlots = Math.max(endSlotIndex - startSlotIndex, 1);
     return {
       top:    `${startSlotIndex * 1.25}rem`,
@@ -1066,18 +1047,10 @@ const CalendarComponent: React.FC<CalendarProps> = ({
   const timeSlots = useMemo(() => generateTimeSlots(practitionerAvailability), [generateTimeSlots, practitionerAvailability]);
 
   // ── FILTERED TIME SLOTS FOR DAY VIEW ──────────────────────────────────────
-  // Only show duty hours in Day view (completely hide non-duty hours)
+  // Use the full 6:00 AM — 8:00 PM range regardless of practitioner availability
   const dayViewTimeSlots = useMemo(() => {
-    if (!practitionerAvailability) return timeSlots; // No filtering if no availability set
-    
-    const dutyStart = timeToMinutes(practitionerAvailability.duty_start_time);
-    const dutyEnd = timeToMinutes(practitionerAvailability.duty_end_time);
-    
-    return timeSlots.filter(slot => {
-      const slotMins = slot.hour * 60 + slot.minutes;
-      return slotMins >= dutyStart && slotMins < dutyEnd;
-    });
-  }, [timeSlots, practitionerAvailability]);
+    return timeSlots;
+  }, [timeSlots]);
 
   const getAppointmentsForDate = useCallback((date: Date): Appointment[] => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -1098,13 +1071,8 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     const durationMins  = Math.max((eH * 60 + eM) - (sH * 60 + sM), 15);
     const durationSlots = durationMins / 15;
 
-    let startSlotIndex: number;
-    if (forDayView && practitionerAvailability) {
-      const dutyStartMins = timeToMinutes(practitionerAvailability.duty_start_time);
-      startSlotIndex = Math.floor((sH * 60 + sM - dutyStartMins) / 15);
-    } else {
-      startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
-    }
+    // Always use 6 AM baseline offset for consistent rendering
+    const startSlotIndex = (sH - 6) * 4 + Math.floor(sM / 15);
 
     // h-5 = 1.25rem per slot
     return {

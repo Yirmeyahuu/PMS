@@ -127,11 +127,16 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
                 try:
                     from cloudinary.utils import cloudinary_url
                     public_id = instance.file.name
+                    
+                    # If public_id already has .pdf, it was uploaded as 'raw' (new behavior)
+                    # Otherwise it was uploaded as 'image' (old behavior)
+                    res_type = 'raw' if public_id.lower().endswith('.pdf') else 'image'
+                    
                     # Cloudinary strict delivery requires the URL to end with .pdf
                     if not public_id.lower().endswith('.pdf'):
                         public_id += '.pdf'
                     
-                    signed_url, _ = cloudinary_url(public_id, sign_url=True, secure=True)
+                    signed_url, _ = cloudinary_url(public_id, resource_type=res_type, sign_url=True, secure=True)
                     rep['file'] = signed_url
                 except Exception as e:
                     import logging
