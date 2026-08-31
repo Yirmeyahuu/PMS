@@ -14,6 +14,9 @@ import { usePatientProfileContext } from '../context/PatientProfileContext';
 import { InvoiceList, InvoiceDetailModal, AddPaymentModal, PrintInvoiceModal } from '@/features/billing/Invoices';
 import { SendInvoiceEmailModal } from '../components/SendInvoiceEmailModal';
 import { MasterInvoiceCard } from '../components/MasterInvoiceCard';
+import { getAppointments } from '@/features/appointments/appointment.api';
+import type { Appointment } from '@/types/appointment';
+import { format } from 'date-fns';
 
 export const PatientInvoicesPage: React.FC = () => {
   const { patientId, patient } = usePatientProfileContext();
@@ -24,6 +27,13 @@ export const PatientInvoicesPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize] = useState(20);
+
+  // Outstanding Balance Monitoring
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
+  const [apptPage, setApptPage] = useState(1);
+  const [apptTotalPages, setApptTotalPages] = useState(1);
+  const [isLoadingAppts, setIsLoadingAppts] = useState(true);
 
   // Modals
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -65,6 +75,47 @@ export const PatientInvoicesPage: React.FC = () => {
     setPage(1);
     fetchInvoices();
   }, [searchQuery, selectedStatus]);
+
+  // Fetch all invoices for the patient (unpaginated/large limit) to calculate global outstanding balances
+  useEffect(() => {
+    if (!patientId) return;
+    const fetchAllInvoices = async () => {
+      try {
+        const response = await billingApi.getInvoices({
+          patient: patientId,
+          page_size: 1000,
+        });
+        setAllInvoices(response.results || []);
+      } catch (error) {
+        console.error('Failed to fetch all invoices for monitoring:', error);
+      }
+    };
+    fetchAllInvoices();
+  }, [patientId]);
+
+  // Fetch appointments for monitoring table
+  useEffect(() => {
+    if (!patientId) return;
+    const fetchAppts = async () => {
+      setIsLoadingAppts(true);
+      try {
+        const response = await getAppointments({
+          patient: patientId,
+          page: apptPage,
+          page_size: 15,
+          ordering: '-date',
+          status: ['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW', 'ARRIVED', 'DNA'] // Excludes CANCELLED
+        });
+        setAppointments(response.results || []);
+        setApptTotalPages(Math.ceil(response.count / 15));
+      } catch (error) {
+        console.error('Failed to fetch appointments for monitoring:', error);
+      } finally {
+        setIsLoadingAppts(false);
+      }
+    };
+    fetchAppts();
+  }, [patientId, apptPage]);
 
   const handleViewInvoice = async (invoice: Invoice) => {
     try {
@@ -290,6 +341,143 @@ export const PatientInvoicesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Outstanding Balance Monitoring Table */}
+      <div className="flex-shrink-0 px-6 py-6 border-t border-gray-300 bg-white">
+        <h2 className="text-lg font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2">
+          <Layers className="w-5 h-5 text-sky-600" />
+          Outstanding Balance Monitoring
+        </h2>
+        
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-100 border-b border-gray-200">
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Appointment Date</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Time</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Type</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Session Allocation</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase">Primary Practitioner</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-right">Outstanding Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingAppts ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      Loading appointments...
+                    </td>
+                  </tr>
+                ) : appointments.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No appointments found.
+                    </td>
+                  </tr>
+                ) : (
+                  appointments.map(appt => {
+                    let outstandingBalance = 0;
+                    let isPackageBalance = false;
+                    
+                    if (appt.patient_case) {
+                      const masterInv = allInvoices.find(inv => inv.patient_case === appt.patient_case && inv.status !== 'CANCELLED');
+                      if (masterInv && Number(masterInv.balance_due) > 0) {
+                        outstandingBalance = Number(masterInv.balance_due);
+                        isPackageBalance = true;
+                      }
+                    } else {
+                      const stdInv = allInvoices.find(inv => inv.appointment === appt.id && inv.status !== 'CANCELLED');
+                      if (stdInv && Number(stdInv.balance_due) > 0) {
+                        outstandingBalance = Number(stdInv.balance_due);
+                      }
+                    }
+
+                    return (
+                      <tr key={appt.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                          {format(new Date(appt.date), 'MMM dd, yyyy')}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {appt.start_time} - {appt.end_time}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {appt.appointment_type}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {appt.patient_case ? appt.session_display || 'Packaged' : 'Un-packaged'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {appt.practitioner_name || 'Unassigned'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium">
+                          {outstandingBalance > 0 ? (
+                            <div className="flex flex-col items-end">
+                              <span className="text-red-600">₱{outstandingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              {isPackageBalance && (
+                                <span className="text-[10px] text-gray-400 font-normal uppercase">(Package Balance)</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-50 border-t border-gray-200">
+                  <td colSpan={5} className="px-4 py-4 text-sm font-bold text-gray-900 text-right uppercase tracking-wider">
+                    Total Outstanding Balance
+                  </td>
+                  <td className="px-4 py-4 text-sm font-bold text-red-600 text-right">
+                    ₱{(() => {
+                      const countedIds = new Set<number>();
+                      let total = 0;
+                      allInvoices.forEach(inv => {
+                        if (inv.status !== 'CANCELLED' && inv.status !== 'PAID' && Number(inv.balance_due) > 0) {
+                          if (!countedIds.has(inv.id)) {
+                            countedIds.add(inv.id);
+                            total += Number(inv.balance_due);
+                          }
+                        }
+                      });
+                      return total.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          
+          {/* Appointments Pagination */}
+          {apptTotalPages > 1 && (
+            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                Page {apptPage} of {apptTotalPages}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setApptPage(p => Math.max(1, p - 1))}
+                  disabled={apptPage === 1}
+                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setApptPage(p => Math.min(apptTotalPages, p + 1))}
+                  disabled={apptPage === apptTotalPages}
+                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-white disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modals */}
       <InvoiceDetailModal

@@ -167,7 +167,7 @@
             border-radius: 4px;
         }
 
-        .note-status.signed {
+        .note-status.finalized {
             background: #dcfce7;
             color: #166534;
         }
@@ -295,17 +295,26 @@
         <!-- Header -->
         <div class="note-header">
             <div class="practitioner-info">
-                {% if practitioner_avatar %}
-                    <img src="{{ practitioner_avatar }}" alt="Practitioner" class="practitioner-avatar" />
+                {% if note.created_by_avatar %}
+                    <img src="{{ note.created_by_avatar }}" alt="Creator" class="practitioner-avatar" />
                 {% else %}
                     <div class="practitioner-avatar" style="background: linear-gradient(135deg, #0284c7, #0369a1); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 700;">
-                        {{ practitioner_initials }}
+                        {{ note.created_by_initials }}
                     </div>
                 {% endif %}
                 <div class="practitioner-details">
-                    <div class="practitioner-name">{{ note.practitioner_name }}</div>
-                    {% if note.practitioner_title %}
-                        <div class="practitioner-title">{{ note.practitioner_title }}</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #111827; margin-bottom: 6px; letter-spacing: -0.02em;">
+                        {{ note.day_name }}, {{ note.month }} {{ note.day }}, {{ note.year }}, {{ note.time }}
+                    </div>
+                    <div class="practitioner-name">{{ note.created_by_name }}</div>
+                    <div class="practitioner-title" style="color: #475569; font-weight: 500; font-size: 13px;">{{ note.created_by_title|default:"Practitioner" }}</div>
+                    {% if note.created_by_email or note.created_by_phone %}
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                            {{ note.created_by_email|default:"" }}{% if note.created_by_email and note.created_by_phone %} | {% endif %}{{ note.created_by_phone|default:"" }}
+                        </div>
+                    {% endif %}
+                    {% if note.created_by_clinic_name %}
+                        <div style="font-size: 11px; color: #64748b;">{{ note.created_by_clinic_name }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -318,11 +327,7 @@
             </div>
         </div>
 
-        <!-- Date & Time -->
-        <div class="date-time" style="text-align: right; margin-bottom: 24px;">
-            <div class="date">{{ note.day_name }}, {{ note.month }} {{ note.day }}, {{ note.year }}</div>
-            <div class="time">{{ note.time }}</div>
-        </div>
+
 
         <!-- Patient Info -->
         <div class="patient-info">
@@ -340,6 +345,10 @@
                     <label>Date of Note</label>
                     <value>{{ note.date }}</value>
                 </div>
+                <div class="patient-field">
+                    <label>Created By</label>
+                    <value>{{ note.created_by_name }}</value>
+                </div>
             </div>
         </div>
 
@@ -355,8 +364,8 @@
                     ({{ note.template_category }})
                 {% endif %}
             </span>
-            {% if note.is_signed %}
-                <span class="note-status signed">SIGNED</span>
+            {% if note.status == 'finalized' %}
+                <span class="note-status finalized">FINALIZED</span>
             {% else %}
                 <span class="note-status draft">DRAFT</span>
             {% endif %}
@@ -390,13 +399,13 @@
         <div class="note-footer">
             <div class="footer-info">
                 <div><strong>Created:</strong> {{ note.created_at }}</div>
-                {% if note.is_signed and note.signed_at %}
-                    <div><strong>Signed:</strong> {{ note.signed_at }}</div>
+                {% if note.status == 'finalized' and note.updated_at %}
+                    <div><strong>Finalized:</strong> {{ note.updated_at }}</div>
                 {% endif %}
             </div>
             <div class="footer-signature">
                 <div class="signature-line"></div>
-                <div class="signature-label">Created by: {{ note.practitioner_name }}</div>
+                <div class="signature-label">Created by: {{ note.created_by_name }}</div>
             </div>
         </div>
 

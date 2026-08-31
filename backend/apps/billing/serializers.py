@@ -40,6 +40,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     appointment_start_time        = serializers.TimeField(source='appointment.start_time',                                   read_only=True, allow_null=True)
     appointment_practitioner_name = serializers.SerializerMethodField()
     appointment_service_name      = serializers.SerializerMethodField()
+    
+    previous_outstanding_balances = serializers.SerializerMethodField()
+    patient_previous_outstanding_total = serializers.SerializerMethodField()
 
     # Not required in the request body — set by perform_create or passed explicitly
     clinic  = serializers.PrimaryKeyRelatedField(queryset=Clinic.objects.all(),      required=False)
@@ -101,6 +104,44 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if obj.patient_case:
             return f"Package: {obj.patient_case.title}"
         return None
+
+    def get_previous_outstanding_balances(self, obj):
+        if obj.patient_case_id is not None:
+            return []
+            
+        qs = Invoice.objects.filter(
+            patient_id=obj.patient_id,
+            is_deleted=False,
+            patient_case__isnull=True,
+            balance_due__gt=0
+        ).exclude(
+            pk=obj.pk
+        ).order_by('invoice_date', 'created_at')
+        
+        return [
+            {
+                'invoice_number': inv.invoice_number,
+                'invoice_date': inv.invoice_date.isoformat() if inv.invoice_date else None,
+                'balance_due': str(inv.balance_due),
+                'appointment_date': inv.appointment.date.isoformat() if inv.appointment and inv.appointment.date else None,
+            }
+            for inv in qs
+        ]
+
+    def get_patient_previous_outstanding_total(self, obj) -> str:
+        if obj.patient_case_id is not None:
+            return "0.00"
+
+        qs = Invoice.objects.filter(
+            patient_id=obj.patient_id,
+            is_deleted=False,
+            patient_case__isnull=True,
+            balance_due__gt=0
+        ).exclude(
+            pk=obj.pk
+        )
+        total = sum((inv.balance_due for inv in qs), Decimal('0.00'))
+        return str(total)
 
 
 class InvoiceCreateSerializer(serializers.Serializer):

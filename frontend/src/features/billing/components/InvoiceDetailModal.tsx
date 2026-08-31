@@ -332,6 +332,37 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 </div>
               </div>
 
+              {/* Previous Outstanding Balance (Unpackaged only, current version only) */}
+              {isCurrentVersion && !invoice.is_package_invoice && invoice.previous_outstanding_balances && invoice.previous_outstanding_balances.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide">Previous Outstanding Balance</h3>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-600">Invoice #</th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-600">Outstanding</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {invoice.previous_outstanding_balances.map((prev) => (
+                          <tr key={prev.invoice_number} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-gray-900 font-medium">
+                              {new Date(prev.invoice_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{prev.invoice_number}</td>
+                            <td className="px-4 py-3 text-right text-red-600 font-bold">
+                              ₱{parseFloat(prev.balance_due).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Totals */}
               <div className="flex justify-end mb-8">
                 <div className="w-full md:w-1/2 space-y-3 bg-gray-50 p-5 rounded-xl border border-gray-200">
@@ -365,6 +396,24 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                       {parseFloat(String(displayData.balance_due)) < 0 ? '-' : ''}₱{Math.abs(parseFloat(String(displayData.balance_due))).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+                  {isCurrentVersion && !invoice.is_package_invoice && invoice.previous_outstanding_balances && invoice.previous_outstanding_balances.length > 0 && (
+                    <div className="pt-4 mt-4 border-t-2 border-gray-200 border-dashed">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600 font-medium">Previous Outstanding</span>
+                        <span className="text-gray-900 font-semibold">₱{parseFloat(invoice.patient_previous_outstanding_total || '0').toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600 font-medium">Current Outstanding</span>
+                        <span className="text-gray-900 font-semibold">₱{parseFloat(String(displayData.balance_due)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-black pt-3 border-t border-gray-200">
+                        <span className="text-red-700">Total Patient Outstanding</span>
+                        <span className="text-red-700">
+                          ₱{(parseFloat(invoice.patient_previous_outstanding_total || '0') + parseFloat(String(displayData.balance_due))).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

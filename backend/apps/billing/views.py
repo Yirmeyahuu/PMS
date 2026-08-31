@@ -138,6 +138,36 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             instance.patient.account_notes = self.request.data['account_notes']
             instance.patient.save(update_fields=['account_notes'])
 
+    # ── Fetch Patient Outstanding Balance ─────────────────────────────────────
+    @action(detail=False, methods=['get'], url_path='patient-outstanding')
+    def patient_outstanding(self, request):
+        patient_id = request.query_params.get('patient_id')
+        if not patient_id:
+            return Response({"detail": "patient_id is required"}, status=400)
+            
+        qs = Invoice.objects.filter(
+            patient_id=patient_id,
+            is_deleted=False,
+            patient_case__isnull=True,
+            balance_due__gt=0
+        ).order_by('invoice_date', 'created_at')
+        
+        previous_outstanding_balances = []
+        for inv in qs:
+            previous_outstanding_balances.append({
+                'invoice_number': inv.invoice_number,
+                'invoice_date': inv.invoice_date,
+                'balance_due': str(inv.balance_due),
+                'appointment_date': inv.appointment.date if inv.appointment else None,
+            })
+            
+        total = sum((inv.balance_due for inv in qs), Decimal('0.00'))
+        
+        return Response({
+            'previous_outstanding_balances': previous_outstanding_balances,
+            'patient_previous_outstanding_total': str(total)
+        })
+
     # ── Create invoice from appointment ───────────────────────────────────────
     @action(
         detail=False,
@@ -652,6 +682,28 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             status__in=['SCHEDULED', 'CONFIRMED']
         ).exclude(id=invoice.appointment_id if invoice.appointment else None).order_by('date', 'start_time').first()
 
+        # Previous Outstanding Balances (Unpackaged Invoices Only)
+        previous_outstanding_balances = []
+        patient_previous_outstanding_total = Decimal('0')
+
+        if not package_summary:
+            qs = Invoice.objects.filter(
+                patient=invoice.patient,
+                is_deleted=False,
+                patient_case__isnull=True,
+                balance_due__gt=0
+            ).exclude(pk=invoice.pk).order_by('invoice_date', 'created_at')
+            
+            for inv in qs:
+                previous_outstanding_balances.append({
+                    'invoice_number': inv.invoice_number,
+                    'invoice_date': inv.invoice_date,
+                    'balance_due': inv.balance_due,
+                    'appointment_date': inv.appointment.date if inv.appointment else None,
+                })
+            if previous_outstanding_balances:
+                patient_previous_outstanding_total = sum(inv['balance_due'] for inv in previous_outstanding_balances)
+
         context = {
             'system_branding':      SYSTEM_BRANDING,
             'invoice':              invoice,
@@ -668,6 +720,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'computed_balance_due': f'{computed_balance_due:,.2f}',
             'package_summary':      package_summary,
             'next_appointment':     next_appointment,
+            'previous_outstanding_balances': previous_outstanding_balances,
+            'patient_previous_outstanding_total': patient_previous_outstanding_total,
+            'raw_total_patient_outstanding': f'{(patient_previous_outstanding_total + computed_balance_due):,.2f}',
         }
         return context
 

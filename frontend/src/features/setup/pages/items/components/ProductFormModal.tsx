@@ -9,6 +9,7 @@ interface Props {
   isLoading: boolean;
   error?:    string | null;
   product?:  Product | null;
+  initialName?: string;
 }
 
 const UNIT_OPTIONS: { value: UnitType; label: string }[] = [
@@ -46,7 +47,7 @@ const EMPTY: CreateProductPayload = {
 };
 
 export const ProductFormModal: React.FC<Props> = ({
-  isOpen, onClose, onSubmit, isLoading, error, product,
+  isOpen, onClose, onSubmit, isLoading, error, product, initialName,
 }) => {
   const [form, setForm] = useState<CreateProductPayload>(EMPTY);
   const isEdit          = !!product;
@@ -59,7 +60,7 @@ export const ProductFormModal: React.FC<Props> = ({
         barcode:           product.barcode,
         description:       product.description,
         item_type:         product.item_type,
-        category:          product.category,
+        category:          product.category?.id || null,
         cost_price:        product.cost_price,
         selling_price:     product.selling_price,
         unit:              product.unit,
@@ -67,10 +68,12 @@ export const ProductFormModal: React.FC<Props> = ({
         reorder_level:     product.reorder_level,
         is_active:         product.is_active,
       });
+    } else if (isOpen) {
+      setForm({ ...EMPTY, name: initialName || '' });
     } else {
       setForm(EMPTY);
     }
-  }, [product, isOpen]);
+  }, [product, isOpen, initialName]);
 
   if (!isOpen) return null;
 

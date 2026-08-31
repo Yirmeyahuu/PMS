@@ -72,6 +72,12 @@ export const billingApi = {
     return data;
   },
 
+  /** GET /api/invoices/patient-outstanding/?patient_id={id} */
+  getPatientOutstanding: async (patientId: number): Promise<{ previous_outstanding_balances: any[], patient_previous_outstanding_total: string }> => {
+    const { data } = await axiosInstance.get(`/invoices/patient-outstanding/`, { params: { patient_id: patientId } });
+    return data;
+  },
+
   /** GET /api/invoices/by-appointment/{appointmentId}/ */
   getByAppointment: async (appointmentId: number): Promise<Invoice | null> => {
     try {

@@ -131,6 +131,13 @@ export interface InvoiceItem {
   updated_at:       string;
 }
 
+export interface PreviousOutstandingBalance {
+  invoice_number: string;
+  invoice_date: string;
+  balance_due: string;
+  appointment_date?: string | null;
+}
+
 export interface Invoice {
   id:                  number;
   invoice_number:      string;
@@ -156,6 +163,8 @@ export interface Invoice {
   modified_by_name:    string | null;
   version_number:      number;
   is_package_invoice?: boolean;
+  previous_outstanding_balances?: PreviousOutstandingBalance[];
+  patient_previous_outstanding_total?: string;
 
   invoice_date:        string;
   due_date:            string | null;

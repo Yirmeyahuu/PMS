@@ -12,6 +12,7 @@ import { getMyClinic } from '@/features/clinics/clinic.api';
 import type { ClinicalTemplate, ClinicalNote } from '@/types/clinicalTemplate';
 import type { Appointment } from '@/types';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 interface ClinicalNoteFeedItemProps {
   isNewNote?: boolean;
@@ -61,7 +62,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
   const { selectedCaseId, setEditorContext } = useClinicalWorkspace();
 
   const [saving, setSaving] = useState(false);
-  
+
   const { data: clinicProfile } = useQuery({
     queryKey: ['myClinic'],
     queryFn: getMyClinic,
@@ -69,13 +70,13 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
   const [selectedTemplate, setSelectedTemplate] = useState<ClinicalTemplate | null>(null);
-  
+
   const [selectedAppointment, setSelectedAppointment] = useState<number | null>(null);
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [content, setContent] = useState<Record<string, unknown>>({});
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
-  
+
 
   // Make all history items (signed and drafts) strictly read-only in the feed.
   // The only editable item is the new note creation block.
@@ -95,10 +96,10 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
       } else if (note) {
         setSelectedAppointment(note.appointment);
         setNoteDate(note.date);
-        
+
         if (note.template) {
           let tmpl = templates.find(t => t.id === note.template);
-          
+
           if (!tmpl) {
             // Template might be inactive, fetch explicitly
             try {
@@ -108,13 +109,13 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               console.error('Failed to load inactive template', err);
             }
           }
-          
+
           if (tmpl && isMounted) {
             setSelectedTemplateId(tmpl.id);
             setSelectedTemplate(tmpl);
           }
         }
-        
+
         if (note.decrypted_content && isMounted) {
           const mergedValues = { ...note.decrypted_content };
           if (note.chart_annotation_data) {
@@ -183,8 +184,9 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
   };
 
   const appt = appointments.find(a => a.id === selectedAppointment);
-  const practitionerName = note?.practitioner_name || appt?.practitioner_name || 'Practitioner';
-  const practitionerAvatar = note?.practitioner_avatar || appt?.practitioner_avatar || null;
+  // Feedback #2: Display true creator if available, fallback to legacy practitioner name
+  const practitionerName = note?.created_by_name || note?.practitioner_name || appt?.practitioner_name || 'Practitioner';
+  const practitionerAvatar = note?.created_by_avatar || note?.practitioner_avatar || appt?.practitioner_avatar || null;
   const clinicBranchName = appt?.location_name || selectedTemplate?.clinic_branch_name || 'Malasakit Clinic';
 
   return (
@@ -194,9 +196,9 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
 
       {/* FEED ITEM HEADER */}
       <div className={`p-6 border-b flex-shrink-0 ${isNewNote ? 'bg-indigo-50/40 border-indigo-100' : 'bg-slate-50 border-slate-200'}`}>
-        
+
         {/* Practitioner Info & Status */}
-        <div 
+        <div
           className={`flex justify-between items-start pb-5 border-b border-slate-200/70 ${!isNewNote ? 'cursor-pointer hover:bg-slate-100/50 -mx-6 px-6 pt-5 -mt-5 transition-colors' : 'mb-5'}`}
           onClick={() => !isNewNote && onToggleExpand?.()}
         >
@@ -207,27 +209,50 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               className="w-11 h-11 border border-slate-200 shadow-sm ring-2 ring-white"
             />
             <div>
-              <h4 className="text-base font-bold text-slate-800 tracking-tight">{practitionerName}</h4>
-              <p className="text-xs text-slate-500 font-medium tracking-wide uppercase mt-0.5">{clinicBranchName}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {!isNewNote && note && (
-              <div className="flex items-center gap-2 mr-2">
-                {note.status !== 'finalized' && (
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+              {appt && appt.date && appt.start_time && (
+                <p className="text-[15px] font-black text-slate-900 mb-1 tracking-tight">
+                  {(() => {
+                    try {
+                      const [hours, minutes] = appt.start_time.split(':');
+                      const d = new Date(appt.date);
+                      d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+                      return format(d, "EEEE, do MMMM yyyy, hh:mma");
+                    } catch (e) {
+                      return `${appt.date} ${appt.start_time}`;
+                    }
+                  })()}
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-bold text-slate-800 tracking-tight">{practitionerName}</h4>
+                {!isNewNote && note && note.status !== 'finalized' && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                     Drafted
                   </span>
                 )}
-                <span className="text-slate-300">•</span>
-                <span className="text-xs font-medium text-slate-500">{formatDate(note.created_at)}</span>
+              </div>
+              <p className="text-xs text-slate-600 font-medium">{note?.created_by_title || 'Practitioner'}</p>
+              {(note?.created_by_email || note?.created_by_phone) && (
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {[note.created_by_email, note.created_by_phone].filter(Boolean).join(' | ')}
+                </p>
+              )}
+              <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
+                {note?.created_by_clinic_name || clinicBranchName}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {!isNewNote && note && (
+              <div className="flex items-center gap-2 mr-2">
+                <span className="text-xs font-medium text-slate-500">Created at {formatDate(note.created_at)}</span>
               </div>
             )}
-            
+
             {!isNewNote && note && (
               <>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowPrintModal(true);
@@ -237,19 +262,17 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
                 >
                   <Printer className="w-4 h-4" />
                 </button>
-                {note.status === 'drafted' && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditorContext({ type: 'EDIT_NOTE', noteId: note.id });
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
-                    title="Edit Note"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                )}
-                <button 
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditorContext({ type: 'EDIT_NOTE', noteId: note.id });
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                  title="Edit Note"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowEmailModal(true);
@@ -259,7 +282,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
                 >
                   <Mail className="w-4 h-4" />
                 </button>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditorContext({ type: 'COPY_NOTE', sourceNoteId: note.id });
@@ -272,7 +295,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               </>
             )}
             {isNewNote && (
-              <button 
+              <button
                 onClick={onCancelNewNote}
                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                 title="Cancel"
@@ -280,9 +303,9 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
                 <X className="w-5 h-5" />
               </button>
             )}
-            
+
             {!isNewNote && (
-              <button 
+              <button
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors ml-2"
                 title={isExpanded ? "Collapse Note" : "Expand Note"}
               >
@@ -295,98 +318,98 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
         {/* Note Metadata Details */}
         {isExpanded && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-5">
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Session (Appointment)</label>
-            {isReadOnly ? (
-              <p className="text-sm font-medium text-slate-800">
-                {appt ? (
-                  <>
-                    {formatDate(appt.date)} — {formatTime(appt.start_time)} — {appt.service_name}
-                    {appt.case_session_number && (
-                      <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-2 border border-sky-200 inline-block">
-                        {appt.case_session_number}{appt.case_approved_sessions ? `/${appt.case_approved_sessions}` : ''} Session
-                      </span>
-                    )}
-                  </>
-                ) : 'No Session Linked'}
-              </p>
-            ) : (
-              <select
-                value={selectedAppointment || ''}
-                onChange={(e) => setSelectedAppointment(Number(e.target.value))}
-                className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              >
-                <option value="">Select Appointment</option>
-                {appointments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {formatDate(a.date)} — {formatTime(a.start_time)} — {a.practitioner_name} — {a.service_name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
-            {isReadOnly ? (
-              <p className="text-sm font-medium text-slate-800">{formatDate(noteDate)}</p>
-            ) : (
-              <input
-                type="date"
-                value={noteDate}
-                onChange={(e) => setNoteDate(e.target.value)}
-                className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              />
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Clinical Note Template</label>
-            {isReadOnly ? (
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-500" />
-                <p className="text-sm font-semibold text-slate-900">{selectedTemplate?.name || 'N/A'}</p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Session (Appointment)</label>
+              {isReadOnly ? (
+                <p className="text-sm font-medium text-slate-800">
+                  {appt ? (
+                    <>
+                      {formatDate(appt.date)} — {formatTime(appt.start_time)} — {appt.service_name}
+                      {appt.case_session_number && (
+                        <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-2 border border-sky-200 inline-block">
+                          {appt.case_session_number}{appt.case_approved_sessions ? `/${appt.case_approved_sessions}` : ''} Session
+                        </span>
+                      )}
+                    </>
+                  ) : 'No Session Linked'}
+                </p>
+              ) : (
                 <select
-                  value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(Number(e.target.value))}
-                  className="flex-1 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  value={selectedAppointment || ''}
+                  onChange={(e) => setSelectedAppointment(Number(e.target.value))}
+                  className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 >
-                  <option value="">Select Template</option>
-                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  <option value="">Select Appointment</option>
+                  {appointments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {formatDate(a.date)} — {formatTime(a.start_time)} — {a.practitioner_name} — {a.service_name}
+                    </option>
+                  ))}
                 </select>
-                <button
-                  onClick={handleLoadTemplate}
-                  disabled={!selectedTemplateId || selectedTemplate?.id === selectedTemplateId}
-                  className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-300 transition-colors shadow-sm"
-                >
-                  Load
-                </button>
-              </div>
-            )}
+              )}
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
+              {isReadOnly ? (
+                <p className="text-sm font-medium text-slate-800">{formatDate(noteDate)}</p>
+              ) : (
+                <input
+                  type="date"
+                  value={noteDate}
+                  onChange={(e) => setNoteDate(e.target.value)}
+                  className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Clinical Note Template</label>
+              {isReadOnly ? (
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-500" />
+                  <p className="text-sm font-semibold text-slate-900">{selectedTemplate?.name || 'N/A'}</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(Number(e.target.value))}
+                    className="flex-1 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  >
+                    <option value="">Select Template</option>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <button
+                    onClick={handleLoadTemplate}
+                    disabled={!selectedTemplateId || selectedTemplate?.id === selectedTemplateId}
+                    className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-300 transition-colors shadow-sm"
+                  >
+                    Load
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         )}
       </div>
 
       {/* FEED ITEM EDITOR */}
       {isExpanded && (
-      <div className="p-6">
-        {selectedTemplate ? (
-          <DynamicFormRenderer
-            sections={selectedTemplate.structure?.sections || []}
-            values={content}
-            onChange={(fieldId, val) => setContent(prev => ({ ...prev, [fieldId]: val }))}
-            disabled={isReadOnly}
-          />
-        ) : (
-          <div className="py-8 flex flex-col items-center justify-center text-slate-400">
-            <FileText className="w-10 h-10 mb-3 opacity-20" />
-            <p className="text-sm">Select and load a template to begin documentation</p>
-          </div>
-        )}
-      </div>
+        <div className="p-6">
+          {selectedTemplate ? (
+            <DynamicFormRenderer
+              sections={selectedTemplate.structure?.sections || []}
+              values={content}
+              onChange={(fieldId, val) => setContent(prev => ({ ...prev, [fieldId]: val }))}
+              disabled={isReadOnly}
+            />
+          ) : (
+            <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+              <FileText className="w-10 h-10 mb-3 opacity-20" />
+              <p className="text-sm">Select and load a template to begin documentation</p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* FEED ITEM ACTIONS & FOOTER */}
@@ -407,7 +430,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Finalize / Sign
+              Finalize
             </button>
           </div>
         </div>
@@ -415,10 +438,10 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
       {isExpanded && isReadOnly && (
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-400 flex-shrink-0">
           <span>Generated by Malasakit Systems</span>
-          {note?.status === 'finalized' && note.signed_at && <span>Signed on {formatDate(note.signed_at)}</span>}
+          {note?.status === 'finalized' && note.signed_at && <span className="text-xs font-medium text-emerald-700">Finalized at {format(new Date(note.signed_at), "MMMM d, yyyy 'at' h:mma")} by {note.created_by_name || note.practitioner_name || 'Practitioner'}</span>}
         </div>
       )}
-      
+
       {/* Modals */}
       {showPrintModal && note && (
         <PrintNoteModal

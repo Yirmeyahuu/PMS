@@ -86,11 +86,19 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
     appointment_time = serializers.TimeField(source='appointment.start_time', read_only=True)
     appointment_service = serializers.CharField(source='appointment.service_name', read_only=True)
     appointment_practitioner = serializers.CharField(source='appointment.practitioner_name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_title = serializers.SerializerMethodField()
+    created_by_email = serializers.CharField(source='created_by.email', read_only=True)
+    created_by_phone = serializers.CharField(source='created_by.phone', read_only=True)
+    created_by_clinic_name = serializers.CharField(source='created_by.clinic.name', read_only=True)
+    created_by_avatar = serializers.SerializerMethodField()
     
     class Meta:
         model = ClinicalNote
         fields = [
             'id', 'patient', 'patient_name', 'practitioner', 'practitioner_name', 'practitioner_avatar',
+            'created_by', 'created_by_name', 'created_by_avatar',
+            'created_by_title', 'created_by_email', 'created_by_phone', 'created_by_clinic_name',
             'appointment', 'appointment_date', 'appointment_time', 'appointment_service', 'appointment_practitioner',
             'clinic', 'template', 'template_name', 'template_version', 'patient_case',
             'date', 'note_type', 'status', 'signed_at', 'last_autosave',
@@ -109,8 +117,26 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         }
         read_only_fields = [
             'id', 'signed_at', 'last_autosave', 'created_at', 'updated_at',
-            'template_version', 'version_number'
+            'template_version', 'version_number', 'created_by'
         ]
+        
+    def get_created_by_title(self, obj) -> str:
+        """Get creator title, falling back to role display name if empty."""
+        if obj.created_by:
+            return obj.created_by.position or obj.created_by.get_role_display() or 'Practitioner'
+        return 'Practitioner'
+    def get_created_by_avatar(self, obj) -> str | None:
+        """Get creator avatar URL."""
+        if obj.created_by:
+            avatar = getattr(obj.created_by, 'avatar', None)
+            if avatar:
+                request = self.context.get('request')
+                if request and hasattr(avatar, 'url'):
+                    return request.build_absolute_uri(avatar.url)
+                elif hasattr(avatar, 'url'):
+                    return avatar.url
+                return str(avatar)
+        return None
     
     def get_practitioner_avatar(self, obj) -> str | None:
         """Get practitioner avatar URL from user model."""
@@ -154,17 +180,6 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
             appointment = self.instance.appointment
             
         if appointment:
-            # Check if a clinical note already exists for this appointment
-            existing_note = ClinicalNote.objects.filter(
-                appointment=appointment,
-                is_deleted=False
-            ).exists()
-            
-            # If creating a new note (not updating) and note already exists for this appointment
-            if not self.instance and existing_note:
-                raise serializers.ValidationError(
-                    {'detail': 'A clinical note already exists for this appointment. Please edit the existing note instead.'}
-                )
 
             # If it's an ID, fetch the object
             if isinstance(appointment, int) or isinstance(appointment, str):
@@ -300,20 +315,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         # Pop the tracking flag so it doesn't get passed to the model constructor
         validated_data.pop('has_content_update', None)
         
-        print(f'\n{"="*60}')
-        print(f'[CREATE TRACE] Step 5: Inside create()')
-        print(f'[CREATE TRACE]   content type={type(content).__name__}')
-        if isinstance(content, dict):
-            print(f'[CREATE TRACE]   content keys={list(content.keys())}')
-            print(f'[CREATE TRACE]   content key count={len(content)}')
-            for k, v in content.items():
-                vtype = type(v).__name__
-                vpreview = repr(v)[:100] if not isinstance(v, dict) else f'dict with keys {list(v.keys())}'
-                print(f'[CREATE TRACE]   content["{k}"] = ({vtype}) {vpreview}')
-        else:
-            print(f'[CREATE TRACE]   content value={repr(content)[:200]}')
-        print(f'{"="*60}\n')
-        
+
         # Auto-populate fields from appointment if not set
         appointment = validated_data.get('appointment')
         if appointment:
@@ -346,6 +348,8 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         # Auto-populate fields from request user
         request = self.context.get('request')
         if request and request.user:
+            # Set the creator to the authenticated user
+            validated_data['created_by'] = request.user
             # Ensure clinic is set from user
             if not validated_data.get('clinic') and hasattr(request.user, 'clinic'):
                 validated_data['clinic'] = request.user.clinic
@@ -360,40 +364,10 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
         # Apply unified content assignment logic
         self._apply_content(instance, content)
 
-        print(f'[CREATE TRACE] Step 6: After _apply_content()')
-        print(f'[CREATE TRACE]   instance.encrypted_content length={len(instance.encrypted_content) if instance.encrypted_content else 0}')
-        print(f'[CREATE TRACE]   instance.chart_annotation_data={instance.chart_annotation_data}')
 
         instance.save()
 
-        # ---------------------------------------------------------
-        # CLINICAL NOTE PERSISTENCE AUDIT
-        # ---------------------------------------------------------
-        saved_note = ClinicalNote.objects.get(pk=instance.pk)
-        
-        submitted_keys = set(content.keys()) if content else set()
-        saved_content = saved_note.content
-        saved_keys = set(saved_content.keys()) if saved_content else set()
-        
-        missing_keys = submitted_keys - saved_keys
-        
-        print(f'\n{"="*60}')
-        print(f'[CREATE TRACE] Step 7: Database Verification')
-        print(f'[CREATE TRACE]   Submitted keys: {submitted_keys}')
-        print(f'[CREATE TRACE]   Saved content keys: {saved_keys}')
-        print(f'[CREATE TRACE]   Missing keys: {missing_keys}')
-        print(f'[CREATE TRACE]   saved_note.encrypted_content length: {len(saved_note.encrypted_content) if saved_note.encrypted_content else 0}')
-        print(f'[CREATE TRACE]   saved_note.chart_annotation_data: {saved_note.chart_annotation_data}')
-        
-        content_persisted = (len(missing_keys) == 0 and len(submitted_keys) > 0)
-        
-        if content_persisted:
-            print(f'[CREATE TRACE]   ✓ ALL CONTENT PERSISTED ({len(saved_keys)} fields)')
-        else:
-            print(f'[CREATE TRACE]   ✗ CONTENT NOT PERSISTED')
-            print(f'[CREATE TRACE]   submitted {len(submitted_keys)} keys, saved {len(saved_keys)} keys')
-        print(f'{"="*60}\n')
-        # ---------------------------------------------------------
+
 
         # Create initial ClinicalNoteVersion
         ClinicalNoteVersion.objects.create(
@@ -419,9 +393,7 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
 
         has_content_update = validated_data.pop('has_content_update', False)
 
-        # Prevent editing signed notes
-        if instance.status == 'finalized':
-            raise serializers.ValidationError('Cannot edit a signed clinical note')
+
 
         # Update fields
         for attr, value in validated_data.items():
@@ -452,9 +424,6 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
 
         logger.info(f"[ClinicalNote Edit] After Save: instance.encrypted_content={instance.encrypted_content}")
         
-        # Database Reload
-        saved_note = ClinicalNote.objects.get(pk=instance.pk)
-        logger.info(f"[ClinicalNote Edit] Database Reload: content={saved_note.content}")
 
         # Log update
         self._create_audit_log(instance, 'UPDATED')

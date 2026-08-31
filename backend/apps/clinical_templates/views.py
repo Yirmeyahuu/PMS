@@ -178,36 +178,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         logger.info(f'[ClinicalNote Edit] Request.data: {request.data}')
         return super().update(request, *args, **kwargs)
     
-    @action(detail=True, methods=['post'])
-    def sign(self, request, pk=None):
-        """
-        Sign and finalize a clinical note.
-        
-        POST /api/clinical-notes/{id}/sign/
-        """
-        note = self.get_object()
-        
-        try:
-            note.sign_note(request.user)
-            
-            # Log signing
-            ClinicalNoteAuditLog.objects.create(
-                clinical_note=note,
-                user=request.user,
-                action='SIGNED',
-                ip_address=self._get_client_ip(),
-                user_agent=request.META.get('HTTP_USER_AGENT', '')
-            )
-            
-            serializer = self.get_serializer(note)
-            return Response(serializer.data)
-        
-        except ValidationError as e:
-            return Response(
-                {'detail': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
+
     @action(detail=True, methods=['post'])
     def archive(self, request, pk=None):
         """
@@ -325,12 +296,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         """
         note = self.get_object()
         
-        if note.status == 'finalized':
-            return Response(
-                {'detail': 'Cannot modify signed notes'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+
         content = request.data.get('content')
         if content:
             note.set_content(content)
@@ -489,7 +455,19 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         patient = note.patient
         clinic = note.clinic
         
-        # Get practitioner user for avatar and profile
+        # Feedback #2: Resolve actual Clinical Note creator
+        creator_user = note.created_by
+        creator_avatar = None
+        creator_initials = ''
+        if creator_user:
+            if hasattr(creator_user, 'avatar') and creator_user.avatar:
+                raw_url = creator_user.avatar.url if hasattr(creator_user.avatar, 'url') else str(creator_user.avatar)
+                creator_avatar = request.build_absolute_uri(raw_url)
+            first = getattr(creator_user, 'first_name', '') or ''
+            last = getattr(creator_user, 'last_name', '') or ''
+            creator_initials = f"{first[0] if first else ''}{last[0] if last else ''}".upper()
+            
+        # Get assigned practitioner for reference
         practitioner_user = None
         practitioner_avatar = None
         practitioner_initials = ''
@@ -577,12 +555,18 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         time_str = ''
         
         if note_date:
+            def get_ordinal(n):
+                if 11 <= (n % 100) <= 13:
+                    return 'th'
+                return ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
+                
             # Day name (Monday, Tuesday, etc.)
             day_name = note_date.strftime('%A')
             # Month name
             month = note_date.strftime('%B')
-            # Day number
-            day = str(note_date.day)
+            # Day number with ordinal
+            day_num = note_date.day
+            day = f"{day_num}{get_ordinal(day_num)}"
             # Year
             year = str(note_date.year)
         
@@ -599,6 +583,10 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
             'clinic_address': getattr(clinic, 'address', ''),
             'clinic_phone': getattr(clinic, 'phone', ''),
             'clinic_email': getattr(clinic, 'email', ''),
+            'created_by_name': creator_user.get_full_name() if creator_user else (practitioner_user.get_full_name() if practitioner_user else 'Practitioner'),
+            'created_by_title': getattr(creator_user, 'title', '') if creator_user else (getattr(practitioner_user, 'title', '') if practitioner_user else ''),
+            'created_by_avatar': creator_avatar or practitioner_avatar,
+            'created_by_initials': creator_initials or practitioner_initials,
             'practitioner_name': practitioner_user.get_full_name() if practitioner_user else 'Practitioner',
             'practitioner_title': getattr(practitioner_user, 'title', '') if practitioner_user else '',
             'practitioner_avatar': practitioner_avatar,

@@ -80,6 +80,13 @@ export interface ClinicalNote {
   practitioner: number;
   practitioner_name: string;
   practitioner_avatar: string | null;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  created_by_avatar?: string | null;
+  created_by_title?: string | null;
+  created_by_email?: string | null;
+  created_by_phone?: string | null;
+  created_by_clinic_name?: string | null;
   appointment: number | null;
   appointment_date?: string | null;
   appointment_time?: string | null;

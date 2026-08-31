@@ -13,7 +13,7 @@ export const NoteEditor: React.FC = () => {
   const navigate = useNavigate();
   const isNewNote = noteId === 'new';
 
-  const { note, template, loading, saving, saveNote, signNote } = useClinicalNote(
+  const { note, template, loading, saving, saveNote } = useClinicalNote(
     isNewNote ? null : Number(noteId)
   );
 
@@ -98,7 +98,6 @@ export const NoteEditor: React.FC = () => {
     setIsSigning(true);
     try {
       await saveNote({ content: formValues });
-      await signNote();
       toast.success('Note signed successfully');
       navigate('/clinical-notes');
     } catch (error) {

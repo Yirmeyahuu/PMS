@@ -4,6 +4,7 @@ import type { Appointment } from '@/types';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
 import { SystemBranding } from '@/config/branding';
 import { UserAvatar } from '@/components/UserAvatar';
+import { format } from 'date-fns';
 
 interface ClinicalNotePrintTemplateProps {
   note: ClinicalNote;
@@ -60,13 +61,35 @@ export const ClinicalNotePrintTemplate: React.FC<ClinicalNotePrintTemplateProps>
         <div className="flex items-center justify-between pt-5 border-t border-slate-200/60">
           <div className="flex items-center gap-3">
             <UserAvatar
-              avatarUrl={note.practitioner_avatar}
-              name={note.practitioner_name ?? 'Practitioner'}
+              avatarUrl={note.created_by_avatar || note.practitioner_avatar}
+              name={note.created_by_name || note.practitioner_name || 'Practitioner'}
               className="w-12 h-12 border-2 border-white shadow-sm ring-1 ring-slate-200"
             />
             <div>
-              <p className="font-bold text-slate-900 text-lg">{note.practitioner_name || 'Practitioner'}</p>
-              <p className="text-sm text-slate-500 font-medium">Attending Practitioner</p>
+              {appointment && appointment.date && appointment.start_time && (
+                <p className="text-[15px] font-black text-slate-900 mb-1.5 tracking-tight">
+                  {(() => {
+                    try {
+                      const [hours, minutes] = appointment.start_time.split(':');
+                      const d = new Date(appointment.date);
+                      d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+                      return format(d, "EEEE, do MMMM yyyy, hh:mma");
+                    } catch (e) {
+                      return `${appointment.date} ${appointment.start_time}`;
+                    }
+                  })()}
+                </p>
+              )}
+              <p className="font-bold text-slate-900 text-lg">{note.created_by_name || note.practitioner_name || 'Practitioner'}</p>
+              <p className="text-sm text-slate-600 font-medium">{note.created_by_title || 'Practitioner'}</p>
+              {(note.created_by_email || note.created_by_phone) && (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {[note.created_by_email, note.created_by_phone].filter(Boolean).join(' | ')}
+                </p>
+              )}
+              {note.created_by_clinic_name && (
+                <p className="text-xs text-slate-500">{note.created_by_clinic_name}</p>
+              )}
             </div>
           </div>
           
@@ -93,10 +116,6 @@ export const ClinicalNotePrintTemplate: React.FC<ClinicalNotePrintTemplateProps>
             <p className="font-semibold">{appointment.service_name || 'General Consultation'}</p>
           </div>
         )}
-        <div>
-          <p className="text-slate-500 font-medium mb-1">Practitioner:</p>
-          <p className="font-semibold">{note.practitioner_name || 'N/A'}</p>
-        </div>
       </div>
 
         {template?.description && (
@@ -137,11 +156,7 @@ export const ClinicalNotePrintTemplate: React.FC<ClinicalNotePrintTemplateProps>
           <img src={SystemBranding.logoColored} alt={SystemBranding.companyName} className="h-3.5 object-contain opacity-70 grayscale hover:grayscale-0 transition-all" />
           <span>on {new Date().toLocaleDateString('en-PH')}</span>
         </div>
-        {note.status === 'finalized' && note.signed_at && (
-          <p className="mt-2 font-medium text-emerald-700">
-            Digitally signed by {note.practitioner_name} on {new Date(note.signed_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </p>
-        )}
+
       </div>
     </div>
   );

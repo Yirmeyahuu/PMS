@@ -1,0 +1,34 @@
+@@ -228,31 +228,6 @@
+     if (!patient || !selectedAppointment || !selectedTemplate) return;
+-    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
+-
+-    setSaving(true);
+-    try {
+-      const apptDetails = appointments.find(a => a.id === selectedAppointment);
+-      const noteData: CreateClinicalNoteData = {
+-        patient: patient.id,
+-        template: selectedTemplate.id,
+-        date: noteDate,
+-        content,
+-        appointment: selectedAppointment,
+-        patient_case: selectedCaseId || undefined,
+-        status: isFinalize ? 'finalized' : 'drafted',
+-      };
+-
+-      if (apptDetails?.practitioner) {
+-        noteData.practitioner = apptDetails.practitioner;
+-      }
+-
+-      if (existingDraft) {
+-        const { updateNote } = await import('@/features/clinical-template/clinical-templates.api');
+-        await updateNote(existingDraft.id, noteData);
+-        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'updated'} successfully`);
+-      } else {
+-        await createNote(noteData);
+-        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
+-      }
++      await createNote(noteData);
++      toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
+ 
+       triggerRefresh();
+ 

@@ -11,7 +11,7 @@ import type {
 
 export interface AppointmentFilters {
   search?: string;
-  status?: string;
+  status?: string | string[];
   appointment_type?: string;
   service?: number;
   patient?: number;
@@ -90,7 +90,13 @@ export const getAppointments = async (
   const params = new URLSearchParams();
 
   if (filters?.search)           params.append('search',           filters.search);
-  if (filters?.status)           params.append('status',           filters.status);
+  if (filters?.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach(s => params.append('status', s));
+    } else {
+      params.append('status', filters.status);
+    }
+  }
   if (filters?.appointment_type) params.append('appointment_type', filters.appointment_type);
   if (filters?.service)          params.append('service',          String(filters.service));
   if (filters?.patient)          params.append('patient',          String(filters.patient));

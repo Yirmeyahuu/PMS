@@ -4,6 +4,7 @@ import { FileText, Loader2, User, Calendar, Clock, Eye } from 'lucide-react';
 import { getNotes } from '@/features/clinical-template/clinical-templates.api';
 import { ViewClinicalNoteModal } from '@/features/clinical-template/components/ViewClinicalNoteModal';
 import type { ClinicalNote } from '@/types/clinicalTemplate';
+import { format } from 'date-fns';
 
 interface ClinicalNotesTabProps {
   appointmentId: number;
@@ -122,7 +123,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ appointmentI
               <div className="flex flex-wrap gap-4 mb-3 text-xs text-gray-600">
                 <div className="flex items-center gap-1">
                   <User className="w-3.5 h-3.5" />
-                  <span>{note.practitioner_name || 'Unknown Practitioner'}</span>
+                  <span>{note.created_by_name || note.practitioner_name || 'Unknown Practitioner'}</span>
                 </div>
                 {note.appointment_date && (
                   <div className="flex items-center gap-1">
@@ -157,8 +158,8 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ appointmentI
               {/* Signed info */}
               {note.signed_at && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs text-green-600">
-                    Signed on {new Date(note.signed_at).toLocaleString()}
+                  <p className="text-xs font-medium text-emerald-700">
+                    Finalized at {format(new Date(note.signed_at), "MMMM d, yyyy 'at' h:mma")} by {note.created_by_name || note.practitioner_name || 'Practitioner'}
                   </p>
                 </div>
               )}

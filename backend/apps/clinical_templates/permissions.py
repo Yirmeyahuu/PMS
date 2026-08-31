@@ -77,6 +77,10 @@ class CanEditClinicalNote(permissions.BasePermission):
         if user.role == 'STAFF':
             return True
         
+        # Creator can edit their own note
+        if hasattr(obj, 'created_by') and obj.created_by == user:
+            return True
+            
         # Practitioner can edit their own note
         if hasattr(obj, 'practitioner') and obj.practitioner and hasattr(obj.practitioner, 'user'):
             return obj.practitioner.user == user

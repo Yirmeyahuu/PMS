@@ -77,6 +77,7 @@ export default function GenerateNewInvoice() {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [showCreateItemModal, setShowCreateItemModal] = useState(false);
   const [createItemTargetIndex, setCreateItemTargetIndex] = useState<number | null>(null);
+  const [createItemDefaultName, setCreateItemDefaultName] = useState<string>('');
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -114,6 +115,15 @@ export default function GenerateNewInvoice() {
       setAccountNotes(patientData.account_notes);
     }
   }, [patientData]);
+
+  const { data: patientOutstanding } = useQuery({
+    queryKey: ['patient-outstanding', appointment?.patient],
+    queryFn: async () => {
+      if (!appointment?.patient) return null;
+      return billingApi.getPatientOutstanding(appointment.patient);
+    },
+    enabled: !!appointment?.patient,
+  });
 
   // This query will be placed after patientCase query is defined.
 
@@ -335,6 +345,9 @@ export default function GenerateNewInvoice() {
     modified_by: null,
     modified_by_name: null,
     version_number: existingInvoice?.version_number ?? 1,
+    is_package_invoice: isPackageBilling,
+    previous_outstanding_balances: patientOutstanding?.previous_outstanding_balances,
+    patient_previous_outstanding_total: patientOutstanding?.patient_previous_outstanding_total,
     invoice_date: invoiceDate,
     due_date: dueDate || null,
     status: isPackageBilling ? 
@@ -707,24 +720,41 @@ export default function GenerateNewInvoice() {
                                 Stock: {Number(linkedProduct.quantity_in_stock).toLocaleString()} {linkedProduct.unit.toLowerCase()}
                               </div>
                             )}
-                            {isDropdownOpen && (
+                            {isDropdownOpen && query.trim().length > 0 && (
                               <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
                                 <div className="max-h-40 overflow-y-auto">
-                                  {filteredProducts.length > 0 ? filteredProducts.map((p) => (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      className="w-full text-left px-2 py-2 text-sm hover:bg-sky-50 flex justify-between"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        handleSelectInventoryItem(index, p);
-                                      }}
-                                    >
-                                      <span>{p.name}</span>
-                                      <span className="text-gray-500">₱{Number(p.selling_price).toLocaleString()}</span>
-                                    </button>
-                                  )) : (
-                                    <div className="px-2 py-2 text-sm text-gray-400">Start typing...</div>
+                                  {filteredProducts.length > 0 ? (
+                                    filteredProducts.map((p) => (
+                                      <button
+                                        key={p.id}
+                                        type="button"
+                                        className="w-full text-left px-2 py-2 text-sm hover:bg-sky-50 flex justify-between"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          handleSelectInventoryItem(index, p);
+                                        }}
+                                      >
+                                        <span>{p.name}</span>
+                                        <span className="text-gray-500">₱{Number(p.selling_price).toLocaleString()}</span>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-3 text-sm text-center border-t border-gray-100">
+                                      <p className="text-gray-500 mb-2">No inventory item found</p>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          setCreateItemTargetIndex(index);
+                                          setCreateItemDefaultName(item.description);
+                                          setShowCreateItemModal(true);
+                                          setInventoryDropdownIndex(null);
+                                        }}
+                                        className="text-sky-600 font-medium hover:text-sky-700 inline-flex items-center gap-1 bg-sky-50 px-3 py-1.5 rounded-md w-full justify-center transition-colors hover:bg-sky-100"
+                                      >
+                                        <Plus className="w-4 h-4" /> Create New Item
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -921,6 +951,40 @@ export default function GenerateNewInvoice() {
                   </>
                 )}
               </div>
+              
+              {!isPackageBilling && patientOutstanding?.previous_outstanding_balances && patientOutstanding.previous_outstanding_balances.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Previous Outstanding Balance</h3>
+                  <table className="w-full text-xs mb-3">
+                    <thead>
+                      <tr className="border-y border-gray-900 text-gray-700">
+                        <th className="text-left font-semibold py-1.5 w-1/3">Date</th>
+                        <th className="text-left font-semibold py-1.5 w-1/3">Invoice</th>
+                        <th className="text-right font-semibold py-1.5 w-1/3">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {patientOutstanding.previous_outstanding_balances.map((prev: any) => (
+                        <tr key={prev.invoice_number} className="border-b border-gray-200">
+                          <td className="py-1.5 text-gray-700">{format(new Date(prev.invoice_date), 'MMM dd, yyyy')}</td>
+                          <td className="py-1.5 text-gray-700">{prev.invoice_number}</td>
+                          <td className="py-1.5 text-right text-gray-900 font-medium">₱{Number(prev.balance_due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  <div className="flex justify-between mt-3 pt-2">
+                    <span className="text-sm text-gray-700">Previous Outstanding Total:</span>
+                    <span className="text-sm font-semibold text-gray-900">₱{Number(patientOutstanding.patient_previous_outstanding_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  
+                  <div className="flex justify-between mt-2 pt-2 border-t-2 border-gray-900">
+                    <span className="text-sm font-bold text-red-700">Overall Patient Outstanding:</span>
+                    <span className="text-sm font-black text-red-700">₱{(Number(patientOutstanding.patient_previous_outstanding_total) + balanceDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="border-t border-gray-300 mb-8 w-full"></div>
@@ -978,6 +1042,7 @@ export default function GenerateNewInvoice() {
         onSubmit={(data) => createProductMutation.mutate(data)}
         isLoading={createProductMutation.isPending}
         error={createProductError}
+        initialName={createItemDefaultName}
       />
     </div>
   );

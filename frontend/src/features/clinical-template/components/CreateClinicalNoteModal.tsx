@@ -301,20 +301,11 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
       return;
     }
 
-    // Check for existing draft in the selected appointment
-    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
-    if (existingDraft) {
-      setShowConfirmReplace(true);
-      return;
-    }
-
     executeSave();
   };
 
   const executeSave = async () => {
     if (!selectedTemplate || !selectedAppointment) return;
-
-    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
     setSaving(true);
     try {
       // Get practitioner from selected appointment
@@ -347,16 +338,9 @@ export const CreateClinicalNoteModal: React.FC<CreateClinicalNoteModalProps> = (
 
       console.log('[ClinicalNote Create] Incoming Request:', JSON.stringify(noteData, null, 2));
 
-      if (existingDraft) {
-        const { updateNote } = await import('../clinical-templates.api');
-        await updateNote(existingDraft.id, noteData);
-        console.log('[CreateClinicalNoteModal] Existing draft updated successfully!');
-        toast.success('Clinical note updated successfully');
-      } else {
-        await createNote(noteData);
-        console.log('[CreateClinicalNoteModal] Note created successfully!');
-        toast.success('Clinical note created successfully');
-      }
+      await createNote(noteData);
+      console.log('[CreateClinicalNoteModal] Note created successfully!');
+      toast.success('Clinical note created successfully');
       
       console.log('[CreateClinicalNoteModal] Calling onSuccess callback...');
       onSuccess?.();

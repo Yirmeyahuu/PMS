@@ -355,6 +355,35 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
             </div>
           </div>
 
+          {/* ── Previous Outstanding Balance ── */}
+          {!packageSummary && invoice.previous_outstanding_balances && invoice.previous_outstanding_balances.length > 0 && (
+            <div className="mb-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-900 mb-2">
+                Previous Outstanding Balance
+              </p>
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-700">
+                      <th className="text-left py-2 px-4 text-xs font-semibold uppercase tracking-wider">Date</th>
+                      <th className="text-left py-2 px-4 text-xs font-semibold uppercase tracking-wider">Invoice #</th>
+                      <th className="text-right py-2 px-4 text-xs font-semibold uppercase tracking-wider">Outstanding</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {invoice.previous_outstanding_balances.map(prev => (
+                      <tr key={prev.invoice_number}>
+                        <td className="py-2 px-4 text-gray-800">{fmtDate(prev.invoice_date)}</td>
+                        <td className="py-2 px-4 text-gray-600">{prev.invoice_number}</td>
+                        <td className="py-2 px-4 text-right text-red-600 font-medium">{fmt(prev.balance_due, currencySymbol)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* ── Totals ── */}
           <div className="flex justify-end mb-8">
             <div className="w-80 border border-gray-200 rounded-xl overflow-hidden">
@@ -443,6 +472,30 @@ export const PMSInvoiceTemplate = forwardRef<HTMLDivElement, PMSInvoiceTemplateP
                   {fmt(packageSummary ? packageSummary.outstanding_balance : invoice.balance_due, currencySymbol)}
                 </span>
               </div>
+              
+              {/* Total Patient Account Summary */}
+              {!packageSummary && invoice.previous_outstanding_balances && invoice.previous_outstanding_balances.length > 0 && (
+                <div className="bg-gray-50 border-t border-gray-200 pt-2 pb-3 px-4">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-600">Previous Outstanding</span>
+                    <span className="text-gray-800 font-medium">
+                      {fmt(invoice.patient_previous_outstanding_total || '0', currencySymbol)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="text-gray-600">Current Outstanding</span>
+                    <span className="text-gray-800 font-medium">
+                      {fmt(invoice.balance_due, currencySymbol)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-dashed border-gray-300 pt-2 mt-1">
+                    <span className="font-bold text-xs text-red-700">Total Patient Outstanding</span>
+                    <span className="font-bold text-sm text-red-700">
+                      {fmt((parseFloat(invoice.patient_previous_outstanding_total || '0') + parseFloat(invoice.balance_due)).toString(), currencySymbol)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

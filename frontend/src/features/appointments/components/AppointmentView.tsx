@@ -38,6 +38,7 @@ import { CancelAppointmentModal } from './CancelAppointmentModal';
 import { AddRecurringAppointments } from './AddRecurringAppointments';
 import { SendInvoiceEmailModal } from '@/features/patients/components/SendInvoiceEmailModal';
 import { PrintInvoiceModal } from '@/features/billing/components/PrintInvoiceModal';
+import { ClinicalNotesTab } from './ClinicalNotesTab';
 import {
   createRecurringAppointments,
   editAppointment as apiEditAppointment,
@@ -2197,9 +2198,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
 
             {/* ── Clinical Notes Tab ── */}
             {activeTab === 'clinical_notes' && (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-sm text-gray-500">Redirecting to Clinical Notes...</p>
-              </div>
+              <ClinicalNotesTab appointmentId={appointment.id} />
             )}
 
             {/* ── Communications Tab ── */}

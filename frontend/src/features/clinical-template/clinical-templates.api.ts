@@ -83,10 +83,6 @@ export const updateNote = async (
   return response.data;
 };
 
-export const signNote = async (id: number): Promise<ClinicalNote> => {
-  const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/sign/`);
-  return response.data;
-};
 
 export const autosaveNote = async (id: number, content: Record<string, any>): Promise<{ detail: string; last_autosave: string }> => {
   const response = await axiosInstance.post(`${BASE_URL}/notes/${id}/autosave/`, { content });

@@ -25,7 +25,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
   const [loading, setLoading] = useState(true);
 
-  
+
   const [showConfirmReplace, setShowConfirmReplace] = useState(false);
   const [pendingSaveParams, setPendingSaveParams] = useState<{ isFinalize: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -106,17 +106,16 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
     fetchData().then(async (result) => {
       if (!result) return;
       const { templatesData: fetchedTemplates, sortedAppointments, signedNotes } = result;
-      
+
       // Initialize Appointment and Date
       let defaultApptId: number | null = null;
       let defaultDate = new Date().toISOString().split('T')[0];
       let isAutoSelected = false;
-      
+
       if (initialAppointmentId) {
         const match = sortedAppointments.find((a: Appointment) => a.id === initialAppointmentId);
-        const hasNote = signedNotes.some((n: any) => n.appointment === initialAppointmentId);
-        
-        if (match && !hasNote) {
+
+        if (match) {
           defaultApptId = initialAppointmentId;
           defaultDate = match.date;
           isAutoSelected = true;
@@ -145,7 +144,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
             }
             setContent(mergedValues);
           }
-          
+
           if (editorContext.type === 'EDIT_NOTE') {
             if (sourceNote.appointment) {
               // Ensure the appointment is in the list
@@ -216,19 +215,11 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
     }
     if (!patient) return;
 
-    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
-    if (existingDraft && !isFinalize) {
-      setPendingSaveParams({ isFinalize });
-      setShowConfirmReplace(true);
-      return;
-    }
-
     executeSave(isFinalize);
   };
 
   const executeSave = async (isFinalize: boolean = false) => {
     if (!patient || !selectedAppointment || !selectedTemplate) return;
-    const existingDraft = allDrafts.find(d => d.appointment === selectedAppointment);
 
     setSaving(true);
     try {
@@ -247,14 +238,8 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
         noteData.practitioner = apptDetails.practitioner;
       }
 
-      if (existingDraft) {
-        const { updateNote } = await import('@/features/clinical-template/clinical-templates.api');
-        await updateNote(existingDraft.id, noteData);
-        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'updated'} successfully`);
-      } else {
-        await createNote(noteData);
-        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
-      }
+      await createNote(noteData);
+      toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
 
       triggerRefresh();
       refreshCases(); // Update case session counts (e.g., 6 out of 8 Sessions)
@@ -325,9 +310,9 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* Meta Information */}
-        
-        <ConfirmReplaceModal 
-          isOpen={showConfirmReplace} 
+
+        <ConfirmReplaceModal
+          isOpen={showConfirmReplace}
           onConfirm={() => {
             if (pendingSaveParams) {
               executeSave(pendingSaveParams.isFinalize);
@@ -374,8 +359,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
                     <option
                       key={appt.id}
                       value={appt.id}
-                      disabled={hasNote}
-                      title={hasNote ? 'This session has already a Clinical Note.' : undefined}
+                      title={hasNote ? 'Note exists for this session' : undefined}
                     >
                       {formatDateLabel(appt.date)} — {formatTimeLabel(appt.start_time)}
                       {appt.practitioner_name ? ` — ${appt.practitioner_name}` : ''}
@@ -434,7 +418,7 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 shadow-sm"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Finalize / Sign
+          Finalize
         </button>
       </div>
     </div>

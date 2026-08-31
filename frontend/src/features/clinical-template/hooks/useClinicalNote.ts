@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getNote, updateNote, signNote as apiSignNote } from '../clinical-templates.api';
+import { getNote, updateNote } from '../clinical-templates.api';
 import { getTemplate } from '../clinical-templates.api';
 import type { ClinicalNote, ClinicalTemplate } from '@/types/clinicalTemplate';
 import toast from 'react-hot-toast';
@@ -48,19 +48,6 @@ export const useClinicalNote = (noteId: number | null) => {
     }
   };
 
-  const signNote = async () => {
-    if (!noteId) return;
-    setSaving(true);
-    try {
-      const signed = await apiSignNote(noteId);
-      setNote(signed);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to sign note');
-      throw err;
-    } finally {
-      setSaving(false);
-    }
-  };
 
-  return { note, template, loading, saving, saveNote, signNote };
+  return { note, template, loading, saving, saveNote };
 };

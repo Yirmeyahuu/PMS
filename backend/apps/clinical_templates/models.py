@@ -164,6 +164,15 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='clinical_notes_v2'
     )
+    
+    # The authenticated user who actually created the note
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_clinical_notes'
+    )
 
     # Case assignment (optional - notes can exist without a case)
     patient_case = models.ForeignKey(
@@ -244,15 +253,7 @@ class ClinicalNote(TimeStampedModel, SoftDeleteModel):
         """Encrypt and save content"""
         self.encrypted_content = FieldEncryptor.encrypt(content_dict)
     
-    def sign_note(self, user):
-        """Sign and lock the clinical note"""
-        if self.practitioner.user != user:
-            raise ValidationError('Only the assigned practitioner can sign this note')
-        
-        from django.utils import timezone
-        self.status = 'finalized'
-        self.signed_at = timezone.now()
-        self.save(update_fields=['status', 'signed_at'])
+
 
 
 class ClinicalNoteVersion(TimeStampedModel):
