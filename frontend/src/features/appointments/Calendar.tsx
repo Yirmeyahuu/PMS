@@ -1614,7 +1614,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
       const durationSlots = Math.max(((eH * 60 + eM) - (sH * 60 + sM)) / 15, 1);
       baseStyle = { top: `${startSlot * 1.25}rem`, height: `${durationSlots * 1.25}rem` };
     } else {
-      baseStyle = getAppointmentStyle(apt, forDayView);
+      baseStyle = getAppointmentStyle(apt);
     }
 
     const anyDragging = dragState.isDragging || blockDragState.isDragging;
@@ -1774,7 +1774,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
       const durationSlots = Math.max(((eH * 60 + eM) - (sH * 60 + sM)) / 15, 1);
       baseStyle = { top: `${startSlot * 1.25}rem`, height: `${durationSlots * 1.25}rem` };
     } else {
-      baseStyle = getBlockAppointmentStyle(block, forDayView);
+      baseStyle = getBlockAppointmentStyle(block);
     }
 
     const handleClick = (e: React.MouseEvent) => {
@@ -1893,7 +1893,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
       const durationSlots = Math.max(((eH * 60 + eM) - (sH * 60 + sM)) / 15, 1);
       baseNoteStyle = { top: `${startSlot * 1.25}rem`, height: `${durationSlots * 1.25}rem` };
     } else {
-      baseNoteStyle = getNoteStyle(note, forDayView);
+      baseNoteStyle = getNoteStyle(note);
     }
 
     const anyDragging = dragState.isDragging || blockDragState.isDragging || noteDragState.isDragging;
