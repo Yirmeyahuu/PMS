@@ -4,7 +4,9 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { deleteCaseDocument, type CaseDocument } from '../api/caseDocuments.api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
-import { getLetter } from '../api/letters.api';
+import { getLetter, type Letter } from '../api/letters.api';
+import { ClinicLetterhead } from './ClinicLetterhead';
+import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 
 // TipTap Imports for Read-Only rendering
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -32,10 +34,11 @@ interface DocumentPreviewModalProps {
 }
 
 export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }: DocumentPreviewModalProps) => {
+  const { patient } = usePatientProfileContext();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isLetterLoading, setIsLetterLoading] = useState(false);
-  const [letterContent, setLetterContent] = useState<string>('');
+  const [letter, setLetter] = useState<Letter | null>(null);
   
   const isLetter = doc.source_type === 'LETTER';
   const isPdf = !isLetter && (doc.mime_type === 'application/pdf' || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf')));
@@ -89,9 +92,9 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
       const fetchLetter = async () => {
         setIsLetterLoading(true);
         try {
-          const letter = await getLetter(doc.source_id!);
+          const fetchedLetter = await getLetter(doc.source_id!);
           if (mounted) {
-            setLetterContent(letter.content_html || '<p></p>');
+            setLetter(fetchedLetter);
           }
         } catch (err) {
           console.error('Failed to load letter content', err);
@@ -106,15 +109,15 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
   }, [isLetter, doc.source_id]);
 
   useEffect(() => {
-    if (editor && !editor.isDestroyed && letterContent) {
+    if (editor && !editor.isDestroyed && letter?.content_html) {
       // Need a small timeout to ensure editor is fully ready in React Strict Mode
       setTimeout(() => {
         if (editor && !editor.isDestroyed) {
-          editor.commands.setContent(letterContent);
+          editor.commands.setContent(letter.content_html || '');
         }
       }, 0);
     }
-  }, [editor, letterContent]);
+  }, [editor, letter?.content_html]);
   
   const handleDownload = () => {
     window.open(secureFileUrl, '_blank');
@@ -183,19 +186,57 @@ export const DocumentPreviewModal = ({ document: doc, onClose, onDeleteSuccess }
         <div className="flex-1 bg-slate-100 overflow-hidden relative flex flex-col">
           {isLetter ? (
             <div className="flex-1 overflow-y-auto p-8 flex justify-center">
-              <div className="w-full max-w-3xl bg-white shadow-sm border border-slate-200 p-12 min-h-full">
+              <div 
+                className="w-[794px] min-h-[1123px] bg-white shadow-md rounded-sm p-12 flex flex-col gap-6"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0px, transparent 1099px, #f3f4f6 1099px, #f3f4f6 1123px)'
+                }}
+              >
                 {isLetterLoading ? (
                   <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                     <Loader2 className="w-8 h-8 animate-spin mb-4" />
                     <p>Loading letter content...</p>
                   </div>
-                ) : !letterContent ? (
+                ) : !letter ? (
                   <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                     <FileText className="w-12 h-12 mb-4 opacity-20" />
                     <p>No letter content available for preview.</p>
                   </div>
                 ) : (
-                  <EditorContent editor={editor} className="letter-preview-content" />
+                  <>
+                    {/* Visual representation of Letterhead */}
+                    {letter.layout_letter_head && (
+                      <ClinicLetterhead profile={letter.clinic_profile} />
+                    )}
+
+                    {/* Visual representation of Date */}
+                    {letter.layout_date && (
+                      <div className="mb-5 font-sans">
+                        <p className="m-0 text-slate-800">
+                          {new Date(letter.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Visual representation of Addressee */}
+                    {letter.layout_addressee && patient && (
+                      <div className="mb-10 font-sans">
+                        <p className="m-0 font-bold text-slate-900">
+                          {patient.full_name || `${patient.first_name} ${patient.last_name}`}
+                        </p>
+                        {patient.address && (
+                          <p className="m-0 text-slate-700">{patient.address}</p>
+                        )}
+                        {(patient.city || patient.province || patient.postal_code) && (
+                          <p className="m-0 text-slate-700">
+                            {[patient.city, patient.province, patient.postal_code].filter(Boolean).join(' ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <EditorContent editor={editor} className="letter-preview-content" />
+                  </>
                 )}
               </div>
             </div>

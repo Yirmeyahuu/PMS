@@ -199,14 +199,43 @@ class LetterGeneratorService:
         from apps.billing.models import InvoicePrintSettings
         print_settings = InvoicePrintSettings.get_for_clinic(clinic)
         
-        logo_url = print_settings.logo_url
+        # Priority 1: logo_url stored in InvoicePrintSettings (Cloudinary URL)
+        logo_url = print_settings.logo_url or None
+        
+        # Priority 2: clinic.logo ImageField (local filesystem or Cloudinary)
         if not logo_url and clinic.logo:
-            logo_url = request.build_absolute_uri(clinic.logo.url) if request else clinic.logo.url
+            try:
+                raw_url = clinic.logo.url
+                if request:
+                    logo_url = request.build_absolute_uri(raw_url)
+                else:
+                    logo_url = raw_url
+            except Exception:
+                logo_url = None
+        
+        # Priority 3: fall back to parent clinic's logo if branch has none
+        if not logo_url and clinic.parent_clinic:
+            parent = clinic.parent_clinic
+            parent_settings = InvoicePrintSettings.get_for_clinic(parent)
+            logo_url = parent_settings.logo_url or None
+            if not logo_url and parent.logo:
+                try:
+                    raw_url = parent.logo.url
+                    if request:
+                        logo_url = request.build_absolute_uri(raw_url)
+                    else:
+                        logo_url = raw_url
+                except Exception:
+                    logo_url = None
+        
+        # Force HTTPS for any Cloudinary URL to prevent Mixed Content errors
+        if logo_url and logo_url.startswith('http://') and 'cloudinary.com' in logo_url:
+            logo_url = logo_url.replace('http://', 'https://')
             
         return {
             'name': print_settings.clinic_name or clinic.name,
             'branch_name': clinic.name,
-            'logo': logo_url,
+            'logo': logo_url or '',
             'address': print_settings.clinic_address or clinic.address,
             'phone': print_settings.clinic_phone or clinic.phone,
             'email': print_settings.clinic_email or clinic.email,
