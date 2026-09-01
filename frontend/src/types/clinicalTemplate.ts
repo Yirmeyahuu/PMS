@@ -122,4 +122,5 @@ export interface CreateClinicalNoteData {
   content: Record<string, any>;
   status?: 'drafted' | 'finalized';
   patient_case?: number;
+  amendment_reason?: string;
 }

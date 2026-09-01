@@ -162,7 +162,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
         date: noteDate,
         content,
         patient_case: selectedCaseId || undefined,
-        status: sign ? 'finalized' : 'drafted',
+        status: (sign ? 'finalized' : 'drafted') as 'finalized' | 'drafted',
         amendment_reason: undefined
       };
 
