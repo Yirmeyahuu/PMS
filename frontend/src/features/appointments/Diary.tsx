@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
-import { ChevronLeft, ChevronRight, Filter, Building2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Filter, Building2 } from 'lucide-react';
 import { Calendar } from './Calendar';
 import { ArrivalsList } from './components/ArrivalsList';
 import { EventViewModal } from './components/EventViewModal';
@@ -128,6 +128,7 @@ export const Diary: React.FC = () => {
   const [selectedPractitioner, setSelectedPractitioner] = useState<number | string | null>(null);
   const [selectedClinicBranch, setSelectedClinicBranch] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [pendingWeekView, setPendingWeekView] = useState(false);
   const [calendarReadyDate, setCalendarReadyDate] = useState<Date | null>(null);
   const [isCalendarLive, setIsCalendarLive] = useState(false);
 
@@ -471,6 +472,10 @@ export const Diary: React.FC = () => {
   const handlePractitionerSelect = (practitionerId: number | string | null) => {
     setSelectedPractitioner(practitionerId);
     setShowFilterDropdown(false);
+    if (pendingWeekView) {
+      setView('week');
+      setPendingWeekView(false);
+    }
     // Persist the user's manual selection (user-specific, branch-specific).
     // Only called from the UI — never from auto-select effects — so we never
     // accidentally persist a loading-time default as the user's preference.
@@ -819,6 +824,84 @@ export const Diary: React.FC = () => {
     setShowAddNoteModal(true);
   };
 
+  const practitionerDropdownContent = showFilterDropdown && !loadingPractitioners && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => { setShowFilterDropdown(false); setPendingWeekView(false); }} />
+                            <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg border border-gray-200 z-[9999] max-h-80 overflow-y-auto">
+
+                              {/* Show All option — displays all practitioners in current branch */}
+                              <button
+                                onClick={() => handlePractitionerSelect(null)}
+                                className={`
+                                  w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
+                                  ${selectedPractitioner === null
+                                    ? 'bg-care-blue/10 text-care-blue font-semibold'
+                                    : 'text-gray-700'
+                                  }
+                                `}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span>Show All</span>
+                                  {selectedPractitioner === null && (
+                                    <span className="text-care-blue text-base">✓</span>
+                                  )}
+                                </div>
+                              </button>
+
+
+                              {practitionerOptions.length === 0 ? (
+                                <div className="px-4 py-6 text-sm text-gray-500 text-center">
+                                  <p className="font-medium">No practitioners found</p>
+                                  {selectedClinicBranch && (
+                                    <p className="text-xs mt-1 text-gray-400">
+                                      No staff assigned to this branch yet.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                practitionerOptions.map((practitioner) => (
+                                  <button
+                                    key={practitioner.id}
+                                    onClick={() => handlePractitionerSelect(practitioner.id)}
+                                    className={`
+                                      w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
+                                      ${selectedPractitioner === practitioner.id
+                                        ? 'bg-care-blue/10 text-care-blue font-semibold'
+                                        : 'text-gray-700'
+                                      }
+                                    `}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="truncate">
+                                          {practitioner.name}
+                                          {practitioner.id === cachedOwnId && (
+                                            <span className="ml-1.5 text-xs text-care-blue font-medium">(me)</span>
+                                          )}
+                                        </div>
+                                        {practitioner.specialization && (
+                                          <div className="text-xs text-gray-500 mt-0.5 truncate">
+                                            {practitioner.specialization}
+                                          </div>
+                                        )}
+                                        {!selectedClinicBranch && practitioner.clinic_branch_name && (
+                                          <div className="text-xs text-care-blue mt-0.5 flex items-center gap-1">
+                                            <Building2 className="w-3 h-3" />
+                                            {practitioner.clinic_branch_name}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {selectedPractitioner === practitioner.id && (
+                                        <span className="text-care-blue flex-shrink-0 text-base">✓</span>
+                                      )}
+                                    </div>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          </>
+                        );
+
   return (
     <DashboardLayout>
       <div className="h-full flex flex-col overflow-hidden">
@@ -928,34 +1011,8 @@ export const Diary: React.FC = () => {
             <div className="flex-shrink-0 border-b border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
 
-                {/* Navigation + Practitioner Filter */}
+                {/* Left Side: Branch Badge & Live Status */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={handleToday}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Today
-                  </button>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={handlePrevious}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <h2 className="text-lg font-semibold text-trust-harbor">
-                    {dateRangeText}
-                  </h2>
-
                   {/* Active branch badge */}
                   {selectedBranchName && (
                     <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-care-blue/10 text-care-blue border border-care-blue/20">
@@ -964,142 +1021,135 @@ export const Diary: React.FC = () => {
                     </span>
                   )}
 
-                  {/* Practitioner Filter / Compare Mode */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  {/* Live status indicator */}
+                  {isCalendarLive && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full select-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Live
+                    </span>
+                  )}
+                </div>
+
+                {/* Right Side: Date, View Switcher, Practitioner Filter */}
+                <div className="flex items-center gap-3 flex-wrap ml-auto">
+                  
+                  {/* Date Controls */}
+                  <div className="flex items-center gap-2 mr-2">
+                    <h2 className="text-lg font-semibold text-trust-harbor mr-2">
+                      {dateRangeText}
+                    </h2>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={handlePrevious}
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={handleToday}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={handleNext}
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* View Switcher */}
+                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                  {(['day', 'week', 'month'] as CalendarView[]).map((v) => {
+                    const isWeek = v === 'week';
+                    
+                    if (isWeek && !compareMode) {
+                      return (
+                        <div key={v} className="relative">
+                          <button
+                            onClick={() => {
+                              if (view === 'week' || pendingWeekView) {
+                                setShowFilterDropdown(!showFilterDropdown);
+                                if (pendingWeekView && showFilterDropdown) {
+                                  setPendingWeekView(false);
+                                }
+                              } else {
+                                setShowFilterDropdown(true);
+                                setPendingWeekView(true);
+                              }
+                            }}
+                            className={`
+                              flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
+                              ${(view === 'week' || pendingWeekView)
+                                ? 'bg-white text-care-blue shadow-sm'
+                                : 'text-steady-slate hover:text-trust-harbor'
+                              }
+                            `}
+                          >
+                            {v}
+                            <ChevronDown className={`w-4 h-4 transition-transform ${showFilterDropdown && (view === 'week' || pendingWeekView) ? 'rotate-180' : ''}`} />
+                          </button>
+                          {(view === 'week' || pendingWeekView) && practitionerDropdownContent}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => {
+                          setView(v);
+                          setPendingWeekView(false);
+                          if (v === 'month') handleSetCompareMode(false);
+                          if (v === 'day' && selectedClinicBranch !== null && !cachedOwnId) setSelectedPractitioner(null);
+                        }}
+                        className={`
+                          px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
+                          ${view === v
+                            ? 'bg-white text-care-blue shadow-sm'
+                            : 'text-steady-slate hover:text-trust-harbor'
+                          }
+                        `}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Practitioner Filter / Compare Mode */}
+                <div className="flex items-center gap-2 flex-wrap">
 
                     {!compareMode ? (
-                      /* ── Single Practitioner Filter Dropdown ── */
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                          disabled={loadingPractitioners}
-                          className={`
-                            flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors
-                            ${selectedPractitioner
-                              ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
-                              : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
+                      view !== 'week' && (
+                        /* ── Single Practitioner Filter Dropdown ── */
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                            disabled={loadingPractitioners}
+                            className={`
+                              flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors
+                              ${selectedPractitioner
+                                ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
+                                : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
+                              }
+                              ${loadingPractitioners ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+                          >
+                            <Filter className="w-4 h-4" />
+                            {loadingPractitioners
+                              ? 'Loading...'
+                              : selectedPractitioner
+                                ? practitioners.find(p => p.id === selectedPractitioner)?.name || 'Practitioner'
+                                : 'Show All'
                             }
-                            ${loadingPractitioners ? 'opacity-50 cursor-not-allowed' : ''}
-                          `}
-                        >
-                          <Filter className="w-4 h-4" />
-                          {loadingPractitioners
-                            ? 'Loading...'
-                            : selectedPractitioner
-                              ? practitioners.find(p => p.id === selectedPractitioner)?.name || 'Practitioner'
-                              : 'Show All'
-                          }
-                        </button>
+                          </button>
 
-                        {showFilterDropdown && !loadingPractitioners && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setShowFilterDropdown(false)} />
-                            <div className="absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-auto">
-
-                              {selectedClinicBranch && (
-                                <div className="px-4 py-2 bg-care-blue/10 border-b border-care-blue/20">
-                                  <p className="text-xs font-semibold text-care-blue">
-                                    Showing practitioners for: {selectedBranchName}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Show All option — displays all practitioners in current branch */}
-                              <button
-                                onClick={() => handlePractitionerSelect(null)}
-                                className={`
-                                  w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
-                                  ${selectedPractitioner === null
-                                    ? 'bg-care-blue/10 text-care-blue font-semibold'
-                                    : 'text-gray-700'
-                                  }
-                                `}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span>Show All</span>
-                                  {selectedPractitioner === null && (
-                                    <span className="text-care-blue text-base">✓</span>
-                                  )}
-                                </div>
-                              </button>
-
-                              {/* My Schedule option — for practitioners viewing their own clinic */}
-                              {(isPractitioner || isStaff) && isOwnAssignedClinic && cachedOwnId && (
-                                <>
-                                  <div className="border-t border-gray-200" />
-                                  <button
-                                    onClick={() => handlePractitionerSelect(cachedOwnId)}
-                                    className={`
-                                      w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
-                                      ${selectedPractitioner === cachedOwnId
-                                        ? 'bg-care-blue/10 text-care-blue font-semibold'
-                                        : 'text-gray-700'
-                                      }
-                                    `}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span>My Schedule</span>
-                                      {selectedPractitioner === cachedOwnId && (
-                                        <span className="text-care-blue text-base">✓</span>
-                                      )}
-                                    </div>
-                                  </button>
-                                </>
-                              )}
-
-                              {practitionerOptions.length === 0 ? (
-                                <div className="px-4 py-6 text-sm text-gray-500 text-center">
-                                  <p className="font-medium">No practitioners found</p>
-                                  {selectedClinicBranch && (
-                                    <p className="text-xs mt-1 text-gray-400">
-                                      No staff assigned to this branch yet.
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                practitionerOptions.map((practitioner) => (
-                                  <button
-                                    key={practitioner.id}
-                                    onClick={() => handlePractitionerSelect(practitioner.id)}
-                                    className={`
-                                      w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors
-                                      ${selectedPractitioner === practitioner.id
-                                        ? 'bg-care-blue/10 text-care-blue font-semibold'
-                                        : 'text-gray-700'
-                                      }
-                                    `}
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <div className="truncate">
-                                          {practitioner.name}
-                                          {practitioner.id === cachedOwnId && (
-                                            <span className="ml-1.5 text-xs text-care-blue font-medium">(me)</span>
-                                          )}
-                                        </div>
-                                        {practitioner.specialization && (
-                                          <div className="text-xs text-gray-500 mt-0.5 truncate">
-                                            {practitioner.specialization}
-                                          </div>
-                                        )}
-                                        {!selectedClinicBranch && practitioner.clinic_branch_name && (
-                                          <div className="text-xs text-care-blue mt-0.5 flex items-center gap-1">
-                                            <Building2 className="w-3 h-3" />
-                                            {practitioner.clinic_branch_name}
-                                          </div>
-                                        )}
-                                      </div>
-                                      {selectedPractitioner === practitioner.id && (
-                                        <span className="text-care-blue flex-shrink-0 text-base">✓</span>
-                                      )}
-                                    </div>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                          {!pendingWeekView && practitionerDropdownContent}
+                        </div>
+                      )
                     ) : (
                       /* ── Compare Mode: Two Practitioner Dropdowns ── */
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1198,62 +1248,11 @@ export const Diary: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Clear/Show All button outside dropdown:
-                        - Day View + specific branch: show 'Show All' to restore divided columns
-                        - Week/Month View: hidden since "Show All" is now in dropdown */}
-                    {!compareMode && selectedPractitioner !== null && view === 'day' && selectedClinicBranch !== null && (
-                      <button
-                        onClick={() => {
-                          setSelectedPractitioner(null);
-                          setShowFilterDropdown(false);
-                        }}
-                        className="text-xs text-care-blue hover:text-trust-harbor font-medium"
-                      >
-                        Show All
-                      </button>
-                    )}
-                  </div>
+
                 </div>
-
-                {/* View Switcher */}
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                  {(['day', 'week', 'month'] as CalendarView[]).map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => {
-                        setView(v);
-                        if (v === 'month') handleSetCompareMode(false);
-                        // Entering Day View: clear practitioner filter so divided
-                        // columns are the primary display on a specific branch.
-                        // Entering Day View: clear practitioner filter to enable split-column
-                        // mode for admins.  Preserve the logged-in practitioner's own filter
-                        // so they always see their own schedule (not the split-column layout).
-                        if (v === 'day' && selectedClinicBranch !== null && !cachedOwnId) setSelectedPractitioner(null);
-                      }}
-                      className={`
-                        px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
-                        ${view === v
-                          ? 'bg-white text-care-blue shadow-sm'
-                          : 'text-steady-slate hover:text-trust-harbor'
-                        }
-                      `}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Add Event Button removed — admin uses double-click / drag-select on calendar */}
-
-                {/* Live status indicator */}
-                {isCalendarLive && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full select-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    Live
-                  </span>
-                )}
               </div>
             </div>
+          </div>
 
             {/* Calendar */}
             <div className="flex-1 overflow-hidden p-4 bg-clinical-cloud">
