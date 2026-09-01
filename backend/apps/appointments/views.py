@@ -1751,7 +1751,7 @@ class PublicRebookingSlotsView(APIView):
 
         appt = link.appointment
         clinic = appt.clinic
-        practitioner = appt.practitioner
+        practitioner = appt.practitioner or getattr(appt.patient_case, 'primary_practitioner', getattr(appt.patient, 'primary_practitioner', None))
         service = appt.service
         duration = appt.duration_minutes or service.duration_minutes if service else 60
 
@@ -1827,23 +1827,49 @@ class PublicRebookingSlotsView(APIView):
                 m += SLOT_INTERVAL
 
         # Filter out booked appointments
+        from django.db import models
         booked_ranges = []
-        diary_qs = Appointment.objects.filter(
-            date=target_date,
-            clinic=clinic,
-            practitioner=practitioner,
-            status__in=['SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'],
-            is_deleted=False,
-            patient__is_archived=False,
-        )
+        
+        if practitioner:
+            # Filter by practitioner globally (across all branches), excluding ONLY CANCELLED
+            diary_qs = Appointment.objects.filter(
+                date=target_date,
+                practitioner=practitioner,
+                is_deleted=False,
+                patient__is_archived=False,
+            ).exclude(status='CANCELLED').exclude(id=appt.id)
+            
+            # Filter out blocked times for this practitioner OR clinic-wide blocks
+            block_qs = BlockAppointment.objects.filter(
+                date=target_date,
+                is_deleted=False,
+            ).filter(
+                models.Q(practitioner=practitioner) | 
+                models.Q(practitioner__isnull=True, clinic=clinic)
+            )
+        else:
+            # Fallback to clinic-wide if no practitioner assigned
+            diary_qs = Appointment.objects.filter(
+                date=target_date,
+                clinic=clinic,
+                practitioner__isnull=True,
+                is_deleted=False,
+                patient__is_archived=False,
+            ).exclude(status='CANCELLED').exclude(id=appt.id)
+            
+            block_qs = BlockAppointment.objects.filter(
+                clinic=clinic, 
+                date=target_date, 
+                practitioner__isnull=True,
+                is_deleted=False,
+            )
+
         for existing in diary_qs:
             booked_ranges.append((
                 parse_mins(existing.start_time.strftime('%H:%M')),
                 parse_mins(existing.end_time.strftime('%H:%M')),
             ))
 
-        # Filter out blocked times
-        block_qs = BlockAppointment.objects.filter(clinic=clinic, date=target_date)
         for block in block_qs:
             booked_ranges.append((
                 parse_mins(block.start_time.strftime('%H:%M')),
@@ -1982,10 +2008,75 @@ class PublicRebookingLinkView(APIView):
                       datetime.combine(new_date, new_start_time)).total_seconds() // 60)
         )
 
+        practitioner = original.practitioner or getattr(original.patient_case, 'primary_practitioner', getattr(original.patient, 'primary_practitioner', None))
+
+        # ── Backend Conflict Enforcement ────────────────────────────────────
+        from django.db import models
+        if practitioner:
+            conflicting_qs = Appointment.objects.filter(
+                date=new_date,
+                practitioner=practitioner,
+                is_deleted=False,
+                patient__is_archived=False,
+            ).exclude(status='CANCELLED').exclude(id=original.id)
+            
+            conflicting_blocks = BlockAppointment.objects.filter(
+                date=new_date,
+                is_deleted=False,
+            ).filter(
+                models.Q(practitioner=practitioner) | 
+                models.Q(practitioner__isnull=True, clinic=original.clinic)
+            )
+        else:
+            conflicting_qs = Appointment.objects.filter(
+                date=new_date,
+                clinic=original.clinic,
+                practitioner__isnull=True,
+                is_deleted=False,
+                patient__is_archived=False,
+            ).exclude(status='CANCELLED').exclude(id=original.id)
+            
+            conflicting_blocks = BlockAppointment.objects.filter(
+                clinic=original.clinic, 
+                date=new_date, 
+                practitioner__isnull=True,
+                is_deleted=False,
+            )
+            
+        def parse_mins(t) -> int:
+            return t.hour * 60 + t.minute
+
+        new_start_min = parse_mins(new_start_time)
+        new_end_min = parse_mins(new_end_time)
+        
+        has_conflict = False
+        for existing in conflicting_qs:
+            e_start = parse_mins(existing.start_time)
+            e_end = parse_mins(existing.end_time)
+            if new_start_min < e_end and new_end_min > e_start:
+                has_conflict = True
+                break
+                
+        if not has_conflict:
+            for block in conflicting_blocks:
+                b_start = parse_mins(block.start_time)
+                b_end = parse_mins(block.end_time)
+                if new_start_min < b_end and new_end_min > b_start:
+                    has_conflict = True
+                    break
+
+        if has_conflict:
+            return Response(
+                {'detail': 'The selected time slot is no longer available.', 'code': 'conflict'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        # ────────────────────────────────────────────────────────────────────
+
         # Create a new appointment instead of mutating the original
         new_appointment = Appointment.objects.create(
             clinic=original.clinic,
             patient=original.patient,
+            patient_case=original.patient_case,
             practitioner=original.practitioner,
             service=original.service,
             location=original.location,
