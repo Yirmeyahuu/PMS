@@ -64,10 +64,6 @@ class CanEditClinicalNote(permissions.BasePermission):
             elif user_clinic and user_clinic.parent_clinic:
                 return obj_clinic == user_clinic or obj_clinic == user_clinic.parent_clinic
             return False
-        
-        # Edit/Delete: Reject if note is finalized
-        if hasattr(obj, 'status') and obj.status == 'finalized':
-            return False
             
         # Admin can edit any note
         if user.is_admin:

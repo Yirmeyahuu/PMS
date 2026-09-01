@@ -92,13 +92,31 @@ class ClinicalNoteSerializer(serializers.ModelSerializer):
     created_by_phone = serializers.CharField(source='created_by.phone', read_only=True)
     created_by_clinic_name = serializers.CharField(source='created_by.clinic.name', read_only=True)
     created_by_avatar = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
     
+    def get_updated_by_name(self, obj):
+        # Return the person who created the latest version, fallback to creator/practitioner
+        versions = list(obj.versions.all())
+        if versions:
+            latest = max(versions, key=lambda v: v.created_at)
+            if latest.created_by:
+                return latest.created_by.get_full_name()
+        
+        if obj.created_by:
+            return obj.created_by.get_full_name()
+            
+        if obj.practitioner and obj.practitioner.user:
+            return obj.practitioner.user.get_full_name()
+            
+        return "System"
+
     class Meta:
         model = ClinicalNote
         fields = [
             'id', 'patient', 'patient_name', 'practitioner', 'practitioner_name', 'practitioner_avatar',
             'created_by', 'created_by_name', 'created_by_avatar',
             'created_by_title', 'created_by_email', 'created_by_phone', 'created_by_clinic_name',
+            'updated_by_name',
             'appointment', 'appointment_date', 'appointment_time', 'appointment_service', 'appointment_practitioner',
             'clinic', 'template', 'template_name', 'template_version', 'patient_case',
             'date', 'note_type', 'status', 'signed_at', 'last_autosave',

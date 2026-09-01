@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, FileText, Loader2, Save, Calendar, ClipboardList } from 'lucide-react';
-import { getActiveTemplates, createNote, getNote, getNotes } from '@/features/clinical-template/clinical-templates.api';
+import { getActiveTemplates, createNote, getNote, getNotes, updateNote } from '@/features/clinical-template/clinical-templates.api';
 import { getAppointments, getAppointment } from '@/features/appointments/appointment.api';
 import { DynamicFormRenderer } from '@/features/clinical-template/components/DynamicFormRenderer';
 import { ConfirmReplaceModal } from '@/features/clinical-documentation/components/ConfirmReplaceModal';
@@ -238,8 +238,13 @@ export const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ initialA
         noteData.practitioner = apptDetails.practitioner;
       }
 
-      await createNote(noteData);
-      toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
+      if (editorContext.type === 'EDIT_NOTE') {
+        await updateNote(editorContext.noteId, noteData);
+        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'updated'} successfully`);
+      } else {
+        await createNote(noteData);
+        toast.success(`Clinical note ${isFinalize ? 'finalized' : 'created'} successfully`);
+      }
 
       triggerRefresh();
       refreshCases(); // Update case session counts (e.g., 6 out of 8 Sessions)

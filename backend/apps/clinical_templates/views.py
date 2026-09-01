@@ -106,7 +106,9 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
     """
     
     queryset = ClinicalNote.objects.filter(is_deleted=False).select_related(
-        'patient', 'practitioner__user', 'appointment', 'template', 'clinic'
+        'patient', 'practitioner__user', 'appointment', 'template', 'clinic', 'created_by'
+    ).prefetch_related(
+        'versions', 'versions__created_by'
     )
     serializer_class = ClinicalNoteSerializer
     permission_classes = [IsAuthenticated]

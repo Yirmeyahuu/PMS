@@ -77,7 +77,7 @@ export const createNote = async (data: CreateClinicalNoteData): Promise<Clinical
 
 export const updateNote = async (
   id: number, 
-  data: Partial<{ content: Record<string, any>; date?: string; appointment?: number; amendment_reason?: string }>
+  data: Partial<CreateClinicalNoteData>
 ): Promise<ClinicalNote> => {
   const response = await axiosInstance.patch(`${BASE_URL}/notes/${id}/`, data);
   return response.data;

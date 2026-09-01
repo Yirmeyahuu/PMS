@@ -110,6 +110,7 @@ export interface ClinicalNote {
   chart_annotation_data: Record<string, { chart_type: string; doodle_data: Record<string, unknown>[] }> | null;
   created_at: string;
   updated_at: string;
+  updated_by_name?: string;
 }
 
 export interface CreateClinicalNoteData {
