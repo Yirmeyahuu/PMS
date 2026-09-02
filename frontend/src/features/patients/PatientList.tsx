@@ -10,7 +10,6 @@ interface PatientListProps {
   totalPages:  number;
   isArchived?: boolean;   // ← true when showing the archived list
   onPageChange: (page: number) => void;
-  onView:       (patient: Patient) => void;
   onEdit:       (patient: Patient) => void;
   onArchive?:   (patient: Patient) => void;
   onRestore?:   (patient: Patient) => void;
@@ -23,7 +22,6 @@ export const PatientList: React.FC<PatientListProps> = ({
   totalPages,
   isArchived = false,
   onPageChange,
-  onView,
   onEdit,
   onArchive,
   onRestore,
@@ -140,34 +138,31 @@ export const PatientList: React.FC<PatientListProps> = ({
                           <button
                             onClick={() => navigate(`/patients/${patient.id}/profile`)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                            title="Profile"
                           >
                             <ExternalLink className="w-4 h-4" />
-                            Profile
+                            <span className="hidden 2xl:inline">Profile</span>
                           </button>
                         )}
-                        <button
-                          onClick={() => onView(patient)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                          View
-                        </button>
+
                         {!isArchived && (
                           <button
                             onClick={() => onEdit(patient)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                            title="Edit"
                           >
                             <Edit className="w-4 h-4" />
-                            Edit
+                            <span className="hidden 2xl:inline">Edit</span>
                           </button>
                         )}
                         {!isArchived && onMerge && (
                           <button
                             onClick={() => onMerge(patient)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                            title="Merge"
                           >
                             <ArchiveRestore className="w-4 h-4" />
-                            Merge
+                            <span className="hidden 2xl:inline">Merge</span>
                           </button>
                         )}
 
@@ -176,17 +171,19 @@ export const PatientList: React.FC<PatientListProps> = ({
                           <button
                             onClick={() => onRestore?.(patient)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+                            title="Restore"
                           >
                             <ArchiveRestore className="w-4 h-4" />
-                            Restore
+                            <span className="hidden 2xl:inline">Restore</span>
                           </button>
                         ) : (
                           <button
                             onClick={() => onArchive?.(patient)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                            title="Archive"
                           >
                             <Archive className="w-4 h-4" />
-                            Archive
+                            <span className="hidden 2xl:inline">Archive</span>
                           </button>
                         )}
                       </div>

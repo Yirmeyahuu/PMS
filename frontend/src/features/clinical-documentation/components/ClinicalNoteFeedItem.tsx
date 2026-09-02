@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, FileText, Copy, X, ChevronDown, ChevronRight, Printer, Mail, Edit } from 'lucide-react';
+import { Loader2, Save, FileText, Copy, X, Printer, Mail, Edit } from 'lucide-react';
 import { usePatientProfileContext } from '@/features/patients/context/PatientProfileContext';
 import { useClinicalWorkspace } from '../context/ClinicalWorkspaceContext';
 import { createNote, updateNote } from '@/features/clinical-template/clinical-templates.api';
@@ -243,12 +243,8 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {!isNewNote && note && (
-              <div className="flex items-center gap-2 mr-2">
-                <span className="text-[10px] 2xl:text-xs font-medium text-slate-500">Created at {formatDate(note.created_at)}</span>
-              </div>
-            )}
+          <div className="flex items-center gap-1">
+
 
             {!isNewNote && note && (
               <>
@@ -304,14 +300,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               </button>
             )}
 
-            {!isNewNote && (
-              <button
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors ml-2"
-                title={isExpanded ? "Collapse Note" : "Expand Note"}
-              >
-                {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-              </button>
-            )}
+
           </div>
         </div>
 
