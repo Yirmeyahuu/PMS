@@ -210,7 +210,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             />
             <div>
               {appt && appt.date && appt.start_time && (
-                <p className="text-[15px] font-black text-slate-900 mb-1 tracking-tight">
+                <p className="text-xs 2xl:text-[15px] font-black text-slate-900 mb-1 tracking-tight">
                   {(() => {
                     try {
                       const [hours, minutes] = appt.start_time.split(':');
@@ -224,20 +224,20 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
                 </p>
               )}
               <div className="flex items-center gap-2">
-                <h4 className="text-base font-bold text-slate-800 tracking-tight">{practitionerName}</h4>
+                <h4 className="text-xs 2xl:text-sm font-bold text-slate-800 tracking-tight">{practitionerName}</h4>
                 {!isNewNote && note && note.status !== 'finalized' && (
                   <span className="inline-flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                     Drafted
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-600 font-medium">{note?.created_by_title || 'Practitioner'}</p>
+              <p className="text-[10px] 2xl:text-xs text-slate-600 font-medium">{note?.created_by_title || 'Practitioner'}</p>
               {(note?.created_by_email || note?.created_by_phone) && (
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   {[note.created_by_email, note.created_by_phone].filter(Boolean).join(' | ')}
                 </p>
               )}
-              <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
+              <p className="text-[10px] 2xl:text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
                 {note?.created_by_clinic_name || clinicBranchName}
               </p>
             </div>
@@ -246,7 +246,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
           <div className="flex items-center gap-3">
             {!isNewNote && note && (
               <div className="flex items-center gap-2 mr-2">
-                <span className="text-xs font-medium text-slate-500">Created at {formatDate(note.created_at)}</span>
+                <span className="text-[10px] 2xl:text-xs font-medium text-slate-500">Created at {formatDate(note.created_at)}</span>
               </div>
             )}
 
@@ -319,14 +319,14 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
         {isExpanded && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-5">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Session (Appointment)</label>
+              <label className="block text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Session (Appointment)</label>
               {isReadOnly ? (
-                <p className="text-sm font-medium text-slate-800">
+                <p className="text-xs 2xl:text-sm font-medium text-slate-800">
                   {appt ? (
                     <>
                       {formatDate(appt.date)} — {formatTime(appt.start_time)} — {appt.service_name}
                       {appt.case_session_number && (
-                        <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-2 border border-sky-200 inline-block">
+                        <span className="text-[10px] 2xl:text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-2 border border-sky-200 inline-block">
                           {appt.case_session_number}{appt.case_approved_sessions ? `/${appt.case_approved_sessions}` : ''} Session
                         </span>
                       )}
@@ -349,9 +349,9 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
               )}
             </div>
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
+              <label className="block text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
               {isReadOnly ? (
-                <p className="text-sm font-medium text-slate-800">{formatDate(noteDate)}</p>
+                <p className="text-xs 2xl:text-sm font-medium text-slate-800">{formatDate(noteDate)}</p>
               ) : (
                 <input
                   type="date"
@@ -363,11 +363,11 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Clinical Note Template</label>
+              <label className="block text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Clinical Note Template</label>
               {isReadOnly ? (
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-indigo-500" />
-                  <p className="text-sm font-semibold text-slate-900">{selectedTemplate?.name || 'N/A'}</p>
+                  <p className="text-xs 2xl:text-sm font-semibold text-slate-900">{selectedTemplate?.name || 'N/A'}</p>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -415,7 +415,7 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
       {/* FEED ITEM ACTIONS & FOOTER */}
       {isExpanded && !isReadOnly && (
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4 flex-shrink-0">
-          <span className="text-xs text-slate-400">Generated by Malasakit Systems</span>
+          <span className="text-[10px] 2xl:text-xs text-slate-400">Generated by Malasakit Systems</span>
           <div className="flex justify-end gap-3 w-full sm:w-auto">
             <button
               onClick={() => handleSave(false)}
@@ -436,16 +436,16 @@ export const ClinicalNoteFeedItem: React.FC<ClinicalNoteFeedItemProps> = ({
         </div>
       )}
       {isExpanded && isReadOnly && (
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-400 flex-shrink-0">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-[10px] 2xl:text-xs text-slate-400 flex-shrink-0">
           <span>Generated by Malasakit Systems</span>
           <div className="flex flex-col items-end gap-1">
             {note?.status === 'finalized' && note.signed_at && (
-              <span className="text-xs font-medium text-emerald-700">
+              <span className="text-[10px] 2xl:text-xs font-medium text-emerald-700">
                 Finalized at {format(new Date(note.signed_at), "MMMM d, yyyy 'at' h:mma")} by {note.created_by_name || note.practitioner_name || 'Practitioner'}
               </span>
             )}
             {note?.updated_at && note?.updated_by_name && (
-              <span className="text-[11px] text-slate-500 font-medium">
+              <span className="text-[10px] 2xl:text-[11px] text-slate-500 font-medium">
                 Last modified by {note.updated_by_name} at {format(new Date(note.updated_at), "MMMM d, yyyy 'at' h:mma")}
               </span>
             )}

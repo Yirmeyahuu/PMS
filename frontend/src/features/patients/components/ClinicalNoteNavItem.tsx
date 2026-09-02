@@ -72,10 +72,10 @@ export const ClinicalNoteNavItem = () => {
         to={`/patients/${patient?.id}/clinical`}
         className={({ isActive }) => {
           const active = isCustomActive !== undefined ? isCustomActive : isActive;
-          return `flex items-center justify-between rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ${
+          return `flex items-center justify-between px-4 py-2 text-xs font-medium transition-colors ${
             active
-              ? 'bg-sky-600 text-white shadow-sm'
-              : 'text-gray-600 hover:bg-sky-50 hover:text-sky-700'
+              ? 'bg-sky-700 text-white shadow-sm'
+              : 'text-sky-50 hover:bg-sky-300 hover:text-sky-900'
           }`;
         }}
       >

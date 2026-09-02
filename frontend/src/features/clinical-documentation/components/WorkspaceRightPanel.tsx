@@ -118,7 +118,7 @@ export const WorkspaceRightPanel = () => {
       <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto hide-scrollbar flex-shrink-0">
         <button
           onClick={() => setActiveRightTab('history')}
-          className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+          className={`flex-1 min-w-[100px] py-2.5 text-xs 2xl:text-sm font-semibold transition-colors ${
             activeRightTab === 'history' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -126,7 +126,7 @@ export const WorkspaceRightPanel = () => {
         </button>
         <button
           onClick={() => setActiveRightTab('documents')}
-          className={`flex-1 min-w-[100px] py-2.5 text-sm font-semibold transition-colors ${
+          className={`flex-1 min-w-[100px] py-2.5 text-xs 2xl:text-sm font-semibold transition-colors ${
             activeRightTab === 'documents' ? 'bg-white border-t-2 border-t-sky-600 text-sky-600' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -134,18 +134,18 @@ export const WorkspaceRightPanel = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto p-2 lg:p-4 bg-slate-50/50">
         {loading ? (
           <div className="flex justify-center p-8">
             <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
           </div>
         ) : activeRightTab === 'history' ? (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="w-full space-y-4">
             {notes.length === 0 ? (
               <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <h3 className="text-lg font-medium text-slate-600 mb-2">No Clinical Notes Found</h3>
-                <p className="text-sm">There are no finalized or drafted clinical notes for this case.</p>
+                <h3 className="text-base 2xl:text-lg font-medium text-slate-600 mb-2">No Clinical Notes Found</h3>
+                <p className="text-xs 2xl:text-sm">There are no finalized or drafted clinical notes for this case.</p>
               </div>
             ) : (
               <>
@@ -155,7 +155,7 @@ export const WorkspaceRightPanel = () => {
                       const currentCase = cases.find(c => c.id === selectedCaseId);
                       if (currentCase && currentCase.session_source === 'PACKAGE') {
                         return (
-                          <span className="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
+                          <span className="text-xs 2xl:text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
                             {currentCase.is_unlimited || !currentCase.approved_sessions
                               ? `${currentCase.completed_sessions} Session${currentCase.completed_sessions !== 1 ? 's' : ''}`
                               : `${currentCase.completed_sessions} out of ${currentCase.approved_sessions} Sessions`}
@@ -211,11 +211,11 @@ export const WorkspaceRightPanel = () => {
             )}
           </div>
         ) : activeRightTab === 'documents' ? (
-          <div className="max-w-4xl mx-auto flex flex-col min-h-full">
+          <div className="w-full flex flex-col min-h-full">
             <div className="flex justify-end mb-4">
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-xs 2xl:text-sm transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 Add Documents

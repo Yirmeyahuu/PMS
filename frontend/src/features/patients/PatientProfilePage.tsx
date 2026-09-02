@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Archive,
@@ -17,9 +17,7 @@ import { usePatientProfileContext } from './context/PatientProfileContext';
 import {
   formatDate,
   formatDateTime,
-  getAppointmentIdsWithNotes,
   getGenderLabel,
-  getPatientProfileStats,
 } from './patientProfile.utils.tsx';
 import type { CreatePatientData } from '@/types';
 
@@ -92,11 +90,8 @@ const ConfirmDialog = ({
 
 export const PatientProfilePage = () => {
   const {
-    clinicalNotes,
-    cases,
     loadingPatient,
     refreshPatient,
-    appointments,
     patient,
   } = usePatientProfileContext();
 
@@ -104,53 +99,6 @@ export const PatientProfilePage = () => {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
-
-  const appointmentIdsWithNotes = useMemo(() => getAppointmentIdsWithNotes(clinicalNotes), [clinicalNotes]);
-
-  const stats = useMemo(
-    () => getPatientProfileStats(appointments, appointmentIdsWithNotes),
-    [appointments, appointmentIdsWithNotes]
-  );
-
-  const caseCount = cases.length;
-
-  const cards = [
-    {
-      title: 'Card 1',
-      subtitle: 'Total Sessions',
-      value: stats.total,
-      valueClass: 'text-gray-900',
-      bgClass: 'bg-white border-gray-200',
-    },
-    {
-      title: 'Card 2',
-      subtitle: 'Completed',
-      value: stats.completed,
-      valueClass: 'text-green-700',
-      bgClass: 'bg-green-50 border-green-200',
-    },
-    {
-      title: 'Card 3',
-      subtitle: 'Upcoming',
-      value: stats.upcoming,
-      valueClass: 'text-sky-700',
-      bgClass: 'bg-sky-50 border-sky-200',
-    },
-    {
-      title: 'Card 4',
-      subtitle: 'Unfinished Notes',
-      value: stats.unfinished,
-      valueClass: 'text-orange-700',
-      bgClass: 'bg-orange-50 border-orange-200',
-    },
-    {
-      title: 'Card 5',
-      subtitle: 'Active Cases',
-      value: caseCount,
-      valueClass: 'text-purple-700',
-      bgClass: 'bg-purple-50 border-purple-200',
-    },
-  ];
 
   const handleSavePatient = async (data: CreatePatientData) => {
     if (!patient) return;
@@ -263,16 +211,6 @@ export const PatientProfilePage = () => {
             </p>
           </div>
         )}
-
-        <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-          {cards.map((card) => (
-            <div key={card.title} className={`${card.bgClass} border rounded-xl p-4`}>
-              <p className="text-[11px] text-gray-500 mb-1">{card.title}</p>
-              <p className={`text-2xl font-bold ${card.valueClass}`}>{card.value}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{card.subtitle}</p>
-            </div>
-          ))}
-        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="bg-white border border-gray-200 rounded-xl p-4">

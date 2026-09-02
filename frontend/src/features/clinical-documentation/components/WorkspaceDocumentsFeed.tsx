@@ -21,8 +21,8 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
     return (
       <div className="text-center py-20 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
         <Files className="w-12 h-12 mx-auto mb-4 opacity-20" />
-        <h3 className="text-lg font-medium text-slate-600 mb-2">No Documents Found</h3>
-        <p className="text-sm">There are no uploaded files, consent forms, or attachments for this case.</p>
+        <h3 className="text-base 2xl:text-lg font-medium text-slate-600 mb-2">No Documents Found</h3>
+        <p className="text-xs 2xl:text-sm">There are no uploaded files, consent forms, or attachments for this case.</p>
       </div>
     );
   }
@@ -75,10 +75,10 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
             {isConsent ? <ShieldCheck className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-slate-900 truncate">
+            <h4 className="text-xs 2xl:text-sm font-semibold text-slate-900 truncate">
               {isConsent ? doc.consent_document_name : doc.title}
             </h4>
-            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+            <p className="text-[10px] 2xl:text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
               {isConsent && (
                 <>
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-700">
@@ -121,19 +121,19 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
             <div className="flex items-center gap-2 mb-4 -ml-[25px] bg-slate-50 py-1 pr-4 rounded-r-full max-w-max">
               <div className="w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-50 shadow-sm" />
               {appt ? (
-                <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <span className="text-xs 2xl:text-sm font-medium text-slate-700 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-indigo-500" />
                   Appointment: {new Date(appt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   <span className="text-slate-400">•</span>
                   {appt.start_time}
                   {appt.case_session_number && (
-                    <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-1 border border-sky-200">
+                    <span className="text-[10px] 2xl:text-xs font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-md ml-1 border border-sky-200">
                       {appt.case_session_number}{appt.case_approved_sessions ? `/${appt.case_approved_sessions}` : ''} Session
                     </span>
                   )}
                 </span>
               ) : (
-                <span className="text-sm font-medium text-slate-700">Unknown Session</span>
+                <span className="text-xs 2xl:text-sm font-medium text-slate-700">Unknown Session</span>
               )}
             </div>
             
@@ -146,7 +146,7 @@ export const WorkspaceDocumentsFeed: React.FC<WorkspaceDocumentsFeedProps> = ({ 
 
       {unassigned.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
+          <h3 className="text-xs 2xl:text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
             <Files className="w-4 h-4" />
             Case Level Documents
           </h3>

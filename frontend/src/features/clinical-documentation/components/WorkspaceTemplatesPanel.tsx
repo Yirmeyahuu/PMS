@@ -96,7 +96,7 @@ export const WorkspaceTemplatesPanel = () => {
               </h4>
               <div className="h-px flex-1 bg-slate-200/60" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               {filteredTemplates
                 .filter(t => t.discipline === discipline)
                 .map(template => (

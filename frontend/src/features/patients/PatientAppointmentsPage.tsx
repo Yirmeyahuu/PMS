@@ -18,6 +18,7 @@ import {
   getStrictAppointmentStatus,
   getPaymentStatus,
   formatDate,
+  getPatientProfileStats,
 } from './patientProfile.utils.tsx';
 import type { Appointment } from '@/types';
 
@@ -240,6 +241,35 @@ export const PatientAppointmentsPage = () => {
 
   const appointmentIdsWithNotes = useMemo(() => getAppointmentIdsWithNotes(clinicalNotes), [clinicalNotes]);
 
+  const stats = useMemo(
+    () => getPatientProfileStats(appointments, appointmentIdsWithNotes),
+    [appointments, appointmentIdsWithNotes]
+  );
+
+  const cards = [
+    {
+      title: 'Appointments',
+      subtitle: 'Total Sessions',
+      value: stats.total,
+      valueClass: 'text-gray-900',
+      bgClass: 'bg-white border-gray-200',
+    },
+    {
+      title: 'Appointments',
+      subtitle: 'Completed',
+      value: stats.completed,
+      valueClass: 'text-green-700',
+      bgClass: 'bg-green-50 border-green-200',
+    },
+    {
+      title: 'Appointments',
+      subtitle: 'Upcoming',
+      value: stats.upcoming,
+      valueClass: 'text-sky-700',
+      bgClass: 'bg-sky-50 border-sky-200',
+    },
+  ];
+
   const filteredAppointments = useMemo(() => {
     return appointments.filter((appointment) => {
       const hasNote = appointmentIdsWithNotes.has(appointment.id);
@@ -401,6 +431,16 @@ export const PatientAppointmentsPage = () => {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {cards.map((card) => (
+            <div key={card.subtitle} className={`${card.bgClass} border rounded-xl p-4`}>
+              <p className="text-[11px] text-gray-500 mb-1">{card.title}</p>
+              <p className={`text-2xl font-bold ${card.valueClass}`}>{card.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{card.subtitle}</p>
+            </div>
+          ))}
         </div>
 
         <div className="bg-white border border-gray-200 rounded-2xl p-4">
