@@ -45,7 +45,7 @@ export const About: React.FC = () => {
             Built for Healthcare Professionals
           </h2>
           <p className="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed font-body">
-            We understand the challenges of running a modern practice. That's why we created 
+            We understand the challenges of running a modern practice. That's why we created
             a platform that combines simplicity with powerful features.
           </p>
         </div>
@@ -77,12 +77,12 @@ export const About: React.FC = () => {
         <div className="mt-16 bg-gradient-to-r from-clinical-cloud to-care-blue/5 rounded-3xl p-10 sm:p-12">
           <div className="max-w-3xl mx-auto text-center">
             <p className="text-lg sm:text-xl text-gray-600 leading-relaxed font-body">
-              Founded by healthcare professionals and technologists, Malasakit EMR Solution was born from 
-              firsthand experience with outdated practice management systems. We believe 
+              Founded by healthcare professionals and technologists, Malasakit was born from
+              firsthand experience with outdated practice management systems. We believe
               that technology should enhance patient care, not complicate it.
             </p>
             <p className="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed font-body">
-              Today, we serve over 10,000 practitioners across multiple specialties, 
+              Today, we serve over 10,000 practitioners across multiple specialties,
               helping them save time, reduce errors, and focus on what matters most—their patients.
             </p>
           </div>
