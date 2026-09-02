@@ -904,10 +904,13 @@ export const Diary: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="h-full flex flex-col overflow-hidden">
+      {/* Scrollable container for smaller screens */}
+      <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+        {/* Fixed minimum width to maintain desktop-like calendar layout */}
+        <div className="h-full flex flex-col min-w-[1024px]">
 
-        {/* ── Branch Tabs ── */}
-        {branches.length > 0 && (
+          {/* ── Branch Tabs ── */}
+          {branches.length > 0 && (
           <div className="flex-shrink-0 bg-clinical-cloud border-b border-gray-200">
             <div className="flex items-center overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
 
@@ -1035,7 +1038,7 @@ export const Diary: React.FC = () => {
                   
                   {/* Date Controls */}
                   <div className="flex items-center gap-2 mr-2">
-                    <h2 className="text-lg font-semibold text-trust-harbor mr-2">
+                    <h2 className="text-sm md:text-base lg:text-lg font-semibold text-trust-harbor mr-2">
                       {dateRangeText}
                     </h2>
                     <div className="flex items-center gap-1">
@@ -1047,7 +1050,7 @@ export const Diary: React.FC = () => {
                       </button>
                       <button
                         onClick={handleToday}
-                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                        className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                       >
                         Today
                       </button>
@@ -1081,7 +1084,7 @@ export const Diary: React.FC = () => {
                               }
                             }}
                             className={`
-                              flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
+                              flex items-center gap-1.5 px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-md transition-all capitalize
                               ${(view === 'week' || pendingWeekView)
                                 ? 'bg-white text-care-blue shadow-sm'
                                 : 'text-steady-slate hover:text-trust-harbor'
@@ -1106,7 +1109,7 @@ export const Diary: React.FC = () => {
                           if (v === 'day' && selectedClinicBranch !== null && !cachedOwnId) setSelectedPractitioner(null);
                         }}
                         className={`
-                          px-4 py-2 text-sm font-medium rounded-md transition-all capitalize
+                          px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-md transition-all capitalize
                           ${view === v
                             ? 'bg-white text-care-blue shadow-sm'
                             : 'text-steady-slate hover:text-trust-harbor'
@@ -1130,7 +1133,7 @@ export const Diary: React.FC = () => {
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                             disabled={loadingPractitioners}
                             className={`
-                              flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors
+                              flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-lg border transition-colors
                               ${selectedPractitioner
                                 ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
                                 : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
@@ -1158,7 +1161,7 @@ export const Diary: React.FC = () => {
                           <button
                             onClick={() => setShowCompareDropdownA(!showCompareDropdownA)}
                             disabled={loadingPractitioners}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors
+                            className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-lg border transition-colors
                               ${comparePractitioners[0]
                                 ? 'bg-care-blue/10 text-care-blue border-care-blue/30 hover:bg-care-blue/20'
                                 : 'bg-white text-trust-harbor border-gray-300 hover:bg-gray-50'
@@ -1195,14 +1198,14 @@ export const Diary: React.FC = () => {
                           )}
                         </div>
 
-                        <span className="text-gray-400 font-bold text-sm">vs</span>
+                        <span className="text-gray-400 font-bold text-xs md:text-sm">vs</span>
 
                         {/* Practitioner B Dropdown */}
                         <div className="relative">
                           <button
                             onClick={() => setShowCompareDropdownB(!showCompareDropdownB)}
                             disabled={loadingPractitioners}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors
+                            className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium rounded-lg border transition-colors
                               ${comparePractitioners[1]
                                 ? 'bg-violet-50 text-violet-700 border-violet-300 hover:bg-violet-100'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -1523,6 +1526,7 @@ export const Diary: React.FC = () => {
           }}
         />
       )}
+      </div>
     </DashboardLayout>
   );
 };

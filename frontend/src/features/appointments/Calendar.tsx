@@ -1126,7 +1126,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
     return (
       <div
         key={i}
-        className={`h-5 px-1.5 text-[9px] tracking-tighter font-medium text-right flex items-start justify-end pt-0.5
+        className={`h-5 px-1 md:px-1.5 text-[8px] md:text-[9px] tracking-tighter font-medium text-right flex items-start justify-end pt-0.5
           ${slot.quarter === 0 ? 'border-t border-gray-300 text-gray-500' : 'border-t border-gray-100 text-gray-400'}
           bg-gray-50`}
       >
@@ -2375,7 +2375,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
 
             {/* Day header */}
             <div className="flex-shrink-0 p-3 border-b border-gray-200 bg-gray-50 text-center">
-              <h3 className="text-base font-semibold text-gray-900">
+              <h3 className="text-sm md:text-base font-semibold text-gray-900">
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
               </h3>
               <p className="text-xs text-sky-600 font-medium mt-0.5">Compare Mode — side-by-side schedules</p>
@@ -2385,9 +2385,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
             <div className="flex-shrink-0 grid grid-cols-[55px_1fr_1fr] border-b border-gray-200">
               <div className="bg-gray-50 border-r border-gray-200" />
               {/* Prac A header */}
-              <div className="py-3 px-4 bg-sky-50 border-r border-gray-200 text-center">
-                <div className="text-sm font-bold text-sky-700 truncate">{nameA}</div>
-                <div className="flex items-center justify-center gap-2 mt-1 text-xs text-sky-500">
+              <div className="py-2 md:py-3 px-2 md:px-4 bg-sky-50 border-r border-gray-200 text-center">
+                <div className="text-xs md:text-sm font-bold text-sky-700 truncate">{nameA}</div>
+                <div className="flex items-center justify-center gap-2 mt-1 text-[10px] md:text-xs text-sky-500">
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-white border border-sky-300 inline-block" />
                     Duty
@@ -2399,9 +2399,9 @@ const CalendarComponent: React.FC<CalendarProps> = ({
                 </div>
               </div>
               {/* Prac B header */}
-              <div className="py-3 px-4 bg-violet-50 text-center">
-                <div className="text-sm font-bold text-violet-700 truncate">{nameB}</div>
-                <div className="flex items-center justify-center gap-2 mt-1 text-xs text-violet-500">
+              <div className="py-2 md:py-3 px-2 md:px-4 bg-violet-50 text-center">
+                <div className="text-xs md:text-sm font-bold text-violet-700 truncate">{nameB}</div>
+                <div className="flex items-center justify-center gap-2 mt-1 text-[10px] md:text-xs text-violet-500">
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-white border border-violet-300 inline-block" />
                     Duty
@@ -2692,7 +2692,7 @@ const CalendarComponent: React.FC<CalendarProps> = ({
         <div className={`flex flex-col h-full rounded-xl border overflow-hidden ${isDayAvailable ? 'bg-white border-gray-200' : 'bg-trust-harbor/5 border-trust-harbor/20'}`}>
           <div className={`flex-shrink-0 p-4 border-b ${isDayAvailable ? 'border-gray-200 bg-gray-50' : 'border-trust-harbor/20 bg-trust-harbor/10'}`}>
             <div className="text-center">
-              <h3 className={`text-lg font-semibold ${isDayAvailable ? 'text-gray-900' : 'text-trust-harbor'}`}>
+              <h3 className={`text-base md:text-lg font-semibold ${isDayAvailable ? 'text-gray-900' : 'text-trust-harbor'}`}>
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
               </h3>
               {!isDayAvailable && (

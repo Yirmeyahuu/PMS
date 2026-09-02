@@ -42,9 +42,10 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
 
   return (
     <DashboardLayout>
-      <div className="h-full p-4 overflow-hidden flex flex-col">
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
-          <aside className="w-full lg:w-64 xl:w-72 flex-shrink-0 overflow-y-auto">
+      <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+        <div className="h-full p-4 overflow-hidden flex flex-col min-w-[1024px]">
+          <div className="flex-1 flex flex-row gap-4 min-h-0">
+            <aside className="w-64 xl:w-72 flex-shrink-0 overflow-y-auto">
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
               <div className="text-center border-b border-gray-100 pb-4 mb-4">
                 <div className="mx-auto flex justify-center mb-3">
@@ -135,6 +136,7 @@ const PatientProfileShell = ({ patientId }: { patientId: number }) => {
           <section className="flex-1 min-h-0 overflow-y-auto flex flex-col relative">
             <Outlet />
           </section>
+          </div>
         </div>
       </div>
     </DashboardLayout>

@@ -76,13 +76,13 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4 animate-pulse min-h-[120px]">
-            <div className="h-8 w-8 bg-gray-200 rounded-xl mb-3"></div>
-            <div className="h-3 bg-gray-200 rounded w-2/3 mb-2"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+          <div key={i} className="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4 animate-pulse min-h-[100px] sm:min-h-[120px]">
+            <div className="h-6 w-6 sm:h-8 sm:w-8 bg-gray-200 rounded-xl mb-2 sm:mb-3"></div>
+            <div className="h-2.5 sm:h-3 bg-gray-200 rounded w-2/3 mb-1.5 sm:mb-2"></div>
+            <div className="h-6 sm:h-8 bg-gray-200 rounded w-1/2 mb-1.5 sm:mb-2"></div>
+            <div className="h-2.5 sm:h-3 bg-gray-200 rounded w-3/4"></div>
           </div>
         ))}
       </div>
@@ -90,7 +90,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
@@ -99,7 +99,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
             className={`
               bg-white rounded-2xl border border-gray-100 
               p-3 sm:p-4 hover:shadow-md shadow-sm transition-all duration-300 group 
-              flex flex-col justify-between overflow-hidden min-h-[120px]
+              flex flex-col justify-between overflow-hidden min-h-[100px] sm:min-h-[120px]
             `}
           >
             {/* Top Section: Icon + Badge */}

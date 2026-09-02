@@ -75,10 +75,10 @@ export const RightUtilityRail: React.FC = () => {
 
   return (
     <>
-      {/* ── DESKTOP RAIL (lg and up) ── */}
+      {/* ── RAIL (All screens) ── */}
       {/* Always 32px wide tab bar */}
       <aside
-        className="hidden lg:flex flex-col flex-shrink-0 h-full w-8 bg-white border-l border-gray-100 relative z-30 shadow-[-4px_0_20px_rgba(0,0,0,0.05)]"
+        className="flex flex-col flex-shrink-0 h-full w-8 bg-white border-l border-gray-100 relative z-30 shadow-[-4px_0_20px_rgba(0,0,0,0.05)]"
       >
 
 
@@ -133,41 +133,6 @@ export const RightUtilityRail: React.FC = () => {
         </button>
       </aside>
 
-      {/* ── MOBILE FALLBACKS (Visible only on small screens < lg) ── */}
-      {/* Floating Triggers */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-40 flex flex-col gap-3">
-        {showMessages && (
-          <button
-            onClick={() => setActivePanel(prev => prev === 'MESSAGES' ? 'NONE' : 'MESSAGES')}
-            className={`w-12 h-12 text-white rounded-full shadow-xl flex items-center justify-center relative transition-colors ${activePanel === 'MESSAGES' ? 'bg-green-700' : 'bg-green-600 hover:bg-green-700'}`}
-          >
-            <MessageSquare className="w-5 h-5" />
-            {msgUnread > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
-                {msgUnread > 99 ? '99+' : msgUnread}
-              </span>
-            )}
-          </button>
-        )}
-        <button
-          onClick={() => setActivePanel(prev => prev === 'NOTIFICATIONS' ? 'NONE' : 'NOTIFICATIONS')}
-          className={`w-12 h-12 text-white rounded-full shadow-xl flex items-center justify-center relative transition-colors ${activePanel === 'NOTIFICATIONS' ? 'bg-yellow-600' : 'bg-yellow-500 hover:bg-yellow-600'}`}
-        >
-          <Bell className="w-5 h-5" />
-          {notifUnread > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
-              {notifUnread > 99 ? '99+' : notifUnread}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setIsSupportOpen(true)}
-          className="w-12 h-12 text-white rounded-full shadow-xl flex items-center justify-center relative transition-colors bg-blue-500 hover:bg-blue-600"
-          aria-label="Customer Service and Feedback"
-        >
-          <Headphones className="w-5 h-5" />
-        </button>
-      </div>
 
       {/* Universal Modal Wrappers */}
       {activePanel !== 'NONE' && (

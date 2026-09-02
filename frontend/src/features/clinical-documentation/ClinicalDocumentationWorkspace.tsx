@@ -49,9 +49,11 @@ const ClinicalWorkspaceLayout = () => {
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4 p-4">
-          {/* Left Panel: Templates / Letters / Editor */}
-          <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
+        {/* Horizontal scroll wrapper for smaller screens */}
+        <div className="flex-1 w-full overflow-x-auto overflow-y-hidden">
+          <div className="h-full flex flex-row gap-4 p-4 min-w-[1440px]">
+            {/* Left Panel: Templates / Letters / Editor */}
+            <div className="w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             {isEditorActive ? (
               isLetterEditorActive ? (
                 <ClinicalLetterEditor initialAppointmentId={state?.appointmentId} />
@@ -87,8 +89,9 @@ const ClinicalWorkspaceLayout = () => {
           </div>
 
           {/* Right Panel: Content Feed */}
-          <div className="w-full md:w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
+          <div className="w-1/2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 transition-all duration-300">
             <WorkspaceRightPanel />
+          </div>
           </div>
         </div>
       </div>
