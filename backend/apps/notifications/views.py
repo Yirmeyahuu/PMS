@@ -281,10 +281,22 @@ class CommunicationLogViewSet(viewsets.ReadOnlyModelViewSet):
         if date_to:
             qs = qs.filter(created_at__date__lte=date_to)
 
-        # Branch filter
-        branch_id = self.request.query_params.get('branch')
+        # Branch / Clinic filter & cross-clinic patient validation (Part 18)
+        branch_id  = self.request.query_params.get('branch') or self.request.query_params.get('clinic')
+        patient_id = self.request.query_params.get('patient')
+
         if branch_id:
             qs = qs.filter(clinic_id=branch_id)
+
+        if branch_id and patient_id:
+            # Backend validation: verify that patient belongs to this clinic branch
+            from apps.patients.models import Patient
+            from django.db.models import Q
+            patient_in_branch = Patient.objects.filter(
+                Q(id=patient_id) & (Q(home_branch_id=branch_id) | (Q(home_branch__isnull=True) & Q(clinic_id=branch_id)))
+            ).exists()
+            if not patient_in_branch:
+                return CommunicationLog.objects.none()
 
         # Appointment status filter
         appointment_status = self.request.query_params.get('appointment_status')

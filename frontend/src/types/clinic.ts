@@ -21,6 +21,7 @@ export interface ClinicBranch {
   logo?: string | null;
   email_notifications_enabled?: boolean;
   sms_notifications_enabled?: boolean;
+  patient_count?: number;
 }
 
 export interface ClinicBranchesResponse {

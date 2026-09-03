@@ -52,6 +52,16 @@ class ClinicViewSet(viewsets.ModelViewSet):
         if user.is_manager:
             allowed_branches = list(user.branch_accesses.values_list('branch_id', flat=True))
             return self.queryset.filter(Q(id=user.clinic_id) | Q(id__in=allowed_branches))
+
+        if user.clinic and (
+            user.has_feature_permission('manage_communications', 'edit') or
+            user.has_feature_permission('setup_communication', 'edit') or
+            user.has_feature_permission('communication', 'edit')
+        ):
+            main_clinic = user.clinic.main_clinic
+            return self.queryset.filter(
+                Q(id=main_clinic.id) | Q(parent_clinic=main_clinic)
+            )
             
         return self.queryset.filter(id=user.clinic_id) if user.clinic else self.queryset.none()
 

@@ -50,9 +50,13 @@ def send_appointment_reminder_email(appointment) -> tuple[bool, str]:
         logger.info(msg)
         return False, msg
 
-    _notif_clinic = getattr(clinic, 'main_clinic', clinic)
-    if not getattr(_notif_clinic, 'email_notifications_enabled', True):
-        msg = f"Clinic {_notif_clinic.id} has email notifications disabled — skipping reminder for appointment {appointment.id}."
+    if not getattr(clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {clinic.id} ({clinic.name}) has email notifications disabled — skipping reminder for appointment {appointment.id}."
+        logger.info(msg)
+        return False, msg
+
+    if not getattr(patient, 'send_email_notifications', True):
+        msg = f"Patient {patient.id} has email notifications disabled — skipping reminder for appointment {appointment.id}."
         logger.info(msg)
         return False, msg
 
@@ -215,6 +219,16 @@ def send_appointment_cancellation_email(appointment, cancellation_reason: str) -
     if not recipient_email:
         msg = f"Patient {patient.id} has no email — cancellation email skipped."
         logger.warning(msg)
+        return False, msg
+
+    if not getattr(clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {clinic.id} ({clinic.name}) has email notifications disabled — cancellation email skipped."
+        logger.info(msg)
+        return False, msg
+
+    if not getattr(patient, 'send_email_notifications', True):
+        msg = f"Patient {patient.id} has email notifications disabled — cancellation email skipped."
+        logger.info(msg)
         return False, msg
 
     # ── Build context ─────────────────────────────────────────────────────

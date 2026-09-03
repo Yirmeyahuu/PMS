@@ -56,17 +56,18 @@ def _get_portal_booking_url(clinic) -> str:
 
 
 def _should_send(clinic, patient, channel: str) -> bool:
-    """Check master switches at clinic and patient level."""
-    main_clinic = clinic.main_clinic
-
+    """
+    Check master switches at branch/clinic and patient level.
+    Branch settings operate independently (e.g. Main Clinic ON, Branch OFF).
+    """
     if channel in ('EMAIL', 'BOTH'):
-        if not main_clinic.email_notifications_enabled:
+        if not getattr(clinic, 'email_notifications_enabled', True):
             return False
         if not getattr(patient, 'send_email_notifications', True):
             return False
 
     if channel in ('SMS', 'BOTH'):
-        if not main_clinic.sms_notifications_enabled:
+        if not getattr(clinic, 'sms_notifications_enabled', False):
             return False
         if not getattr(patient, 'sms_notifications_enabled', False):
             return False

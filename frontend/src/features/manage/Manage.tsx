@@ -161,7 +161,8 @@ export const Manage: React.FC = () => {
                 'edit' access → fully interactive. */}
             <div 
               className={`flex-1 h-full flex flex-col min-h-0 relative ${
-                activeCategory === 'clinical' && activeItem === 'clinical2' 
+                (activeCategory === 'clinical' && activeItem === 'clinical2') ||
+                (activeCategory === 'communications' && activeItem === 'comm2')
                   ? 'overflow-hidden' 
                   : 'overflow-y-auto'
               }`}

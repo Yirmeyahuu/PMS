@@ -268,6 +268,18 @@ class PatientViewSet(viewsets.ModelViewSet):
             
             base_qs = base_qs.filter(home_branch_id__in=assigned_branches)
 
+        # ── Clinic / Branch scoping filter ─────────────────────────────────
+        branch_id = (
+            self.request.query_params.get('branch') or
+            self.request.query_params.get('home_branch') or
+            self.request.query_params.get('clinic_branch')
+        )
+        if branch_id:
+            from django.db.models import Q
+            base_qs = base_qs.filter(
+                Q(home_branch_id=branch_id) | (Q(home_branch__isnull=True) & Q(clinic_id=branch_id))
+            )
+
         # ── Default: exclude archived patients unless explicitly requested ──
         # Pass ?include_archived=true  → return ALL (active + archived)
         # Pass ?archived=true          → return ONLY archived

@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 class ClinicBranchSerializer(serializers.ModelSerializer):
     """Lightweight serializer for clinic branches"""
 
-    is_branch   = serializers.BooleanField(read_only=True)
-    parent_name = serializers.CharField(source='parent_clinic.name', read_only=True)
+    is_branch     = serializers.BooleanField(read_only=True)
+    parent_name   = serializers.CharField(source='parent_clinic.name', read_only=True)
+    patient_count = serializers.SerializerMethodField()
 
     class Meta:
         model  = Clinic
@@ -21,8 +22,18 @@ class ClinicBranchSerializer(serializers.ModelSerializer):
             'email', 'phone', 'address', 'postal_code', 'website', 'tin',
             'custom_location', 'latitude', 'longitude',
             'email_notifications_enabled', 'sms_notifications_enabled',
+            'patient_count',
         ]
-        read_only_fields = ['id', 'branch_code', 'is_branch', 'parent_name']
+        read_only_fields = ['id', 'branch_code', 'is_branch', 'parent_name', 'patient_count']
+
+    def get_patient_count(self, obj) -> int:
+        from apps.patients.models import Patient
+        from django.db.models import Q
+        return Patient.objects.filter(
+            Q(home_branch=obj) | (Q(home_branch__isnull=True) & Q(clinic=obj)),
+            is_deleted=False,
+            is_archived=False,
+        ).distinct().count()
 
 
 class ClinicSerializer(serializers.ModelSerializer):

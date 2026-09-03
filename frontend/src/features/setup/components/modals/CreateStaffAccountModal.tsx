@@ -113,6 +113,28 @@ const hasScheduleConflict = (blocks: { start: string; end: string }[]): boolean 
 const makeDefaultSchedule = (days: DutyDay[]): DutySchedule =>
   Object.fromEntries(days.map(d => [d, [{ start: '08:00', end: '17:00' }]])) as DutySchedule;
 
+const generateTimeOptions = () => {
+  const options = [];
+  for (let i = 0; i < 24; i++) {
+    for (let j = 0; j < 60; j += 15) {
+      const h24 = String(i).padStart(2, '0');
+      const m = String(j).padStart(2, '0');
+      const ampm = i >= 12 ? 'PM' : 'AM';
+      const h12 = i % 12 === 0 ? 12 : i % 12;
+      const h12Str = String(h12).padStart(2, '0');
+      options.push({
+        value: `${h24}:${m}`,
+        label: `${h12Str}:${m} ${ampm}`
+      });
+    }
+  }
+  // Also add 23:59 as a convenient end-of-day option
+  options.push({ value: '23:59', label: '11:59 PM' });
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
+
 /** Build a duty_schedule from editing staff data, falling back to legacy fields. */
 const buildDutySchedule = (staff: StaffMember): DutySchedule => {
   if (staff.duty_schedule) return staff.duty_schedule;
@@ -935,19 +957,25 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                               <div className="space-y-2">
                                 {blocks.map((block: { start: string; end: string }, idx: number) => (
                                   <div key={idx} className="flex items-center gap-2">
-                                    <input
-                                      type="time"
+                                    <select
                                       value={block.start}
                                       onChange={e => updateBlock(day.value, idx, 'start', e.target.value)}
                                       className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
-                                    />
+                                    >
+                                      {TIME_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
                                     <span className="text-gray-400 text-xs shrink-0">–</span>
-                                    <input
-                                      type="time"
+                                    <select
                                       value={block.end}
                                       onChange={e => updateBlock(day.value, idx, 'end', e.target.value)}
                                       className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
-                                    />
+                                    >
+                                      {TIME_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
                                     <button
                                       type="button"
                                       disabled={blocks.length === 1}
@@ -970,22 +998,28 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label required>Lunch Start</Label>
-                          <input
-                            type="time"
+                          <select
                             value={formData.lunch_start_time ?? '12:00'}
                             onChange={e => set('lunch_start_time', e.target.value)}
-                            className={inputCls(!!errors.lunch_start_time)}
-                          />
+                            className={selectCls}
+                          >
+                            {TIME_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
                           <FieldError msg={errors.lunch_start_time} />
                         </div>
                         <div>
                           <Label required>Lunch End</Label>
-                          <input
-                            type="time"
+                          <select
                             value={formData.lunch_end_time ?? '13:00'}
                             onChange={e => set('lunch_end_time', e.target.value)}
-                            className={inputCls(!!errors.lunch_end_time)}
-                          />
+                            className={selectCls}
+                          >
+                            {TIME_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
                           <FieldError msg={errors.lunch_end_time} />
                         </div>
                       </div>

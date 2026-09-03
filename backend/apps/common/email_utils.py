@@ -62,9 +62,8 @@ def send_booking_confirmation_email(booking) -> tuple[bool, str]:
 
     clinic = booking.portal_link.clinic
 
-    _notif_clinic = getattr(clinic, 'main_clinic', clinic)
-    if not getattr(_notif_clinic, 'email_notifications_enabled', True):
-        msg = f"Clinic {_notif_clinic.id} has email notifications disabled — skipping booking confirmation for #{booking.reference_number}."
+    if not getattr(clinic, 'email_notifications_enabled', True):
+        msg = f"Clinic {clinic.id} ({clinic.name}) has email notifications disabled — skipping booking confirmation for #{booking.reference_number}."
         logger.info(msg)
         return False, msg
 

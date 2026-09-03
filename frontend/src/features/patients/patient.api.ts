@@ -5,6 +5,7 @@ export interface PatientFilters {
   search?: string;
   gender?: 'M' | 'F' | 'O' | '';
   is_active?: boolean;
+  branch?: number | '';
   // ── Archive filters ──────────────────────────────────────────────────────
   archived?: boolean;          // ?archived=true  → only archived patients
   include_archived?: boolean;  // ?include_archived=true → all patients
@@ -43,6 +44,7 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
   if (filters?.search)                          params.append('search',           filters.search);
   if (filters?.gender)                          params.append('gender',           filters.gender);
   if (filters?.is_active !== undefined)         params.append('is_active',        String(filters.is_active));
+  if (filters?.branch)                          params.append('branch',           String(filters.branch));
   if (filters?.archived === true)               params.append('archived',         'true');
   if (filters?.include_archived === true)       params.append('include_archived', 'true');
   if (filters?.page)                            params.append('page',             String(filters.page));
