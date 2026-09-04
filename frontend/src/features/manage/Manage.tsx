@@ -16,7 +16,6 @@ import { ClinicServices } from './pages/clinical/ClinicServices';
 import { ClinicProfile } from './pages/clinical/ClinicProfile';
 import { EmailReminder } from './pages/communications/EmailReminder';
 import { Records } from './pages/communications/Records';
-import { Notifications } from './pages/communications/Notifications';
 import { ClinicalAuditLogs } from './pages/communications/ClinicalAuditLogs';
 
 const NoteTemplatesPage = () => <ClinicalMenu2 initialTab="notes" />;
@@ -76,7 +75,6 @@ const MANAGE_CATEGORIES: ManageCategory[] = [
     items: [
       { id: 'comm1', label: 'Email Reminder', path: 'comm1', component: EmailReminder },
       { id: 'comm2', label: 'Records',        path: 'comm2', component: Records },
-      { id: 'comm3', label: 'Notifications',  path: 'comm3', component: Notifications },
       { id: 'clinical-audit', label: 'Clinical Audit', path: 'clinical-audit', component: ClinicalAuditLogs },
     ],
   },

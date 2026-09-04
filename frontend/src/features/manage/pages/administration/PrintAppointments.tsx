@@ -2,16 +2,28 @@ import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Printer, Search, Filter, RefreshCw, Download,
-  Calendar, User, Building2, Clock, CheckCircle,
+  Calendar, User, Building2, Clock,
   ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { printAppointmentsApi } from '../../services/billing.api';
 import type { AppointmentPrintFilters, AppointmentPrintRecord, AppointmentStatus } from '@/types/billing';
+import MalasakitLogo from '@/assets/malasakit/PrimaryLogo-Colored.png';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd');
+
+const formatTime12h = (timeStr?: string) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const hour = parseInt(parts[0], 10);
+  const minute = parts[1];
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute} ${ampm}`;
+};
 
 const statusOpts: AppointmentStatus[] = [
   'SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW',
@@ -59,12 +71,6 @@ export const AdminMenu1: React.FC = () => {
     enabled:  !!(filters.date_from && filters.date_to),
   });
 
-  const { data: summary } = useQuery({
-    queryKey: ['appointments-print-summary', activeFilters],
-    queryFn:  () => printAppointmentsApi.summary(activeFilters),
-    enabled:  !!(filters.date_from && filters.date_to),
-  });
-
   const appointments = listData?.results ?? [];
 
   // ── sort toggle ────────────────────────────────────────────────────────────
@@ -89,14 +95,14 @@ export const AdminMenu1: React.FC = () => {
 
     const rows = payload.appointments.map((a: AppointmentPrintRecord) => `
       <tr>
-        <td>${a.date}</td>
-        <td>${a.start_time} – ${a.end_time}</td>
-        <td>${a.patient_name}<br/><small>${a.patient_number}</small></td>
-        <td>${a.practitioner_name}</td>
-        <td>${a.clinic_name}</td>
-        <td>${a.appointment_type_display}</td>
-        <td>${a.status_display}</td>
-        <td>${a.has_invoice ? '✓' : '–'}</td>
+        <td style="font-family: monospace; font-size: 11px;">${a.patient_number || (a.patient_id ? String(a.patient_id) : '—')}</td>
+        <td><strong>${a.patient_name || '—'}</strong></td>
+        <td>${a.clinic_name || '—'}</td>
+        <td>${a.appointment_type_display || a.appointment_type || '—'}</td>
+        <td>${a.practitioner_name || '—'}</td>
+        <td>${a.date || '—'}</td>
+        <td>${a.start_time && a.end_time ? `${formatTime12h(a.start_time)} – ${formatTime12h(a.end_time)}` : (formatTime12h(a.start_time) || '—')}</td>
+        <td>${a.status_display || a.status || '—'}</td>
       </tr>`).join('');
 
     win.document.write(`
@@ -105,30 +111,39 @@ export const AdminMenu1: React.FC = () => {
       <head>
         <title>Appointments — ${filters.date_from} to ${filters.date_to}</title>
         <style>
-          body  { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+          body  { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
           h1    { font-size: 16px; margin-bottom: 4px; }
           p     { margin: 2px 0 8px; color: #555; }
           table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #ddd; padding: 5px 8px; text-align: left; }
-          th    { background: #f3f4f6; font-weight: 600; }
+          th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+          th    { background: #f3f4f6; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #4b5563; }
           tr:nth-child(even) { background: #fafafa; }
-          small { color: #888; }
           @media print { button { display: none; } }
         </style>
       </head>
       <body>
         <h1>Appointment Report</h1>
-        <p>${filters.date_from} → ${filters.date_to} &nbsp;|&nbsp; Total: ${payload.total}</p>
+        <p>${filters.date_from} → ${filters.date_to}</p>
         <button onclick="window.print()">🖨 Print</button>
         <table>
           <thead>
             <tr>
-              <th>Date</th><th>Time</th><th>Patient</th><th>Practitioner</th>
-              <th>Branch</th><th>Type</th><th>Status</th><th>Invoice</th>
+              <th>Patient ID</th>
+              <th>Patient Full Name</th>
+              <th>Branch</th>
+              <th>Appointment Type</th>
+              <th>Practitioner</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
+        <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #6b7280; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span>Generated by Malasakit</span>
+          <img src="${MalasakitLogo}" alt="Malasakit Logo" style="height: 24px; width: auto;" />
+        </div>
       </body>
       </html>`);
     win.document.close();
@@ -272,22 +287,6 @@ export const AdminMenu1: React.FC = () => {
         )}
       </div>
 
-      {/* ── Summary cards ──────────────────────────────────────────────────── */}
-      {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <p className="text-xs text-gray-500 mb-1">Total</p>
-            <p className="text-2xl font-bold text-gray-900">{summary.total}</p>
-          </div>
-          {Object.entries(summary.by_status).map(([s, count]) => (
-            <div key={s} className="bg-white rounded-xl border border-gray-200 p-3">
-              <p className="text-xs text-gray-500 mb-1">{s.replace('_', ' ')}</p>
-              <p className="text-2xl font-bold text-gray-900">{count as number}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         {isLoading ? (
@@ -306,14 +305,14 @@ export const AdminMenu1: React.FC = () => {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {[
-                    { label: 'Date',         field: 'date' },
-                    { label: 'Time',         field: 'start_time' },
-                    { label: 'Patient',      field: 'patient__last_name' },
-                    { label: 'Practitioner', field: 'practitioner__user__last_name' },
-                    { label: 'Branch',       field: 'clinic__name' },
-                    { label: 'Type',         field: 'appointment_type' },
-                    { label: 'Status',       field: 'status' },
-                    { label: 'Invoice',      field: '' },
+                    { label: 'Patient ID',        field: '' },
+                    { label: 'Patient Full Name', field: 'patient__last_name' },
+                    { label: 'Branch',            field: 'clinic__name' },
+                    { label: 'Appointment Type',  field: 'appointment_type' },
+                    { label: 'Practitioner',      field: 'practitioner__user__last_name' },
+                    { label: 'Date',              field: 'date' },
+                    { label: 'Time',              field: 'start_time' },
+                    { label: 'Status',            field: 'status' },
                   ].map(col => (
                     <th
                       key={col.label}
@@ -331,39 +330,46 @@ export const AdminMenu1: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {appointments.map((appt: AppointmentPrintRecord) => (
                   <tr key={appt.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                      {appt.date}
+                    {/* 1. Patient ID */}
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-700 whitespace-nowrap">
+                      {appt.patient_number || (appt.patient_id ? String(appt.patient_id) : '—')}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                      <Clock className="w-3 h-3 inline mr-1 opacity-50" />
-                      {appt.start_time} – {appt.end_time}
+                    {/* 2. Patient Full Name */}
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {appt.patient_name || '—'}
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{appt.patient_name}</p>
-                      <p className="text-xs text-gray-400">{appt.patient_number}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{appt.practitioner_name}</span>
-                      </div>
-                    </td>
+                    {/* 3. Branch */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{appt.clinic_name}</span>
+                        <span className="text-gray-700">{appt.clinic_name || '—'}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{appt.appointment_type_display}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STAT_COLORS[appt.status] ?? ''}`}>
-                        {appt.status_display}
-                      </span>
+                    {/* 4. Appointment Type */}
+                    <td className="px-4 py-3 text-gray-600">
+                      {appt.appointment_type_display || appt.appointment_type || '—'}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {appt.has_invoice
-                        ? <CheckCircle className="w-4 h-4 text-green-500 inline" />
-                        : <span className="text-gray-300">—</span>}
+                    {/* 5. Practitioner */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-700">{appt.practitioner_name || '—'}</span>
+                      </div>
+                    </td>
+                    {/* 6. Date */}
+                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                      {appt.date || '—'}
+                    </td>
+                    {/* 7. Time */}
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      <Clock className="w-3 h-3 inline mr-1 opacity-50" />
+                      {appt.start_time && appt.end_time ? `${formatTime12h(appt.start_time)} – ${formatTime12h(appt.end_time)}` : (formatTime12h(appt.start_time) || '—')}
+                    </td>
+                    {/* 8. Status */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STAT_COLORS[appt.status] ?? 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                        {appt.status_display || appt.status || '—'}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -391,3 +397,6 @@ export const AdminMenu1: React.FC = () => {
     </div>
   );
 };
+
+export const PrintAppointments = AdminMenu1;
+export default AdminMenu1;
