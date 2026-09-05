@@ -72,14 +72,14 @@ class SubscriptionMiddleware:
 
         user = self._resolve_user(request)
         if user and not self._is_subscription_active(user):
-            return JsonResponse(
-                {
-                    'error': 'Subscription expired',
-                    'message': 'Your subscription has expired. Please subscribe to continue.',
-                    'redirect': '/setup/account/subscription',
-                },
-                status=403,
-            )
+            # Block write actions, but allow reads (GET, HEAD, OPTIONS)
+            if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+                return JsonResponse(
+                    {
+                        'detail': 'Your subscription has ended. Please pay your outstanding invoice to restore full access.',
+                    },
+                    status=403,
+                )
 
         return self.get_response(request)
 

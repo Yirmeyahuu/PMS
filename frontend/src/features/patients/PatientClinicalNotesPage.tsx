@@ -13,6 +13,7 @@ import { ViewClinicalNoteModal } from '@/features/clinical-template/components/V
 import { usePatientProfileContext } from './context/PatientProfileContext';
 import { assignNoteToCase } from './patientCases.api';
 import { formatDate } from './patientProfile.utils.tsx';
+import { useSubscriptionAccess } from '@/features/setup/hooks/useSubscriptionAccess';
 
 export const PatientClinicalNotesPage = () => {
   const {
@@ -33,6 +34,7 @@ export const PatientClinicalNotesPage = () => {
   const [emailingNoteId, setEmailingNoteId] = useState<number | null>(null);
   const [printingNoteId, setPrintingNoteId] = useState<number | null>(null);
   const [createCaseId, setCreateCaseId] = useState('');
+  const { isActionAllowed } = useSubscriptionAccess();
 
   const selectedCaseFilter = searchParams.get('case') ?? 'all';
 
@@ -117,7 +119,8 @@ export const PatientClinicalNotesPage = () => {
             <button
               type="button"
               onClick={handleOpenCreateNote}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
+              disabled={!isActionAllowed}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               Create Note

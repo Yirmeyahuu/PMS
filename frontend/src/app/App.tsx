@@ -77,6 +77,10 @@ import { FeatureAccessGuard } from '@/components/auth/FeatureAccessGuard';
 // ── NEW: Clinic Setup ─────────────────────────────────────────────────────────
 import { ClinicSetupPage } from '@/features/clinic-setup/ClinicSetupPage';
 
+// ── NEW: Subscription ─────────────────────────────────────────────────────────
+import { SubscriptionEndedModal } from '@/features/setup/components/modals/SubscriptionEndedModal';
+import { SubscriptionInvoicePage } from '@/features/setup/pages/account/SubscriptionInvoicePage';
+
 // ─── Routes where internal components should NOT appear ────────────────────────────
 const PUBLIC_PATHS = ['/login', '/register', '/portal', '/clinic-setup', '/book', '/client-form', '/public', '/user-manual'];
 
@@ -329,12 +333,15 @@ function App() {
           <Route path="/manage" element={<ClinicMemberRoute><Manage /></ClinicMemberRoute>} />
           <Route path="/setup"  element={<ClinicMemberRoute><Setup /></ClinicMemberRoute>} />
 
+          <Route path="/setup/subscription/invoice" element={<ClinicMemberRoute><SubscriptionInvoicePage /></ClinicMemberRoute>} />
+
           {/* ── 404 ─────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
         <FloatingNotificationsGuard />
         <GlobalLogoutModal />
+        <SubscriptionEndedModal />
         <SessionGuard />
         <Analytics />
       </BrowserRouter>

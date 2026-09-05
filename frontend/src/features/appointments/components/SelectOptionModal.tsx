@@ -13,6 +13,7 @@ import {
 import { getPatients, createPatient } from '@/features/patients/patient.api';
 import { PatientModal } from '@/features/patients/components/PatientModal';
 import type { Patient, CreatePatientData } from '@/types';
+import { useSubscriptionAccess } from '@/features/setup/hooks/useSubscriptionAccess';
 
 interface PendingSlot {
   date: Date;
@@ -75,6 +76,7 @@ export const SelectOptionModal: React.FC<SelectOptionModalProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showPatientModal, setShowPatientModal] = useState(false);
+  const { isActionAllowed } = useSubscriptionAccess();
 
   const arrowRef = useRef<SVGSVGElement>(null);
   const firstNameRef = useRef<HTMLInputElement>(null);
@@ -227,11 +229,14 @@ export const SelectOptionModal: React.FC<SelectOptionModalProps> = ({
             {(['appointment', 'event', 'note'] as TabType[]).map((tab) => (
               <button
                 key={tab}
+                disabled={!isActionAllowed && tab !== 'appointment'}
                 onClick={() => handleTabClick(tab)}
                 className={`text-sm font-medium pb-1.5 transition-colors relative ${
                   activeTab === tab
                     ? 'text-sky-600'
-                    : 'text-gray-400 hover:text-gray-600'
+                    : !isActionAllowed && tab !== 'appointment'
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -323,7 +328,8 @@ export const SelectOptionModal: React.FC<SelectOptionModalProps> = ({
                   <p className="text-xs text-gray-400 mb-1.5">No matching clients found.</p>
                   <button
                     onClick={() => setShowPatientModal(true)}
-                    className="text-xs text-sky-500 font-medium hover:text-sky-600"
+                    disabled={!isActionAllowed}
+                    className="text-xs text-sky-500 font-medium hover:text-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     + Add New Client
                   </button>
@@ -335,9 +341,11 @@ export const SelectOptionModal: React.FC<SelectOptionModalProps> = ({
 
         <button
           onClick={handleCreateAppointment}
-          disabled={!selectedPatient}
+          disabled={!selectedPatient || !isActionAllowed}
           className={`w-full py-2 rounded-lg text-xs font-medium transition-colors ${
-            selectedPatient
+            !isActionAllowed
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+              : selectedPatient
               ? 'bg-sky-500 text-white hover:bg-sky-600'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }`}

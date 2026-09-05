@@ -11,6 +11,7 @@ import { useCalendarSocket } from '@/features/appointments/hooks/useCalendarSock
 import { createPatient, updatePatient } from './patient.api';
 import type { Patient, CreatePatientData } from '@/types';
 import toast from 'react-hot-toast';
+import { useSubscriptionAccess } from '@/features/setup/hooks/useSubscriptionAccess';
 
 interface FilterOptions {
   gender: '' | 'M' | 'F' | 'O';
@@ -32,6 +33,8 @@ export const Clients: React.FC = () => {
     handleArchive,
     handleRestore,
   } = usePatients();
+
+  const { isActionAllowed } = useSubscriptionAccess();
 
   // Refresh client list in real-time when a portal booking creates a new patient.
   useCalendarSocket({ onPatientCreated: refresh });
@@ -183,7 +186,8 @@ export const Clients: React.FC = () => {
                   </button>
                   <button
                     onClick={handleAddClient}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors"
+                    disabled={!isActionAllowed}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">Add Client</span>

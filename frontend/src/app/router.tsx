@@ -5,7 +5,6 @@ import { Loader2 } from 'lucide-react';
 import { useSubscriptionStatus } from '@/features/setup/hooks/useSubscription';
 import { isSubscriptionActive } from '@/features/setup/services/subscription.api';
 
-const SUBSCRIPTION_REDIRECT_PATH = '/setup?card=account&option=subscription';
 
 const RouteGuardLoading = () => (
   <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-sky-50 to-blue-50">
@@ -36,9 +35,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <RouteGuardLoading />;
   }
 
-  if (subscription && !isSubscriptionActive(subscription) && location.pathname !== '/setup') {
-    return <Navigate to={SUBSCRIPTION_REDIRECT_PATH} replace />;
-  }
+
 
   // Admin must complete clinic setup before accessing any protected page
   if (
@@ -109,9 +106,7 @@ export const ClinicMemberRoute: React.FC<{ children: React.ReactNode }> = ({ chi
     return <RouteGuardLoading />;
   }
 
-  if (subscription && !isSubscriptionActive(subscription) && location.pathname !== '/setup') {
-    return <Navigate to={SUBSCRIPTION_REDIRECT_PATH} replace />;
-  }
+
 
   if (!user?.clinic) {
     return <Navigate to="/unauthorized" replace />;

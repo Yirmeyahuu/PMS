@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 const SUBSCRIPTION_REDIRECT_PATH = '/setup?card=account&option=subscription';
@@ -50,19 +51,10 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const responseData = error.response?.data as { error?: string; message?: string } | undefined;
+    const responseData = error.response?.data as { error?: string; message?: string; detail?: string } | undefined;
 
-    if (error.response?.status === 403 && responseData?.error === 'Subscription expired') {
-      const currentLocation = `${window.location.pathname}${window.location.search}`;
-      const isAuthPage =
-        window.location.pathname.startsWith('/login') ||
-        window.location.pathname.startsWith('/register') ||
-        window.location.pathname.startsWith('/forgot-password');
-
-      if (!isAuthPage && currentLocation !== SUBSCRIPTION_REDIRECT_PATH) {
-        window.location.href = SUBSCRIPTION_REDIRECT_PATH;
-      }
-
+    if (error.response?.status === 403 && responseData?.detail?.includes('Your subscription has ended')) {
+      toast.error(responseData.detail, { id: 'subscription-expired-error' });
       return Promise.reject(error);
     }
 

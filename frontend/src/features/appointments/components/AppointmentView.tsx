@@ -51,6 +51,7 @@ import { communicationRecordsApi } from '@/features/manage/services/communicatio
 import { usePractitioners } from '@/features/clinics/hooks/usePractitioners';
 import { useAppointmentServices } from '../hooks/useAppointmentServices';
 import type { AppointmentEditPayload } from '../appointment.api';
+import { useSubscriptionAccess } from '@/features/setup/hooks/useSubscriptionAccess';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 const fmt12 = (t: string): string => {
@@ -1045,7 +1046,7 @@ const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number
           )}
           <button
             onClick={() => navigate(`/billing/generate-invoice/${appointment.id}`)}
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || !isActionAllowed}
             className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-semibold">
             {createMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {createMutation.isPending ? 'Generating…' : 'Generate Invoice'}
@@ -1397,7 +1398,8 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
     cancelAppointmentAction, markDirty,
   } = useAppointmentEdit();
 
-  const { practitioners, loading: loadingPractitioners } = usePractitioners();
+  const { practitioners, loading: loadingPractitioners } = usePractitioners({ clinicBranchId: appointment?.clinic_branch });
+  const { isActionAllowed } = useSubscriptionAccess();
 
   // ── Patient data ───────────────────────────────────────────────────────────────
   const navigate = useNavigate();
