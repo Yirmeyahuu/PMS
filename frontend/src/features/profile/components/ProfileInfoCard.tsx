@@ -5,8 +5,9 @@ import {
 } from 'lucide-react';
 import type { User as UserType } from '@/types/auth';
 import type { UpdateProfileData } from '../services/profile.api';
-import { formatPHPhone, normalizePHPhone } from '@/utils/phoneFormatter';
 import { validatePHPhoneDetailed } from '@/utils/validation';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 interface ProfileInfoCardProps {
   user:           UserType;
@@ -46,18 +47,35 @@ const Field: React.FC<{
     </label>
     {editing ? (
       <>
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange(name, e.target.value)}
-          placeholder={placeholder}
-          className={`w-full border-2 ${
+        {type === 'tel' ? (
+          <div className={`flex w-full overflow-hidden p-0 border-2 ${
             error
-              ? 'border-red-400 bg-red-50 focus:ring-red-300'
-              : 'border-gray-200 bg-gray-50 focus:ring-sky-300'
-          } rounded-xl px-4 py-3 text-sm focus:bg-white focus:outline-none
-            focus:ring-2 focus:border-transparent transition`}
-        />
+              ? 'border-red-400 bg-red-50 focus-within:ring-red-300'
+              : 'border-gray-200 bg-gray-50 focus-within:ring-sky-300'
+          } rounded-xl transition focus-within:bg-white focus-within:ring-2 focus-within:border-transparent`}>
+            <PhoneInput
+              international
+              defaultCountry="PH"
+              value={value}
+              onChange={val => onChange(name, val || '')}
+              placeholder={placeholder}
+              className="w-full px-4 py-3 text-sm focus:outline-none"
+            />
+          </div>
+        ) : (
+          <input
+            type={type}
+            value={value}
+            onChange={e => onChange(name, e.target.value)}
+            placeholder={placeholder}
+            className={`w-full border-2 ${
+              error
+                ? 'border-red-400 bg-red-50 focus:ring-red-300'
+                : 'border-gray-200 bg-gray-50 focus:ring-sky-300'
+            } rounded-xl px-4 py-3 text-sm focus:bg-white focus:outline-none
+              focus:ring-2 focus:border-transparent transition`}
+          />
+        )}
         {error && (
           <p className="text-xs text-red-500 font-medium">{error}</p>
         )}
@@ -79,7 +97,7 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
   const [form,    setForm]    = useState<FormState>({
     first_name: user.first_name ?? '',
     last_name:  user.last_name  ?? '',
-    phone:      user.phone ? formatPHPhone(user.phone) : '',
+    phone:      user.phone || '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -88,14 +106,13 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
       setForm({
         first_name: user.first_name ?? '',
         last_name:  user.last_name  ?? '',
-        phone:      user.phone ? formatPHPhone(user.phone) : '',
+        phone:      user.phone || '',
       });
     }
   }, [user, editing]);
 
   const set = (k: keyof FormState, v: string) => {
-    const formatted = k === 'phone' ? formatPHPhone(v) : v;
-    setForm(prev => ({ ...prev, [k]: formatted }));
+    setForm(prev => ({ ...prev, [k]: v }));
     setErrors(prev => ({ ...prev, [k]: undefined }));
   };
 
@@ -117,7 +134,7 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
     const ok = await onSave({
       first_name: form.first_name.trim(),
       last_name:  form.last_name.trim(),
-      phone:      form.phone.trim() ? normalizePHPhone(form.phone) : '',
+      phone:      form.phone.trim(),
     });
     console.log('[ProfileInfoCard] handleSave result:', ok);
     if (ok) setEditing(false);

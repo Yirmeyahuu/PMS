@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Clinic, Practitioner, Location, ClinicConsentForm
-from apps.common.validators import normalize_ph_phone, validate_ph_phone, validate_email_detailed
+from apps.common.validators import normalize_international_phone, validate_international_phone, validate_email_detailed
 from django.core.exceptions import ValidationError as DjangoValidationError
 import logging
 
@@ -112,10 +112,10 @@ class ClinicProfileSetupSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             raise serializers.ValidationError("Clinic phone number is required.")
         try:
-            validate_ph_phone(value)
+            validate_international_phone(value)
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.message)
-        return normalize_ph_phone(value)
+        return normalize_international_phone(value)
 
     def validate(self, attrs):
         has_standard  = attrs.get('address', '').strip() and attrs.get('city', '').strip() and attrs.get('province', '').strip()

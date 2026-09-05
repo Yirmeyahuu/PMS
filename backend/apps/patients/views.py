@@ -36,7 +36,7 @@ from .serializers import (
 import logging
 import traceback
 from django.db import transaction
-from apps.common.validators import normalize_ph_phone
+from apps.common.validators import normalize_international_phone
 from apps.appointments.calendar_events import emit_calendar_event
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def _confirm_portal_booking(booking, confirmed_by_user):
         clinic = booking.portal_link.clinic
 
     # Normalize phone to +63XXXXXXXXXX (13 chars) so it fits Patient.phone max_length=15
-    normalized_phone = normalize_ph_phone(booking.patient_phone) if booking.patient_phone else ''
+    normalized_phone = normalize_international_phone(booking.patient_phone) if booking.patient_phone else ''
 
     # ── 1. Find or create Patient (race-condition-safe) ─────────────────────
     # Uses PatientMatchingService for intelligent duplicate detection

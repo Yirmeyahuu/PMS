@@ -47,6 +47,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'practitioner_name',
             'clinic_branch_id',
             'clinic_branch_name',
+            'related_feedback_id',
             'is_read',
             'read_at',
             'created_at',

@@ -50,27 +50,34 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
         main_clinic = user.clinic.main_clinic
 
+        from django.db.models import Q
         qs = (
             Notification.objects
             .filter(clinic=main_clinic)
+            .filter(Q(recipient__isnull=True) | Q(recipient=user))
             .select_related('appointment', 'clinic_branch', 'patient', 'practitioner')
         )
         
         # 1. RBAC Filtering
         if not user.is_admin:
+            from django.db.models import Q
+            # Direct notifications should bypass RBAC filtering for branch/practitioner
+            rbac_q = Q(recipient=user)
+            
             if user.is_manager:
                 managed_branches = user.get_managed_branches()
-                qs = qs.filter(clinic_branch__in=managed_branches)
+                rbac_q |= Q(recipient__isnull=True, clinic_branch__in=managed_branches)
             else:
-                qs = qs.filter(clinic_branch=user.clinic_branch)
-                
+                base_rbac = Q(recipient__isnull=True, clinic_branch=user.clinic_branch)
                 if user.is_practitioner:
-                    from django.db.models import Q
                     try:
                         practitioner = user.practitioner_profile
-                        qs = qs.filter(Q(practitioner=practitioner) | Q(practitioner__isnull=True))
+                        base_rbac &= (Q(practitioner=practitioner) | Q(practitioner__isnull=True))
                     except Exception:
-                        qs = qs.none()
+                        base_rbac = Q(pk__in=[]) # False
+                rbac_q |= base_rbac
+                
+            qs = qs.filter(rbac_q)
 
         # 2. Custom UI Filters
         date_from = self.request.query_params.get('date_from')

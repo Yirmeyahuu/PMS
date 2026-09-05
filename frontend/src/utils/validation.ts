@@ -24,40 +24,27 @@ export const validateEmailDetailed = (email: string): string => {
   return '';
 };
 
+import { isValidPHPhone } from './phoneFormatter';
+
 /**
- * Validate Philippine phone number.
+ * Validate international phone number.
  * Delegates to isValidPHPhone from phoneFormatter utility.
  */
 export const validatePhone = (phone: string): boolean => {
   if (!phone) return true; // Phone is optional
-
-  const digits = phone.replace(/\D/g, '');
-  let cleaned = digits;
-  if (cleaned.startsWith('0'))  cleaned = cleaned.slice(1);
-  if (cleaned.startsWith('63')) cleaned = cleaned.slice(2);
-  return /^9\d{9}$/.test(cleaned);
+  return isValidPHPhone(phone);
 };
-
 /**
- * Returns a specific error message for an invalid PH phone number, or '' if valid.
- * Distinguishes between invalid characters, wrong prefix, too short, and too long.
+ * Returns a specific error message for an invalid international phone number, or '' if valid.
  */
 export const validatePHPhoneDetailed = (value: string, required = true): string => {
   const empty = !value || !value.trim() || value.trim() === '(+63)';
   if (empty) return required ? 'Phone number is required' : '';
 
-  // Check for disallowed characters (anything that isn't digit, space, +, (, ))
-  const stripped = value.replace(/[\s()+]/g, '');
-  if (/[^0-9]/.test(stripped)) return 'Phone number contains invalid characters';
+  if (!isValidPHPhone(value)) {
+    return 'Please enter a valid phone number including country code';
+  }
 
-  const digits = value.replace(/\D/g, '');
-  let cleaned = digits;
-  if (cleaned.startsWith('0'))  cleaned = cleaned.slice(1);
-  if (cleaned.startsWith('63')) cleaned = cleaned.slice(2);
-
-  if (!cleaned.startsWith('9')) return 'Phone number must start with a valid prefix (09 or +63 9)';
-  if (cleaned.length < 10) return 'Phone number is too short';
-  if (cleaned.length > 10) return 'Phone number is too long';
   return '';
 };
 
@@ -97,23 +84,10 @@ export const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, '');
 };
 
+import { formatPHPhone } from './phoneFormatter';
+
 export const formatPhoneNumber = (phone: string): string => {
-  // Delegate to formatPHPhone standard
-  const digits = phone.replace(/\D/g, '');
-  let cleaned = digits;
-  if (cleaned.startsWith('0'))  cleaned = cleaned.slice(1);
-  if (cleaned.startsWith('63')) cleaned = cleaned.slice(2);
-  cleaned = cleaned.slice(0, 10);
-
-  const p1 = cleaned.slice(0, 3);
-  const p2 = cleaned.slice(3, 6);
-  const p3 = cleaned.slice(6, 10);
-
-  let formatted = '(+63)';
-  if (p1) formatted += ` ${p1}`;
-  if (p2) formatted += ` ${p2}`;
-  if (p3) formatted += ` ${p3}`;
-  return formatted;
+  return formatPHPhone(phone);
 };
 /**
  * Validates a Date of Birth string (YYYY-MM-DD).

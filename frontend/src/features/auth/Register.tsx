@@ -7,8 +7,9 @@ import {
   validatePassword, 
   sanitizeInput 
 } from '@/utils/validation';
-import { formatPHPhone } from '@/utils/phoneFormatter';
-import { Eye, EyeOff, Lock, Mail, User, Phone } from 'lucide-react';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 
 /**
  * Register Component
@@ -45,8 +46,8 @@ export const Register: React.FC = () => {
     // Sanitize input
     const sanitized = name === 'password' || name === 'password_confirm'
       ? value // Don't sanitize passwords
-      : name === 'phone'
-        ? formatPHPhone(value)
+      : name === 'email'
+        ? value.toLowerCase()
         : sanitizeInput(value);
     
     setFormData(prev => ({
@@ -237,20 +238,22 @@ export const Register: React.FC = () => {
               <label htmlFor="phone" className="block text-sm font-medium text-trust-harbor">
                 Phone number <span className="text-gray-500">(optional)</span>
               </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
+              <div className="mt-1">
+                <PhoneInput
                   id="phone"
-                  name="phone"
-                  type="tel"
+                  international
+                  defaultCountry="PH"
                   value={formData.phone}
-                  onChange={handleChange}
-                  className={`appearance-none block w-full pl-10 pr-3 py-2 border ${
+                  onChange={(value) => {
+                    setFormData((prev) => ({ ...prev, phone: value || '' }));
+                    if (validationErrors.phone) {
+                      setValidationErrors((prev) => ({ ...prev, phone: '' }));
+                    }
+                  }}
+                  className={`appearance-none flex w-full px-3 py-2 border ${
                     validationErrors.phone ? 'border-red-300' : 'border-gray-200'
-                  } rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-care-blue focus:border-care-blue sm:text-sm`}
-                  placeholder="(+63) 9XX XXX XXXX"
+                  } rounded-2xl shadow-sm bg-white focus-within:ring-1 focus-within:ring-care-blue focus-within:border-care-blue sm:text-sm`}
+                  placeholder="Enter phone number"
                   disabled={isLoading}
                 />
               </div>

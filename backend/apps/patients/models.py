@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.crypto import get_random_string
 from apps.common.models import TimeStampedModel, SoftDeleteModel
-from apps.common.validators import validate_ph_phone
+from apps.common.validators import validate_international_phone
 
 
 class Patient(TimeStampedModel, SoftDeleteModel):
@@ -35,7 +35,7 @@ class Patient(TimeStampedModel, SoftDeleteModel):
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
 
     email       = models.EmailField()  # required — enforced at serializer and model level
-    phone       = models.CharField(max_length=15, validators=[validate_ph_phone])
+    phone       = models.CharField(max_length=15, validators=[validate_international_phone])
     address     = models.TextField(blank=True)
     barangay    = models.CharField(max_length=100, blank=True)
     city        = models.CharField(max_length=100, blank=True)
@@ -45,7 +45,7 @@ class Patient(TimeStampedModel, SoftDeleteModel):
     # Emergency contact is required only for minor patients (< 18 years old);
     # blank=True allows adult records without an emergency contact.
     emergency_contact_name         = models.CharField(max_length=200, blank=True)
-    emergency_contact_phone        = models.CharField(max_length=15, blank=True, validators=[validate_ph_phone])
+    emergency_contact_phone        = models.CharField(max_length=15, blank=True, validators=[validate_international_phone])
     emergency_contact_relationship = models.CharField(max_length=100, blank=True)
 
     philhealth_number = models.CharField(max_length=50, blank=True)

@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 from apps.common.models import TimeStampedModel, SoftDeleteModel
-from apps.common.validators import validate_ph_phone
+from apps.common.validators import validate_international_phone
 
 # ── RBAC Feature Keys ─────────────────────────────────────────────────────────
 FEATURE_KEYS = [
@@ -437,7 +437,7 @@ class User(AbstractUser, TimeStampedModel, SoftDeleteModel):
     username = None  # Remove username field
     email = models.EmailField(unique=True, db_index=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STAFF')
-    phone = models.CharField(max_length=15, blank=True, validators=[validate_ph_phone])
+    phone = models.CharField(max_length=15, blank=True, validators=[validate_international_phone])
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     

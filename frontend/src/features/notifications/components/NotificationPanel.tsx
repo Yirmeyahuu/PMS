@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { X, Bell, CheckCheck, Loader2, InboxIcon } from 'lucide-react';
 import { NotificationItem } from './NotificationItem';
+import { FeedbackResolutionModal } from '@/features/support/components/FeedbackResolutionModal';
 import type { Notification } from '../types/notifications.types';
 
 interface Props {
@@ -44,6 +45,14 @@ export const NotificationPanel: React.FC<Props> = ({
 }) => {
   const panelRef  = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const [resolutionFeedbackId, setResolutionFeedbackId] = useState<number | null>(null);
+
+  const handleNotificationAction = (notification: Notification) => {
+    if (notification.notification_type === 'FEEDBACK_RESOLVED' && notification.related_feedback_id) {
+      setResolutionFeedbackId(notification.related_feedback_id);
+    }
+  };
 
   // ── Group by Today / Earlier ───────────────────────────────────────────────
   const { today, earlier } = useMemo(() => {
@@ -174,6 +183,7 @@ export const NotificationPanel: React.FC<Props> = ({
                 key={notification.id}
                 notification={notification}
                 onMarkRead={onMarkRead}
+                onAction={handleNotificationAction}
               />
             ))}
           </>
@@ -190,6 +200,7 @@ export const NotificationPanel: React.FC<Props> = ({
                 key={notification.id}
                 notification={notification}
                 onMarkRead={onMarkRead}
+                onAction={handleNotificationAction}
               />
             ))}
           </>
@@ -209,6 +220,12 @@ export const NotificationPanel: React.FC<Props> = ({
           Showing appointment bookings &amp; daily summaries
         </p>
       </div>
+
+      <FeedbackResolutionModal
+        isOpen={resolutionFeedbackId !== null}
+        onClose={() => setResolutionFeedbackId(null)}
+        feedbackId={resolutionFeedbackId}
+      />
     </div>
   );
 };

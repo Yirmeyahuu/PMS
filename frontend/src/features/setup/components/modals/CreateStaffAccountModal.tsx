@@ -6,8 +6,9 @@ import type { DutySchedule, DutyDay } from '@/features/clinics/clinic.api';
 import { TITLE_OPTIONS, GENDER_OPTIONS } from '../../types/staff.types';
 import { useDisciplineOptions } from '../../hooks/useDisciplineOptions';
 import { useClinicBranches } from '@/features/clinics/hooks/useClinicBranches';
-import { formatPHPhone, normalizePHPhone } from '@/utils/phoneFormatter';
 import { validateEmailDetailed, validatePHPhoneDetailed } from '@/utils/validation';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PractitionerRemovalModal } from './PractitionerRemovalModal';
 import { getPractitionerRoleImpact } from '../../services/StaffService';
@@ -305,7 +306,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
         position:      editingStaff.position       ?? '',
         discipline:    editingStaff.discipline || 'OCCUPATIONAL_THERAPY',
         email:         editingStaff.email,
-        phone:         editingStaff.phone ? formatPHPhone(editingStaff.phone) : '',
+        phone:         editingStaff.phone || '',
         address:       editingStaff.address        ?? '',
         date_of_birth: editingStaff.date_of_birth  ?? '',
         gender:        editingStaff.gender         ?? 'Male',
@@ -452,7 +453,7 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
 
     const payload: CreateStaffData & { confirm_practitioner_removal?: boolean } = {
       ...formData,
-      phone: normalizePHPhone(formData.phone),
+      phone: formData.phone,
       roles: finalRoles as CreateStaffData['roles'],
     };
 
@@ -1197,22 +1198,20 @@ export const CreateStaffAccountModal: React.FC<CreateStaffAccountModalProps> = (
                   {/* Phone */}
                   <div>
                     <Label required>Phone Number</Label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={e => {
-                        const formatted = formatPHPhone(e.target.value);
-                        set('phone', formatted);
-                        const msg = validatePHPhoneDetailed(formatted);
-                        setErrors(prev => ({ ...prev, phone: msg || undefined }));
-                      }}
-                      onBlur={e => {
-                        const msg = validatePHPhoneDetailed(e.target.value);
-                        setErrors(prev => ({ ...prev, phone: msg || undefined }));
-                      }}
-                      placeholder="(+63) 9XX XXX XXXX"
-                      className={inputCls(!!errors.phone)}
-                    />
+                    <div className={`flex w-full overflow-hidden p-0 bg-slate-50 border rounded-xl focus-within:ring-2 focus-within:ring-care-blue focus-within:bg-white transition-colors ${errors.phone ? 'border-red-300' : 'border-slate-200'}`}>
+                      <PhoneInput
+                        international
+                        defaultCountry="PH"
+                        value={formData.phone}
+                        onChange={val => {
+                          set('phone', val || '');
+                          const msg = validatePHPhoneDetailed(val || '');
+                          setErrors(prev => ({ ...prev, phone: msg || undefined }));
+                        }}
+                        className="w-full"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
                     <FieldError msg={errors.phone} />
                   </div>
 

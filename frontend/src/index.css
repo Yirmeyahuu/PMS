@@ -203,6 +203,31 @@ textarea,
   cursor: var(--cursor-crosshair) !important;
 }
 
+/* Remove standard autofill backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+}
+
+/* Reset react-phone-number-input inner input to inherit our tailwind wrapper styles */
+.PhoneInputInput {
+  outline: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  padding-left: 0.5rem;
+}
+.PhoneInputInput:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+.PhoneInput {
+  align-items: center;
+}
+
 /* Not allowed cursor */
 [data-cursor="not-allowed"],
 .not-allowed,

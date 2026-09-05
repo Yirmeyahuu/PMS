@@ -20,6 +20,7 @@ class Notification(TimeStampedModel):
         ('NEW_CLIENT',    'New Client'),
         ('ONLINE_BOOKING','New Online Booking'),
         ('DAILY_SUMMARY', 'Daily Appointments Summary'),
+        ('FEEDBACK_RESOLVED', 'Feedback Resolved'),
     ]
 
     # ── Scoping — clinic-wide, NOT per-user ───────────────────────────────────
@@ -72,6 +73,21 @@ class Notification(TimeStampedModel):
         null=True,
         blank=True,
         related_name='branch_notifications',
+    )
+
+    # 1-to-1 Notifications
+    recipient = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='direct_notifications',
+        help_text='If set, this notification is ONLY visible to this user.',
+    )
+    related_feedback_id = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text='Links to support.UserFeedback without enforcing cross-app FK constraints.',
     )
 
     class Meta:

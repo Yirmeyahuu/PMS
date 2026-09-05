@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { User, Mail, Phone, FileText, Calendar, CheckCircle2, ArrowRight } from 'lucide-react';
-import { formatPHPhone } from '@/utils/phoneFormatter';
 import { validateDOB, isMinorAge } from '@/utils/validation';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { ShieldAlert, MapPin } from 'lucide-react';
 
 export interface PatientFormData {
@@ -108,8 +109,7 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
   };
   const set = (field: keyof PatientFormData) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const value = field === 'phone' ? formatPHPhone(e.target.value) : e.target.value;
-      onChange({ ...formData, [field]: value });
+      onChange({ ...formData, [field]: e.target.value });
     };
 
   return (
@@ -287,16 +287,16 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
               </label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  value={formData.phone}
-                  onChange={set('phone')}
-                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
-                  placeholder="(+63) 9XX XXX XXXX"
-                />
+                <div className="flex w-full overflow-hidden p-0 rounded-xl bg-gray-50 border border-gray-200 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-transparent transition-colors">
+                  <PhoneInput
+                    international
+                    defaultCountry="PH"
+                    value={formData.phone}
+                    onChange={(val) => set('phone')({ target: { name: 'phone', value: val || '' } } as any)}
+                    className="w-full"
+                    placeholder="Enter phone number"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -339,14 +339,16 @@ export const PatientDetailsForm: React.FC<PatientDetailsFormProps> = ({
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      name="emergency_contact_phone"
-                      type="tel"
-                      value={formData.emergency_contact_phone || ''}
-                      onChange={set('emergency_contact_phone')}
-                      className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
-                      placeholder="(+63) 9XX XXX XXXX"
-                    />
+                    <div className="flex w-full overflow-hidden p-0 rounded-xl bg-gray-50 border border-gray-200 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-transparent transition-colors">
+                      <PhoneInput
+                        international
+                        defaultCountry="PH"
+                        value={formData.emergency_contact_phone || ''}
+                        onChange={(val) => set('emergency_contact_phone')({ target: { name: 'emergency_contact_phone', value: val || '' } } as any)}
+                        className="w-full"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

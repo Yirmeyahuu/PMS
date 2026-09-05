@@ -1,4 +1,4 @@
-export type NotificationType = 'NEW_BOOKING' | 'NEW_CLIENT' | 'ONLINE_BOOKING' | 'DAILY_SUMMARY';
+export type NotificationType = 'NEW_BOOKING' | 'NEW_CLIENT' | 'ONLINE_BOOKING' | 'DAILY_SUMMARY' | 'FEEDBACK_RESOLVED';
 
 export type NotificationCategory = 'booking' | 'appointment' | 'system' | 'reminder' | 'alert';
 
@@ -7,6 +7,7 @@ export function getCategory(type: NotificationType): NotificationCategory {
     case 'NEW_BOOKING':
     case 'ONLINE_BOOKING': return 'booking';
     case 'DAILY_SUMMARY': return 'reminder';
+    case 'FEEDBACK_RESOLVED': return 'system';
     default:              return 'system';
   }
 }
@@ -25,6 +26,7 @@ export interface Notification {
   practitioner_name: string | null;
   clinic_branch_id: number | null;
   clinic_branch_name: string | null;
+  related_feedback_id: number | null;
   is_read: boolean;
   read_at: string | null;
   created_at: string;

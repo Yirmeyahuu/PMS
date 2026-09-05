@@ -9,8 +9,9 @@ import {
   validateEmailDetailed,
   validatePHPhoneDetailed,
 } from '@/utils/validation';
-import { formatPHPhone, normalizePHPhone } from '@/utils/phoneFormatter';
-import { Mail, User, Building2, Phone, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { Mail, User, Building2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import MalasakitWhiteLogo from '@/assets/malasakit/Primary Logo - White.svg';
 import MalasakitColoredLogo from '@/assets/malasakit/PrimaryLogo-Colored.svg';
 import type { AdminRegisterData, AuthError } from '@/types/auth';
@@ -65,11 +66,9 @@ export const AdminRegister: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     // Normalize email to lowercase immediately to prevent case-sensitive issues.
-    const sanitized = name === 'phone'
-      ? formatPHPhone(value)
-      : name === 'email'
-        ? value.toLowerCase()
-        : sanitizeInput(value);
+    const sanitized = name === 'email'
+      ? value.toLowerCase()
+      : sanitizeInput(value);
     
     setFormData(prev => ({
       ...prev,
@@ -190,12 +189,11 @@ export const AdminRegister: React.FC = () => {
       setIsLoading(true);
 
       try {
-        const payload = {
+        const response = await authService.registerAdmin({
           ...formData,
-          phone:              formData.phone ? normalizePHPhone(formData.phone) : '',
+          phone: formData.phone,
           verification_token: token,
-        };
-        const response = await authService.registerAdmin(payload);
+        });
 
         // Store onboarding session data so SetOnboardingPasswordPage can use them
         sessionStorage.setItem('reg_onboarding_token', response.onboarding_token);
@@ -485,20 +483,22 @@ export const AdminRegister: React.FC = () => {
               <label htmlFor="phone" className="block text-sm font-medium text-trust-harbor mb-1.5">
                 Phone Number <span className="text-gray-500 font-normal">(optional)</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
+              <div className="mt-1">
+                <PhoneInput
                   id="phone"
-                  name="phone"
-                  type="tel"
+                  international
+                  defaultCountry="PH"
                   value={formData.phone}
-                  onChange={handleChange}
-                  className={`block w-full pl-10 pr-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-care-blue focus:border-transparent text-sm ${
+                  onChange={(value) => {
+                    setFormData((prev) => ({ ...prev, phone: value || '' }));
+                    if (validationErrors.phone) {
+                      setValidationErrors((prev) => ({ ...prev, phone: '' }));
+                    }
+                  }}
+                  className={`flex w-full px-3 py-2.5 border rounded-2xl bg-white shadow-sm placeholder-gray-400 focus-within:ring-2 focus-within:ring-care-blue focus-within:border-transparent text-sm ${
                     validationErrors.phone ? 'border-red-300' : 'border-gray-200'
                   }`}
-                  placeholder="(+63) 9XX XXX XXXX"
+                  placeholder="Enter phone number"
                   disabled={isLoading}
                 />
               </div>

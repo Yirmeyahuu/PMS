@@ -2,44 +2,42 @@ import re
 from django.core.exceptions import ValidationError
 
 
-def _extract_ph_digits(value: str) -> str:
-    """Strip formatting and remove leading 0 or +63/63 prefix."""
-    digits = re.sub(r'\D', '', value)
-    if digits.startswith('0'):
-        digits = digits[1:]
-    if digits.startswith('63'):
-        digits = digits[2:]
-    return digits
+import phonenumbers
+from phonenumbers.phonenumberutil import NumberParseException
 
-
-def validate_ph_phone(value: str) -> None:
+def validate_international_phone(value: str) -> None:
     """
-    Validate that *value* is a valid Philippine mobile number.
-    Accepts any common format: 09XXXXXXXXX, +639XXXXXXXXX, (63) 9XX XXX XXXX, etc.
-    Raises ValidationError with a specific message describing the exact problem.
+    Validate that *value* is a valid international phone number.
+    Raises ValidationError if invalid.
     """
     if not value:
-        return  # blank/null handled by field-level blank/null constraints
+        return  # blank/null handled by field-level constraints
 
-    # Check for disallowed characters (only digits, spaces, +, (, ) are allowed)
-    stripped = re.sub(r'[\s()+]', '', value)
-    if re.search(r'[^0-9]', stripped):
-        raise ValidationError("Phone number contains invalid characters.")
+    try:
+        # Default to 'PH' region if no '+' is provided, but allow any valid international number
+        parsed = phonenumbers.parse(value, "PH")
+        if not phonenumbers.is_valid_number(parsed):
+            raise ValidationError("Please enter a valid phone number.")
+    except NumberParseException:
+        raise ValidationError("Please enter a valid phone number format (e.g. +639XXXXXXXXX).")
 
-    digits = _extract_ph_digits(value)
 
-    if not digits.startswith('9'):
-        raise ValidationError(
-            "Phone number must start with a valid prefix (09 or +63 9)."
-        )
-    if len(digits) < 10:
-        raise ValidationError("Phone number is too short.")
-    if len(digits) > 10:
-        raise ValidationError("Phone number is too long.")
-    if not re.match(r'^9\d{9}$', digits):
-        raise ValidationError(
-            "Enter a valid Philippine mobile number (e.g. 09XX XXX XXXX)."
-        )
+def normalize_international_phone(value: str) -> str:
+    """
+    Normalize any phone input to the canonical E.164 storage format: +<CountryCode><NationalNumber>.
+    Call this in serializer validate_<field> or model save() before persisting.
+    """
+    if not value:
+        return value
+
+    try:
+        parsed = phonenumbers.parse(value, "PH")
+        if phonenumbers.is_valid_number(parsed):
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except NumberParseException:
+        pass
+    
+    return value  # Fallback to original if parsing fails, though validation should catch it first
 
 
 def validate_email_detailed(value: str) -> None:
@@ -73,15 +71,3 @@ def validate_email_detailed(value: str) -> None:
 
     if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', value):
         raise ValidationError("Please enter a valid email address.")
-
-
-def normalize_ph_phone(value: str) -> str:
-    """
-    Normalize any PH phone input to the canonical storage format: +63XXXXXXXXXX.
-    Call this in serializer validate_<field> or model save() before persisting.
-    """
-    if not value:
-        return value
-
-    digits = _extract_ph_digits(value)
-    return f'+63{digits}'

@@ -35,15 +35,26 @@ class UserFeedbackSerializer(serializers.ModelSerializer):
     comments = serializers.SerializerMethodField()
     status_history = UserFeedbackStatusHistorySerializer(many=True, read_only=True)
     
+    resolved_by_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = UserFeedback
         fields = [
             'id', 'type', 'module', 'priority', 'status', 'title', 'description', 
             'page_url', 'browser', 'os', 'user_agent', 'app_version',
             'created_at', 'updated_at', 'resolved_at', 'closed_at',
+            'resolved_by', 'resolved_by_name', 'resolution_summary', 
+            'resolution_root_cause', 'resolution_details',
             'attachments', 'comments', 'status_history'
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at', 'resolved_at', 'closed_at']
+        read_only_fields = [
+            'id', 'status', 'created_at', 'updated_at', 'resolved_at', 'closed_at',
+            'resolved_by', 'resolved_by_name', 'resolution_summary',
+            'resolution_root_cause', 'resolution_details'
+        ]
+
+    def get_resolved_by_name(self, obj):
+        return obj.resolved_by.get_full_name() if obj.resolved_by else None
 
     def get_comments(self, obj):
         request = self.context.get('request')

@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 blank=True,
                 max_length=15,
-                validators=[apps.common.validators.validate_ph_phone],
+                validators=[apps.common.validators.validate_international_phone],
             ),
         ),
         migrations.AlterField(

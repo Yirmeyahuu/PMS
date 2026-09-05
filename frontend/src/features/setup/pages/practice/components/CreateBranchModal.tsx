@@ -6,6 +6,8 @@ import type { ReverseGeocodeResult } from '@/components/maps/ClinicLocationPicke
 import { forwardGeocode } from '@/utils/geocode';
 import type { ClinicBranch, CreateBranchData } from '@/types/clinic';
 import { formatPHPhone, isValidPHPhone, normalizePHPhone } from '@/utils/phoneFormatter';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 const EMPTY_FORM = {
   location: '',
@@ -126,8 +128,7 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const formatted = name === 'phone' ? formatPHPhone(value) : value;
-    setForm((prev) => ({ ...prev, [name]: formatted }));
+    setForm((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
@@ -141,8 +142,7 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
     const errs: Record<string, string> = {};
     if (!form.location.trim()) errs.location = 'Location / barangay name is required';
     if (!form.email.trim())    errs.email    = 'Email is required';
-    if (!form.phone.trim())    errs.phone    = 'Phone is required';
-    else if (!isValidPHPhone(form.phone)) errs.phone = 'Enter a valid Philippine mobile number';
+    else if (!isValidPHPhone(form.phone)) errs.phone = 'Enter a valid phone number';
     if (!form.address.trim())  errs.address  = 'Address is required';
     if (!form.city.trim())     errs.city     = 'City is required';
     if (!form.province.trim()) errs.province = 'Province is required';
@@ -309,11 +309,19 @@ export const CreateBranchModal: React.FC<CreateBranchModalProps> = ({
                   <label className={labelBase}>
                     Phone <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="tel" name="phone" value={form.phone} onChange={handleChange}
-                    placeholder="(+63) 9XX XXX XXXX"
-                    className={`${inputBase} ${errors.phone ? inputErr : ''}`}
-                  />
+                  <div className={`flex w-full ${inputBase} ${errors.phone ? inputErr : ''} focus-within:ring-2 focus-within:ring-care-blue focus-within:border-transparent p-0 overflow-hidden`}>
+                    <PhoneInput
+                      international
+                      defaultCountry="PH"
+                      value={form.phone}
+                      onChange={(val) => {
+                        setForm((prev) => ({ ...prev, phone: val || '' }));
+                        if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                      }}
+                      className="w-full"
+                      placeholder="Enter phone number"
+                    />
+                  </div>
                   {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                 </div>
               </div>

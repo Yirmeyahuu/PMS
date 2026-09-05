@@ -100,6 +100,18 @@ class UserFeedback(TimeStampedModel):
     user_agent = models.TextField(blank=True)
     app_version = models.CharField(max_length=50, blank=True)
 
+    # Resolution Info
+    resolved_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='resolved_feedback'
+    )
+    resolution_summary = models.CharField(max_length=500, blank=True)
+    resolution_root_cause = models.TextField(blank=True)
+    resolution_details = models.TextField(blank=True)
+    
     resolved_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 

@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='patient',
             name='emergency_contact_phone',
-            field=models.CharField(max_length=15, validators=[apps.common.validators.validate_ph_phone]),
+            field=models.CharField(max_length=15, validators=[apps.common.validators.validate_international_phone]),
         ),
         migrations.AlterField(
             model_name='patient',
             name='phone',
-            field=models.CharField(max_length=15, validators=[apps.common.validators.validate_ph_phone]),
+            field=models.CharField(max_length=15, validators=[apps.common.validators.validate_international_phone]),
         ),
     ]

@@ -8,37 +8,22 @@ logger = logging.getLogger(__name__)
 
 def _normalize_phone(phone: str) -> str | None:
     """
-    Normalize a Philippine mobile number to E.164 format (+63XXXXXXXXXX).
-    Accepts:
-        09XXXXXXXXX   → +639XXXXXXXXX
-        639XXXXXXXXX  → +639XXXXXXXXX
-        +639XXXXXXXXX → +639XXXXXXXXX
-    Returns None if the number cannot be normalized.
+    Ensure the phone number is in E.164 format.
+    Assumes the database already stores valid international numbers,
+    but performs a safe fallback parse just in case.
     """
     if not phone:
         return None
 
-    # Strip all non-digit characters except leading +
-    cleaned = re.sub(r'[^\d+]', '', phone.strip())
-
-    # Already in E.164
-    if cleaned.startswith('+63') and len(cleaned) == 13:
-        return cleaned
-
-    # International without +
-    if cleaned.startswith('63') and len(cleaned) == 12:
-        return f'+{cleaned}'
-
-    # Local format 09XXXXXXXXX
-    if cleaned.startswith('09') and len(cleaned) == 11:
-        return f'+63{cleaned[1:]}'
-
-    # 10-digit without prefix
-    if cleaned.startswith('9') and len(cleaned) == 10:
-        return f'+63{cleaned}'
-
-    logger.warning("Could not normalize phone number: %s", phone)
-    return None
+    try:
+        import phonenumbers
+        parsed = phonenumbers.parse(phone, "PH")
+        if phonenumbers.is_valid_number(parsed):
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception as e:
+        logger.warning(f"Could not parse phone number '{phone}' in sms_service: {e}")
+        
+    return phone if phone.startswith('+') else None
 
 
 def _build_sms_body(appointment) -> str:

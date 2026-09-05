@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from apps.clinics.services.models import Service as ClinicService
-from apps.common.validators import normalize_ph_phone
+from apps.common.validators import normalize_international_phone
 from .models import (
     Patient, IntakeForm,
     ServiceCategory, PortalService,
@@ -43,10 +43,10 @@ class PatientSerializer(serializers.ModelSerializer):
         return None
 
     def validate_phone(self, value):
-        return normalize_ph_phone(value) if value else value
+        return normalize_international_phone(value) if value else value
 
     def validate_emergency_contact_phone(self, value):
-        return normalize_ph_phone(value) if value else value
+        return normalize_international_phone(value) if value else value
 
     def validate_email(self, value):
         """Normalize patient email to lowercase and enforce required + format rules."""

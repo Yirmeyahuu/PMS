@@ -4,7 +4,9 @@ import axios from 'axios';
 import {
   AlertTriangle, CheckCircle, ChevronRight, Loader2, ShieldCheck,
 } from 'lucide-react';
-import { formatPHPhone, isValidPHPhone, normalizePHPhone } from '@/utils/phoneFormatter';
+import { isValidPHPhone } from '@/utils/phoneFormatter';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api';
 const api = axios.create({ baseURL: BASE });
@@ -345,7 +347,7 @@ const ClientFormStep: React.FC<{
     city:          prefill.city,
     postal_code:   prefill.postal_code,
     emergency_contact_name:         prefill.emergency_contact_name,
-    emergency_contact_phone:        prefill.emergency_contact_phone ? formatPHPhone(prefill.emergency_contact_phone) : '',
+    emergency_contact_phone:        prefill.emergency_contact_phone || '',
     emergency_contact_relationship: prefill.emergency_contact_relationship,
     philhealth_number:     prefill.philhealth_number,
     has_medical_conditions: prefill.medical_conditions ? true  : null,
@@ -378,7 +380,7 @@ const ClientFormStep: React.FC<{
     // Emergency contact
     if (!form.emergency_contact_name.trim())         e.emergency_contact_name         = 'Required';
     if (!form.emergency_contact_phone.trim())        e.emergency_contact_phone        = 'Required';
-    else if (!isValidPHPhone(form.emergency_contact_phone)) e.emergency_contact_phone = 'Enter a valid Philippine mobile number';
+    else if (!isValidPHPhone(form.emergency_contact_phone)) e.emergency_contact_phone = 'Enter a valid phone number';
     if (!form.emergency_contact_relationship.trim()) e.emergency_contact_relationship = 'Required';
 
     // Medical
@@ -415,7 +417,7 @@ const ClientFormStep: React.FC<{
         city:          form.city,
         postal_code:   form.postal_code,
         emergency_contact_name:         form.emergency_contact_name,
-        emergency_contact_phone:        normalizePHPhone(form.emergency_contact_phone),
+        emergency_contact_phone:        form.emergency_contact_phone,
         emergency_contact_relationship: form.emergency_contact_relationship,
         philhealth_number:  form.philhealth_number,
         medical_conditions: form.has_medical_conditions ? form.medical_conditions : '',
@@ -516,13 +518,16 @@ const ClientFormStep: React.FC<{
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="Phone Number" required error={errors.emergency_contact_phone}>
-                <input
-                  type="tel"
-                  value={form.emergency_contact_phone}
-                  onChange={(e) => set('emergency_contact_phone', formatPHPhone(e.target.value))}
-                  placeholder="(+63) 9XX XXX XXXX"
-                  className={inputCls(errors.emergency_contact_phone)}
-                />
+                <div className={`flex w-full overflow-hidden p-0 rounded-xl focus-within:ring-2 focus-within:ring-sky-500 focus-within:bg-white transition-colors ${inputCls(errors.emergency_contact_phone)}`}>
+                  <PhoneInput
+                    international
+                    defaultCountry="PH"
+                    value={form.emergency_contact_phone}
+                    onChange={(val) => set('emergency_contact_phone', val || '')}
+                    className="w-full"
+                    placeholder="Enter phone number"
+                  />
+                </div>
               </Field>
               <Field label="Relationship" required error={errors.emergency_contact_relationship}>
                 <input

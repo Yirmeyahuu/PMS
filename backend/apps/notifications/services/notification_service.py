@@ -74,6 +74,40 @@ def _push_to_all_clinic_users(notification: Notification) -> None:
         logger.exception('_push_to_all_clinic_users failed: %s', exc)
 
 
+def _push_to_single_user(notification: Notification, user) -> None:
+    """
+    Push the notification via WebSocket only to a specific user.
+    """
+    try:
+        from channels.layers import get_channel_layer
+        from apps.notifications.serializers import NotificationSerializer
+
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            logger.warning('Channel layer is None — WebSocket push skipped')
+            return
+
+        payload = NotificationSerializer(notification).data
+        payload['is_read'] = False
+        payload['read_at'] = None
+
+        async_to_sync(channel_layer.group_send)(
+            f'notifications_{user.id}',
+            {
+                'type': 'notification.new',
+                'notification': payload,
+            }
+        )
+
+        logger.debug(
+            'Notification %s pushed directly to user %s via WebSocket',
+            notification.id, user.id
+        )
+
+    except Exception as exc:
+        logger.exception('_push_to_single_user failed: %s', exc)
+
+
 def create_notification(
     *,
     clinic,
@@ -85,18 +119,23 @@ def create_notification(
     patient=None,
     practitioner=None,
     clinic_branch=None,
+    recipient=None,
+    related_feedback_id=None,
 ) -> Notification:
     """
     Create a single clinic-wide Notification and push it to all clinic users.
+    If recipient is provided, it creates a direct notification for that user only.
 
     Args:
         clinic:            The clinic (branch or main) — will be resolved to main clinic.
-        notification_type: 'NEW_BOOKING' or 'DAILY_SUMMARY'
+        notification_type: 'NEW_BOOKING' or 'DAILY_SUMMARY' or 'FEEDBACK_RESOLVED'
         title:             Notification title
         message:           Notification body
         link_url:          Frontend route to navigate to
         appointment:       Optional Appointment FK
         clinic_branch:     Optional — which branch this concerns (for display)
+        recipient:         Optional User FK for direct notifications
+        related_feedback_id: Optional Integer field to link to feedback
     """
     main_clinic = _get_main_clinic(clinic)
 
@@ -110,9 +149,14 @@ def create_notification(
         patient=patient,
         practitioner=practitioner,
         clinic_branch=clinic_branch,
+        recipient=recipient,
+        related_feedback_id=related_feedback_id,
     )
 
-    _push_to_all_clinic_users(notification)
+    if recipient:
+        _push_to_single_user(notification, recipient)
+    else:
+        _push_to_all_clinic_users(notification)
 
     return notification
 

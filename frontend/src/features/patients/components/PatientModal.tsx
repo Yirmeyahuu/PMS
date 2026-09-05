@@ -4,7 +4,9 @@ import toast from 'react-hot-toast';
 import type { Patient, CreatePatientData } from '@/types';
 import { useAuthStore } from '@/store/auth.store';
 import { PhLocationSelect } from '@/components/location/PhLocationSelect';
-import { formatPHPhone, isValidPHPhone } from '@/utils/phoneFormatter';
+import { isValidPHPhone } from '@/utils/phoneFormatter';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 /** Returns the age in whole years for a given ISO date string, or null if the input is blank. */
 function computeAge(dob: string): number | null {
@@ -66,13 +68,13 @@ export const PatientModal: React.FC<PatientModalProps> = ({
     date_of_birth: currentPatient.date_of_birth || '',
     gender:        currentPatient.gender || 'M',
     email:         currentPatient.email || '',
-    phone:         currentPatient.phone ? formatPHPhone(currentPatient.phone) : '',
-    address:       currentPatient.address || '',
-    city:          currentPatient.city || '',
-    province:      currentPatient.province || '',
-    postal_code:   currentPatient.postal_code || '',
-    emergency_contact_name:         currentPatient.emergency_contact_name || '',
-    emergency_contact_phone:        currentPatient.emergency_contact_phone ? formatPHPhone(currentPatient.emergency_contact_phone) : '',
+    phone:         currentPatient.phone || '',
+    address:       currentPatient.address ?? '',
+    city:          currentPatient.city ?? '',
+    province:      currentPatient.province ?? '',
+    postal_code:   currentPatient.postal_code ?? '',
+    emergency_contact_name:         currentPatient.emergency_contact_name ?? '',
+    emergency_contact_phone:        currentPatient.emergency_contact_phone || '',
     emergency_contact_relationship: currentPatient.emergency_contact_relationship || '',
     philhealth_number: currentPatient.philhealth_number || '',
     hmo_provider:      currentPatient.hmo_provider      || '',
@@ -155,7 +157,7 @@ export const PatientModal: React.FC<PatientModalProps> = ({
     if (!formData.last_name.trim())    newErrors.last_name    = 'Last name is required.';
     if (!formData.date_of_birth)       newErrors.date_of_birth = 'Date of birth is required.';
     if (!formData.phone.trim())        newErrors.phone        = 'Phone number is required.';
-    else if (!isValidPHPhone(formData.phone)) newErrors.phone = 'Enter a valid Philippine mobile number.';
+    else if (!isValidPHPhone(formData.phone)) newErrors.phone = 'Enter a valid phone number.';
 
     // Email is always required.
     const emailError = validateEmail(formData.email ?? '');
@@ -170,12 +172,12 @@ export const PatientModal: React.FC<PatientModalProps> = ({
       if (!formData.emergency_contact_phone?.trim())
         newErrors.emergency_contact_phone = 'Emergency contact phone is required for minor patients.';
       else if (!isValidPHPhone(formData.emergency_contact_phone))
-        newErrors.emergency_contact_phone = 'Enter a valid Philippine mobile number.';
+        newErrors.emergency_contact_phone = 'Enter a valid phone number.';
       if (!formData.emergency_contact_relationship?.trim())
         newErrors.emergency_contact_relationship = 'Relationship is required for minor patients.';
     } else if (formData.emergency_contact_phone?.trim() && !isValidPHPhone(formData.emergency_contact_phone)) {
       // Still validate format when provided voluntarily by adult patients.
-      newErrors.emergency_contact_phone = 'Enter a valid Philippine mobile number.';
+      newErrors.emergency_contact_phone = 'Enter a valid phone number.';
     }
     if (formData.date_of_birth && new Date(formData.date_of_birth) > new Date())
       newErrors.date_of_birth = 'Date of birth cannot be in the future.';
@@ -341,16 +343,19 @@ export const PatientModal: React.FC<PatientModalProps> = ({
                     </div>
                     <div>
                       <label className={labelBase}>Phone <span className="text-red-500">*</span></label>
-                      <input
-                        type="tel" name="phone" value={formData.phone}
-                        onChange={(e) => {
-                          const formatted = formatPHPhone(e.target.value);
-                          setFormData((prev) => ({ ...prev, phone: formatted }));
-                          if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
-                        }}
-                        placeholder="(+63) 9XX XXX XXXX"
-                        className={`${inputBase} ${errors.phone ? inputError : ''}`}
-                      />
+                      <div className={`flex w-full overflow-hidden p-0 rounded-xl focus-within:ring-2 focus-within:ring-care-blue focus-within:bg-white transition-colors ${inputBase} ${errors.phone ? inputError : ''}`}>
+                        <PhoneInput
+                          international
+                          defaultCountry="PH"
+                          value={formData.phone}
+                          onChange={(val) => {
+                            setFormData((prev) => ({ ...prev, phone: val || '' }));
+                            if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                          }}
+                          className="w-full"
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                       {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                     </div>
                   </div>
@@ -420,17 +425,19 @@ export const PatientModal: React.FC<PatientModalProps> = ({
                       <label className={labelBase}>
                         Emergency Contact Phone{isMinor && <span className="text-red-500"> *</span>}
                       </label>
-                      <input
-                        type="tel" name="emergency_contact_phone"
-                        value={formData.emergency_contact_phone}
-                        onChange={(e) => {
-                          const formatted = formatPHPhone(e.target.value);
-                          setFormData((prev) => ({ ...prev, emergency_contact_phone: formatted }));
-                          if (errors.emergency_contact_phone) setErrors((prev) => ({ ...prev, emergency_contact_phone: '' }));
-                        }}
-                        placeholder="(+63) 9XX XXX XXXX"
-                        className={`${inputBase} ${errors.emergency_contact_phone ? inputError : ''}`}
-                      />
+                      <div className={`flex w-full overflow-hidden p-0 rounded-xl focus-within:ring-2 focus-within:ring-care-blue focus-within:bg-white transition-colors ${inputBase} ${errors.emergency_contact_phone ? inputError : ''}`}>
+                        <PhoneInput
+                          international
+                          defaultCountry="PH"
+                          value={formData.emergency_contact_phone}
+                          onChange={(val) => {
+                            setFormData((prev) => ({ ...prev, emergency_contact_phone: val || '' }));
+                            if (errors.emergency_contact_phone) setErrors((prev) => ({ ...prev, emergency_contact_phone: '' }));
+                          }}
+                          className="w-full"
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                       {errors.emergency_contact_phone && (
                         <p className="text-red-500 text-xs mt-1">{errors.emergency_contact_phone}</p>
                       )}

@@ -59,6 +59,11 @@ export interface UserFeedback {
   attachments: UserFeedbackAttachment[];
   comments: UserFeedbackComment[];
   status_history: UserFeedbackStatusHistory[];
+  resolved_by?: number | null;
+  resolved_by_name?: string | null;
+  resolution_summary?: string;
+  resolution_root_cause?: string;
+  resolution_details?: string;
 }
 
 export interface CreateFeedbackPayload {

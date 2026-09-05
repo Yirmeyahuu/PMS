@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 from django.db.models import Q
 from apps.patients.models import Patient
-from apps.common.validators import normalize_ph_phone
+from apps.common.validators import normalize_international_phone
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class PatientMatchingService:
         last_name = (last_name or '').strip().lower()
         
         # Phone normalization
-        norm_phone = normalize_ph_phone(phone) if phone else ''
+        norm_phone = normalize_international_phone(phone) if phone else ''
         
         # Email normalization
         norm_email = (email or '').strip().lower()

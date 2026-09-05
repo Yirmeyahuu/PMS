@@ -7,6 +7,7 @@ import { getCategory } from '../types/notifications.types';
 interface Props {
   notification: Notification;
   onMarkRead: (id: number) => void;
+  onAction?: (notification: Notification) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ const CATEGORY_CONFIG: Record<NotificationCategory, {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const NotificationItem: React.FC<Props> = ({ notification, onMarkRead }) => {
+export const NotificationItem: React.FC<Props> = ({ notification, onMarkRead, onAction }) => {
   const navigate = useNavigate();
   const category = useMemo(() => getCategory(notification.notification_type), [notification.notification_type]);
   const config   = CATEGORY_CONFIG[category];
@@ -88,7 +89,11 @@ export const NotificationItem: React.FC<Props> = ({ notification, onMarkRead }) 
 
   const handleClick = () => {
     if (!notification.is_read) onMarkRead(notification.id);
-    if (notification.link_url) navigate(notification.link_url);
+    if (onAction && notification.notification_type === 'FEEDBACK_RESOLVED') {
+      onAction(notification);
+    } else if (notification.link_url) {
+      navigate(notification.link_url);
+    }
   };
 
   return (

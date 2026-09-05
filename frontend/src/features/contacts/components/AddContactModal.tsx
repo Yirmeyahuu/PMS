@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { X, UserPlus, AlertCircle, RefreshCw, Building2, Phone, Mail, MapPin, Briefcase } from 'lucide-react';
 import type { CreateContactData, Contact } from '@/types';
 import { PhLocationSelect } from '@/components/location/PhLocationSelect';
-import { formatPHPhone } from '@/utils/phoneFormatter';
 import { validateEmailDetailed, validatePHPhoneDetailed } from '@/utils/validation';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 interface AddContactModalProps {
   isOpen:          boolean;
@@ -107,8 +108,8 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
         specialty:           editingContact.specialty         ?? '',
         license_number:      editingContact.license_number    ?? '',
         email:               editingContact.email             ?? '',
-        phone:               editingContact.phone ? formatPHPhone(editingContact.phone) : '',
-        alternative_phone:   editingContact.alternative_phone ? formatPHPhone(editingContact.alternative_phone) : '',
+        phone:               editingContact.phone || '',
+        alternative_phone:   editingContact.alternative_phone || '',
         address:             editingContact.address,
         city:                editingContact.city,
         province:            editingContact.province,
@@ -437,26 +438,32 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
                         Phone Number
                       </span>
                     </Label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={e => set('phone', formatPHPhone(e.target.value))}
-                      placeholder="(+63) 9XX XXX XXXX"
-                      className={inputCls(!!errors.phone)}
-                    />
+                    <div className={`flex w-full overflow-hidden p-0 bg-slate-50 border rounded-xl focus-within:ring-2 focus-within:ring-sky-500 focus-within:bg-white transition-colors ${errors.phone ? 'border-red-300' : 'border-slate-200'}`}>
+                      <PhoneInput
+                        international
+                        defaultCountry="PH"
+                        value={formData.phone}
+                        onChange={(val) => set('phone', val || '')}
+                        className="w-full"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
                     <FieldError msg={errors.phone} />
                   </div>
 
                   {/* Alternative Phone */}
                   <div>
                     <Label>Alternative Phone</Label>
-                    <input
-                      type="tel"
-                      value={formData.alternative_phone}
-                      onChange={e => set('alternative_phone', formatPHPhone(e.target.value))}
-                      placeholder="(+63) 9XX XXX XXXX"
-                      className={inputCls()}
-                    />
+                    <div className="flex w-full overflow-hidden p-0 bg-slate-50 border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-sky-500 focus-within:bg-white transition-colors">
+                      <PhoneInput
+                        international
+                        defaultCountry="PH"
+                        value={formData.alternative_phone}
+                        onChange={(val) => set('alternative_phone', val || '')}
+                        className="w-full"
+                        placeholder="Enter alternative phone"
+                      />
+                    </div>
                   </div>
 
                   {/* Email */}
