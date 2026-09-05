@@ -872,6 +872,7 @@ const InlineAppointmentCard = React.forwardRef<
 
 // ── Invoice Tab ───────────────────────────────────────────────────────────────
 const InvoiceTab: React.FC<{ appointment: Appointment, invoiceIdToFetch?: number }> = ({ appointment, invoiceIdToFetch }) => {
+  const { isActionAllowed } = useSubscriptionAccess();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -1398,9 +1399,7 @@ export const AppointmentView: React.FC<AppointmentViewProps> = ({
     cancelAppointmentAction, markDirty,
   } = useAppointmentEdit();
 
-  const { practitioners, loading: loadingPractitioners } = usePractitioners({ clinicBranchId: appointment?.clinic_branch });
-  const { isActionAllowed } = useSubscriptionAccess();
-
+  const { practitioners, loading: loadingPractitioners } = usePractitioners({ clinicBranchId: appointment?.branch_id ?? undefined });
   // ── Patient data ───────────────────────────────────────────────────────────────
   const navigate = useNavigate();
   const { data: patient, isLoading: loadingPatient } = useQuery({

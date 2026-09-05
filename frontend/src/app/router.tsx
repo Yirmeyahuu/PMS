@@ -3,7 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { Loader2 } from 'lucide-react';
 import { useSubscriptionStatus } from '@/features/setup/hooks/useSubscription';
-import { isSubscriptionActive } from '@/features/setup/services/subscription.api';
 
 
 const RouteGuardLoading = () => (
@@ -20,7 +19,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
   const shouldCheckSubscription = isAuthenticated;
-  const { data: subscription, isLoading: isCheckingSubscription } = useSubscriptionStatus(shouldCheckSubscription);
+  const { isLoading: isCheckingSubscription } = useSubscriptionStatus(shouldCheckSubscription);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -91,7 +90,7 @@ export const ClinicMemberRoute: React.FC<{ children: React.ReactNode }> = ({ chi
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
   const shouldCheckSubscription = isAuthenticated && location.pathname !== '/setup';
-  const { data: subscription, isLoading: isCheckingSubscription } = useSubscriptionStatus(shouldCheckSubscription);
+  const { isLoading: isCheckingSubscription } = useSubscriptionStatus(shouldCheckSubscription);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

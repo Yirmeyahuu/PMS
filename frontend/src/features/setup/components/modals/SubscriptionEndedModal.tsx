@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { AlertTriangle, X, CreditCard } from 'lucide-react';
+import { AlertTriangle, CreditCard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSubscriptionAccess } from '../../hooks/useSubscriptionAccess';
 import MalasakitLogo from '@/assets/malasakit/PrimaryLogo-Colored.png';
