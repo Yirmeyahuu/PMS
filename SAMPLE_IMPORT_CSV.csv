@@ -1,0 +1,16 @@
+first_name,middle_initial,last_name,date_of_birth,gender,phone,email,street_address,province,city,postal_code,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship
+Liam,A,Smith,2012-05-14,Male,555-0101,liam.s@email.com,123 Main St,BC,Vancouver,V6B 1A1,John Smith,555-9901,Father
+Mia,,Garcia,2015-11-20,Female,555-0102,mia.g@email.com,456 Elm St,ON,Toronto,M5H 2N2,Maria Garcia,555-9902,Mother
+Noah,J,Patel,2010-02-28,Male,555-0103,noah.p@email.com,,,,,Rahul Patel,555-9903,Father
+Emma,C,Kim,2020-08-05,Female,555-0104,emma.k@email.com,789 Pine St,AB,Calgary,T2P 1J9,David Kim,555-9904,Father
+Lucas,,Silva,2009-12-12,Male,555-0105,lucas.s@email.com,,,,,Ana Silva,555-9905,Mother
+Olivia,M,Brown,1985-04-10,Female,555-0106,olivia.b@email.com,321 Oak St,MB,Winnipeg,R3C 1A5,,,
+Ethan,,Davis,1992-07-22,Male,555-0107,ethan.d@email.com,,,,,Sarah Davis,555-9906,Wife
+Ava,R,Miller,1978-01-30,Female,555-0108,ava.m@email.com,654 Birch Rd,NS,Halifax,B3J 2K9,,,
+William,,Wilson,2000-09-01,Male,555-0109,william.w@email.com,987 Cedar Ln,QC,Montreal,H2Y 1C6,,,
+Sophia,L,Moore,1965-10-15,Female,555-0110,sophia.m@email.com,,,,,James Moore,555-9907,Son
+James,,Taylor,1988-03-05,Male,555-0111,james.t@email.com,111 Maple Ave,SK,Regina,S4P 3C8,,,
+Isabella,K,Anderson,1995-12-25,Female,555-0112,isabella.a@email.com,,,,,,,
+Benjamin,,Thomas,1970-06-18,Male,555-0113,benjamin.t@email.com,222 Spruce St,NB,Fredericton,E3B 1B6,,,
+Charlotte,E,Jackson,2005-02-14,Female,555-0114,charlotte.j@email.com,,,,,,,
+Alexander,,White,1982-11-08,Male,555-0115,alexander.w@email.com,333 Ash Blvd,NL,St. John's,A1C 1B9,Emily White,555-9908,Sister

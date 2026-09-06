@@ -480,6 +480,307 @@ class PatientViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.warning(f"Welcome email failed for patient {patient.id}: {e}")
 
+    @action(detail=False, methods=['get'], url_path='import-template')
+    def import_template(self, request):
+        """
+        GET /api/patients/import-template/?format=csv
+        GET /api/patients/import-template/?file_format=xlsx
+        Returns a blank template for patient import with the exact required columns.
+        """
+        fmt = request.query_params.get('file_format', 'csv').lower()
+        
+        headers = [
+            "First Name", "Middle Initial", "Last Name", "Date of Birth", "Gender",
+            "Phone Number", "Email Address", "Street Address", "Province", "City",
+            "Postal Code", "Emergency Contact Name", "Emergency Contact Phone",
+            "Emergency Contact Relationship"
+        ]
+
+        if fmt == 'xlsx':
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill
+            from django.http import HttpResponse
+            
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Patients Import"
+            ws.append(headers)
+            
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="0EA5E9", end_color="0EA5E9", fill_type="solid")
+            
+            for col_num, cell in enumerate(ws[1], 1):
+                cell.font = header_font
+                cell.fill = header_fill
+                ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 20
+                
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="patient_import_template.xlsx"'
+            wb.save(response)
+            return response
+
+        # Default to CSV
+        import csv
+        from django.http import HttpResponse
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="patient_import_template.csv"'
+        
+        # Use UTF-8 with BOM for Excel compatibility
+        response.write('\ufeff'.encode('utf8'))
+        writer = csv.writer(response)
+        writer.writerow(headers)
+        
+        return response
+
+    @action(detail=False, methods=['post'], url_path='import')
+    def import_patients(self, request):
+        from django.db import transaction
+        from apps.patients.services.matching_service import PatientMatchingService, MATCH_EXACT, MATCH_POSSIBLE
+        from rest_framework import status
+        import csv
+        import io
+        import openpyxl
+
+        if 'file' not in request.FILES:
+            return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        file_obj = request.FILES['file']
+        filename = file_obj.name.lower()
+        
+        parsed_data = []
+        
+        if filename.endswith('.csv'):
+            try:
+                decoded_file = file_obj.read().decode('utf-8-sig')
+                io_string = io.StringIO(decoded_file)
+                reader = csv.DictReader(io_string)
+                for row in reader:
+                    parsed_data.append(row)
+            except Exception as e:
+                return Response({'detail': f'Error reading CSV file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        elif filename.endswith('.xlsx'):
+            try:
+                wb = openpyxl.load_workbook(file_obj, data_only=True)
+                ws = wb.active
+                headers_row = [cell.value for cell in ws[1]]
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if not any(row):
+                        continue
+                    row_dict = dict(zip(headers_row, row))
+                    parsed_data.append(row_dict)
+            except Exception as e:
+                return Response({'detail': f'Error reading XLSX file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'detail': 'Invalid file format. Please upload a .csv or .xlsx file.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if not parsed_data:
+            return Response({'detail': 'The uploaded file is empty or has no data rows.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        header_mapping = {
+            "first name": "first_name",
+            "first_name": "first_name",
+            "middle initial": "middle_name",
+            "middle_initial": "middle_name",
+            "middle name": "middle_name",
+            "middle_name": "middle_name",
+            "last name": "last_name",
+            "last_name": "last_name",
+            "date of birth": "date_of_birth",
+            "date_of_birth": "date_of_birth",
+            "dob": "date_of_birth",
+            "gender": "gender",
+            "phone number": "phone",
+            "phone_number": "phone",
+            "phone": "phone",
+            "email address": "email",
+            "email_address": "email",
+            "email": "email",
+            "street address": "address",
+            "street_address": "address",
+            "address": "address",
+            "province": "province",
+            "city": "city",
+            "postal code": "postal_code",
+            "postal_code": "postal_code",
+            "zip code": "postal_code",
+            "emergency contact name": "emergency_contact_name",
+            "emergency_contact_name": "emergency_contact_name",
+            "emergency contact phone": "emergency_contact_phone",
+            "emergency_contact_phone": "emergency_contact_phone",
+            "emergency contact relationship": "emergency_contact_relationship",
+            "emergency_contact_relationship": "emergency_contact_relationship",
+        }
+        
+        errors = []
+        success_count = 0
+        
+        user = request.user
+        base_kwargs = {}
+        if user.clinic_branch_id:
+            base_kwargs['home_branch_id'] = user.clinic_branch_id
+        elif user.is_manager and user.get_managed_branches().exists():
+            base_kwargs['home_branch'] = user.get_managed_branches().first()
+        elif user.branch_accesses.exists():
+            base_kwargs['home_branch_id'] = user.branch_accesses.first().branch_id
+
+        try:
+            with transaction.atomic():
+                for index, raw_row in enumerate(parsed_data, start=2):
+                    row_data = {}
+                    for raw_col, val in raw_row.items():
+                        if raw_col is None:
+                            continue
+                            
+                        # Normalize column name
+                        normalized_col = str(raw_col).replace('\ufeff', '').strip().lower()
+                        if normalized_col in header_mapping:
+                            field_name = header_mapping[normalized_col]
+                            
+                            if val is None:
+                                val = ""
+                                
+                            if field_name == 'date_of_birth' and hasattr(val, 'strftime'):
+                                val = val.strftime('%Y-%m-%d')
+                                
+                            if field_name == 'postal_code' and val:
+                                val = str(val).split('.')[0] if str(val) != 'None' else ""
+                                
+                            if field_name == 'gender' and val:
+                                g = str(val).strip().lower()
+                                if g in ['m', 'male']: val = 'M'
+                                elif g in ['f', 'female']: val = 'F'
+                                elif g in ['o', 'other']: val = 'O'
+                                
+                            # Set only if not already populated by a duplicate column match
+                            if field_name not in row_data or row_data[field_name] == "":
+                                row_data[field_name] = str(val).strip() if val != "" else ""
+
+                    # Inject clinic so serializer validates it properly
+                    row_data['clinic'] = request.user.clinic.id
+
+                    serializer = self.get_serializer(data=row_data)
+                    if not serializer.is_valid():
+                        for field, field_errors in serializer.errors.items():
+                            err_msg = field_errors[0] if isinstance(field_errors, list) else field_errors
+                            errors.append({
+                                'row': index,
+                                'details': f"{field}: {err_msg}"
+                            })
+                        continue
+                        
+                    match_result = PatientMatchingService.match_patient(
+                        first_name=serializer.validated_data.get('first_name', ''),
+                        last_name=serializer.validated_data.get('last_name', ''),
+                        dob=serializer.validated_data.get('date_of_birth'),
+                        phone=serializer.validated_data.get('phone', ''),
+                        clinic=request.user.clinic
+                    )
+                    
+                    if match_result.status in [MATCH_EXACT, MATCH_POSSIBLE] and match_result.existing_patient:
+                        errors.append({
+                            'row': index,
+                            'details': f"Duplicate found: matches existing patient {match_result.existing_patient.get_full_name()} (Fields: {', '.join(match_result.matched_fields)})"
+                        })
+                        continue
+                        
+                    patient = serializer.save(**base_kwargs)
+                    success_count += 1
+                    
+                if errors:
+                    raise Exception("Validation errors occurred")
+                    
+        except Exception as e:
+            if errors:
+                return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"errors": [{"row": 0, "details": str(e)}]}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "detail": f"Successfully imported {success_count} clients."
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export_patients(self, request):
+        import csv
+        import openpyxl
+        from django.http import HttpResponse
+        
+        fmt = request.query_params.get('file_format', 'csv').lower()
+        
+        # 1. Reuse existing scoping and filtering logic to respect RBAC
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        headers = [
+            "First Name", "Middle Initial", "Last Name", "Date of Birth", "Gender",
+            "Phone Number", "Email Address", "Street Address", "Province", "City",
+            "Postal Code", "Emergency Contact Name", "Emergency Contact Phone",
+            "Emergency Contact Relationship"
+        ]
+        
+        def row_generator():
+            for patient in queryset:
+                yield [
+                    patient.first_name,
+                    patient.middle_name,
+                    patient.last_name,
+                    patient.date_of_birth.strftime('%Y-%m-%d') if patient.date_of_birth else '',
+                    patient.gender,
+                    patient.phone,
+                    patient.email,
+                    patient.address,
+                    patient.province,
+                    patient.city,
+                    str(patient.postal_code) if patient.postal_code else '',
+                    patient.emergency_contact_name,
+                    patient.emergency_contact_phone,
+                    patient.emergency_contact_relationship
+                ]
+
+        if fmt == 'xlsx':
+            from openpyxl.styles import Font, PatternFill
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Patients Export"
+            
+            # Write Headers
+            ws.append(headers)
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="0EA5E9", end_color="0EA5E9", fill_type="solid")
+            for col_num, cell in enumerate(ws[1], 1):
+                cell.font = header_font
+                cell.fill = header_fill
+                ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 20
+                
+            # Write Data
+            for row in row_generator():
+                ws.append(row)
+                
+            # Force Postal Code (Column K / 11) to Text
+            for row in range(2, ws.max_row + 1):
+                cell = ws.cell(row=row, column=11)
+                cell.number_format = '@'
+                
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="patient_export.xlsx"'
+            wb.save(response)
+            return response
+
+        # Default to CSV
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="patient_export.csv"'
+        response.write('\ufeff'.encode('utf8')) # UTF-8 BOM
+        writer = csv.writer(response)
+        writer.writerow(headers)
+        for row in row_generator():
+            writer.writerow(row)
+            
+        return response
+
     @action(detail=True, methods=['get'])
     def intake_forms(self, request, pk=None):
         patient    = self.get_object()

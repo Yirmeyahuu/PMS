@@ -5,10 +5,11 @@ import { PatientFilters } from './components/PatientFilters';
 import { PatientModal } from './components/PatientModal';
 
 import { MergePatientsModal } from './components/MergePatientsModal';
-import { Users, Plus, Filter, Search, Loader2, Archive, ArchiveRestore } from 'lucide-react';
+import { PatientImportModal } from './components/PatientImportModal';
+import { Users, Plus, Filter, Search, Loader2, Archive, ArchiveRestore, Download, ChevronDown, Upload } from 'lucide-react';
 import { usePatients } from './hooks/usePatients';
 import { useCalendarSocket } from '@/features/appointments/hooks/useCalendarSocket';
-import { createPatient, updatePatient } from './patient.api';
+import { createPatient, updatePatient, downloadPatientImportTemplate, exportPatients } from './patient.api';
 import type { Patient, CreatePatientData } from '@/types';
 import toast from 'react-hot-toast';
 import { useSubscriptionAccess } from '@/features/setup/hooks/useSubscriptionAccess';
@@ -43,6 +44,8 @@ export const Clients: React.FC = () => {
   const [isFilterModalOpen,  setIsFilterModalOpen]  = useState(false);
   const [isAddModalOpen,     setIsAddModalOpen]      = useState(false);
   const [isEditModalOpen,    setIsEditModalOpen]     = useState(false);
+  const [isImportModalOpen,  setIsImportModalOpen]   = useState(false);
+  const [isImportExportDropdownOpen, setIsImportExportDropdownOpen] = useState(false);
 
   const [isMergeModalOpen,   setIsMergeModalOpen]    = useState(false);
   const [selectedPatient,    setSelectedPatient]     = useState<Patient | null>(null);
@@ -64,6 +67,30 @@ export const Clients: React.FC = () => {
 
   const handleMergeClient  = (patient: Patient) => { setSelectedPatient(patient); setIsMergeModalOpen(true); };
   const handleFilterClients = () => setIsFilterModalOpen(true);
+
+  const handleDownloadTemplate = async (format: 'csv' | 'xlsx') => {
+    try {
+      await downloadPatientImportTemplate(format);
+      toast.success(`Downloaded ${format.toUpperCase()} template`);
+    } catch (error) {
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleExportPatients = async (format: 'csv' | 'xlsx') => {
+    try {
+      const activeFilters = { ...filters };
+      if (view === 'archived') {
+        activeFilters.archived = true;
+      }
+      
+      const toastId = toast.loading(`Exporting clients to ${format.toUpperCase()}...`);
+      await exportPatients(format, activeFilters);
+      toast.success('Export completed successfully', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to export clients');
+    }
+  };
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setCurrentFilters(newFilters);
@@ -192,6 +219,71 @@ export const Clients: React.FC = () => {
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">Add Client</span>
                   </button>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsImportExportDropdownOpen(!isImportExportDropdownOpen)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <span>Actions</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+
+                    {isImportExportDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setIsImportExportDropdownOpen(false)} />
+                        <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                          <div className="p-1">
+                            <button
+                              onClick={() => { setIsImportModalOpen(true); setIsImportExportDropdownOpen(false); }}
+                              disabled={!isActionAllowed}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Upload className="w-4 h-4 text-gray-500" />
+                              Import Clients
+                            </button>
+                            <button
+                              onClick={() => { 
+                                setIsImportExportDropdownOpen(false); 
+                                handleExportPatients('csv'); 
+                              }}
+                              disabled={!isActionAllowed}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Download className="w-4 h-4 text-gray-500" />
+                              Export Clients (CSV)
+                            </button>
+                            <button
+                              onClick={() => { 
+                                setIsImportExportDropdownOpen(false); 
+                                handleExportPatients('xlsx'); 
+                              }}
+                              disabled={!isActionAllowed}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Download className="w-4 h-4 text-gray-500" />
+                              Export Clients (XLSX)
+                            </button>
+                            <div className="h-px bg-gray-200 my-1 mx-2" />
+                            <button
+                              onClick={() => { handleDownloadTemplate('csv'); setIsImportExportDropdownOpen(false); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                            >
+                              <Download className="w-4 h-4 text-gray-400" />
+                              Download CSV Template
+                            </button>
+                            <button
+                              onClick={() => { handleDownloadTemplate('xlsx'); setIsImportExportDropdownOpen(false); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                            >
+                              <Download className="w-4 h-4 text-gray-400" />
+                              Download XLSX Template
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -265,6 +357,17 @@ export const Clients: React.FC = () => {
           onClose={() => { setIsAddModalOpen(false); setSelectedPatient(null); }}
           onSave={handleSavePatient}
           mode="create"
+        />
+
+        {/* ── Import Patient Modal ── */}
+        <PatientImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onDownloadTemplate={handleDownloadTemplate}
+          onImportSuccess={() => {
+            refresh();
+            setIsImportModalOpen(false);
+          }}
         />
 
         {/* ── Edit Patient Modal ── */}

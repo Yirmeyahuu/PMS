@@ -64,6 +64,70 @@ export const getPatient = async (id: number): Promise<Patient> => {
   return response.data;
 };
 
+/**
+ * Download Patient Import Template
+ */
+export const downloadPatientImportTemplate = async (format: 'csv' | 'xlsx'): Promise<void> => {
+  const response = await axiosInstance.get(`/patients/import-template/?file_format=${format}`, {
+    responseType: 'blob', // Important for file downloads
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `patient_import_template.${format}`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+};
+
+/**
+ * Export Patients
+ * Passes along active filters so the export matches the current UI view.
+ */
+export const exportPatients = async (format: 'csv' | 'xlsx', filters?: PatientFilters): Promise<void> => {
+  const params = new URLSearchParams();
+  params.append('file_format', format);
+  
+  if (filters?.search)                          params.append('search',           filters.search);
+  if (filters?.gender)                          params.append('gender',           filters.gender);
+  if (filters?.is_active !== undefined)         params.append('is_active',        String(filters.is_active));
+  if (filters?.branch)                          params.append('clinic',           String(filters.branch));
+  if (filters?.archived)                        params.append('is_archived',      'True');
+  if (filters?.include_archived)                params.append('include_archived', 'True');
+  
+  const response = await axiosInstance.get(`/patients/export/?${params.toString()}`, {
+    responseType: 'blob',
+  });
+  
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `patient_export.${format}`);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+};
+
+export interface ImportPatientResponse {
+  detail?: string;
+  errors?: { row: number; details: string }[];
+}
+
+/**
+ * Import Patients from CSV or XLSX
+ */
+export const importPatients = async (file: File): Promise<ImportPatientResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await axiosInstance.post<ImportPatientResponse>('/patients/import/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 import React from 'react';
 import toast from 'react-hot-toast';
 import { DuplicateToast } from './components/DuplicateToast';
