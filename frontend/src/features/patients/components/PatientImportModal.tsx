@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, FileSpreadsheet, Loader2, FileType, CheckCircle2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { importPatients } from '../patient.api';
@@ -20,6 +20,17 @@ export const PatientImportModal: React.FC<PatientImportModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<{row: number, details: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFile(null);
+      setErrors([]);
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
